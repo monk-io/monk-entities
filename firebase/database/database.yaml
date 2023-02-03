@@ -1,0 +1,31 @@
+namespace: poc
+
+firebase-db-instance:
+  defines: entity
+  schema:
+    required: [ "name", "location", "project" ]
+    name:
+      type: string
+    location: # one of us-central1, europe-west1, asia-southeast1
+      type: string
+    project: # firebase project
+      type: string
+  lifecycle:
+    sync: <<< db-instance-sync.js
+    # custom actions on instances
+    disable: ""
+    reenable: ""
+    # working with security rules
+    get-rules: ""
+    set-rules: ""
+    # actions to work with db data
+    get: ""
+    set: ""
+    push: ""
+    remove: ""
+
+myinstance:
+  defines: poc/firebase-db-instance
+  name: common-access-project-4swaig
+  location: us-central1
+  project-id: common-access-project

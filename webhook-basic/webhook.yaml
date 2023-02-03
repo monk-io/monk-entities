@@ -1,0 +1,25 @@
+namespace: entity-demo
+
+ip-foo:
+  defines: entity
+  schema:
+    first-url:
+      type: string
+    second-url:
+      type: string
+  lifecycle:
+    sync:
+      url: <- "http://127.0.0.1:8090/" concat-all
+
+foo-operator:
+  defines: runnable
+  containers:
+    operator:
+      image: your-image/test:webhook
+      ports:
+        - 8090:8090
+
+beep:
+  defines: entity-demo/ip-foo
+  first-url: zoop
+  second-url: pooz

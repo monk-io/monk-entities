@@ -1,0 +1,287 @@
+namespace: poc
+
+# BEFORE RUNNING:
+#  If not already done, enable the Cloud SQL Administration API
+#  and check the quota for your project at
+#  https://console.developers.google.com/apis/api/sqladmin
+cloud-sql-instance:
+  defines: entity
+  schema:
+    required: [ "name" ]
+    name:
+      type: string
+    database-version:
+      type: string
+      default: "POSTGRES_14"
+    tier:
+      type: string
+      default: "db-f1-micro"
+    region:
+      type: string
+      default: "us-central1"
+    allow-all:
+      type: bool
+  requires:
+    - cloud/gcp
+  lifecycle:
+    create: |
+      var createInstance = function(project, def) {
+        let body = {
+          name: def.name,
+          databaseVersion: "POSTGRES_14",
+          region: "us-central1",
+          settings: {
+            tier: "db-f1-micro",
+          }
+        };
+      
+        if (def.tier) {
+           body.settings.tier = def.tier;
+        }
+      
+        if (def["allow-all"]) {
+           body.settings.ipConfiguration = {
+             authorizedNetworks: [{name: "unsafe-allow-all", value: "0.0.0.0/0"}]
+           }
+        }
+
+        if (def.region) {
+           body.region = def.region;
+        }
+      
+        if (def["database-version"]) {
+           body.databaseVersion = def["database-version"];
+        }
+      
+        return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances",
+          {"body": JSON.stringify(body)});
+      }
+      
+      function main(def, state, ctx) {
+        let res = createInstance(gcp.getProject(), def);
+        console.log(JSON.stringify(res));
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        return {"statusCode": res.statusCode};
+      }
+    purge: |
+      var deleteInstance = function(project, name) {
+        return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+name);
+      }
+      
+      function main(def, state, context) {
+        let res = deleteInstance(gcp.getProject(), def.name);
+        console.log(JSON.stringify(res));
+        if (res.error) {
+          throw new Error(res.error);
+        }
+      }
+    get-address: |
+      var cli = require("cli");
+      
+      var getAddress = function(project, name) {
+        let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/instances/"+name);
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        let instance = JSON.parse(res.body);
+        if (!instance.ipAddresses) {
+          throw new Error("instance has no address yet");
+        }
+        let address = ""
+        for (let i = 0; i < instance.ipAddresses.length; i++) {
+          if (instance.ipAddresses[i].type === "PRIMARY") {
+             address = instance.ipAddresses[i].ipAddress;
+             break;
+          }
+        }
+        return address;
+      }
+      
+      function main(def, state, context) {
+        let address = getAddress(gcp.getProject(), def.name);
+        cli.output("Instance Public IP: " + address);
+      }
+
+cloud-sql-database:
+  defines: entity
+  schema:
+    required: [ "instance", "name" ]
+    instance:
+      type: string
+    name:
+      type: string
+  requires:
+    - cloud/gcp
+  lifecycle:
+    create: |
+      var createDatabase = function(project, instance, name) {
+        let body = {
+          name: name
+        };
+
+        return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/databases",
+          {"body": JSON.stringify(body)});
+      }
+      
+      var getAddress = function(project, def) {
+        let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/instances/"+def.instance);
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        let instance = JSON.parse(res.body);
+        if (!instance.ipAddresses) {
+          throw new Error("instance has no address yet");
+        }
+        let address = ""
+        for (let i = 0; i < instance.ipAddresses.length; i++) {
+          if (instance.ipAddresses[i].type === "PRIMARY") {
+             address = instance.ipAddresses[i].ipAddress;
+             break;
+          }
+        }
+        return address;
+      }
+      
+      function main(def, state, ctx) {
+        // get instance address
+        let address = getAddress(gcp.getProject(), def)
+        if (!address) {
+          throw new Error("instance address is empty");
+        }
+      
+        res = createDatabase(gcp.getProject(), def.instance, def.name)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error)
+        }
+        return {"name": def.name, "address": address}
+      }
+    purge: |
+      var deleteDatabase = function(project, instance, name) {
+        return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/databases/"+name)
+      }
+      
+      function main(def, state, context) {
+        res = deleteDatabase(gcp.getProject(), def.instance, def.name)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error)
+        }
+      }
+
+cloud-sql-user:
+  defines: entity
+  schema:
+    required: [ "instance", "name", "password-secret" ]
+    instance:
+      type: string
+    name:
+      type: string
+    password-secret:
+      type: string
+  requires:
+    - cloud/gcp
+    - secret
+  lifecycle:
+    create1: |
+      var createUser = function(project, def) {
+        let body = {
+          name: def.name
+        };
+      
+        try {
+          body.password = secret.get(def["password-secret"]);
+        } catch (error) {
+          // generate password and save to secret if it doesn't exist
+          secret.set(def["password-secret"], secret.randString(16));
+          body.password = secret.get(def["password-secret"]);
+        }
+        console.log(body.password);
+      
+        return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+def.instance+"/users",
+          {"body": JSON.stringify(body)});
+      }
+      
+      function main(def, state, ctx) {      
+        res = createUser(gcp.getProject(), def)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        return {}
+      }
+    purge: |
+      var deleteUser = function(project, instance, name) {
+        return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/users?name="+name);
+      }
+      
+      function main(def, state, context) {
+        let res = deleteUser(gcp.getProject(), def.instance, def.name)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error)
+        }
+        try {
+          secret.remove(def["password-secret"]);
+        } catch (error) {}
+      }
+
+myinstance:
+  defines: poc/cloud-sql-instance
+  name: testmyinstance1
+  database-version: MYSQL_8_0
+  allow-all: true
+
+mydb:
+  defines: poc/cloud-sql-database
+  name: mydb1
+  instance: <- get-entity("poc/myinstance") get-member("name")
+
+myuser:
+  defines: poc/cloud-sql-user
+  name: myuser1
+  instance: name
+  password-secret: myuser-password
+  permitted-secrets:
+    myuser-password: true
+
+wordpress:
+  defines: runnable
+  permitted-secrets:
+    myuser-password: true
+  variables:
+    wordpress_db_host:
+      value: <- get-entity-state("poc/mydb") get-member("address")
+      type: string
+    wordpress_db_name:
+      value: <- get-entity("poc/mydb") get-member("name")
+      type: string
+    wordpress_db_password:
+      value: <- get-entity("poc/myuser") get-member("password-secret")
+      type: string
+    wordpress_db_user:
+      value: <- get-entity("poc/myuser") get-member("name")
+      type: string
+    wordpress_db_addr:
+      value: <- $wordpress_db_host `:3306` concat-all
+      type: string
+    wordpress_table_prefix:
+      type: string
+      value: wp_
+    image-tag:
+      value: latest
+      type: string
+  containers:
+    wordpress:
+      environment:
+        - <- `WORDPRESS_DB_NAME=${wordpress_db_name}`
+        - <- `WORDPRESS_DB_HOST=${wordpress_db_addr}`
+        - <- `WORDPRESS_TABLE_PREFIX=${wordpress_table_prefix}`
+        - <- `WORDPRESS_DB_PASSWORD=${wordpress_db_password}`
+        - <- `WORDPRESS_DB_USER=${wordpress_db_user}`
+      ports:
+        - 8080:80
+      image-tag: <- `${image-tag}`
+      image: wordpress

@@ -1,0 +1,42 @@
+namespace: poc
+
+firebase-site:
+  defines: entity
+  schema:
+    required: [ "name", "project" ]
+    name:
+      type: string
+    project:
+      type: string
+  lifecycle:
+    sync: <<< site-sync.js
+
+firebase-channel:
+  defines: entity
+  schema:
+    required: [ "name", "site" ]
+    name:
+      type: string
+    site:
+      type: string
+    ttl:
+      type: string
+    retained-release-count:
+      type: integer
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+  lifecycle:
+    sync: <<< site-channel-sync.js
+    list-releases: ""
+
+mysite:
+  defines: poc/firebase-site
+  name: common-access-project-orekhyk0
+  project: common-access-project
+
+mysite-beta:
+  defines: poc/firebase-channel
+  name: beta
+  site: <- get-entity("poc/mysite") get-member("name")

@@ -1,0 +1,58 @@
+namespace: objectstorage
+
+aws-bucket:
+  defines: entity
+  schema:
+    required: [ "name", "region" ]
+    name:
+      type: string
+    region:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    create: |
+      createBucket = function(name, region) {
+        return aws.put("https://"+name+".s3.amazonaws.com", {"service": "s3", "region": region, "headers": {"x-amz-acl": "public-read"}})
+      }
+      
+      function main(definition, state, context) {
+        res = createBucket(definition.name, definition.region)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error)
+        }
+        return {"statusCode": res.statusCode}
+      }
+    purge: |
+      deleteBucket = function(name, region) {
+        return aws.delete("https://"+name+".s3.amazonaws.com", {"service": "s3", "region": region})
+      }
+      
+      function main(definition, state, context) {
+        res = deleteBucket(definition.name, definition.region)
+        console.log(JSON.stringify(res))
+        if (res.error) {
+          throw new Error(res.error)
+        }
+        return {"statusCode": res.statusCode}
+      }
+    presign: |
+      var cli = require("cli")
+      
+      presignUpload = function(name, region, path) {
+        return aws.presign("https://"+name+".s3.amazonaws.com" + path, {"method": "PUT", "expire": "5m", "service": "s3", "region": region, "headers": {"x-amz-acl": "public-read"}})
+      }
+      
+      function main(definition, state, context) {
+        let {url, headers} = presignUpload(definition.name, definition.region, context.args.path)
+        cli.output("Pre-signed URL:", decodeURI(url))
+        if (headers) {
+          cli.output("Pre-signed headers", JSON.stringify(headers))
+        }
+      }
+
+mybucket:
+  defines: objectstorage/aws-bucket
+  name: testmyuniquebucket
+  region: us-east-1
