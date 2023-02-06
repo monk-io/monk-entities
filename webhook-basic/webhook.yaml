@@ -1,4 +1,4 @@
-namespace: entity-demo
+namespace: webhook
 
 ip-foo:
   defines: entity
@@ -18,8 +18,3 @@ foo-operator:
       image: your-image/test:webhook
       ports:
         - 8090:8090
-
-beep:
-  defines: entity-demo/ip-foo
-  first-url: zoop
-  second-url: pooz

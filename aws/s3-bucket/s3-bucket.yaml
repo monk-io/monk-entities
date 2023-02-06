@@ -51,8 +51,3 @@ aws-bucket:
           cli.output("Pre-signed headers", JSON.stringify(headers))
         }
       }
-
-mybucket:
-  defines: objectstorage/aws-bucket
-  name: testmyuniquebucket
-  region: us-east-1

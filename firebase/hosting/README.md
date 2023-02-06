@@ -7,7 +7,7 @@ Entities to manage Firebase Hosting Site and Channel.
 We'll use Monk CLI to load and run everything:
 
       # load templates
-      monk load hosting.yaml
+      monk load hosting.yaml example.yaml
       
       # run site resource create a new website
       # it will populate entity state with site url

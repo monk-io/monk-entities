@@ -7,7 +7,7 @@ Cloud SQL contains Entities to deploy Cloud SQL Database instances on Google Clo
 We'll use Monk CLI to load and run everything:
 
       # load Entity types
-      monk load cloud-sql.yaml
+      monk load cloud-sql.yaml example.yaml
 
       # run db Instance
       monk run poc/myinstance

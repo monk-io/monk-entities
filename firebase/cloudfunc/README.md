@@ -9,7 +9,7 @@ Artifact Registry, Cloud Build, Cloud Run,
 Load entity type and definition
 
 ```bash
-monk load cloudfunc.yaml
+monk load cloudfunc.yaml example.yaml
 ```
 
 You need to upload sources code in zip file, for node js runtime it has to contain package.json and index.js files.

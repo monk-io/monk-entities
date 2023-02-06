@@ -1,0 +1,2 @@
+REPO monk-entities
+DIRS aws/s3-bucket firebase/cloudfunc firebase/database firebase/hosting gcp/cloud-sql

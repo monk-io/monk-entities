@@ -1,0 +1,3 @@
+REPO database
+LOAD database.yaml
+RESOURCES db-instance-sync.js

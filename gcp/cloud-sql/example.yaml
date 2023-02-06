@@ -1,0 +1,59 @@
+namespace: poc
+
+myinstance:
+  defines: poc/cloud-sql-instance
+  name: testmyinstance1
+  database-version: MYSQL_8_0
+  allow-all: true
+
+mydb:
+  defines: poc/cloud-sql-database
+  name: mydb1
+  instance: <- get-entity("poc/myinstance") get-member("name")
+
+myuser:
+  defines: poc/cloud-sql-user
+  name: myuser1
+  instance: name
+  password-secret: myuser-password
+  permitted-secrets:
+    myuser-password: true
+
+wordpress:
+  defines: runnable
+  permitted-secrets:
+    myuser-password: true
+  variables:
+    wordpress_db_host:
+      value: <- get-entity-state("poc/mydb") get-member("address")
+      type: string
+    wordpress_db_name:
+      value: <- get-entity("poc/mydb") get-member("name")
+      type: string
+    wordpress_db_password:
+      value: <- get-entity("poc/myuser") get-member("password-secret")
+      type: string
+    wordpress_db_user:
+      value: <- get-entity("poc/myuser") get-member("name")
+      type: string
+    wordpress_db_addr:
+      value: <- $wordpress_db_host `:3306` concat-all
+      type: string
+    wordpress_table_prefix:
+      type: string
+      value: wp_
+    image-tag:
+      value: latest
+      type: string
+  containers:
+    wordpress:
+      environment:
+        - <- `WORDPRESS_DB_NAME=${wordpress_db_name}`
+        - <- `WORDPRESS_DB_HOST=${wordpress_db_addr}`
+        - <- `WORDPRESS_TABLE_PREFIX=${wordpress_table_prefix}`
+        - <- `WORDPRESS_DB_PASSWORD=${wordpress_db_password}`
+        - <- `WORDPRESS_DB_USER=${wordpress_db_user}`
+      ports:
+        - 8080:80
+      image-tag: <- `${image-tag}`
+      image: wordpress

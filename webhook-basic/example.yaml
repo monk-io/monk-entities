@@ -1,0 +1,6 @@
+namespace: webhook
+
+beep:
+  defines: webhook/ip-foo
+  first-url: zoop
+  second-url: pooz

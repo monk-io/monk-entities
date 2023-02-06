@@ -1,0 +1,6 @@
+namespace: objectstorage
+
+mybucket:
+  defines: objectstorage/aws-bucket
+  name: testmyuniquebucket
+  region: us-east-1

@@ -8,7 +8,7 @@ It will allow us to create new Buckets and upload files using Monk.
 We'll use Monk CLI to load and run everything:
 
       # load templates
-      monk load s3-bucket.yaml
+      monk load s3-bucket.yaml example.yaml
       
       # run to trigger a "create" event
       monk run objectstorage/mybucket

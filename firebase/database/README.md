@@ -37,6 +37,9 @@ myinstance:
 Available operations:
 
 ```
+monk load MANIFEST
+monk load example.yaml
+
 # create instance
 monk run poc/myinstance
 

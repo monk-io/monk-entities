@@ -1,0 +1,11 @@
+namespace: poc
+
+mysite:
+  defines: poc/firebase-site
+  name: common-access-project-orekhyk0
+  project: common-access-project
+
+mysite-beta:
+  defines: poc/firebase-channel
+  name: beta
+  site: <- get-entity("poc/mysite") get-member("name")

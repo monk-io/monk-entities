@@ -23,9 +23,3 @@ firebase-db-instance:
     set: ""
     push: ""
     remove: ""
-
-myinstance:
-  defines: poc/firebase-db-instance
-  name: common-access-project-4swaig
-  location: us-central1
-  project-id: common-access-project
