@@ -4,6 +4,7 @@ myinstance:
   defines: poc/cloud-sql-instance
   name: testmyinstance1
   database-version: MYSQL_8_0
+  tier: "db-g1-small"
   allow-all: true
 
 mydb:
@@ -14,7 +15,7 @@ mydb:
 myuser:
   defines: poc/cloud-sql-user
   name: myuser1
-  instance: name
+  instance: <- get-entity("poc/myinstance") get-member("name")
   password-secret: myuser-password
   permitted-secrets:
     myuser-password: true
@@ -30,14 +31,17 @@ wordpress:
     wordpress_db_name:
       value: <- get-entity("poc/mydb") get-member("name")
       type: string
-    wordpress_db_password:
+    wordpress_db_secret:
       value: <- get-entity("poc/myuser") get-member("password-secret")
+      type: string
+    wordpress_db_password:
+      value: <- secret($wordpress_db_secret)
       type: string
     wordpress_db_user:
       value: <- get-entity("poc/myuser") get-member("name")
       type: string
     wordpress_db_addr:
-      value: <- $wordpress_db_host `:3306` concat-all
+      value: <- $wordpress_db_host ":3306" concat-all
       type: string
     wordpress_table_prefix:
       type: string
@@ -56,4 +60,4 @@ wordpress:
       ports:
         - 8080:80
       image-tag: <- `${image-tag}`
-      image: wordpress
+      image: docker.io/library/wordpress

@@ -61,7 +61,7 @@ cloud-sql-instance:
         let res = createInstance(gcp.getProject(), def);
         console.log(JSON.stringify(res));
         if (res.error) {
-          throw new Error(res.error);
+          throw new Error(res.error + ", body: " + res.body);
         }
         return {"statusCode": res.statusCode};
       }
@@ -74,34 +74,22 @@ cloud-sql-instance:
         let res = deleteInstance(gcp.getProject(), def.name);
         console.log(JSON.stringify(res));
         if (res.error) {
-          throw new Error(res.error);
+          throw new Error(res.error + ", body: " + res.body);
         }
       }
-    get-address: |
+    get-info: |
       var cli = require("cli");
       
-      var getAddress = function(project, name) {
-        let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/instances/"+name);
-        if (res.error) {
-          throw new Error(res.error);
-        }
-        let instance = JSON.parse(res.body);
-        if (!instance.ipAddresses) {
-          throw new Error("instance has no address yet");
-        }
-        let address = ""
-        for (let i = 0; i < instance.ipAddresses.length; i++) {
-          if (instance.ipAddresses[i].type === "PRIMARY") {
-             address = instance.ipAddresses[i].ipAddress;
-             break;
-          }
-        }
-        return address;
+      var getInstance = function(project, name) {
+        return gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+name);
       }
       
       function main(def, state, context) {
-        let address = getAddress(gcp.getProject(), def.name);
-        cli.output("Instance Public IP: " + address);
+        let res = getInstance(gcp.getProject(), def.name);
+        if (res.error) {
+          throw new Error(res.error + ", body: " + res.body);
+        }
+        cli.output(res.body);
       }
 
 cloud-sql-database:
@@ -154,7 +142,7 @@ cloud-sql-database:
         res = createDatabase(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
         if (res.error) {
-          throw new Error(res.error)
+          throw new Error(res.error + ", body: " + res.body);
         }
         return {"name": def.name, "address": address}
       }
@@ -167,7 +155,7 @@ cloud-sql-database:
         res = deleteDatabase(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
         if (res.error) {
-          throw new Error(res.error)
+          throw new Error(res.error + ", body: " + res.body);
         }
       }
 
@@ -185,7 +173,7 @@ cloud-sql-user:
     - cloud/gcp
     - secret
   lifecycle:
-    create1: |
+    create: |
       var createUser = function(project, def) {
         let body = {
           name: def.name
@@ -208,7 +196,7 @@ cloud-sql-user:
         res = createUser(gcp.getProject(), def)
         console.log(JSON.stringify(res))
         if (res.error) {
-          throw new Error(res.error);
+          throw new Error(res.error + ", body: " + res.body);
         }
         return {}
       }
