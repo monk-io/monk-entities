@@ -12,13 +12,16 @@ cloudfunc:
       type: string
     location:
       type: string
-    source:
+    event-trigger:
       type: object
       properties:
-        bucket:
+        event-type:
           type: string
-        object:
-          type: string
+        event-filters:
+          type: object
+          additionalProperties:
+            type: string
+
     build:
       type: object
       properties:
@@ -37,5 +40,5 @@ cloudfunc:
           type: integer
   lifecycle:
     sync: <<< cloudfunc-sync.js
-    generate-upload: ""
+    get: ""
     patch: ""
