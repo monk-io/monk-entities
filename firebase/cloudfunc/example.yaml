@@ -1,18 +1,44 @@
 namespace: poc
 
-myfunc:
+date:
   defines: poc/cloudfunc
+  files:
+    index:
+      path: index.js
+      contents: <<< date/index.js
+    package:
+      path: package.json
+      contents: <<< date/package.json
   name: date
-  project: your-firebase-project
+  project: common-access-project
   location: us-east1
-  # source can be filled after you upload function files
-  # use `monk run` with empty source to generate upload url and fill bucket/object parameters
-  #  source:
-  #    bucket: gcf-v2-uploads-548884607057-us-east1
-  #    object: 1f108c38-cd01-496a-a0f0-dd2165acb430.zip
   build:
     runtime: nodejs16
     entrypoint: date
+  service:
+    max-instance-count: 1
+    available-memory: 256M
+    timeout-seconds: 60
+
+thumbnail:
+  defines: poc/cloudfunc
+  files:
+    index:
+      path: index.js
+      contents: <<< thumbnail/index.js
+    package:
+      path: package.json
+      contents: <<< thumbnail/package.json
+  name: thumbnail
+  project: common-access-project
+  location: us-west2
+  build:
+    runtime: nodejs14
+    entrypoint: generateThumbnail
+  event-trigger:
+    event-type: "google.cloud.storage.object.v1.finalized"
+    event-filters:
+      bucket: common-access-project.appspot.com
   service:
     max-instance-count: 1
     available-memory: 256M

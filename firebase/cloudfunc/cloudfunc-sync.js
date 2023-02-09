@@ -1,15 +1,22 @@
-let gcp = require("cloud/gcp")
-let cli = require("cli")
+let gcp = require("cloud/gcp");
+let cli = require("cli");
+let fs = require("fs");
+let http = require("http");
+
 let BASE_URL = "https://cloudfunctions.googleapis.com/v2"
 
-let createFunc = function (def) {
+let prepareBody = function (def, storage) {
+    const firebaseConfig = {
+        "projectId": def["project"],
+        "databaseURL": "https://" + def["project"] + "-default-rtdb.firebaseio.com",
+        "storageBucket": def["project"] + ".appspot.com",
+        "locationId": def["region"]
+    }
+
     let body = {
         buildConfig: {
             source: {
-                storageSource: {
-                    bucket: def["source"]["bucket"],
-                    object: def["source"]["object"]
-                }
+                storageSource: storage
             },
             runtime: def["build"]["runtime"],
             entryPoint: def["build"]["entrypoint"]
@@ -17,33 +24,42 @@ let createFunc = function (def) {
         serviceConfig: {
             maxInstanceCount: def["service"]["max-instance-count"],
             availableMemory: def["service"]["available-memory"],
-            timeoutSeconds: def["service"]["timeout-seconds"]
+            timeoutSeconds: def["service"]["timeout-seconds"],
+            environmentVariables: {
+                FIREBASE_CONFIG: JSON.stringify(firebaseConfig),
+                GCLOUD_PROJECT: def["project"]
+            }
         }
     };
+
+    if (def["event-trigger"]) {
+        body.eventTrigger = {
+            eventType: def["event-trigger"]["event-type"],
+            eventFilters: [],
+        };
+
+        for (const [key, value] of Object.entries(def["event-trigger"]["event-filters"])) {
+            body.eventTrigger.eventFilters.push({attribute: key, value: value});
+        }
+
+        body.serviceConfig.environmentVariables.FUNCTION_SIGNATURE_TYPE = "cloudevent";
+        body.serviceConfig.environmentVariables.EVENTARC_CLOUD_EVENT_SOURCE = "projects/" +
+            def["project"] + "/locations/" + def["region"] + "/services/" + def["name"];
+    }
+
+    return body
+}
+
+let createFunc = function (def, storage) {
+    let body = prepareBody(def, storage);
 
     return gcp.post(BASE_URL + "/projects/" + def["project"] +
         "/locations/" + def["location"] + "/functions?functionId=" + def["name"],
         {"body": JSON.stringify(body)});
 };
 
-let patchFunc = function (def) {
-    let body = {
-        buildConfig: {
-            source: {
-                storageSource: {
-                    bucket: def["source"]["bucket"],
-                    object: def["source"]["object"]
-                }
-            },
-            runtime: def["build"]["runtime"],
-            entryPoint: def["build"]["entrypoint"]
-        },
-        serviceConfig: {
-            maxInstanceCount: def["service"]["max-instance-count"],
-            availableMemory: def["service"]["available-memory"],
-            timeoutSeconds: def["service"]["timeout-seconds"]
-        }
-    };
+let patchFunc = function (def, storage) {
+    const body = prepareBody(def, storage);
 
     return gcp.do(BASE_URL + "/projects/" + def["project"] +
         "/locations/" + def["location"] + "/functions/" + def["name"],
@@ -65,39 +81,43 @@ let generateUploadFunc = function (def) {
         "/locations/" + def["location"] + "/functions:generateUploadUrl");
 };
 
+let uploadFuncFiles = function (def) {
+    let res = generateUploadFunc(def);
+    if (res.error) {
+        throw new Error(res.error + ", body " + res.body);
+    }
+    let body = JSON.parse(res.body);
+
+    // zip files that we need to upload
+    let zippedBody = fs.zip(...fs.ls());
+
+    // use http without authorization because uploadUrl contains auth already
+    res = http.put(body.uploadUrl, {headers: {"content-type": "application/zip"}, body: zippedBody})
+    if (res.error) {
+        throw new Error(res.error + ", body " + res.body);
+    }
+
+    return body.storageSource;
+};
+
 function main(def, state, ctx) {
     let res = {};
     switch (ctx.action) {
         case "create":
-            // check that source is provided
-            if (!def.source) {
-                res = generateUploadFunc(def);
-                if (res.error) {
-                    throw new Error(res.error + ", body " + res.body);
-                }
-                let body = JSON.parse(res.body);
-                cli.output("Upload url: " + body.uploadUrl);
-                cli.output("Storage source: " + JSON.stringify(body.storageSource));
-                cli.output("Please upload and fill-in func sources");
-                throw new Error("please, upload sources")
-            }
-            res = createFunc(def);
+            res = createFunc(def, uploadFuncFiles(def));
             break;
         case "patch":
-            // check that source is provided
-            res = patchFunc(def);
+            res = patchFunc(def, uploadFuncFiles(def));
             break;
         case "purge":
             res = deleteFunc(def);
             break;
-        case "generate-upload":
-            res = generateUploadFunc(def);
+        case "get":
+            res = getFunc(def);
             if (res.error) {
                 throw new Error(res.error + ", body " + res.body);
             }
-            let body = JSON.parse(res.body);
-            cli.output("Upload url: " + body.uploadUrl);
-            cli.output("Storage source: " + JSON.stringify(body.storageSource));
+            cli.output(res.body);
             return;
         default:
             // no action defined
@@ -106,7 +126,10 @@ function main(def, state, ctx) {
     if (res.error) {
         throw new Error(res.error + ", body " + res.body);
     }
-    // set instance result to state
+
+    // set result operation to state
     let body = JSON.parse(res.body)
-    return {"operation": body.name};
+    state["last-operation"] = body.name;
+
+    return state;
 }

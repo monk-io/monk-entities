@@ -1,0 +1,25 @@
+namespace: poc
+echo:
+  defines: entity
+  schema:
+    name:
+      type: string
+  lifecycle:
+    start: |
+      function main() {
+          // no action
+      }
+    sync: |
+      const cli = require("cli");
+      
+      function main(def, state, ctx) {
+          // print current action and name
+          cli.output("do " + ctx.action + " on " +def.name);
+      
+          // return something that will be saved in entity state
+          return {"last-action": ctx.action};
+      }
+
+echo-foo:
+  defines: poc/echo
+  name: foo
