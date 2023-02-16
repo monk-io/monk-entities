@@ -1,7 +1,7 @@
 namespace: poc
 
 date:
-  defines: poc/cloudfunc
+  defines: poc/cloudfunc-v2
   files:
     index:
       path: index.js
@@ -21,7 +21,7 @@ date:
     timeout-seconds: 60
 
 thumbnail:
-  defines: poc/cloudfunc
+  defines: poc/cloudfunc-v2
   files:
     index:
       path: index.js

@@ -1,0 +1,44 @@
+namespace: poc
+
+# Cloud func uses v2 version of funcs, which requires you to enable following API:
+# Artifact Registry, Cloud Build, Cloud Run,
+cloudfunc-v2:
+  defines: entity
+  schema:
+    required: [ "name", "project", "location", "build", "service" ]
+    name:
+      type: string
+    project:
+      type: string
+    location:
+      type: string
+    event-trigger:
+      type: object
+      properties:
+        # Trigger types: https://cloud.google.com/functions/docs/calling/storage
+        event-type:
+          type: string
+        event-filters:
+          type: object
+          additionalProperties:
+            type: string
+    build:
+      type: object
+      properties:
+        runtime:
+          type: string
+        entrypoint:
+          type: string
+    service:
+      type: object
+      properties:
+        max-instance-count:
+          type: integer
+        available-memory:
+          type: string
+        timeout-seconds:
+          type: integer
+  lifecycle:
+    sync: <<< cloudfunc-sync.js
+    get: ""
+    patch: ""

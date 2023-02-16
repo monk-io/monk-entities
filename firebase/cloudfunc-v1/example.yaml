@@ -1,0 +1,24 @@
+namespace: poc
+
+exif:
+  defines: poc/cloudfunc-v1
+  files:
+    index:
+      path: index.js
+      contents: <<< exif-images/index.js
+    package:
+      path: package.json
+      contents: <<< exif-images/package.json
+  name: exif
+  project: common-access-project
+  location: us-west2
+  build:
+    runtime: nodejs16
+    entrypoint: metadata
+  event-trigger:
+    event-type: "google.storage.object.finalize"
+    resource: projects/common-access-project/buckets/common-access-project.appspot.com
+  service:
+    max-instance-count: 1
+    available-memory: 256
+    timeout-seconds: 60

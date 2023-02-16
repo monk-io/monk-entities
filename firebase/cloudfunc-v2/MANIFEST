@@ -1,0 +1,3 @@
+REPO cloudfunc-v2
+LOAD cloudfunc.yaml
+RESOURCES cloudfunc-sync.js
