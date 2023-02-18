@@ -1,0 +1,22 @@
+namespace: aws
+
+create:
+  defines: aws/dynamodb
+  region: us-east-1
+  dbschema: |
+    {
+      "TableName": "ExampleTable",
+      "BillingMode": "PAY_PER_REQUEST",
+      "AttributeDefinitions": [
+        {
+          "AttributeName": "LastPostDateTime",
+          "AttributeType": "S"
+        }
+      ],
+      "KeySchema": [
+        {
+          "AttributeName": "LastPostDateTime",
+          "KeyType": "HASH"
+        }
+      ]
+    }
