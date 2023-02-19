@@ -10,6 +10,7 @@ storage:
    {
      "properties": {
        "defaultEncryptionScope": "encryptionscope185",
-       "denyEncryptionScopeOverride": true
+       "denyEncryptionScopeOverride": true,
+       "publicAccess": "Container"
      }
    }

@@ -20,7 +20,7 @@ storage:
          "sasExpirationPeriod": "1.15:59:59",
          "expirationAction": "Log"
        },
-       "allowBlobPublicAccess": false,
+       "allowBlobPublicAccess": true,
        "defaultToOAuthAuthentication": false,
        "allowSharedKeyAccess": true,
        "encryption": {
