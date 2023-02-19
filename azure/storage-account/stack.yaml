@@ -1,0 +1,7 @@
+namespace: objectstorage
+
+storage:
+  defines: objectstorage/storage-account
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-storage-account"
+  accountName: "monkazurestorageaccount"

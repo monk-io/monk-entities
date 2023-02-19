@@ -1,0 +1,57 @@
+namespace: objectstorage
+
+storage-account:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "accountName" ]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    accountName:
+      type: string    
+  requires:
+    - cloud/azure
+  lifecycle:
+    create: |
+      var createStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
+         const requestBody = {
+           sku: {
+             name: 'Standard_LRS'
+           },
+           kind: 'StorageV2',
+           location: 'eastus',
+           properties: {}
+         };
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": JSON.stringify(requestBody)});
+      }
+           
+      function main(definition, state, context) {
+           let res = createStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+    purge: |
+      var deleteStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
+         const requestBody = {
+           sku: {
+             name: 'Standard_LRS'
+           },
+           kind: 'StorageV2',
+           location: 'eastus',
+           properties: {}
+         };
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": JSON.stringify(requestBody)});
+      }
+      
+      function main(definition, state, context) {
+        let res = deleteStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName);
+        console.log(JSON.stringify(res));
+        if (res.error) {
+          throw new Error(res.error + ", body: " + res.body);
+        }
+        return {"statusCode": res.statusCode};
+      }
