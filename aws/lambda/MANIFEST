@@ -1,0 +1,2 @@
+REPO lambda
+LOAD lambda.yml example.yml

@@ -1,0 +1,10 @@
+namespace: lambda
+
+my-function:
+  defines: lambda/aws-lambda
+  name: myFunction
+  region: eu-north-1
+  role: arn:aws:iam::042018946306:role/service-role/monk-lambda-role-00qphy3u
+  s3bucket: monk-lambda
+  s3key: index.js.zip
+
