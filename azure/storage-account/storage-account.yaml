@@ -18,7 +18,7 @@ storage-account:
     create: |
       var createStorageAccount = function(subscriptionId, resourceGroupName, accountName, storageAccountObject) {
          const requestBody = storageAccountObject;
-        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": JSON.stringify(requestBody)});
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       }
            
       function main(definition, state, context) {
