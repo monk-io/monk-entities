@@ -16,13 +16,13 @@ storage-account:
     - cloud/azure
   lifecycle:
     create: |
-      var createStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
+      var createStorageAccount = function(subscriptionId, resourceGroupName, accountName, storageAccountObject) {
          const requestBody = storageAccountObject;
         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": JSON.stringify(requestBody)});
       }
            
       function main(definition, state, context) {
-           let res = createStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName);
+           let res = createStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.storageAccountObject );
            console.log(JSON.stringify(res));
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
