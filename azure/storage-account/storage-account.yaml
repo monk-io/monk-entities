@@ -36,15 +36,7 @@ storage-account:
          }
     purge: |
       var deleteStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
-         const requestBody = {
-           sku: {
-             name: 'Standard_LRS'
-           },
-           kind: 'StorageV2',
-           location: 'eastus',
-           properties: {}
-         };
-        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": JSON.stringify(requestBody)});
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}});
       }
       
       function main(definition, state, context) {
