@@ -34,29 +34,29 @@ cloud-sql-instance:
             tier: "db-f1-micro",
           }
         };
-      
+
         if (def.tier) {
-           body.settings.tier = def.tier;
+          body.settings.tier = def.tier;
         }
-      
+
         if (def["allow-all"]) {
-           body.settings.ipConfiguration = {
-             authorizedNetworks: [{name: "unsafe-allow-all", value: "0.0.0.0/0"}]
-           }
+          body.settings.ipConfiguration = {
+            authorizedNetworks: [{name: "unsafe-allow-all", value: "0.0.0.0/0"}]
+          }
         }
 
         if (def.region) {
-           body.region = def.region;
+          body.region = def.region;
         }
-      
+
         if (def["database-version"]) {
-           body.databaseVersion = def["database-version"];
+          body.databaseVersion = def["database-version"];
         }
-      
+
         return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances",
           {"body": JSON.stringify(body)});
       }
-      
+
       function main(def, state, ctx) {
         let res = createInstance(gcp.getProject(), def);
         console.log(JSON.stringify(res));
@@ -69,7 +69,7 @@ cloud-sql-instance:
       var deleteInstance = function(project, name) {
         return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+name);
       }
-      
+
       function main(def, state, context) {
         let res = deleteInstance(gcp.getProject(), def.name);
         console.log(JSON.stringify(res));
@@ -79,11 +79,11 @@ cloud-sql-instance:
       }
     get-info: |
       var cli = require("cli");
-      
+
       var getInstance = function(project, name) {
         return gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+name);
       }
-      
+
       function main(def, state, context) {
         let res = getInstance(gcp.getProject(), def.name);
         if (res.error) {
@@ -112,7 +112,7 @@ cloud-sql-database:
         return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/databases",
           {"body": JSON.stringify(body)});
       }
-      
+
       var getAddress = function(project, def) {
         let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/instances/"+def.instance);
         if (res.error) {
@@ -125,20 +125,20 @@ cloud-sql-database:
         let address = ""
         for (let i = 0; i < instance.ipAddresses.length; i++) {
           if (instance.ipAddresses[i].type === "PRIMARY") {
-             address = instance.ipAddresses[i].ipAddress;
-             break;
+            address = instance.ipAddresses[i].ipAddress;
+            break;
           }
         }
         return address;
       }
-      
+
       function main(def, state, ctx) {
         // get instance address
         let address = getAddress(gcp.getProject(), def)
         if (!address) {
           throw new Error("instance address is empty");
         }
-      
+
         res = createDatabase(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
         if (res.error) {
@@ -150,7 +150,7 @@ cloud-sql-database:
       var deleteDatabase = function(project, instance, name) {
         return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/databases/"+name)
       }
-      
+
       function main(def, state, context) {
         res = deleteDatabase(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
@@ -178,7 +178,7 @@ cloud-sql-user:
         let body = {
           name: def.name
         };
-      
+
         try {
           body.password = secret.get(def["password-secret"]);
         } catch (error) {
@@ -187,12 +187,12 @@ cloud-sql-user:
           body.password = secret.get(def["password-secret"]);
         }
         console.log(body.password);
-      
+
         return gcp.post("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+def.instance+"/users",
           {"body": JSON.stringify(body)});
       }
-      
-      function main(def, state, ctx) {      
+
+      function main(def, state, ctx) {
         res = createUser(gcp.getProject(), def)
         console.log(JSON.stringify(res))
         if (res.error) {
@@ -204,7 +204,7 @@ cloud-sql-user:
       var deleteUser = function(project, instance, name) {
         return gcp.delete("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+instance+"/users?name="+name);
       }
-      
+
       function main(def, state, context) {
         let res = deleteUser(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
