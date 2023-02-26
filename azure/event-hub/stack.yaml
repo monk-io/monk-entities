@@ -29,13 +29,3 @@ hubnamespace:
         "userMetadata": "consumergroup"
       }
     }
-  schemaObject: |
-   {
-     "id": "/subscriptions/31b0b43d-0900-45b7-86a4-4cdd3cfd2550/resourceGroups/rg-event-hub/providers/Microsoft.EventHub/namespaces/monkeventhubnamespace/schemagroups/test",
-     "name": "test",
-     "properties": {
-        groupProperties: {},
-        schemaCompatibility: "None",
-        schemaType: "Avro"
-     }
-   }
