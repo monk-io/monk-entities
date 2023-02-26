@@ -1,0 +1,41 @@
+namespace: event-hub
+
+hubnamespace:
+  defines: event-hub/hub-namespace
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-event-hub"
+  namespaceName: "monkeventhubnamespace"
+  eventHubName: "monkeventhub"
+  consumerGroupName: "monkconsumergroup"
+  namespaceObject: |
+    {
+      "location": "East US",
+      "properties": {
+        "disableLocalAuth": true,
+        "sku": "Premium"
+      }
+    }
+  eventHubObject: |
+    {
+      "properties": {
+        "partitionCount": 5,
+        "messageRetentionInDays": 3,
+        "status": "Active"
+      }
+    }
+  consumerGroupObject: |
+    {
+      "properties": {
+        "userMetadata": "consumergroup"
+      }
+    }
+  schemaObject: |
+   {
+     "id": "/subscriptions/31b0b43d-0900-45b7-86a4-4cdd3cfd2550/resourceGroups/rg-event-hub/providers/Microsoft.EventHub/namespaces/monkeventhubnamespace/schemagroups/test",
+     "name": "test",
+     "properties": {
+        groupProperties: {},
+        schemaCompatibility: "None",
+        schemaType: "Avro"
+     }
+   }
