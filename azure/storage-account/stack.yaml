@@ -21,6 +21,7 @@ storage:
          "expirationAction": "Log"
        },
        "allowBlobPublicAccess": true,
+       "publicNetworkAccess": "Enabled",
        "defaultToOAuthAuthentication": false,
        "allowSharedKeyAccess": true,
        "encryption": {
