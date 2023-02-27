@@ -17,7 +17,11 @@ hub-namespace:
     eventHubObject:
        type: string
     consumerGroupName:
-       type: string                  
+       type: string
+    schemaName:
+       type: string  
+    schemaObject:
+       type: string                                  
   requires:
     - cloud/azure
   lifecycle:
@@ -97,3 +101,30 @@ hub-namespace:
            }
            return {"statusCode": res.statusCode};
          }
+
+    createSchema: |
+       var createSchema = function(subscriptionId, resourceGroupName, namespaceName, schemaName, schemaObject) {
+          const requestBody = schemaObject;
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/schemagroups/"+schemaName+"?api-version=2022-10-01-preview", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+       }
+       function main(definition, state, context) {
+            let res = createSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.schemaName, definition.schemaObject);
+            console.log(JSON.stringify(res));
+            if (res.error) {
+              throw new Error(res.error + ", body: " + res.body);
+            }
+            return {"statusCode": res.statusCode};
+          }  
+    deleteSchema: |
+       var deleteSchema = function(subscriptionId, resourceGroupName, namespaceName, schemaName) {
+          const requestBody = schemaObject;
+         return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/schemagroups/"+schemaName+"?api-version=2022-10-01-preview", { "headers": {"Content-Type": "application/json"}});
+       }
+       function main(definition, state, context) {
+            let res = deleteSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.schemaName);
+            console.log(JSON.stringify(res));
+            if (res.error) {
+              throw new Error(res.error + ", body: " + res.body);
+            }
+            return {"statusCode": res.statusCode};
+          }  

@@ -7,6 +7,7 @@ hubnamespace:
   namespaceName: "monkeventhubnamespace"
   eventHubName: "monkeventhub"
   consumerGroupName: "monkconsumergroup"
+  schemaName: "monkschema"
   namespaceObject: |
     {
       "location": "East US",
@@ -29,3 +30,11 @@ hubnamespace:
         "userMetadata": "consumergroup"
       }
     }
+  schemaObject: |
+   {
+     "properties": {
+        groupProperties: {},
+        schemaCompatibility: "None",
+        schemaType: "Avro"
+     }
+   }  
