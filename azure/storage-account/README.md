@@ -1,7 +1,7 @@
 # Azure Storage Account
 
 Entity to manage Azure Storage Account.
-It will allow us to create new Azure Storage Accounts using Monk.
+It will allow us to create new Azure Storage Account using Monk.
 
 ## Usage
 
@@ -13,13 +13,52 @@ We'll use Monk CLI to load and run everything:
       # run to trigger a "create" event
       monk run objectstorage/storage
 
-An Azure Storage Account in Azure,
-available at:  
-https://monkazurestorageaccount.blob.core.windows.net
+Below is the sample body named `storageAccountObject` to create Storage Account and it can be extend with [Azure Storage Account REST API reference](https://learn.microsoft.com/en-us/rest/api/storagerp/storage-accounts/create?tabs=HTTP)
 
-When we don't need this Bucket anymore,
+```json
+   {
+     "sku": {
+       "name": "Standard_GRS"
+     },
+     "kind": "Storage",
+     "location": "eastus",
+     "properties": {
+       "keyPolicy": {
+         "keyExpirationPeriodInDays": 20
+       },
+       "sasPolicy": {
+         "sasExpirationPeriod": "1.15:59:59",
+         "expirationAction": "Log"
+       },
+       "allowBlobPublicAccess": true,
+       "publicNetworkAccess": "Enabled",
+       "defaultToOAuthAuthentication": false,
+       "allowSharedKeyAccess": true,
+       "encryption": {
+         "services": {
+           "file": {
+             "keyType": "Account",
+             "enabled": true
+           },
+           "blob": {
+             "keyType": "Account",
+             "enabled": true
+           }
+         },
+         "requireInfrastructureEncryption": false,
+         "keySource": "Microsoft.Storage"
+       }
+     },
+     "tags": {
+       "key1": "value1",
+       "key2": "value2"
+     }
+   }
+```
+
+When we don't need this event hub namespace anymore,
 we can delete it with `monk delete`:
 
       monk delete objectstorage/storage
 
-This should remove Entity from Monk and the Azure Storage Account resource from Azure.
+This should remove Entity from Monk and the Azure Event Storage Account resource from Azure.
