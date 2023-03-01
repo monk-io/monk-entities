@@ -26,18 +26,19 @@ hub-namespace:
     - cloud/azure
   lifecycle:
     create: |
+      let cli = require("cli");
       var createNamespace = function(subscriptionId, resourceGroupName, namespaceName, namespaceObject) {
          const requestBody = namespaceObject;
-        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
-      }
-           
+         cli.output("requestbody", JSON.stringify(requestBody));         
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
       function main(definition, state, context) {
            let res = createNamespace(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.namespaceObject );
            console.log(JSON.stringify(res));
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           return {"statusCode": res.statusCode};
+           return {"statusCode": res.statusCode, "last-operation": JSON.stringify(res.body)};
          }
     purge: |
       var deleteNamespace = function(subscriptionId, resourceGroupName, namespaceName) {
@@ -101,14 +102,13 @@ hub-namespace:
            }
            return {"statusCode": res.statusCode};
          }
-
     createSchema: |
        var createSchema = function(subscriptionId, resourceGroupName, namespaceName, schemaName, schemaObject) {
           const requestBody = schemaObject;
          return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/schemagroups/"+schemaName+"?api-version=2022-10-01-preview", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
        }
        function main(definition, state, context) {
-            let res = createSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.schemaName, definition.schemaObject);
+            let res = createSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubSchemaName, definition.eventHubSchemaObject);
             console.log(JSON.stringify(res));
             if (res.error) {
               throw new Error(res.error + ", body: " + res.body);
