@@ -1,0 +1,46 @@
+namespace: objectstorage
+
+storage:
+  defines: objectstorage/storage-account
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-storage-account"
+  accountName: "monkazurestorageaccount"
+  storageAccountObject: |
+   {
+     "sku": {
+       "name": "Standard_GRS"
+     },
+     "kind": "Storage",
+     "location": "eastus",
+     "properties": {
+       "keyPolicy": {
+         "keyExpirationPeriodInDays": 20
+       },
+       "sasPolicy": {
+         "sasExpirationPeriod": "1.15:59:59",
+         "expirationAction": "Log"
+       },
+       "allowBlobPublicAccess": true,
+       "publicNetworkAccess": "Enabled",
+       "defaultToOAuthAuthentication": false,
+       "allowSharedKeyAccess": true,
+       "encryption": {
+         "services": {
+           "file": {
+             "keyType": "Account",
+             "enabled": true
+           },
+           "blob": {
+             "keyType": "Account",
+             "enabled": true
+           }
+         },
+         "requireInfrastructureEncryption": false,
+         "keySource": "Microsoft.Storage"
+       }
+     },
+     "tags": {
+       "key1": "value1",
+       "key2": "value2"
+     }
+   }

@@ -1,0 +1,130 @@
+namespace: event-hub
+
+hub-namespace:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    namespaceName:
+      type: string    
+    namespaceObject:
+      type: string
+    eventHubName:
+       type: string 
+    eventHubObject:
+       type: string
+    consumerGroupName:
+       type: string
+    schemaName:
+       type: string  
+    schemaObject:
+       type: string                                  
+  requires:
+    - cloud/azure
+  lifecycle:
+    create: |
+      let cli = require("cli");
+      var createNamespace = function(subscriptionId, resourceGroupName, namespaceName, namespaceObject) {
+         const requestBody = namespaceObject;
+         cli.output("requestbody", JSON.stringify(requestBody));         
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
+      function main(definition, state, context) {
+           let res = createNamespace(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.namespaceObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "last-operation": JSON.stringify(res.body)};
+         }
+    purge: |
+      var deleteNamespace = function(subscriptionId, resourceGroupName, namespaceName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      }
+      function main(definition, state, context) {
+           let res = deleteNamespace(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+    createEventhub: |
+      var createEventHub = function(subscriptionId, resourceGroupName, namespaceName, eventHubName, eventHubObject) {
+         const requestBody = eventHubObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/eventhubs/"+eventHubName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      }
+      function main(definition, state, context) {
+           let res = createEventHub(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubName,  definition.eventHubObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }  
+    deleteEventHub: |
+      var deleteEventHub = function(subscriptionId, resourceGroupName, namespaceName, eventHubName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/eventhubs/"+eventHubName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      }
+      function main(definition, state, context) {
+           let res = deleteEventHub(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }  
+    createConsumerGroup: |
+      var createConsumerGroup = function(subscriptionId, resourceGroupName, namespaceName, eventHubName, consumerGroupName, consumerGroupObject) {
+         const requestBody = consumerGroupObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/eventhubs/"+eventHubName+"/consumergroups/"+consumerGroupName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      }
+      function main(definition, state, context) {
+           let res = createConsumerGroup(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubName, definition.consumerGroupName, definition.consumerGroupObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }  
+    deleteConsumerGroup: |
+      var deleteConsumerGroup = function(subscriptionId, resourceGroupName, namespaceName, eventHubName, consumerGroupName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/eventhubs/"+eventHubName+"/consumergroups/"+consumerGroupName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      }
+      function main(definition, state, context) {
+           let res = deleteConsumerGroup(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubName, definition.consumerGroupName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+    createSchema: |
+       var createSchema = function(subscriptionId, resourceGroupName, namespaceName, schemaName, schemaObject) {
+          const requestBody = schemaObject;
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/schemagroups/"+schemaName+"?api-version=2022-10-01-preview", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+       }
+       function main(definition, state, context) {
+            let res = createSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.eventHubSchemaName, definition.eventHubSchemaObject);
+            console.log(JSON.stringify(res));
+            if (res.error) {
+              throw new Error(res.error + ", body: " + res.body);
+            }
+            return {"statusCode": res.statusCode};
+          }  
+    deleteSchema: |
+       var deleteSchema = function(subscriptionId, resourceGroupName, namespaceName, schemaName) {
+          const requestBody = schemaObject;
+         return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.EventHub/namespaces/"+namespaceName+"/schemagroups/"+schemaName+"?api-version=2022-10-01-preview", { "headers": {"Content-Type": "application/json"}});
+       }
+       function main(definition, state, context) {
+            let res = deleteSchema(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.schemaName);
+            console.log(JSON.stringify(res));
+            if (res.error) {
+              throw new Error(res.error + ", body: " + res.body);
+            }
+            return {"statusCode": res.statusCode};
+          }  

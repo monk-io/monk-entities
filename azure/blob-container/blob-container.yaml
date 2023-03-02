@@ -1,0 +1,44 @@
+namespace: objectstoragecontainer
+
+blob-container:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "accountName", "containerObject", "containerName" ]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    accountName:
+      type: string    
+    storageAccountObject:
+      type: string    
+  requires:
+    - cloud/azure
+  lifecycle:
+    create: |
+      var createContainer = function(subscriptionId, resourceGroupName, accountName, containerName, containerObject) {
+         const requestBody = containerObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"/blobServices/default/containers/"+containerName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      }
+           
+      function main(definition, state, context) {
+           let res = createContainer(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.containerName, definition.containerObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+    purge: |
+      var deleteContainer = function(subscriptionId, resourceGroupName, accountName, containerName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"/blobServices/default/containers/"+containerName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
+      }
+           
+      function main(definition, state, context) {
+           let res = deleteContainer(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.containerName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }         
