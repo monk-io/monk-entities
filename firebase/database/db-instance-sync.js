@@ -84,16 +84,45 @@ function main(def, state, ctx) {
                 if (body.state === "DELETED") {
                     // restore deleted instance
                     res = undeleteDBInstance(def);
-                    break;
+                    if (res.error) {
+                        throw new Error(res.error + ", body " + res.body);
+                    }
+                    res = reenableDBInstance(def);
+                    if (res.error) {
+                        throw new Error(res.error + ", body " + res.body);
+                    }
+                } else if (body.state === "DISABLED") {
+                    res = reenableDBInstance(def);
+                    if (res.error) {
+                        throw new Error(res.error + ", body " + res.body);
+                    }
+                } else {
+                    // use existing instance
+                    // we could return "already exists" error here
+                    res = exRes;
                 }
-                // use existing instance
-                // we could return "already exists" error here
-                res = exRes;
-                break
             }
-            // create a new instance
-            res = createDBInstance(def);
+            if (!res.body) {
+                // create a new instance
+                res = createDBInstance(def);
+                if (res.error) {
+                    throw new Error(res.error + ", body " + res.body);
+                }
+            }
+            if (def.rules) {
+                let body = JSON.parse(res.body)
+                let rulesRes = setRules(body.databaseUrl, def.rules);
+                if (rulesRes.error) {
+                    throw new Error(rulesRes.error + ", body " + rulesRes.body);
+                }
+            }
             break;
+        case "update":
+            let rulesRes = setRules(state.url, def.rules);
+            if (rulesRes.error) {
+                throw new Error(rulesRes.error + ", body " + rulesRes.body);
+            }
+            return;
         case "disable":
             res = disableDBInstance(def);
             break;
@@ -101,8 +130,21 @@ function main(def, state, ctx) {
             res = reenableDBInstance(def);
             break;
         case "purge":
+            res = getDBInstance(def);
+            if (res.error && res.error.includes("response code 404")) {
+                // resource is removed
+                return;
+            }
+
             if (state.state !== "DISABLED") {
-                throw new Error("Database has to be disabled before remove!");
+                res = disableDBInstance(def);
+                if (res.error) {
+                    throw new Error(res.error + ", body " + res.body);
+                }
+            }
+            if (def.name === def.project + "-default-rtdb") {
+                // cannot delete the default database
+                return
             }
             res = deleteDBInstance(def);
             break;
@@ -149,7 +191,7 @@ function main(def, state, ctx) {
             return;
     }
     if (res.error) {
-        throw new Error(res.error);
+        throw new Error(res.error + ", body " + res.body);
     }
     // set instance result to state
     let body = JSON.parse(res.body)

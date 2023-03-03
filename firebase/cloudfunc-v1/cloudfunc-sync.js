@@ -8,7 +8,7 @@ let BASE_URL = "https://cloudfunctions.googleapis.com/v1"
 let prepareBody = function (def, storageUrl) {
     const firebaseConfig = {
         "projectId": def["project"],
-        "databaseURL": "https://" + def["project"] + "-default-rtdb.firebaseio.com",
+        "databaseURL": "https://" + def["database"] + ".firebaseio.com",
         "storageBucket": def["project"] + ".appspot.com",
         "locationId": def["location"]
     }
@@ -42,6 +42,8 @@ let prepareBody = function (def, storageUrl) {
             eventType: def["event-trigger"]["event-type"],
             resource: def["event-trigger"]["resource"]
         };
+    } else {
+        body.httpsTrigger = {}
     }
 
     return body
@@ -106,13 +108,24 @@ function main(def, state, ctx) {
     let res = {};
     switch (ctx.action) {
         case "create":
+            let exRes = getFunc(def);
+            if (!exRes.error) {
+                // use existing function
+                res = exRes;
+                break
+            }
             res = createFunc(def, uploadFuncFiles(def));
             break;
+        case "update":
         case "patch":
             res = patchFunc(def, uploadFuncFiles(def));
             break;
         case "purge":
             res = deleteFunc(def);
+            if (res.error && res.error.includes("response code 404")) {
+                // resource is removed
+                return;
+            }
             break;
         case "get":
             res = getFunc(def);
@@ -120,6 +133,22 @@ function main(def, state, ctx) {
                 throw new Error(res.error + ", body " + res.body);
             }
             cli.output(res.body);
+            return;
+        case "check-readiness":
+            res = getFunc(def);
+            if (res.error) {
+                throw new Error(res.error + ", body " + res.body);
+            }
+            let body = JSON.parse(res.body);
+            if (body.status !== "ACTIVE") {
+                throw new Error("function is not active yet");
+            }
+
+            if (body.httpsTrigger !== undefined) {
+                state["url"] = body.httpsTrigger.url;
+            }
+
+            state["status"] = body.status;
             return;
         default:
             // no action defined
