@@ -27,7 +27,7 @@ storage-account:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           return {"statusCode": res.statusCode, "primaryEndpoints": res.body};
+           return {"statusCode": res.statusCode};
          }
     purge: |
       var deleteStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
@@ -52,6 +52,6 @@ storage-account:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           return {"statusCode": res.statusCode, "body": res.body};
            console.log(res.body);
+           return {"statusCode": res.statusCode, "primaryEndpoints": JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints)};
          }      
