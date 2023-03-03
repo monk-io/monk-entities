@@ -14,6 +14,15 @@ storage-account:
       type: string    
   requires:
     - cloud/azure
+  checks:
+    readiness:
+      initialDelay: 15
+      attempts: 3 
+      period: 15       
+      code: |
+        function main(definition, state, context) {
+          throw "not ready";
+        }
   lifecycle:
     create: |
       var createStorageAccount = function(subscriptionId, resourceGroupName, accountName, storageAccountObject) {
