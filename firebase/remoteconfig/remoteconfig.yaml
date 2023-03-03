@@ -1,0 +1,13 @@
+namespace: poc
+
+remoteconfig:
+  defines: entity
+  schema:
+    required: [ "project", "name", "vars" ]
+    project:
+      type: string
+    variables:
+      type: string
+  lifecycle:
+    sync: <<< remoteconfig-sync.js
+    get: ""

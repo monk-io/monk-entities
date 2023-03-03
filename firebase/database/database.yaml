@@ -10,6 +10,8 @@ firebase-db-instance:
       type: string
     project: # firebase project
       type: string
+    rules:
+      type: string
   lifecycle:
     sync: <<< db-instance-sync.js
     # custom actions on instances

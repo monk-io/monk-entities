@@ -11,6 +11,7 @@ exif:
       contents: <<< exif-images/package.json
   name: exif
   project: common-access-project
+  database: common-access-project-default-rtdb
   location: us-west2
   build:
     runtime: nodejs16
