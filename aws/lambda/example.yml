@@ -7,4 +7,8 @@ my-function:
   role: arn:aws:iam::042018946306:role/service-role/monk-lambda-role-00qphy3u
   s3bucket: monk-lambda
   s3key: index.js.zip
+  architecture:
+    - x86_64
+  runtime: nodejs16.x
+  handler: index.handler
 

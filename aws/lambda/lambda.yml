@@ -3,7 +3,7 @@ namespace: lambda
 aws-lambda:
   defines: entity
   schema:
-    required: [ "name", "region", "role", "s3bucket", "s3key" ]
+    required: [ "name", "region", "role", "architecture", "handler", "runtime"]
     name:
       type: string
     region:
@@ -14,82 +14,13 @@ aws-lambda:
       type: string
     s3key:
       type: string
+    architecture:
+      type: array
+    runtime:
+      type: string
+    handler: 
+      type: string
   requires:
     - cloud/aws
   lifecycle:
-    create: |
-      var cli = require("cli")
-    
-      createLambdaFunction = function(name, region, role, s3bucket, s3key) {
-        data = {
-          headers: {
-            "Content-Type": "application/x-amz-json-1.0"
-          },
-          "service": "lambda",
-          "region": region,
-          "body": {
-            "Architecture": ["x86_64"],
-            "FunctionName": name,
-            "Runtime": "nodejs16.x",
-            "Handler": "index.handler",
-            "Code": {
-              "S3Bucket": s3bucket,
-              "S3Key": s3key
-            },
-            "Role": role,
-            "Description": "Lambda function created by the Monk",
-            "Timeout": 3,
-            "MemorySize": 128,
-            "Publish": true
-          }
-        }
-        return aws.post("https://lambda."+region+".amazonaws.com/2015-03-31/functions/", {
-            "headers": data.headers, 
-            "service": data.service, 
-            "region": data.region, 
-            "action": data.action, 
-            "Version": data.Version, 
-            "Role": data.Role, 
-            "body": JSON.stringify(data.body)
-          }
-        )
-      }
-
-      function main(definition, state, context) {
-        res = createLambdaFunction(
-          definition.name, 
-          definition.region, 
-          definition.role, 
-          definition.s3bucket,
-          definition.s3key
-        )
-        if (res.error) {
-            throw new Error(res.error + ", body " + res.body);
-        }
-      }
-
-    purge: |
-      deleteLambdaFunction = function(name, region) {
-        data = {
-          headers: {
-            "Content-Type": "application/x-amz-json-1.0"
-          },
-          "service": "lambda",
-          "region": region
-        }
-        console.log(JSON.stringify(data));
-        return aws.delete("https://lambda."+region+".amazonaws.com/2015-03-31/functions/"+name, {
-            "headers": data.headers, 
-            "service": data.service, 
-            "region": data.region
-          }
-        )
-      }
-
-      function main(definition, state, context) {
-        res = deleteLambdaFunction(definition.name, definition.region)
-        console.log(JSON.stringify(res))
-        if (res.error) {
-            throw new Error(res.error + ", body " + res.body);
-        }
-      }
+    sync: <<< lambda.js
