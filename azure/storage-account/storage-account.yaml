@@ -16,27 +16,27 @@ storage-account:
     - cloud/azure
   checks:
     readiness:
-      initialDelay: 25
+      initialDelay: 30
       attempts: 5
       period: 15       
       code: |
-       var getStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
-           return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
-         }
+       var readinessfunc = function(subscriptionId, resourceGroupName, accountName) {
+         return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
+       }
          function main(definition, state, context) {
-              let res = getStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName );
-              provisioningState = JSON.stringify(JSON.parse(res.body).properties.provisioningState)
+            let res = readinessfunc(definition.subscriptionId, definition.resourceGroupName, definition.accountName );
+              provisioningState = JSON.parse(res.body).properties.provisioningState;
               if (res.error) {
                 throw new Error(res.error + ", body: " + res.body);
               }
-              if (provisioningState !== "Succeeded" ) {
-                throw new Error("Storage account is not active yet");
-              }
               if (provisioningState == "Succeeded" ) {
-                return {"statusCode": res.statusCode, "primaryEndpoints": JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints)};
-              }                         
-              console.log(res.body);
-              return {"statusCode": res.statusCode};
+                state["primaryEndpoints"] = JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints);
+              }
+              if (provisioningState != "Succeeded" ) {
+                throw new Error("Storage account is not active yet. Provisioning state is " + provisioningState);
+              }                 
+             state["provisioningState"] = provisioningState; 
+             return state;
             }
   lifecycle:
     create: |
@@ -79,21 +79,3 @@ storage-account:
            console.log(res.body);
            return {"statusCode": res.statusCode, "primaryEndpoints": JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints)};
          }
-    readiness:  |
-      var readinessfunc = function(subscriptionId, resourceGroupName, accountName) {
-        return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
-      }
-        function main(definition, state, context) {
-           let res = readinessfunc(definition.subscriptionId, definition.resourceGroupName, definition.accountName );
-             provisioningState = JSON.stringify(JSON.parse(res.body).properties.provisioningState)    
-             if (res.error) {
-               throw new Error(res.error + ", body: " + res.body);
-             }
-             if (provisioningState == "Succeeded" ) {
-               state["primaryEndpoints"] = JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints);
-               state["a"] = "b";
-             }   
-            state["c"] = "d";
-            state["provisioningState"] = provisioningState;                      
-            return state;
-           }         
