@@ -1,0 +1,20 @@
+namespace: aws
+
+vpc:
+  defines: entity
+  schema:
+    required: [ "cidr", "region"]
+    cidr:
+      type: string
+    region:
+      type: string
+    
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< vpc.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""

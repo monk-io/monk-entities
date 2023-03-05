@@ -1,0 +1,6 @@
+namespace: aws
+
+my-vpc:
+  defines: aws/vpc
+  region: eu-north-1
+  cidr: 10.0.0.0/16

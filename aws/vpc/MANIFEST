@@ -1,0 +1,3 @@
+REPO vpc
+LOAD vpc.yml example.yml
+RESOURCES vpc.js
