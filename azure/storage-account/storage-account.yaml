@@ -66,16 +66,3 @@ storage-account:
         }
         return {"statusCode": res.statusCode};
       }
-    getPrimaryEndpoints: |
-      var getStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
-        return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
-      }
-      function main(definition, state, context) {
-           let res = getStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName );
-           console.log(JSON.stringify(res));
-           if (res.error) {
-             throw new Error(res.error + ", body: " + res.body);
-           }
-           console.log(res.body);
-           return {"statusCode": res.statusCode, "primaryEndpoints": JSON.stringify(JSON.parse(res.body).properties.primaryEndpoints)};
-         }
