@@ -3,35 +3,72 @@ namespace: objectstorage
 storage-account:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "accountName", "storageAccountObject" ]
+    required: [ "subscriptionId", "resourceGroupName" , "accountName", "accessKeySecret", "storageAccountObject" ]
     subscriptionId:
       type: string
     resourceGroupName:
       type: string
     accountName:
-      type: string    
+      type: string
+    accessKeySecret:
+      type: string
     storageAccountObject:
-      type: string    
+      type: string
   requires:
     - cloud/azure
+    - secret
+  checks:
+    readiness:
+      initialDelay: 30
+      attempts: 5
+      period: 15
+      code: |
+        var readinessFunc = function(subscriptionId, resourceGroupName, accountName) {
+          return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
+        }
+        
+        var getAccessKey = function(subscriptionId, resourceGroupName, accountName) {
+          return azure.post("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"/listKeys?api-version=2022-09-01");
+        }  
+        
+        function main(definition, state, context) {
+          var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.accountName );
+          provisioningState = JSON.parse(res.body).properties.provisioningState;
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+          if (provisioningState != "Succeeded" ) {
+            throw new Error("Storage account is not active yet. Provisioning state is " + provisioningState);
+          }
+        
+          res = getAccessKey(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.storageAccountObject);
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+          console.log(JSON.stringify(res)); 
+          secret.set(definition.accessKeySecret, JSON.parse(res.body).keys[0].value);
+        
+          state["provisioningState"] = provisioningState; 
+          return state;
+        }
   lifecycle:
     create: |
       var createStorageAccount = function(subscriptionId, resourceGroupName, accountName, storageAccountObject) {
-         const requestBody = storageAccountObject;
-        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+        const requestBody = storageAccountObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       }
-           
+      
       function main(definition, state, context) {
-           let res = createStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.storageAccountObject );
-           console.log(JSON.stringify(res));
-           if (res.error) {
-             throw new Error(res.error + ", body: " + res.body);
-           }
-           return {"statusCode": res.statusCode};
-         }
+        let res = createStorageAccount(definition.subscriptionId, definition.resourceGroupName, definition.accountName, definition.storageAccountObject );
+        console.log(JSON.stringify(res));
+        if (res.error) {
+          throw new Error(res.error + ", body: " + res.body);
+        }
+        return {"statusCode": res.statusCode};
+      }
     purge: |
       var deleteStorageAccount = function(subscriptionId, resourceGroupName, accountName) {
-        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2018-02-01", { "headers": {"Content-Type": "application/json"}});
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.Storage/storageAccounts/"+accountName+"?api-version=2022-09-01", { "headers": {"Content-Type": "application/json"}});
       }
       
       function main(definition, state, context) {
@@ -40,5 +77,8 @@ storage-account:
         if (res.error) {
           throw new Error(res.error + ", body: " + res.body);
         }
+        try {
+          secret.remove(definition.accessKeySecret);
+        } catch (error) {}
         return {"statusCode": res.statusCode};
       }
