@@ -47,7 +47,7 @@ storage-account:
           }
           console.log(JSON.stringify(res)); 
           secret.set(definition.accessKeySecret, JSON.parse(res.body).keys[0].value);
-          state["accessKeySecret"] = JSON.parse(res.body).keys[0].value; 
+        
           state["provisioningState"] = provisioningState; 
           return state;
         }
