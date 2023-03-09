@@ -56,6 +56,14 @@ Below is the sample body named `storageAccountObject` to create Storage Account 
    }
 ```
 
+In order to see endpoint url of the Storage Account execute below commands;
+
+      # run getPrimaryEndpoint lifecycle in entity
+      monk do  objectstorage/storage/getPrimaryEndpoint
+      # run monk describe command to see whole state of the entity
+      monk describe objectstorage/storage
+    
+
 When we don't need this event hub namespace anymore,
 we can delete it with `monk delete`:
 

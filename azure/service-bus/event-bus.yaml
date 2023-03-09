@@ -1,0 +1,97 @@
+namespace: service-bus
+
+bus-namespace:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    namespaceName:
+      type: string    
+    namespaceObject:
+      type: string
+    queueObject:
+       type: string                               
+  requires:
+    - cloud/azure
+  lifecycle:
+    create: |
+      let cli = require("cli");
+      var createNamespace = function(subscriptionId, resourceGroupName, namespaceName, namespaceObject) {
+         const requestBody = namespaceObject;
+         cli.output("requestbody", JSON.stringify(requestBody));         
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
+      function main(definition, state, context) {
+           let res = createNamespace(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.namespaceObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }
+    purge: |
+      var deleteNamespace = function(subscriptionId, resourceGroupName, namespaceName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      }
+      function main(definition, state, context) {
+           let res = deleteNamespace(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+    createQueue: |
+      var createQueue = function(subscriptionId, resourceGroupName, namespaceName, queueName, queueObject) {
+         const requestBody = queueObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      }
+      function main(definition, state, context) {
+           let res = createQueue(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName,  definition.queueObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }  
+    deleteQueue: |
+      var deleteQueue = function(subscriptionId, resourceGroupName, namespaceName, queueName) {
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      }
+      function main(definition, state, context) {
+           let res = deleteQueue(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }  
+    createTopic: |
+      var createTopic = function(subscriptionId, resourceGroupName, namespaceName, topicName, topicObject) {
+         const requestBody = queueObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      }
+      function main(definition, state, context) {
+           let res = createTopic(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName,  definition.topicObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         } 
+    deleteTopic: |
+      var createTopic = function(subscriptionId, resourceGroupName, namespaceName, topicName) {
+         const requestBody = queueObject;
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"} });
+      }
+      function main(definition, state, context) {
+           let res = createTopic(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }                     
