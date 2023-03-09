@@ -1,11 +1,11 @@
-namespace: event-bus
+namespace: service-bus
 
 busnamespace:
-  defines: event-bus/bus-namespace
+  defines: service-bus/bus-namespace
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
-  resourceGroupName: "rg-event-bus"
-  namespaceName: "monkeventbusnamespace"
-  queueName: "monkeventbusqueue"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  queueName: "monkservicebusqueue"
   topicName: "monktopic"
   namespaceObject: |
    {

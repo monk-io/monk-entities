@@ -1,2 +1,2 @@
-REPO event-bus
-LOAD event-bus.yaml stack.yaml
+REPO service-bus
+LOAD service-bus.yaml stack.yaml
