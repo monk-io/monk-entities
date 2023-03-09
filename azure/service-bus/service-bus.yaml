@@ -12,8 +12,14 @@ bus-namespace:
       type: string    
     namespaceObject:
       type: string
+    queueName:
+       type: string
+    topicName:
+       type: string             
     queueObject:
-       type: string                               
+       type: string
+    topicObject:
+       type: string                                     
   requires:
     - cloud/azure
   lifecycle:
@@ -71,8 +77,8 @@ bus-namespace:
          }  
     createTopic: |
       var createTopic = function(subscriptionId, resourceGroupName, namespaceName, topicName, topicObject) {
-         const requestBody = queueObject;
-        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+         const requestBody = topicObject;
+        return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       }
       function main(definition, state, context) {
            let res = createTopic(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName,  definition.topicObject );
@@ -84,8 +90,7 @@ bus-namespace:
          } 
     deleteTopic: |
       var createTopic = function(subscriptionId, resourceGroupName, namespaceName, topicName) {
-         const requestBody = queueObject;
-        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"} });
+        return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"} });
       }
       function main(definition, state, context) {
            let res = createTopic(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName );

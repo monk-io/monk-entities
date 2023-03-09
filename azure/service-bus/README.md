@@ -1,7 +1,7 @@
-# Azure Service-Hub
+# Azure Service-Bus
 
-Entity to manage Azure Service Hub.
-It will allow us to create new Azure Service Hub using Monk.
+Entity to manage Azure Service Bus.
+It will allow us to create new Azure Service Bus using Monk.
 
 ## Usage
 
@@ -11,9 +11,9 @@ We'll use Monk CLI to load and run everything:
       monk load MANIFEST
       
       # run to trigger a "create" event
-      monk run service-hub/hubnamespace
+      monk run service-bus/busnamespace
 
-Below is the sample body named `namespaceObject` to create Event Hub namespace and it can be extend with [Azure Service hub Namespace REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/namespaces/create-or-update?tabs=HTTP
+Below is the sample body named `namespaceObject` to create Service Bus namespace and it can be extend with [Azure Service Bus Namespace REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/namespaces/create-or-update?tabs=HTTP
 
 ```json
    {
@@ -29,20 +29,20 @@ Below is the sample body named `namespaceObject` to create Event Hub namespace a
    }
 ```
 
-When we don't need this event hub namespace anymore,
+When we don't need this service bus namespace anymore,
 we can delete it with `monk delete`:
 
-      monk delete event-hub/hubnamespace
+      monk delete service-bus/busnamespace
 
-This should remove Entity from Monk and the Azure Event Hub namespace resource from Azure.
+This should remove Entity from Monk and the Azure service bus namespace resource from Azure.
 
 ### Queue
 
-In order to create or update a Queue as a nested resource within a Azure Service Hub namespace.
+In order to create or update a Queue as a nested resource within a Azure Service Bus namespace.
 
-      monk do  service-hub/hubnamespace/createQueue
+      monk do  service-bus/busnamespace/createQueue
 
-Below is the sample body named `createQueue` to create Event Hub and it can be extend with [Azure Event hub Service Hub REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/queues/create-or-update?tabs=HTTP)
+Below is the sample body named `createQueue` to create service bus and it can be extend with [Azure service bus Service Bus REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/queues/create-or-update?tabs=HTTP)
 
 ```json
    {
@@ -52,20 +52,20 @@ Below is the sample body named `createQueue` to create Event Hub and it can be e
    }
 ```
 
-When we don't need this Event Hub anymore,
+When we don't need this service bus anymore,
 we can delete it with: 
 
-      monk do  event-hub/hubnamespace/deleteQueue
+      monk do  service-bus/busnamespace/deleteQueue
 
 
 
 ### Topic
 
-In order to create or update a Topic as a nested resource within a Azure Service Hub.
+In order to create or update a Topic as a nested resource within a Azure Service Bus.
 
-      monk do  event-hub/hubnamespace/createTopic
+      monk do  service-bus/busnamespace/createTopic
 
-Below is the sample body named `createTopic` to create Service Topic  and it can be extend with [Azure Service hub Consumer Group REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/topics/create-or-update?tabs=HTTP)
+Below is the sample body named `createTopic` to create Service Topic  and it can be extend with [Azure Service Bus Consumer Group REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/topics/create-or-update?tabs=HTTP)
 
 ```json
    {
@@ -78,4 +78,4 @@ Below is the sample body named `createTopic` to create Service Topic  and it can
 When we don't need this Consumer Group anymore,
 we can delete it with: 
 
-      monk do  event-hub/hubnamespace/deleteTopic
+      monk do  service-bus/busnamespace/deleteTopic
