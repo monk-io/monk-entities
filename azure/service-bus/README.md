@@ -40,7 +40,7 @@ This should remove Entity from Monk and the Azure service bus namespace resource
 
 In order to create or update a Queue as a nested resource within a Azure Service Bus namespace.
 
-      monk do  service-bus/busnamespace/createQueue
+      monk run service-bus/busqueue
 
 Below is the sample body named `createQueue` to create service bus and it can be extend with [Azure service bus Service Bus REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/queues/create-or-update?tabs=HTTP)
 
@@ -55,7 +55,7 @@ Below is the sample body named `createQueue` to create service bus and it can be
 When we don't need this service bus anymore,
 we can delete it with: 
 
-      monk do  service-bus/busnamespace/deleteQueue
+      monk delete service-bus/busqueue
 
 
 
@@ -63,7 +63,7 @@ we can delete it with:
 
 In order to create or update a Topic as a nested resource within a Azure Service Bus.
 
-      monk do  service-bus/busnamespace/createTopic
+      monk run service-bus/bustopic
 
 Below is the sample body named `createTopic` to create Service Topic  and it can be extend with [Azure Service Bus Consumer Group REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/topics/create-or-update?tabs=HTTP)
 
@@ -78,4 +78,4 @@ Below is the sample body named `createTopic` to create Service Topic  and it can
 When we don't need this Consumer Group anymore,
 we can delete it with: 
 
-      monk do  service-bus/busnamespace/deleteTopic
+      monk delete service-bus/bustopic

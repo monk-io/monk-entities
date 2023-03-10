@@ -5,8 +5,6 @@ busnamespace:
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
-  queueName: "monkservicebusqueue"
-  topicName: "monktopic"
   namespaceObject: |
    {
      "sku": {
@@ -19,12 +17,26 @@ busnamespace:
        "tag2": "value2"
      }
    }
+
+busqueue:
+  defines: service-bus/bus-queue
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  queueName: "monkservicebusqueue"
   queueObject: |
    {
      "properties": {
        "enablePartitioning": true
      }
    }
+
+bustopic:
+  defines: service-bus/bus-topic
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  topicName: "monkservicebustopic"
   topicObject: |
    {
      "properties": {
