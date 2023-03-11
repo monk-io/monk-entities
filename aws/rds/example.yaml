@@ -6,7 +6,9 @@ my-db:
   instance: db.t3.small
   identifier: my-db
   engine: postgresql
-  password: my-password
+  password-secret: my-password
+  permitted-secrets:
+    my-password: true
   username: myusername
   storage: 20
   skip-final-snapshot: true

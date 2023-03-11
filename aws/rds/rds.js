@@ -1,6 +1,7 @@
 let aws = require("cloud/aws");
 let cli = require("cli");
 let http = require("http");
+let secret = require("secret");
 
 function getDateString() {
     let date = new Date();
@@ -29,13 +30,21 @@ let createRDS = function (def) {
         "service": "rds",
         "region": def["region"]
     };
+    let password = "";
+    try {
+        password = secret.get(def["password-secret"]);
+      } catch (error) {
+        // generate password and save to secret if it doesn't exist
+        secret.set(def["password-secret"], secret.randString(16));
+        password = secret.get(def["password-secret"]);
+      }
 
     let param = {
         "DBInstanceIdentifier": def["identifier"],
         "DBInstanceClass": def["instance"],
         "Engine": def["engine"],
         "MasterUsername": def["username"],
-        "MasterUserPassword": def["password"],
+        "MasterUserPassword": password,
         "AllocatedStorage": def["storage"],
         "Version": "2014-09-01",
         "SignatureVersion": def["signature-version"],
@@ -109,6 +118,8 @@ let deleteRDS = function (def) {
             "service": data.service,
             "region": data.region  
         });
+    
+    secret.remove(def["password-secret"]);
 
     return res
     
@@ -142,6 +153,20 @@ let getRDS = function (def) {
     
 }
 
+let showPassword = function (def) {
+    cli.output("showPassword");
+    let password = "";
+    try {
+        password = secret.get(def["password-secret"]);
+        } catch (error) {
+        // generate password and save to secret if it doesn't exist
+        secret.set(def["password-secret"], secret.randString(16));
+        password = secret.get(def["password-secret"]);
+    }
+    cli.output("Password: " + password);
+    return password;
+}
+
 function main(def, state, ctx) {
     cli.output(ctx.action);
     let res = {};
@@ -156,9 +181,11 @@ function main(def, state, ctx) {
         case "create-snapshot":
             res = createSnapshot(def);
             break;
-
         case "get":
             res = getRDS(def);
+            break;
+        case "show-password":
+            res = showPassword(def);
             break;
         default:
             // no action defined

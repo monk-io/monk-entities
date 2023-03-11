@@ -3,7 +3,7 @@ namespace: aws
 rds:
   defines: entity
   schema:
-    required: [ "storage", "region", "instance", "identifier", "engine", "password", "username" ]
+    required: [ "storage", "region", "instance", "identifier", "engine", "password-secret", "username" ]
     storage:
       type: integer
     region:
@@ -14,7 +14,7 @@ rds:
       type: string
     engine:
       type: string
-    password:
+    password-secret:
       type: string
     username:
       type: string
@@ -37,3 +37,4 @@ rds:
     testt: ""
     create-snapshot: ""
     get: ""
+    show-password: ""
