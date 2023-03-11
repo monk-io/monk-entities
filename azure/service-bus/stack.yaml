@@ -43,3 +43,54 @@ bustopic:
        "enableExpress": true
      }
    }
+
+namespaceAuthorizationRule:
+  defines: service-bus/bus-namespace-authRole
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  authorizationRuleName: "namespace-auth-role"
+  AuthorizationRuleObject: |
+   {
+     "properties": {
+       "rights": [
+         "Listen",
+         "Send"
+       ]
+     }
+   }
+
+queueAuthorizationRule:
+  defines: service-bus/bus-queue-authRole
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  queueName: "monkservicebusqueue"
+  authorizationRuleName: "queue-auth-role"
+  AuthorizationRuleObject: |
+   {
+     "properties": {
+       "rights": [
+         "Listen",
+         "Send"
+       ]
+     }
+   }
+
+topicAuthorizationRule:
+  defines: service-bus/bus-topic-authRole
+  subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
+  resourceGroupName: "rg-service-bus"
+  namespaceName: "monkservicebusnamespace"
+  topicName: "monkservicebustopic"
+  authorizationRuleName: "topic-auth-role"
+  AuthorizationRuleObject: |
+   {
+     "properties": {
+       "rights": [
+         "Listen",
+         "Send"
+       ]
+     }
+   }   
+

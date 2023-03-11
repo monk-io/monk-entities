@@ -130,3 +130,200 @@ bus-topic:
            }
            return {"statusCode": res.statusCode};
          }     
+
+
+bus-namespace-authRole:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "AuthorizationRuleObject"]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    namespaceName:
+      type: string    
+    authorizationRuleName:
+       type: string          
+    AuthorizationRuleObject:
+       type: string                                  
+  requires:
+    - cloud/azure
+    - secret
+  checks:
+    readiness:
+      initialDelay: 10
+      attempts: 5
+      period: 5
+      code: |
+        let secret = require("secret");
+        var getAccessKey = function(subscriptionId, resourceGroupName, namespaceName, authorizationRuleName)  {
+           return azure.post("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/AuthorizationRules/"+authorizationRuleName+"/listKeys"+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        } 
+        function main(definition, state, context) {
+             let res = getAccessKey(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName);
+             console.log(JSON.stringify(res));
+             if (res.error) {
+               throw new Error(res.error + ", body: " + res.body);
+             }
+             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             return state;
+           }
+  lifecycle:
+    create: |
+      var createNamespaceAuthRole = function(subscriptionId, resourceGroupName, namespaceName, authorizationRuleName, AuthorizationRuleObject) {
+         const requestBody = AuthorizationRuleObject;
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
+      function main(definition, state, context) {
+           let res = createNamespaceAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }
+    purge: |
+      var deleteNamespaceAuthRole = function(subscriptionId, resourceGroupName, namespaceName, authorizationRuleName) {
+         return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      } 
+      function main(definition, state, context) {
+           let res = deleteNamespaceAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode};
+         }
+
+bus-queue-authRole:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "AuthorizationRuleObject"]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    namespaceName:
+      type: string 
+    queueName:
+      type: string           
+    authorizationRuleName:
+       type: string          
+    AuthorizationRuleObject:
+       type: string                                  
+  requires:
+    - cloud/azure
+    - secret
+  checks:
+    readiness:
+      initialDelay: 10
+      attempts: 5
+      period: 5
+      code: |
+        let secret = require("secret");
+        var getAccessKey = function(subscriptionId, resourceGroupName, namespaceName, queueName, authorizationRuleName)  {
+           return azure.post("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"/AuthorizationRules/"+authorizationRuleName+"/ListKeys"+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        } 
+        function main(definition, state, context) {
+             let res = getAccessKey(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName, definition.authorizationRuleName);
+             console.log(JSON.stringify(res));
+             if (res.error) {
+               throw new Error(res.error + ", body: " + res.body);
+             }
+             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             return state;
+           }    
+  lifecycle:
+    create: |
+      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, queueName, authorizationRuleName, AuthorizationRuleObject) {
+         const requestBody = AuthorizationRuleObject;
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
+      function main(definition, state, context) {
+           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }
+    purge: |
+      var deleteQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, queueName, authorizationRuleName) {
+         return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      } 
+      function main(definition, state, context) {
+           let res = deleteQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName,  definition.authorizationRuleName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }
+
+bus-topic-authRole:
+  defines: entity
+  schema:
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "AuthorizationRuleObject"]
+    subscriptionId:
+      type: string
+    resourceGroupName:
+      type: string
+    namespaceName:
+      type: string 
+    topicName:
+      type: string           
+    authorizationRuleName:
+       type: string          
+    AuthorizationRuleObject:
+       type: string                                  
+  requires:
+    - cloud/azure
+    - secret
+  checks:
+    readiness:
+      initialDelay: 10
+      attempts: 5
+      period: 5
+      code: |
+        let secret = require("secret");
+        var getAccessKey = function(subscriptionId, resourceGroupName, namespaceName, topicName, authorizationRuleName)  {
+           return azure.post("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"/AuthorizationRules/"+authorizationRuleName+"/ListKeys"+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        } 
+        function main(definition, state, context) {
+             let res = getAccessKey(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName, definition.authorizationRuleName);
+             console.log(JSON.stringify(res));
+             if (res.error) {
+               throw new Error(res.error + ", body: " + res.body);
+             }
+             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             return state;
+           }    
+  lifecycle:
+    create: |
+      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, topicName, authorizationRuleName, AuthorizationRuleObject) {
+         const requestBody = AuthorizationRuleObject;
+         return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
+      } 
+      function main(definition, state, context) {
+           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }
+    purge: |
+      var deleteQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, topicName, authorizationRuleName) {
+         return azure.delete("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+      } 
+      function main(definition, state, context) {
+           let res = deleteQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName,  definition.authorizationRuleName);
+           console.log(JSON.stringify(res));
+           if (res.error) {
+             throw new Error(res.error + ", body: " + res.body);
+           }
+           return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
+         }         
