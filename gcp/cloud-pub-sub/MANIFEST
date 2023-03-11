@@ -1,0 +1,3 @@
+REPO cşpud-pub-sub
+LOAD pubsub.yml example.yml
+RESOURCES pubsub.js
