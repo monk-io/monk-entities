@@ -1,0 +1,38 @@
+namespace: aws
+
+redshift:
+  defines: entity
+  schema:
+    required: [ "nodes", "region", "instance", "identifier", "password-secret", "username" ]
+    storage:
+      type: integer
+    region:
+      type: string
+    instance:
+      type: string
+    identifier:
+      type: string
+    password-secret:
+      type: string
+    username:
+      type: string
+    signature-method:
+      type: string
+      default: HmacSHA256
+    signature-version:
+      type: string
+      default: 4
+    skip-final-snapshot:
+      type: string
+      default: true
+    
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< redshift.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""
+    show-password: ""
