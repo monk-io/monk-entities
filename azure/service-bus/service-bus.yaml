@@ -14,6 +14,29 @@ bus-namespace:
       type: string                                  
   requires:
     - cloud/azure
+  checks:
+    readiness:
+      initialDelay: 30
+      attempts: 5
+      period: 15
+      code: |
+        var readinessFunc = function(subscriptionId, resourceGroupName, namespaceName) {
+          return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        }
+                
+        function main(definition, state, context) {
+          var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName );
+          provisioningState = JSON.parse(res.body).properties.provisioningState;
+          console.log(JSON.stringify(res));          
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+          if (provisioningState != "Succeeded" ) {
+            throw new Error("Service Bus namespace is not active yet. Provisioning state is " + provisioningState);
+          }
+          state["provisioningState"] = provisioningState; 
+          return state;
+        }    
   lifecycle:
     create: |
       let cli = require("cli");
@@ -59,6 +82,29 @@ bus-queue:
        type: string                                  
   requires:
     - cloud/azure
+  checks:
+    readiness:
+      initialDelay: 5
+      attempts: 5
+      period: 15
+      code: |
+        var readinessFunc = function(subscriptionId, resourceGroupName, namespaceName, queueName) {
+          return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        }
+                
+        function main(definition, state, context) {
+          var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName);
+          status = JSON.parse(res.body).properties.status;
+          console.log(JSON.stringify(res));           
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+          if (status != "Active" ) {
+            throw new Error("Service Bus queue is not active yet. status state is " + status);
+          }        
+          state["status"] = status; 
+          return state;
+        }     
   lifecycle:
     create: |
       var createQueue = function(subscriptionId, resourceGroupName, namespaceName, queueName, queueObject) {
@@ -102,6 +148,29 @@ bus-topic:
        type: string                                  
   requires:
     - cloud/azure
+  checks:
+    readiness:
+      initialDelay: 5
+      attempts: 5
+      period: 15
+      code: |
+        var readinessFunc = function(subscriptionId, resourceGroupName, namespaceName, topicName) {
+          return azure.get("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}});
+        }
+                
+        function main(definition, state, context) {
+          var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName);
+          status = JSON.parse(res.body).properties.status;
+          console.log(JSON.stringify(res));           
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+          if (status != "Active" ) {
+            throw new Error("Service Bus queue is not active yet. status state is " + status);
+          }        
+          state["status"] = status; 
+          return state;
+        }     
   lifecycle:
     create: |
       let cli = require("cli");
