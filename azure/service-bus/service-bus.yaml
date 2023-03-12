@@ -132,7 +132,7 @@ bus-topic:
          }     
 
 
-bus-namespace-authRole:
+bus-namespace-auth-role:
   defines: entity
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "AuthorizationRuleObject"]
@@ -171,8 +171,6 @@ bus-namespace-authRole:
              }
              secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
              secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);
-             password = secret.get(definition.primaryConnectionString);  
-             console.log("password is " + password );  
              return state;
            }
   lifecycle:
@@ -199,10 +197,12 @@ bus-namespace-authRole:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
+           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);           
            return {"statusCode": res.statusCode};
          }
 
-bus-queue-authRole:
+bus-queue-auth-role:
   defines: entity
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "AuthorizationRuleObject"]
@@ -269,10 +269,12 @@ bus-queue-authRole:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
+           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
            return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
          }
 
-bus-topic-authRole:
+bus-topic-auth-role:
   defines: entity
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "AuthorizationRuleObject"]
@@ -339,5 +341,7 @@ bus-topic-authRole:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
+           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
            return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
          }         

@@ -45,7 +45,7 @@ bustopic:
    }
 
 namespaceAuthorizationRule:
-  defines: service-bus/bus-namespace-authRole
+  defines: service-bus/bus-namespace-auth-role
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -66,7 +66,7 @@ namespaceAuthorizationRule:
    }
 
 queueAuthorizationRule:
-  defines: service-bus/bus-queue-authRole
+  defines: service-bus/bus-queue-auth-role
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -88,7 +88,7 @@ queueAuthorizationRule:
    }
 
 topicAuthorizationRule:
-  defines: service-bus/bus-topic-authRole
+  defines: service-bus/bus-topic-auth-role
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
