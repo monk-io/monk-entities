@@ -1,0 +1,21 @@
+namespace: gcp
+
+# BEFORE RUNNING:
+#  If not already done, enable the Cloud SQL Administration API
+#  and check the quota for your project at
+#  https://console.developers.google.com/apis/api/sqladmin
+big-query:
+  defines: entity
+  schema:
+    required: [ "dataset" ]
+    dataset:
+      type: string
+  requires:
+    - cloud/gcp
+  lifecycle:
+    sync: <<< big-query.js
+    update: ""
+    recreate: ""
+    create-table: ""
+    delete-table: ""
+    get: ""
