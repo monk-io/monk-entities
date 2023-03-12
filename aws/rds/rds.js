@@ -160,8 +160,7 @@ let showPassword = function (def) {
         password = secret.get(def["password-secret"]);
         } catch (error) {
         // generate password and save to secret if it doesn't exist
-        secret.set(def["password-secret"], secret.randString(16));
-        password = secret.get(def["password-secret"]);
+        throw new Error("Password secret not found");
     }
     cli.output("Password: " + password);
     return password;
