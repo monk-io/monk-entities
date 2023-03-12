@@ -145,7 +145,11 @@ bus-namespace-authRole:
     authorizationRuleName:
        type: string          
     AuthorizationRuleObject:
-       type: string                                  
+       type: string  
+    primaryConnectionString:
+       type: string          
+    secondaryConnectionString:
+       type: string                                       
   requires:
     - cloud/azure
     - secret
@@ -166,7 +170,9 @@ bus-namespace-authRole:
                throw new Error(res.error + ", body: " + res.body);
              }
              secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);
+             password = secret.get(definition.primaryConnectionString);  
+             console.log("password is " + password );  
              return state;
            }
   lifecycle:
@@ -211,7 +217,11 @@ bus-queue-authRole:
     authorizationRuleName:
        type: string          
     AuthorizationRuleObject:
-       type: string                                  
+       type: string
+    primaryConnectionString:
+       type: string          
+    secondaryConnectionString:
+       type: string
   requires:
     - cloud/azure
     - secret
@@ -277,7 +287,11 @@ bus-topic-authRole:
     authorizationRuleName:
        type: string          
     AuthorizationRuleObject:
-       type: string                                  
+       type: string 
+    primaryConnectionString:
+       type: string          
+    secondaryConnectionString:
+       type: string                                        
   requires:
     - cloud/azure
     - secret

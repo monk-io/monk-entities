@@ -50,6 +50,11 @@ namespaceAuthorizationRule:
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
   authorizationRuleName: "namespace-auth-role"
+  primaryConnectionString: "primaryConnectionString"
+  secondaryConnectionString: "secondaryConnectionString"
+  permitted-secrets:
+    primaryConnectionString: true
+    secondaryConnectionString: true     
   AuthorizationRuleObject: |
    {
      "properties": {
@@ -67,6 +72,11 @@ queueAuthorizationRule:
   namespaceName: "monkservicebusnamespace"
   queueName: "monkservicebusqueue"
   authorizationRuleName: "queue-auth-role"
+  primaryConnectionString: "primaryConnectionString"
+  secondaryConnectionString: "secondaryConnectionString"   
+  permitted-secrets:
+    primaryConnectionString: true
+    secondaryConnectionString: true   
   AuthorizationRuleObject: |
    {
      "properties": {
@@ -84,6 +94,11 @@ topicAuthorizationRule:
   namespaceName: "monkservicebusnamespace"
   topicName: "monkservicebustopic"
   authorizationRuleName: "topic-auth-role"
+  primaryConnectionString: "primaryConnectionString"
+  secondaryConnectionString: "secondaryConnectionString" 
+  permitted-secrets:
+    primaryConnectionString: true
+    secondaryConnectionString: true      
   AuthorizationRuleObject: |
    {
      "properties": {
