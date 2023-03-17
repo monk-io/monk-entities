@@ -1,0 +1,21 @@
+namespace: poc
+
+serviceusage:
+  defines: entity
+  schema:
+    required: [ "project" ]
+    name:
+      type: string
+    apis:
+      type: array
+      items:
+        type: string
+    project:
+      type: string
+  lifecycle:
+    sync: <<< serviceusage-sync.js
+  checks:
+    readiness:
+      code: ""
+      period: 10
+      attempts: 15

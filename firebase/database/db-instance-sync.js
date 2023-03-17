@@ -7,6 +7,10 @@ let createDBInstance = function (def) {
         type: "USER_DATABASE"
     };
 
+    if (def.name === def.project + "-default-rtdb") {
+        body.type = "DEFAULT_DATABASE";
+    }
+
     return gcp.post(BASE_URL + "/projects/" + def["project"] +
         "/locations/" + def["location"] + "/instances?databaseId=" + def["name"],
         {"body": JSON.stringify(body)});
@@ -118,6 +122,9 @@ function main(def, state, ctx) {
             }
             break;
         case "update":
+            if (!def.rules || !state.url) {
+                return;
+            }
             let rulesRes = setRules(state.url, def.rules);
             if (rulesRes.error) {
                 throw new Error(rulesRes.error + ", body " + rulesRes.body);
@@ -135,8 +142,13 @@ function main(def, state, ctx) {
                 // resource is removed
                 return;
             }
+            let exBody = JSON.parse(res.body);
 
-            if (state.state !== "DISABLED") {
+            if (exBody.state === "DELETED") {
+                // resource is already deleted
+                return;
+            }
+            if (exBody.state !== "DISABLED") {
                 res = disableDBInstance(def);
                 if (res.error) {
                     throw new Error(res.error + ", body " + res.body);
@@ -144,7 +156,7 @@ function main(def, state, ctx) {
             }
             if (def.name === def.project + "-default-rtdb") {
                 // cannot delete the default database
-                return
+                return;
             }
             res = deleteDBInstance(def);
             break;

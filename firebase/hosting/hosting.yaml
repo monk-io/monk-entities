@@ -8,6 +8,8 @@ firebase-site:
       type: string
     project:
       type: string
+    keep-on-delete:
+      type: bool
   lifecycle:
     sync: <<< site-sync.js
 

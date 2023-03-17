@@ -1,2 +1,2 @@
 REPO monk-entities
-DIRS aws/s3-bucket firebase/cloudfunc-v1 firebase/cloudfunc-v2 firebase/database firebase/hosting gcp/cloud-sql
+DIRS aws/s3-bucket firebase/cloudfunc-v1 firebase/cloudfunc-v2 firebase/database firebase/hosting gcp/cloud-sql gcp/serviceusage
