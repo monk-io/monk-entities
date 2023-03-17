@@ -1,0 +1,11 @@
+namespace: poc
+
+enable-apis:
+  defines: poc/serviceusage
+  apis:
+    - firebasedatabase.googleapis.com
+    - firebasehosting.googleapis.com
+    - cloudfunctions.googleapis.com
+    - artifactregistry.googleapis.com
+    - cloudbuild.googleapis.com
+  project: common-access-project

@@ -4,6 +4,9 @@ mysite:
   defines: poc/firebase-site
   name: common-access-project-orekhyk0
   project: common-access-project
+  # Keep the site on purge, so it can be reused later. Deleting a site is a permanent action.
+  # If you delete a site, the SITE_ID cannot be reactivated by you or anyone else.
+  keep-on-delete: true
 
 mysite-beta:
   defines: poc/firebase-channel

@@ -35,6 +35,10 @@ function main(def, state, ctx) {
             res = createSite(def);
             break;
         case "purge":
+            if (def["keep-on-delete"]) {
+                return;
+            }
+
             res = getSite(def);
             if (res.error && res.error.includes("response code 404")) {
                 // resource is removed
