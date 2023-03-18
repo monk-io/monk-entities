@@ -1,0 +1,45 @@
+namespace: aws
+
+rds:
+  defines: entity
+  schema:
+    required: [ "storage", "region", "instance", "identifier", "engine", "password-secret", "username" ]
+    storage:
+      type: integer
+    region:
+      type: string
+    instance:
+      type: string
+    identifier:
+      type: string
+    engine:
+      type: string
+    password-secret:
+      type: string
+    username:
+      type: string
+    signature-method:
+      type: string
+      default: HmacSHA256
+    signature-version:
+      type: string
+      default: 4
+    skip-final-snapshot:
+      type: string
+      default: true
+    
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< rds.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""
+    show-password: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15

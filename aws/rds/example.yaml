@@ -1,0 +1,16 @@
+namespace: aws
+
+my-db:
+  defines: aws/rds
+  region: eu-north-1
+  instance: db.t3.small
+  identifier: my-db
+  engine: postgres
+  password-secret: my-password
+  permitted-secrets:
+    my-password: true
+  username: myusername
+  storage: 20
+  skip-final-snapshot: true
+  signature-version: 4
+  signature-method: HmacSHA256

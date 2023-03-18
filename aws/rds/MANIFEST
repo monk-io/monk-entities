@@ -1,0 +1,3 @@
+REPO rds
+LOAD rds.yaml example.yaml
+RESOURCES rds.js
