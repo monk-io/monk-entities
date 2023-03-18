@@ -1,0 +1,19 @@
+[
+    {
+        "name": "demotable",
+        "fields": [
+            {
+                "name": "name",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "maxLength": "12"
+            },
+            {
+                "name": "title",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "maxLength": "200"
+            }
+        ]
+    }
+]

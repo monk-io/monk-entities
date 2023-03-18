@@ -1,0 +1,6 @@
+namespace: gcp
+
+my-query:
+  defines: gcp/big-query
+  dataset: monkdemo1
+  tables: <<< table.json

@@ -1,0 +1,3 @@
+REPO big-query
+LOAD big-query.yml example.yml
+RESOURCES big-query.js table.json
