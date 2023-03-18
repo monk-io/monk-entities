@@ -204,7 +204,7 @@ bus-topic:
 bus-namespace-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "authorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString" ]
     subscriptionId:
       type: string
     resourceGroupName:
@@ -274,7 +274,7 @@ bus-namespace-auth-role:
 bus-queue-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "authorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString"]
     subscriptionId:
       type: string
     resourceGroupName:
@@ -346,7 +346,7 @@ bus-queue-auth-role:
 bus-topic-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "authorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString"]
     subscriptionId:
       type: string
     resourceGroupName:
