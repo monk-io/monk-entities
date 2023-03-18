@@ -45,7 +45,7 @@ We'll use Monk CLI to load and run everything:
 
 primaryConnectionString/secondaryConnectionString including keys will be saved as secret in existing cluster after run above entity, For more details: [Secret](https://monk-docs.web.app/docs/entities#module-secret)
 
-Below is the sample body named `AuthorizationRuleObject` to create Service Bus namespace authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Namespace-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/namespaces-authorization-rules/create-or-update-authorization-rule?tabs=HTTP)
+Below is the sample body named `authorizationRuleObject` to create Service Bus namespace authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Namespace-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/namespaces-authorization-rules/create-or-update-authorization-rule?tabs=HTTP)
 
 ```json
    {
@@ -96,7 +96,7 @@ We'll use Monk CLI to load and run everything:
 
 primaryConnectionString/secondaryConnectionString including keys will be saved as secret in existing cluster after run above entity, For more details: [Secret](https://monk-docs.web.app/docs/entities#module-secret)
 
-Below is the sample body named `AuthorizationRuleObject` to create Service Bus queue authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Queues-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/queues-authorization-rules/create-or-update-authorization-rule?tabs=HTTP)
+Below is the sample body named `authorizationRuleObject` to create Service Bus queue authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Queues-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/queues-authorization-rules/create-or-update-authorization-rule?tabs=HTTP)
 
 ```json
    {
@@ -141,7 +141,7 @@ We'll use Monk CLI to load and run everything:
 
 primaryConnectionString/secondaryConnectionString including keys will be saved as secret in existing cluster after run above entity, For more details: [Secret](https://monk-docs.web.app/docs/entities#module-secret)
 
-Below is the sample body named `AuthorizationRuleObject` to create Service Bus queue authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Topics-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/topics%20%E2%80%93%20authorization%20rules/create-or-update-authorization-rule?tabs=HTTP)
+Below is the sample body named `authorizationRuleObject` to create Service Bus queue authorization rule and it's primary/secondary key also it can be extend with [Azure Service Bus Topics-Authorization Rules REST API reference](https://learn.microsoft.com/en-us/rest/api/servicebus/stable/topics%20%E2%80%93%20authorization%20rules/create-or-update-authorization-rule?tabs=HTTP)
 
 ```json
    {

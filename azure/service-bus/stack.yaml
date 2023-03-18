@@ -55,7 +55,7 @@ namespaceAuthorizationRule:
   permitted-secrets:
     primaryConnectionString: true
     secondaryConnectionString: true     
-  AuthorizationRuleObject: |
+  authorizationRuleObject: |
    {
      "properties": {
        "rights": [
@@ -77,7 +77,7 @@ queueAuthorizationRule:
   permitted-secrets:
     primaryConnectionString: true
     secondaryConnectionString: true   
-  AuthorizationRuleObject: |
+  authorizationRuleObject: |
    {
      "properties": {
        "rights": [
@@ -99,7 +99,7 @@ topicAuthorizationRule:
   permitted-secrets:
     primaryConnectionString: true
     secondaryConnectionString: true      
-  AuthorizationRuleObject: |
+  authorizationRuleObject: |
    {
      "properties": {
        "rights": [

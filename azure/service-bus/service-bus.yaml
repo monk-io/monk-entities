@@ -204,7 +204,7 @@ bus-topic:
 bus-namespace-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "AuthorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "authorizationRuleObject"]
     subscriptionId:
       type: string
     resourceGroupName:
@@ -213,7 +213,7 @@ bus-namespace-auth-role:
       type: string    
     authorizationRuleName:
        type: string          
-    AuthorizationRuleObject:
+    authorizationRuleObject:
        type: string  
     primaryConnectionString:
        type: string          
@@ -244,12 +244,12 @@ bus-namespace-auth-role:
            }
   lifecycle:
     create: |
-      var createNamespaceAuthRole = function(subscriptionId, resourceGroupName, namespaceName, authorizationRuleName, AuthorizationRuleObject) {
-         const requestBody = AuthorizationRuleObject;
+      var createNamespaceAuthRole = function(subscriptionId, resourceGroupName, namespaceName, authorizationRuleName, authorizationRuleObject) {
+         const requestBody = authorizationRuleObject;
          return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       } 
       function main(definition, state, context) {
-           let res = createNamespaceAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           let res = createNamespaceAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName, definition.authorizationRuleObject );
            console.log(JSON.stringify(res));
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
@@ -274,7 +274,7 @@ bus-namespace-auth-role:
 bus-queue-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "AuthorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "authorizationRuleObject"]
     subscriptionId:
       type: string
     resourceGroupName:
@@ -285,7 +285,7 @@ bus-queue-auth-role:
       type: string           
     authorizationRuleName:
        type: string          
-    AuthorizationRuleObject:
+    authorizationRuleObject:
        type: string
     primaryConnectionString:
        type: string          
@@ -316,12 +316,12 @@ bus-queue-auth-role:
            }    
   lifecycle:
     create: |
-      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, queueName, authorizationRuleName, AuthorizationRuleObject) {
-         const requestBody = AuthorizationRuleObject;
+      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, queueName, authorizationRuleName, authorizationRuleObject) {
+         const requestBody = authorizationRuleObject;
          return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/queues/"+queueName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       } 
       function main(definition, state, context) {
-           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName, definition.authorizationRuleName, definition.authorizationRuleObject );
            console.log(JSON.stringify(res));
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
@@ -346,7 +346,7 @@ bus-queue-auth-role:
 bus-topic-auth-role:
   defines: entity
   schema:
-    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "AuthorizationRuleObject"]
+    required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "authorizationRuleObject"]
     subscriptionId:
       type: string
     resourceGroupName:
@@ -357,7 +357,7 @@ bus-topic-auth-role:
       type: string           
     authorizationRuleName:
        type: string          
-    AuthorizationRuleObject:
+    authorizationRuleObject:
        type: string 
     primaryConnectionString:
        type: string          
@@ -388,12 +388,12 @@ bus-topic-auth-role:
            }    
   lifecycle:
     create: |
-      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, topicName, authorizationRuleName, AuthorizationRuleObject) {
-         const requestBody = AuthorizationRuleObject;
+      var createQueueAuthRole = function(subscriptionId, resourceGroupName, namespaceName, topicName, authorizationRuleName, authorizationRuleObject) {
+         const requestBody = authorizationRuleObject;
          return azure.put("https://management.azure.com/subscriptions/"+subscriptionId+"/resourceGroups/"+resourceGroupName+"/providers/Microsoft.ServiceBus/namespaces/"+namespaceName+"/topics/"+topicName+"/AuthorizationRules/"+authorizationRuleName+"?api-version=2021-11-01", { "headers": {"Content-Type": "application/json"}, "body": requestBody});
       } 
       function main(definition, state, context) {
-           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName, definition.authorizationRuleName, definition.AuthorizationRuleObject );
+           let res = createQueueAuthRole(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName, definition.authorizationRuleName, definition.authorizationRuleObject );
            console.log(JSON.stringify(res));
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
