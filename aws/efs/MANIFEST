@@ -1,0 +1,3 @@
+REPO aws
+LOAD efs.yml example.yml
+RESOURCES efs.js

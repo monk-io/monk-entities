@@ -1,0 +1,35 @@
+namespace: aws
+
+efs:
+  defines: entity
+  schema:
+    required: [ "token", "region", "performance_mode", "encrypted"]
+    token:
+      type: string
+    region:
+      type: string
+    encrypted:
+      type: bool
+    performance_mode:
+      type: string
+    throughput_mode:
+      type: string
+    provisioned_throughput_in_mibps:
+      type: integer
+    backup:
+      type: bool
+
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< efs.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""
+  checks:
+    readiness:
+      code: ""
+      period: 10
+      initialDelay: 5
