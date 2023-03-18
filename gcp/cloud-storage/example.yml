@@ -1,0 +1,6 @@
+namespace: gcp
+
+my-storage:
+  defines: gcp/cloud-storage
+  project: monk-379719
+  name: monk-demo-1

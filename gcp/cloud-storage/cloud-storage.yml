@@ -1,0 +1,29 @@
+namespace: gcp
+
+# BEFORE RUNNING:
+#  If not already done, enable the Cloud SQL Administration API
+#  and check the quota for your project at
+#  https://console.developers.google.com/apis/api/sqladmin
+cloud-storage:
+  defines: entity
+  schema:
+    required: [ "name", "project" ]
+    name:
+      type: string
+    project:
+      type: string
+    predefined-acl:
+      type: string
+    predefined-default-object-acl:
+      type: string
+    projection:
+      type: string
+  requires:
+    - cloud/gcp
+  lifecycle:
+    sync: <<< cloud-storage.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""

@@ -1,0 +1,3 @@
+REPO cloud-storage
+LOAD cloud-storage.yml example.yml
+RESOURCES cloud-storage.js
