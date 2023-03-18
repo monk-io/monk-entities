@@ -38,3 +38,8 @@ rds:
     create-snapshot: ""
     get: ""
     show-password: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15
