@@ -1,0 +1,3 @@
+REPO aurora
+LOAD aurora.yaml example.yaml
+RESOURCES aurora.js

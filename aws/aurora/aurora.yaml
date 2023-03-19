@@ -1,0 +1,43 @@
+namespace: aws
+
+aurora:
+  defines: entity
+  schema:
+    required: ["region", "instance", "identifier", "engine", "password-secret", "username" ]
+    region:
+      type: string
+    instance:
+      type: string
+    identifier:
+      type: string
+    engine:
+      type: string
+    password-secret:
+      type: string
+    username:
+      type: string
+    signature-method:
+      type: string
+      default: HmacSHA256
+    signature-version:
+      type: string
+      default: 4
+    skip-final-snapshot:
+      type: string
+      default: true
+    
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< aurora.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""
+    show-password: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15
