@@ -26,14 +26,14 @@ bus-namespace:
                 
         function main(definition, state, context) {
           var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName );
-          provisioningState = JSON.parse(res.body).properties.provisioningState;
-          console.log(JSON.stringify(res));          
           if (res.error) {
             throw new Error(res.error + ", body: " + res.body);
           }
           if (provisioningState != "Succeeded" ) {
             throw new Error("Service Bus namespace is not active yet. Provisioning state is " + provisioningState);
-          }
+          }          
+          provisioningState = JSON.parse(res.body).properties.provisioningState;
+          console.log(JSON.stringify(res));          
           state["provisioningState"] = provisioningState; 
           return state;
         }    
@@ -94,14 +94,14 @@ bus-queue:
                 
         function main(definition, state, context) {
           var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.queueName);
-          status = JSON.parse(res.body).properties.status;
-          console.log(JSON.stringify(res));           
           if (res.error) {
             throw new Error(res.error + ", body: " + res.body);
           }
           if (status != "Active" ) {
             throw new Error("Service Bus queue is not active yet. status state is " + status);
-          }        
+          }           
+          status = JSON.parse(res.body).properties.status;
+          console.log(JSON.stringify(res));                  
           state["status"] = status; 
           return state;
         }     
@@ -160,14 +160,14 @@ bus-topic:
                 
         function main(definition, state, context) {
           var res = readinessFunc(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.topicName);
-          status = JSON.parse(res.body).properties.status;
-          console.log(JSON.stringify(res));           
           if (res.error) {
             throw new Error(res.error + ", body: " + res.body);
           }
           if (status != "Active" ) {
             throw new Error("Service Bus queue is not active yet. status state is " + status);
-          }        
+          }           
+          status = JSON.parse(res.body).properties.status;
+          console.log(JSON.stringify(res));                  
           state["status"] = status; 
           return state;
         }     
@@ -234,12 +234,13 @@ bus-namespace-auth-role:
         } 
         function main(definition, state, context) {
              let res = getAccessKey(definition.subscriptionId, definition.resourceGroupName, definition.namespaceName, definition.authorizationRuleName);
-             console.log(JSON.stringify(res));
              if (res.error) {
                throw new Error(res.error + ", body: " + res.body);
              }
-             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);
+             console.log(JSON.stringify(res));
+             parsedBody = JSON.parse(res.body);
+             secret.set(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);
              return state;
            }
   lifecycle:
@@ -266,8 +267,9 @@ bus-namespace-auth-role:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);           
+           parsedBody = JSON.parse(res.body);
+           secret.remove(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);           
            return {"statusCode": res.statusCode};
          }
 
@@ -310,8 +312,9 @@ bus-queue-auth-role:
              if (res.error) {
                throw new Error(res.error + ", body: " + res.body);
              }
-             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             parsedBody = JSON.parse(res.body);
+             secret.set(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);        
              return state;
            }    
   lifecycle:
@@ -338,8 +341,9 @@ bus-queue-auth-role:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+           parsedBody = JSON.parse(res.body);
+           secret.remove(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);           
            return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
          }
 
@@ -382,8 +386,9 @@ bus-topic-auth-role:
              if (res.error) {
                throw new Error(res.error + ", body: " + res.body);
              }
-             secret.set(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-             secret.set(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+             parsedBody = JSON.parse(res.body);
+             secret.set(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+             secret.set(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);           
              return state;
            }    
   lifecycle:
@@ -410,7 +415,8 @@ bus-topic-auth-role:
            if (res.error) {
              throw new Error(res.error + ", body: " + res.body);
            }
-           secret.remove(definition.primaryConnectionString, JSON.parse(res.body).primaryConnectionString);
-           secret.remove(definition.secondaryConnectionString, JSON.parse(res.body).secondaryConnectionString);             
+           parsedBody = JSON.parse(res.body);
+           secret.remove(definition.primaryConnectionString, parsedBody.primaryConnectionString);
+           secret.remove(definition.secondaryConnectionString, parsedBody.secondaryConnectionString);            
            return {"statusCode": res.statusCode, "body": JSON.stringify(res.body)};
          }         
