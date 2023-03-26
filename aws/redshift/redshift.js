@@ -2,6 +2,7 @@ let aws = require("cloud/aws");
 let cli = require("cli");
 let http = require("http");
 let secret = require("secret");
+let parser = require("parser");
 
 function getDateString() {
     let date = new Date();
@@ -157,7 +158,18 @@ let getCluster = function (def) {
         "region": data.region
     });
 
-    return res
+    if (res.error) {
+        errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
+        throw new Error(res.error + ", " + errorMessage);
+    }
+    let state = {
+        "status": parser.xmlquery(res.body, "//DescribeClustersResponse/DescribeClustersResult/Clusters/Cluster/ClusterStatus")[0],
+        "endpoint": parser.xmlquery(res.body, "//DescribeClustersResponse/DescribeClustersResult/Clusters/Cluster/Endpoint/Address")[0],
+        "port": parser.xmlquery(res.body, "//DescribeClustersResponse/DescribeClustersResult/Clusters/Cluster/Endpoint/Port")[0],
+        "password-secret": def["password-secret"]
+    }
+
+    return state
 
 }
 
@@ -194,13 +206,17 @@ function main(def, state, ctx) {
         case "show-password":
             res = showPassword(def);
             break;
+        case "check-readiness": {
+            state = getCluster(def);
+            if (state.status !== "available") {
+                throw new Error("Redshift instance is not ready yet");
+            }
+            break;
+        }
         default:
             // no action defined
             return;
     }
-    if (res.error) {
-        throw new Error(res.error + ", body " + res.body);
-    }
 
-    return res.body;
+    return res;
 }
