@@ -1,6 +1,9 @@
 let aws = require("cloud/aws");
 let cli = require("cli");
 let http = require("http");
+let secret = require("secret");
+const parser = require("parser");
+const { stat } = require("fs");
 
 function getDateString() {
     let date = new Date();
@@ -15,20 +18,20 @@ function getDateString() {
 function encodeQueryData(data) {
     const ret = [];
     for (let d in data)
-      ret.push(encodeURIComponent(d) + '=' + encodeURIComponent(data[d]));
+        ret.push(encodeURIComponent(d) + '=' + encodeURIComponent(data[d]));
     return ret.join('&');
- }
+}
+
 
 let createVPC = function (def) {
     cli.output("createVPC");
     data = {
         "headers": {
             "Content-Type": "application/x-amz-json-1.0"
-        }, 
+        },
         "service": "ec2",
         "region": def["region"]
     };
-
     let param = {
         "CidrBlock": def["cidr"],
         "Version": "2016-11-15"
@@ -38,57 +41,39 @@ let createVPC = function (def) {
     cli.output("https://ec2." + def["region"] + ".amazonaws.com/?Action=CreateVpc&" + searchParams.toString());
     // Create aws rds instance
     let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?Action=CreateVpc&" + searchParams.toString(), {
-            "headers": data.headers,
-            "service": data.service,
-            "region": data.region  
-        });
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
 
-    return res
-}
-
-
-let getVPC = function (def) {
-    cli.output("createVPC");
-    data = {
-        "headers": {
-            "Content-Type": "application/x-amz-json-1.0"
-        }, 
-        "service": "ec2",
-        "region": def["region"]
-    };
-
-    let param = {
-        "Filter.1.Name": "cidr",
-        "Filter.1.Value": def["cidr"],
+    if (res.error) {
+        errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
+        throw new Error(res.error + ", " + errorMessage);
     }
 
-    const searchParams = encodeQueryData(param);
-    cli.output("https://ec2." + def["region"] + ".amazonaws.com/?Action=DescribeVpcs&" + searchParams.toString());
-    // Create aws rds instance
-    let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?Action=DescribeVpcs&" + searchParams.toString(), {
-            "headers": data.headers,
-            "service": data.service,
-            "region": data.region  
-        });
-
-    return res
-    
+    let state = {
+        "vpcStatus": parser.xmlquery(res.body, "//CreateVpcResponse/vpc/state")[0],
+        "vpcId": parser.xmlquery(res.body, "//CreateVpcResponse/vpc/vpcId")[0],
+    }
+    return state
 }
- 
 
-let deleteVPC = function (def) {
-    cli.output("createVPC");
-    let VpcId = getVPC(def);
+
+
+let deleteVPC = function (def, state) {
+    cli.output("deleteVPC");
+
+    cli.output(JSON.stringify(state));
     data = {
         "headers": {
             "Content-Type": "application/x-amz-json-1.0"
-        }, 
+        },
         "service": "ec2",
         "region": def["region"]
     };
 
     let param = {
-        "VpcId": VpcId,
+        "VpcId": state["vpcId"],
         "Version": "2016-11-15"
     }
 
@@ -96,13 +81,108 @@ let deleteVPC = function (def) {
     cli.output("https://ec2." + def["region"] + ".amazonaws.com/?Action=DeleteVpc&" + searchParams.toString());
     // Create aws rds instance
     let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?Action=DeleteVpc&" + searchParams.toString(), {
-            "headers": data.headers,
-            "service": data.service,
-            "region": data.region  
-        });
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
 
-    return res
-    
+    if (res.error) {
+        errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
+        throw new Error(res.error + ", " + errorMessage);
+    }
+
+    return {
+        "status": "deleted"
+    }
+
+}
+
+let getVPC = function (def, state) {
+    cli.output("getVPC");
+    data = {
+        "headers": {
+            "Content-Type": "application/x-amz-json-1.0"
+        },
+        "service": "ec2",
+        "region": def["region"]
+    };
+
+    let param = {
+        "VpcId.1": state["vpcId"],
+        "Version": "2016-11-15"
+    }
+
+    const searchParams = encodeQueryData(param);
+    cli.output("https://ec2." + def["region"] + ".amazonaws.com/?Action=DescribeVpcs&" + searchParams.toString());
+    // Create aws rds instance
+    let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?Action=DescribeVpcs&" + searchParams.toString(), {
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
+
+    if (res.error) {
+        errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
+        throw new Error(res.error + ", " + errorMessage);
+    }
+    let lastState = {
+        "vpcStatus": parser.xmlquery(res.body, "//DescribeVpcsResponse/vpcSet/item/state")[0],
+        "vpcId": parser.xmlquery(res.body, "//DescribeVpcsResponse/vpcSet/item/vpcId")[0],
+    }
+    return lastState;
+
+}
+
+let modifyVPCRequest = function (def, state, key, value) {
+    cli.output("getVPC");
+    data = {
+        "headers": {
+            "Content-Type": "application/x-amz-json-1.0"
+        },
+        "service": "ec2",
+        "region": def["region"]
+    };
+
+    let param = {
+        "VpcId": state["vpcId"],
+        "Version": "2016-11-15",
+        [key]: value
+    }
+
+    const searchParams = encodeQueryData(param);
+    cli.output("https://ec2." + def["region"] + ".amazonaws.com/?Action=ModifyVpcAttribute&" + searchParams.toString());
+    // Create aws rds instance
+    let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?Action=ModifyVpcAttribute&" + searchParams.toString(), {
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
+
+    if (res.error) {
+        return false;
+    }
+    return true;
+
+}
+
+modifyVPC = function (def, state) {
+    if (def['dns-resolution']) {
+        state["dnsResolution"] = modifyVPCRequest(def, state,  "EnableDnsSupport.Value", def['dns-resolution']);
+    }
+
+    if (def['dns-hostnames']) {
+        state["dnsHostnames"] = modifyVPCRequest(def, state, "EnableDnsHostnames.Value", def['dns-hostnames']);
+    }
+    return state;
+}
+
+let checkReadiness = function (def, state) {
+    cli.output("checkReadiness");
+    state = getVPC(def, state);
+    if (state.vpcStatus !== "available") {
+        throw new Error("VPC is not ready yet. Current status: " + state.vpcStatus);
+    }
+    return modifyVPC(def, state);
 }
 
 
@@ -112,25 +192,31 @@ function main(def, state, ctx) {
     switch (ctx.action) {
         case "recreate":
         case "create":
-            createVPC(def)
+            state = createVPC(def)
             break;
         case "purge":
-            res = deleteRDS(def);
+            state = deleteVPC(def, state);
             break;
-        case "create-snapshot":
-            res = createSnapshot(def);
-            break;
-
         case "get":
-            res = getRDS(def);
+            state = getVPC(def, state);
             break;
+        case "modify": {
+            state = modifyVPC(def, state)
+            break;
+        }
+        case "xxxx": {
+            state = xxxx(def, state)
+            break;
+        }
+
+        case "check-readiness": {
+            state = checkReadiness(def, state)
+            break;
+        }
         default:
             // no action defined
             return;
     }
-    if (res.error) {
-        throw new Error(res.error + ", body " + res.body);
-    }
 
-    return res.body;
+    return state;
 }

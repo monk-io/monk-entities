@@ -1,0 +1,31 @@
+namespace: aws
+
+vpc:
+  defines: entity
+  schema:
+    required: [ name, cidr ]
+    name:
+      type: string
+    cidr:
+      type: string
+    dns-resolution:
+      type: boolean
+      default: true
+    dns-hostnames:
+      type: boolean
+      default: true
+      
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< vpc.js
+    update: ""
+    recreate: ""
+    get: ""
+    modify: ""
+    xxxx: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15
