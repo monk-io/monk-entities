@@ -23,7 +23,6 @@ vpc:
     recreate: ""
     get: ""
     modify: ""
-    xxxx: ""
   checks:
     readiness:
       code: ""
