@@ -1,0 +1,14 @@
+namespace: aws
+
+my-subnets:
+  defines: aws/subnets
+  vpc-id: vpc-01168d00939cc61fa
+  region: eu-north-1
+  subnets:
+    items:
+      - cidr: 10.0.1.0/24
+        az: eu-north-1a
+        name: my-subnet-1
+      - cidr: 10.0.2.0/24
+        az: eu-north-1b
+        name: my-subnet-2
