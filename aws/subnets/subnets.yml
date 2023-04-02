@@ -3,19 +3,15 @@ namespace: aws
 subnets:
   defines: entity
   schema:
-    required: [ vpc-id, region ]
+    required: [ vpc-id, region, cidr, name ]
     vpc-id:
       type: string
-    subnets:
-      type: array
-      items:
-        type: object
-        required: [ cidr, az ]
-        properties:
-          cidr:
-            type: string
-          az:
-            type: string
+    cidr:
+      type: string
+    az:
+      type: string
+    name:
+      type: string
   requires:
     - cloud/aws
   lifecycle:
@@ -23,7 +19,6 @@ subnets:
     update: ""
     recreate: ""
     get: ""
-    modify: ""
   checks:
     readiness:
       code: ""

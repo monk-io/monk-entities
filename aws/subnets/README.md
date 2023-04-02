@@ -1,4 +1,4 @@
-# Subneta
+# Subnet
 
 Entity to manage Subnet Resources.
 It will allow us to create new Subnet Resources.

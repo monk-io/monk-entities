@@ -37,28 +37,34 @@ let createSubnets = function (def) {
         "region": def["region"]
     };
 
-    if (def["subnets"]) {
-        let publicSubnets = [];
-        for (const [key, value] of Object.entries(def["subnets"])) {
-            let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?" + createSubnetRequest(def['vpc-id'], value).toString(), {
-                "headers": data.headers,
-                "service": data.service,
-                "region": data.region
-            });
-            if (res.error) {
-                errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
-                cli.output(errorMessage);
-            }
-            publicSubnets.push({
-                "subnetStatus": parser.xmlquery(res.body, "//CreateSubnetResponse/subnet/state")[0],
-                "subnetId": parser.xmlquery(res.body, "//CreateSubnetResponse/subnet/subnetId")[0],
-                "subnetName": value["name"]
-            });
-        }
-        state["subnets"] = publicSubnets;
+    let param = {
+        "VpcId": def["vpc-id"],
+        "CidrBlock": def["cidr"],
+        "Version": "2016-11-15",
+        "Action": "CreateSubnet",
+        "TagSpecification.1.Tag.1.Key": "Name",
+        "TagSpecification.1.Tag.1.Value": def["name"],
+        "TagSpecification.1.ResourceType": "subnet"
     }
 
-    return state
+    if (def["az"]) {
+        param["AvailabilityZone"] = def["az"];
+    }
+    cli.output("https://ec2." + def["region"] + ".amazonaws.com/?" + encodeQueryData(param).toString());
+    let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?" + encodeQueryData(param).toString(), {
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
+    if (res.error) {
+        let errorMessage = parser.xmlquery(res.body, "//Response/Errors/Error/Message");
+        throw new Error(errorMessage);
+    }
+    return {
+        "subnetStatus": parser.xmlquery(res.body, "//CreateSubnetResponse/subnet/state")[0],
+        "subnetId": parser.xmlquery(res.body, "//CreateSubnetResponse/subnet/subnetId")[0],
+        "subnetName": def["name"]
+    };
 }
 
 let deleteSubnets = function (def, state) {
@@ -70,25 +76,20 @@ let deleteSubnets = function (def, state) {
         "region": def["region"]
     };
 
-    if (def["subnets"]) {
-        let vpcId = def["vpc-id"];
-        state["subnets"].forEach(item => {
-            let param = {
-                "SubnetId": item['subnetId'],
-                "Version": "2016-11-15",
-                "Action": "DeleteSubnet",
-            }
-            let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?" + encodeQueryData(param).toString(), {
-                "headers": data.headers,
-                "service": data.service,
-                "region": data.region
-            });
+    let param = {
+        "SubnetId": state['subnetId'],
+        "Version": "2016-11-15",
+        "Action": "DeleteSubnet",
+    }
+    let res = aws.post("https://ec2." + def["region"] + ".amazonaws.com/?" + encodeQueryData(param).toString(), {
+        "headers": data.headers,
+        "service": data.service,
+        "region": data.region
+    });
 
-            if (res.error) {
-                errorMessage = parser.xmlquery(res.body, "//ErrorResponse/Error/Message");
-                cli.output(errorMessage);
-            }
-        });
+    if (res.error) {
+        let errorMessage = parser.xmlquery(res.body, "//Response/Errors/Error/Message");
+        throw new Error(errorMessage);
     }
 }
 
@@ -106,6 +107,7 @@ let getSubnets = function (def, state) {
     let param = {
         "Filter.1.Name": "vpc-id",
         "Filter.1.Value.1": def["vpc-id"],
+        "SubnetId.1": state['subnetId'],
         "Version": "2016-11-15",
         "Action": "DescribeSubnets",
     }
@@ -116,27 +118,18 @@ let getSubnets = function (def, state) {
         "region": data.region
     });
 
-    let hasItem = true;
-    let i = 0;
-    while (hasItem) {
-        try {
-            let item = parser.xmlquery(res.body, "//DescribeSubnetsResponse/subnetSet/item");
-            let subnetId = parser.xmlquery(item, "//subnetId")[i]
-            if (!subnetId) {
-                hasItem = false;
-            } else {
-                publicSubnets.push({
-                    "subnetStatus": parser.xmlquery(item, "//state")[i],
-                    "subnetId": parser.xmlquery(item, "//subnetId")[i],
-                });
-            }
-        } catch (error) {
-            hasItem = false;
-        }
-        i++;
+    let item = parser.xmlquery(res.body, "//DescribeSubnetsResponse/subnetSet/item");
+    let subnetId = parser.xmlquery(item, "//subnetId")[i]
+
+    if (res.error) {
+        let errorMessage = parser.xmlquery(res.body, "//Response/Errors/Error/Message");
+        throw new Error(errorMessage);
     }
-    state['subnets'] = publicSubnets;
-    return state
+
+    return {
+        "subnetStatus": parser.xmlquery(item, "//state")[i],
+        "subnetId": subnetId,
+    };
 }
 
 function main(def, state, ctx) {
