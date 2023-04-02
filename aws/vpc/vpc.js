@@ -165,7 +165,7 @@ let modifyVPCRequest = function (def, state, key, value) {
 
 }
 
-modifyVPC = function (def, state) {
+let modifyVPC = function (def, state) {
     if (def['dns-resolution']) {
         state["dnsResolution"] = modifyVPCRequest(def, state,  "EnableDnsSupport.Value", def['dns-resolution']);
     }
@@ -204,11 +204,6 @@ function main(def, state, ctx) {
             state = modifyVPC(def, state)
             break;
         }
-        case "xxxx": {
-            state = xxxx(def, state)
-            break;
-        }
-
         case "check-readiness": {
             state = checkReadiness(def, state)
             break;
