@@ -1,0 +1,37 @@
+namespace: aws
+
+route:
+  defines: entity
+  schema:
+    required: [ "region", "route-table-id", "destination-cidr-block" ]
+    region:
+      type: string
+    route-table-id:
+      type: string
+    carrier-gateway-id:
+      type: string
+    destination-cidr-block:
+      type: string
+    destination-ipv6-cidr-block:
+      type: string
+    egress-only-internet-gateway-id:
+      type: string
+    gateway-id:
+      type: string
+    instance-id:
+      type: string
+    local-gateway-id:
+      type: string
+    nat-gateway-id:
+      type: string
+    network-interface-id:
+      type: string
+    transit-gateway-id:
+      type: string
+    vpc-peering-connection-id:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< route.js
+    recreate: ""

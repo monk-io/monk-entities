@@ -1,0 +1,3 @@
+REPO route
+LOAD route.yml example.yml
+RESOURCES route.js

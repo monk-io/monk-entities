@@ -1,0 +1,15 @@
+namespace: aws
+
+route-table:
+  defines: entity
+  schema:
+    required: [ "region", "vpc-id" ]
+    region:
+      type: string
+    vpc-id:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< route-table.js
+    recreate: ""

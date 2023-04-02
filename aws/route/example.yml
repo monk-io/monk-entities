@@ -1,0 +1,8 @@
+namespace: aws
+
+my-route:
+  defines: aws/route
+  region: eu-north-1
+  route-table-id: rtb-09cf5a7b2765014c8
+  destination-cidr-block: 0.0.0.0/0
+  gateway-id: igw-077de5eaea4e1b021

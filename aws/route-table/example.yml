@@ -1,0 +1,6 @@
+namespace: aws
+
+my-route-table:
+  defines: aws/route-table
+  region: eu-north-1
+  vpc-id: vpc-01168d00939cc61fa
