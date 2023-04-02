@@ -1,0 +1,3 @@
+REPO internet-gateway
+LOAD internet-gateway.yml example.yml
+RESOURCES internet-gateway.js
