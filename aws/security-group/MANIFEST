@@ -1,0 +1,3 @@
+REPO security-group
+LOAD security-group.yml example.yml
+RESOURCES security-group.js

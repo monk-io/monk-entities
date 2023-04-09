@@ -1,0 +1,24 @@
+---
+namespace: aws
+security-group:
+  defines: entity
+  schema:
+    required:
+      - region
+      - name
+      - vpc-id
+      - group-description
+    region:
+      type: string
+    name:
+      type: string
+    vpc-id:
+      type: string
+    group-description:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< security-group.js
+    recreate: ''
+    get: ''

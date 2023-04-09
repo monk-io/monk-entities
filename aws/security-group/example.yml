@@ -1,0 +1,8 @@
+---
+namespace: aws
+my-security-group:
+  defines: aws/security-group
+  region: eu-north-1
+  name: demo
+  vpc-id: vpc-02d98849d31ed22c9
+  group-description: Demo security group
