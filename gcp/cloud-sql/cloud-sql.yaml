@@ -1,4 +1,4 @@
-namespace: poc
+namespace: gcp
 
 # BEFORE RUNNING:
 #  If not already done, enable the Cloud SQL Administration API

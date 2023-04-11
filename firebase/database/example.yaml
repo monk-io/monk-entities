@@ -1,7 +1,7 @@
-namespace: poc
+namespace: firebase
 
 myinstance:
-  defines: poc/firebase-db-instance
+  defines: firebase/firebase-db-instance
   name: common-access-project-4swaig
   location: us-central1
   project-id: common-access-project

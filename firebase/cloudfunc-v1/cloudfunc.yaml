@@ -1,4 +1,4 @@
-namespace: poc
+namespace: firebase
 
 # Cloud func uses v1 version of funcs, which requires you to enable following API:
 # Container Registry or Artifact Registry

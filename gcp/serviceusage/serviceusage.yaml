@@ -1,4 +1,4 @@
-namespace: poc
+namespace: gcp
 
 serviceusage:
   defines: entity

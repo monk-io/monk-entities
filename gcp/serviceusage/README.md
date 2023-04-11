@@ -12,15 +12,15 @@ enabled.
 Example:
 
 ```yaml
-namespace: poc
+namespace: gcp
 
 enable-firebasedatabase:
-  defines: poc/serviceusage
+  defines: gcp/serviceusage
   name: firebasedatabase.googleapis.com
   project: <- `${project}`
 
 enable-firebasehosting:
-  defines: poc/serviceusage
+  defines: gcp/serviceusage
   name: firebasedatabase.googleapis.com
   project: <- `${project}`
 
@@ -28,9 +28,9 @@ db:
   depends:
     wait-for:
       runnables:
-        - poc/enable-firebasedatabase
+        - gcp/enable-firebasedatabase
       timeout: 150
-  defines: poc/firebase-db-instance
+  defines: gcp/firebase-db-instance
   location: us-central1
   name: <- `${database}`
   project: <- `${project}`
@@ -40,9 +40,9 @@ website:
   depends:
     wait-for:
       runnables:
-        - poc/enable-firebasehosting
+        - gcp/enable-firebasehosting
       timeout: 150
-  defines: poc/firebase-site
+  defines: gcp/firebase-site
   name: <- `${website}`
   project: <- `${project}`
 ```

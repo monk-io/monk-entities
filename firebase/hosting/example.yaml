@@ -1,7 +1,7 @@
-namespace: poc
+namespace: firebase
 
 mysite:
-  defines: poc/firebase-site
+  defines: firebase/firebase-site
   name: common-access-project-orekhyk0
   project: common-access-project
   # Keep the site on purge, so it can be reused later. Deleting a site is a permanent action.
@@ -9,6 +9,6 @@ mysite:
   keep-on-delete: true
 
 mysite-beta:
-  defines: poc/firebase-channel
+  defines: firebase/firebase-channel
   name: beta
-  site: <- get-entity("poc/mysite") get-member("name")
+  site: <- get-entity("firebase/mysite") get-member("name")

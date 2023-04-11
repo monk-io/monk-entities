@@ -1,7 +1,7 @@
-namespace: poc
+namespace: gcp
 
 enable-apis:
-  defines: poc/serviceusage
+  defines: gcp/serviceusage
   apis:
     - firebasedatabase.googleapis.com
     - firebasehosting.googleapis.com

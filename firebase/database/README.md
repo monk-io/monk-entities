@@ -26,7 +26,7 @@ Database definition is like this:
 
 ```
 myinstance:
-  defines: poc/firebase-db-instance
+  defines: firebase/firebase-db-instance
   name: common-access-project-4swaig
   location: us-central1
   project-id: common-access-project
@@ -41,32 +41,32 @@ monk load MANIFEST
 monk load example.yaml
 
 # create instance
-monk run poc/myinstance
+monk run firebase/myinstance
 
 # disable instance
-monk do poc/myinstance/disable
+monk do firebase/myinstance/disable
 
 # delete (need to disable first, or will get error)
-monk purge poc/myinstance
+monk purge firebase/myinstance
 
 # reenable instance
-monk do poc/myinstance/reenable
+monk do firebase/myinstance/reenable
 
 # get security rules
-monk do poc/myinstance/get-rules
+monk do firebase/myinstance/get-rules
 
 # set security rules (allows public read/write, careful!)
-monk do poc/myinstance/set-rules rules='{"rules":{".read":true,".write":true}}'
+monk do firebase/myinstance/set-rules rules='{"rules":{".read":true,".write":true}}'
 
 # set json value for a given path
-monk do poc/myinstance/set path=/path/to/location value='{"hey":"haw","hello":"world"}'
+monk do firebase/myinstance/set path=/path/to/location value='{"hey":"haw","hello":"world"}'
 
 # get value for a given path
-monk do poc/myinstance/get path=/path/to/location/hey
+monk do firebase/myinstance/get path=/path/to/location/hey
 
 # remove given path
-monk do poc/myinstance/remove path=/path/to/location/hey
+monk do firebase/myinstance/remove path=/path/to/location/hey
 
 # push value into the list at given path
-monk do poc/myinstance/push path=/path/to/location/ value='{"hey":"haw"}'
+monk do firebase/myinstance/push path=/path/to/location/ value='{"hey":"haw"}'
 ```
