@@ -1,0 +1,3 @@
+REPO subnets
+LOAD subnets.yml example.yml
+RESOURCES subnets.js

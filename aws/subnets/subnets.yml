@@ -1,0 +1,26 @@
+namespace: aws
+
+subnets:
+  defines: entity
+  schema:
+    required: [ vpc-id, region, cidr, name ]
+    vpc-id:
+      type: string
+    cidr:
+      type: string
+    az:
+      type: string
+    name:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< subnets.js
+    update: ""
+    recreate: ""
+    get: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15
