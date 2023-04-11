@@ -1,6 +1,6 @@
-namespace: objectstorage
+namespace: aws
 
-aws-bucket:
+s3-bucket:
   defines: entity
   schema:
     required: [ "name", "region" ]

@@ -11,7 +11,7 @@ We'll use Monk CLI to load and run everything:
       monk load s3-bucket.yaml example.yaml
       
       # run to trigger a "create" event
-      monk run objectstorage/mybucket
+      monk run aws/mybucket
 
 An empty bucket with public read access should be created in AWS,
 available at:  

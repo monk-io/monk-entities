@@ -1,4 +1,4 @@
-namespace: poc
+namespace: firebase
 
 firebase-db-instance:
   defines: entity

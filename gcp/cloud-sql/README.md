@@ -10,21 +10,21 @@ We'll use Monk CLI to load and run everything:
       monk load cloud-sql.yaml example.yaml
 
       # run db Instance
-      monk run poc/myinstance
+      monk run gcp/myinstance
 
       # need to wait a few minutes for GCP to provision the instance until we can use it
       # when Instance is ready, we can create Database and User
-      monk run poc/mydb poc/myuser
+      monk run gcp/mydb gcp/myuser
 
 Then, we can deploy WordPress Runnable that stores data in Cloud SQL Database
 with User credentials from Monk Secret.
 
 Load and run WordPress, it should be able to run using Cloud SQL Database:
 
-      monk run poc/wordpress
+      monk run gcp/wordpress
 
 You can open WordPress address in your browser to check if it works.
 
 To remove everything:
 
-      monk delete poc/wordpress poc/myuser poc/mydb poc/myinstance
+      monk delete gcp/wordpress gcp/myuser gcp/mydb gcp/myinstance

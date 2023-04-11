@@ -1,4 +1,4 @@
-namespace: poc
+namespace: firebase
 
 firebase-site:
   defines: entity

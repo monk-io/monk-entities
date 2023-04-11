@@ -1,6 +1,6 @@
-namespace: objectstorage
+namespace: aws
 
 mybucket:
-  defines: objectstorage/aws-bucket
+  defines: aws/s3-bucket
   name: testmyuniquebucket
   region: us-east-1

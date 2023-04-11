@@ -11,13 +11,13 @@ We'll use Monk CLI to load and run everything:
       
       # run site resource create a new website
       # it will populate entity state with site url
-      monk run poc/mysite
+      monk run firebase/mysite
 
       # run channel resource to create a channel for the website
       # it will populate entity state with site url for the channel
-      monk run poc/mysite-beta
+      monk run firebase/mysite-beta
 
 we can delete it with `monk delete`:
 
-      monk delete poc/mysite-beta
-      monk delete poc/mysite
+      monk delete firebase/mysite-beta
+      monk delete firebase/mysite

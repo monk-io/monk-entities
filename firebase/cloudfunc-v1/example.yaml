@@ -1,7 +1,7 @@
-namespace: poc
+namespace: firebase
 
 exif:
-  defines: poc/cloudfunc-v1
+  defines: firebase/cloudfunc-v1
   files:
     index:
       path: index.js

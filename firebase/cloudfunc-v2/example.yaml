@@ -1,7 +1,7 @@
-namespace: poc
+namespace: firebase
 
 date:
-  defines: poc/cloudfunc-v2
+  defines: firebase/cloudfunc-v2
   files:
     index:
       path: index.js
@@ -21,7 +21,7 @@ date:
     timeout-seconds: 60
 
 thumbnail:
-  defines: poc/cloudfunc-v2
+  defines: firebase/cloudfunc-v2
   files:
     index:
       path: index.js
