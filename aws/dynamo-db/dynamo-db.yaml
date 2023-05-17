@@ -2,6 +2,13 @@ namespace: aws
 
 dynamodb:
   defines: entity
+  metadata:
+    name: Amazon DynamoDB
+    description: |
+      Amazon DynamoDB is a fully managed, serverless, key-value NoSQL database designed to run high-performance applications at any scale.
+    website: https://aws.amazon.com/dynamodb/
+    publisher: monk.io
+    tags: AWS, Database Management, NoSQL, DynamoDB, Amazon
   schema:
     required: [ "region", "dbschema" ]
     region:

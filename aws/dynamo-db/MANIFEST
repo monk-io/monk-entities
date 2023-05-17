@@ -1,2 +1,2 @@
 REPO dynamo-db
-LOAD dynamo-db.yaml example.yaml
+LOAD dynamo-db.yaml

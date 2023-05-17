@@ -2,6 +2,13 @@ namespace: aws
 
 rds:
   defines: entity
+  metadata:
+    name: Amazon RDS
+    description: |
+      Amazon Relational Database Service (RDS) is a fully managed, open-source cloud database service that allows you to easily operate and scale relational database engines of your choice in the cloud or on-premises.
+    website: https://aws.amazon.com/rds/
+    publisher: monk.io
+    tags: AWS, RDS, Amazon Relational Database Service, Amazon
   schema:
     required: [ "storage", "region", "instance", "identifier", "engine", "password-secret", "username" ]
     storage:

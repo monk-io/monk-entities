@@ -2,6 +2,13 @@ namespace: aws
 
 efs:
   defines: entity
+  metadata:
+    name: Amazon EFS
+    description: |
+      Amazon Elastic File System (EFS) automatically grows and shrinks as you add and remove files with no need for management or provisioning.
+    website: https://aws.amazon.com/efs/
+    publisher: monk.io
+    tags: AWS, EFS, Elastic File System, Amazon
   schema:
     required: [ "token", "region", "performance_mode", "encrypted"]
     token:
