@@ -7,6 +7,7 @@ rds:
     description: |
       Amazon Relational Database Service (RDS) is a fully managed, open-source cloud database service that allows you to easily operate and scale relational database engines of your choice in the cloud or on-premises.
     website: https://aws.amazon.com/rds/
+    icon: https://www.svgrepo.com/show/353458/aws-rds.svg
     publisher: monk.io
     tags: AWS, RDS, Amazon Relational Database Service, Amazon
   schema:

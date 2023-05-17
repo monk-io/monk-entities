@@ -2,6 +2,14 @@ namespace: event-hub
 
 hub-namespace:
   defines: entity
+  metadata:
+    name: Azure Event Hubs Namespace
+    description: |
+      An Event Hubs namespace is a management container for event hubs (or topics, in Kafka parlance). It provides DNS-integrated network endpoints and a range of access control and network integration management features such as IP filtering, virtual network service endpoint, and Private Link.
+    website: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-features#namespace
+    icon: https://symbols.getvecta.com/stencil_28/36_event-hubs.77f99882bf.svg
+    publisher: monk.io
+    tags: Azure, Event Hubs, Namespace
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
     subscriptionId:

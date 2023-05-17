@@ -2,6 +2,14 @@ namespace: service-bus
 
 bus-namespace:
   defines: entity
+  metadata:
+    name: Azure Service Bus Namespace
+    description: |
+      A Service Bus namespace is your own capacity slice of a large cluster made up of dozens of all-active virtual machines. It may optionally span three Azure availability zones. So, you get all the availability and robustness benefits of running the message broker at enormous scale.
+    website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
+    icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
+    publisher: monk.io
+    tags: Azure, Service Bus, Namespace
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
     subscriptionId:

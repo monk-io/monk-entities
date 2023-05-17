@@ -2,6 +2,14 @@ namespace: objectstoragecontainer
 
 blob-container:
   defines: entity
+  metadata:
+    name: Azure Blob Container
+    description: |
+      Azure Blob Storage is Microsoft's object storage solution for the cloud. Blob Storage is optimized for storing massive amounts of unstructured data. Unstructured data is data that doesn't adhere to a particular data model or definition, such as text or binary data.
+    website: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction
+    icon: https://www.svgrepo.com/show/448272/azure-blob-storage.svg
+    publisher: monk.io
+    tags: Azure, Blob Storage
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "accountName", "containerObject", "containerName" ]
     subscriptionId:

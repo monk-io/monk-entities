@@ -1,2 +1,2 @@
 REPO event-hub
-LOAD event-hub.yaml stack.yaml
+LOAD event-hub.yaml

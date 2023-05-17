@@ -2,6 +2,14 @@ namespace: objectstorage
 
 storage-account:
   defines: entity
+  metadata:
+    name: Azure Storage Account
+    description: |
+      An Azure storage account contains all of your Azure Storage data objects, including blobs, file shares, queues, tables, and disks.
+    website: https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview
+    icon: https://symbols.getvecta.com/stencil_27/86_storage-blob.476c91d0b1.svg
+    publisher: monk.io
+    tags: Azure, Storage Account
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "accountName", "accessKeySecret", "storageAccountObject" ]
     subscriptionId:

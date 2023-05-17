@@ -7,6 +7,7 @@ dynamodb:
     description: |
       Amazon DynamoDB is a fully managed, serverless, key-value NoSQL database designed to run high-performance applications at any scale.
     website: https://aws.amazon.com/dynamodb/
+    icon: https://www.svgrepo.com/show/353450/aws-dynamodb.svg
     publisher: monk.io
     tags: AWS, Database Management, NoSQL, DynamoDB, Amazon
   schema:

@@ -1,2 +1,2 @@
 REPO storage-account
-LOAD storage-account.yaml stack.yaml
+LOAD storage-account.yaml

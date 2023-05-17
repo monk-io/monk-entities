@@ -1,2 +1,2 @@
 REPO storage-account
-LOAD blob-container.yaml stack.yaml
+LOAD blob-container.yaml

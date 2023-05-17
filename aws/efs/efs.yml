@@ -7,6 +7,7 @@ efs:
     description: |
       Amazon Elastic File System (EFS) automatically grows and shrinks as you add and remove files with no need for management or provisioning.
     website: https://aws.amazon.com/efs/
+    icon: https://symbols.getvecta.com/stencil_24/1_amazon-efs.ef56158125.svg
     publisher: monk.io
     tags: AWS, EFS, Elastic File System, Amazon
   schema:

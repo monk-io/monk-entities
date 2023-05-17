@@ -1,2 +1,2 @@
 REPO service-bus
-LOAD service-bus.yaml stack.yaml
+LOAD service-bus.yaml
