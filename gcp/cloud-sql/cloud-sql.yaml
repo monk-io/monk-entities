@@ -6,6 +6,15 @@ namespace: gcp
 #  https://console.developers.google.com/apis/api/sqladmin
 cloud-sql-instance:
   defines: entity
+  metadata:
+    name: Google Cloud SQL Instance
+    description: |
+      Fully managed relational database service for MySQL, PostgreSQL, and SQL Server with rich extension collections, configuration flags, and developer ecosystems.
+    website: https://cloud.google.com/sql
+    icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
+    publisher: monk.io
+    private: true
+    tags: GCP, Cloud SQL, Instance, Entities
   schema:
     required: [ "name" ]
     name:
@@ -94,6 +103,15 @@ cloud-sql-instance:
 
 cloud-sql-database:
   defines: entity
+  metadata:
+    name: Google Cloud SQL Database
+    description: |
+      Fully managed relational database service for MySQL, PostgreSQL, and SQL Server with rich extension collections, configuration flags, and developer ecosystems.
+    website: https://cloud.google.com/sql
+    icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
+    publisher: monk.io
+    private: true
+    tags: GCP, Cloud SQL, Database, Entities
   schema:
     required: [ "instance", "name" ]
     instance:
@@ -161,6 +179,15 @@ cloud-sql-database:
 
 cloud-sql-user:
   defines: entity
+  metadata:
+    name: Google Cloud SQL User
+    description: |
+      Fully managed relational database service for MySQL, PostgreSQL, and SQL Server with rich extension collections, configuration flags, and developer ecosystems.
+    website: https://cloud.google.com/sql
+    icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
+    publisher: monk.io
+    private: true
+    tags: GCP, Cloud SQL, User, Entities
   schema:
     required: [ "instance", "name", "password-secret" ]
     instance:

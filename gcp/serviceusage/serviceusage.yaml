@@ -2,6 +2,14 @@ namespace: gcp
 
 serviceusage:
   defines: entity
+  metadata:
+    name: Google Service Usage
+    description: |
+      Service Usage enables services that service consumers want to use on Google Cloud Platform.
+    website: https://cloud.google.com/service-usage/docs/reference/rest
+    icon: https://symbols.getvecta.com/stencil_4/62_google-generic-gcp.fcb0e50f27.svg
+    publisher: monk.io
+    tags: GCP, Service Usage, Entities
   schema:
     required: [ "project" ]
     name:

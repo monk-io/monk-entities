@@ -4,6 +4,14 @@ namespace: firebase
 # Artifact Registry, Cloud Build, Cloud Run,
 cloudfunc-v2:
   defines: entity
+  metadata:
+    name: Firebase Cloud Function v2
+    description: |
+      Cloud Functions for Firebase is a serverless framework that lets you automatically run backend code in response to events triggered by Firebase features and HTTPS requests. Your JavaScript or TypeScript code is stored in Google's cloud and runs in a managed environment. There's no need to manage and scale your own servers.
+    website: https://firebase.google.com/docs/firestore/extend-with-functions-2nd-gen
+    icon: https://symbols.getvecta.com/stencil_3/12_firebase-cloud-function.8a5db37c76.svg
+    publisher: monk.io
+    tags: Firebase, GCP, Cloud Functions v2, Entities
   schema:
     required: [ "name", "project", "location", "build", "service" ]
     name:

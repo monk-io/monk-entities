@@ -6,6 +6,14 @@ namespace: gcp
 #  https://console.developers.google.com/apis/api/sqladmin
 cloud-storage:
   defines: entity
+  metadata:
+    name: Google Cloud Storage
+    description: |
+      Cloud Storage is a managed service for storing unstructured data. Store any amount of data and retrieve it as often as you like.
+    website: https://cloud.google.com/storage
+    icon: https://symbols.getvecta.com/stencil_4/47_google-cloud-storage.fee263d33a.svg
+    publisher: monk.io
+    tags: GCP, Cloud Storage, Entities
   schema:
     required: [ "name", "project" ]
     name:

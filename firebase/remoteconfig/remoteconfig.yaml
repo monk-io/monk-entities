@@ -2,6 +2,14 @@ namespace: firebase
 
 remoteconfig:
   defines: entity
+  metadata:
+    name: Firebase Remote Config
+    description: |
+      Firebase Remote Config lets you change the behavior and appearance of your app without requiring users to download an app update.
+    website: https://firebase.google.com/docs/remote-config
+    icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
+    publisher: monk.io
+    tags: Firebase, GCP, Remote Config, Entities
   schema:
     required: [ "project", "name", "vars" ]
     project:

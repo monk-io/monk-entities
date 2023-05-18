@@ -9,7 +9,7 @@ rds:
     website: https://aws.amazon.com/rds/
     icon: https://www.svgrepo.com/show/353458/aws-rds.svg
     publisher: monk.io
-    tags: AWS, RDS, Amazon Relational Database Service, Amazon
+    tags: AWS, RDS, Amazon Relational Database Service, Amazon, Entities
   schema:
     required: [ "storage", "region", "instance", "identifier", "engine", "password-secret", "username" ]
     storage:

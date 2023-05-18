@@ -7,9 +7,9 @@ blob-container:
     description: |
       Azure Blob Storage is Microsoft's object storage solution for the cloud. Blob Storage is optimized for storing massive amounts of unstructured data. Unstructured data is data that doesn't adhere to a particular data model or definition, such as text or binary data.
     website: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction
-    icon: https://www.svgrepo.com/show/448272/azure-blob-storage.svg
+    icon: https://symbols.getvecta.com/stencil_27/86_storage-blob.476c91d0b1.svg
     publisher: monk.io
-    tags: Azure, Blob Storage
+    tags: Azure, Blob Storage, Entities
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "accountName", "containerObject", "containerName" ]
     subscriptionId:

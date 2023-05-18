@@ -9,7 +9,7 @@ efs:
     website: https://aws.amazon.com/efs/
     icon: https://symbols.getvecta.com/stencil_24/1_amazon-efs.ef56158125.svg
     publisher: monk.io
-    tags: AWS, EFS, Elastic File System, Amazon
+    tags: AWS, EFS, Elastic File System, Amazon, Entities
   schema:
     required: [ "token", "region", "performance_mode", "encrypted"]
     token:

@@ -9,7 +9,7 @@ bus-namespace:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus, Namespace
+    tags: Azure, Service Bus Namespace, Entities
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
     subscriptionId:

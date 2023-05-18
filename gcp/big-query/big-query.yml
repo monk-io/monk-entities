@@ -6,6 +6,14 @@ namespace: gcp
 #  https://console.developers.google.com/apis/api/sqladmin
 big-query:
   defines: entity
+  metadata:
+    name: Google Big Query
+    description: |
+      BigQuery is a serverless and cost-effective enterprise data warehouse that works across clouds and scales with your data. Use built-in ML/AI and BI for insights at scale.
+    website: https://cloud.google.com/bigquery
+    icon: https://symbols.getvecta.com/stencil_4/10_google-bigquery.0f26b56a8d.svg
+    publisher: monk.io
+    tags: GCP, Big Query, Entities
   schema:
     required: [ "dataset" ]
     dataset:

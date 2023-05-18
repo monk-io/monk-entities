@@ -2,6 +2,14 @@ namespace: firebase
 
 firebase-site:
   defines: entity
+  metadata:
+    name: Firebase Hosting Site
+    description: |
+      Firebase Hosting provides fast and secure hosting for your web app, static and dynamic content, and microservices.
+    website: https://firebase.google.com/docs/hosting
+    icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
+    publisher: monk.io
+    tags: Firebase, GCP, Hosting Site, Entities
   schema:
     required: [ "name", "project" ]
     name:
@@ -15,6 +23,14 @@ firebase-site:
 
 firebase-channel:
   defines: entity
+  metadata:
+    name: Firebase Hosting Channel
+    description: |
+      Firebase Hosting provides fast and secure hosting for your web app, static and dynamic content, and microservices.
+    website: https://firebase.google.com/docs/hosting
+    icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
+    publisher: monk.io
+    tags: Firebase, GCP, Hosting Channel, Entities
   schema:
     required: [ "name", "site" ]
     name:

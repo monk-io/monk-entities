@@ -9,7 +9,7 @@ storage-account:
     website: https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview
     icon: https://symbols.getvecta.com/stencil_27/86_storage-blob.476c91d0b1.svg
     publisher: monk.io
-    tags: Azure, Storage Account
+    tags: Azure, Storage Account, Entities
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "accountName", "accessKeySecret", "storageAccountObject" ]
     subscriptionId:

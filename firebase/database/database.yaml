@@ -2,6 +2,14 @@ namespace: firebase
 
 firebase-db-instance:
   defines: entity
+  metadata:
+    name: Firebase Realtime Database
+    description: |
+      The Firebase Realtime Database is a cloud-hosted database. Data is stored as JSON and synchronized in realtime to every connected client.
+    website: https://firebase.google.com/docs/database
+    icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
+    publisher: monk.io
+    tags: Firebase, GCP, Realtime Database, Entities
   schema:
     required: [ "name", "location", "project" ]
     name:

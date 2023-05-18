@@ -9,7 +9,7 @@ dynamodb:
     website: https://aws.amazon.com/dynamodb/
     icon: https://www.svgrepo.com/show/353450/aws-dynamodb.svg
     publisher: monk.io
-    tags: AWS, Database Management, NoSQL, DynamoDB, Amazon
+    tags: AWS, Database Management, NoSQL, DynamoDB, Amazon, Entities
   schema:
     required: [ "region", "dbschema" ]
     region:
