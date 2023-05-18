@@ -1,2 +1,2 @@
 REPO cloud-sql
-LOAD cloud-sql.yaml stack.yaml
+LOAD cloud-sql.yaml
