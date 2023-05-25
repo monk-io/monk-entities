@@ -16,6 +16,11 @@ s3-bucket:
       type: string
     region:
       type: string
+  services:
+    bucket-host:
+      protocol: tcp
+      address: <- entity get-member("name") ".s3.amazonaws.com" concat-all
+      port: 443
   requires:
     - cloud/aws
   lifecycle:

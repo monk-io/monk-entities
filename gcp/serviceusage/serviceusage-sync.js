@@ -70,30 +70,35 @@ function enableApis(projectId, apiNames) {
 }
 
 function main(def, state, ctx) {
+    let project = gcp.getProject();
+    if (def.project) {
+        project = def.project;
+    }
+
     switch (ctx.action) {
         case "create":
         case "update":
             if (def.apis) {
                 // process batch
-                let toEnable = checkApis(def.project, def.apis)
+                let toEnable = checkApis(project, def.apis)
                 if (toEnable.length === 0) {
                     return {ready: true};
                 }
-                let body = enableApis(def.project, toEnable);
+                let body = enableApis(project, toEnable);
                 return {ready: false, operation: body.name}
             } else if (def.name) {
                 // process single
-                if (checkApi(def.project, def.name)) {
+                if (checkApi(project, def.name)) {
                     return;
                 }
-                let body = enableApi(def.project, def.name);
+                let body = enableApi(project, def.name);
                 return {ready: false, operation: body.name}
             }
 
             break;
         case "check-readiness":
             if (state.operation) {
-                let res = gcp.get(BASE_URL + `/projects/${def.project}/${state.operation}`);
+                let res = gcp.get(BASE_URL + `/projects/${project}/${state.operation}`);
                 if (res.error) {
                     throw new Error(res.error + ", body: " + res.body);
                 }
@@ -106,13 +111,13 @@ function main(def, state, ctx) {
 
             if (def.apis) {
                 // process batch
-                if (checkApis(def.project, def.apis).length === 0) {
+                if (checkApis(project, def.apis).length === 0) {
                     return {ready: true};
                 }
                 throw "APIs aren't enabled yet"
             } else if (def.name) {
                 // process single
-                if (checkApi(def.project, def.name)) {
+                if (checkApi(project, def.name)) {
                     return {ready: true};
                 }
                 throw "API is not enabled yet"

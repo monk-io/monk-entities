@@ -1,5 +1,10 @@
 namespace: gcp
 
+enable-apis:
+  defines: gcp/serviceusage
+  apis:
+    - sqladmin.googleapis.com
+
 myinstance:
   defines: gcp/cloud-sql-instance
   name: testmyinstance1

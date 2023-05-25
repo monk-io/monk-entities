@@ -29,8 +29,57 @@ cloud-sql-instance:
       default: "us-central1"
     allow-all:
       type: bool
+  services:
+    instance:
+      protocol: tcp
+      address: TBD
+      port: 3306
+  #      address: <- entity-state get-member("address") default("TBD")
+  #      port: <- entity-state get-member("port") default(123)
   requires:
     - cloud/gcp
+  checks:
+    readiness:
+      code: |
+        var getAddress = function(project, name) {
+            let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+project+"/instances/"+name);
+            if (res.error) {
+              throw new Error(res.error);
+            }
+            let instance = JSON.parse(res.body);
+            if (!instance.ipAddresses) {
+              throw new Error("instance has no address yet");
+            }
+            let address = ""
+            for (let i = 0; i < instance.ipAddresses.length; i++) {
+              if (instance.ipAddresses[i].type === "PRIMARY") {
+                address = instance.ipAddresses[i].ipAddress;
+                break;
+              }
+            }
+            return address;
+        }
+        
+        function main(def, state, ctx) {
+          let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/operations/"+state.operationName);
+          if (res.error) {
+            throw new Error(res.error + ", body: " + res.body);
+          }
+
+          var obj = JSON.parse(res.body);
+          if (obj.status === "DONE") {
+            console.log("GCP SQL Instance is ready: " + JSON.stringify(obj));
+            state.address = getAddress(gcp.getProject(), def.name);
+            state.ready = true;
+        
+            return state;
+          }
+
+          throw "not ready";
+        }
+      initialDelay: 10
+      period: 10
+      attempts: 120
   lifecycle:
     create: |
       var createInstance = function(project, def) {
@@ -71,7 +120,20 @@ cloud-sql-instance:
         if (res.error) {
           throw new Error(res.error + ", body: " + res.body);
         }
-        return {"statusCode": res.statusCode};
+      
+        state.port = 5432;
+        if (def["database-version"]) {
+          if (def["database-version"].includes("MYSQL")) {
+            state.port = 3306;
+          }
+          if (def["database-version"].includes("SQLSERVER")) {
+            state.port = 1433;
+          }
+        }
+        var obj = JSON.parse(res.body);
+        state.operationName = obj.name;
+        state.operationType = obj.operationType;
+        return state;
       }
     purge: |
       var deleteInstance = function(project, name) {
@@ -116,6 +178,10 @@ cloud-sql-database:
       type: string
     name:
       type: string
+  connections:
+    instance:
+      runnable: gcp/cloud-sql-instance
+      service: instance
   requires:
     - cloud/gcp
   lifecycle:
@@ -193,6 +259,10 @@ cloud-sql-user:
       type: string
     password-secret:
       type: string
+  connections:
+    instance:
+      runnable: gcp/cloud-sql-instance
+      service: instance
   requires:
     - cloud/gcp
     - secret
