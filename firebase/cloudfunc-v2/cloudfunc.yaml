@@ -11,7 +11,7 @@ cloudfunc-v2:
     website: https://firebase.google.com/docs/firestore/extend-with-functions-2nd-gen
     icon: https://symbols.getvecta.com/stencil_3/12_firebase-cloud-function.8a5db37c76.svg
     publisher: monk.io
-    tags: Firebase, GCP, Cloud Functions v2, Entities
+    tags: entities, gcp, firebase
   schema:
     required: [ "name", "project", "location", "build", "service" ]
     name:

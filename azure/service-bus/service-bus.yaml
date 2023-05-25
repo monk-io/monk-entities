@@ -9,7 +9,7 @@ bus-namespace:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Namespace, Entities
+    tags: entities, azure, service bus namespace
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
     subscriptionId:
@@ -83,7 +83,7 @@ bus-queue:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Queue, Entities
+    tags: entities, azure, service bus queue
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "queueObject" ]
     subscriptionId:
@@ -157,7 +157,7 @@ bus-topic:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Topic, Entities
+    tags: entities, azure, service bus topic
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "topicObject" ]
     subscriptionId:
@@ -234,7 +234,7 @@ bus-namespace-auth-role:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Namespace Auth Role, Entities
+    tags: entities, azure, service bus namespace auth role
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString" ]
     subscriptionId:
@@ -314,7 +314,7 @@ bus-queue-auth-role:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Queue Auth Role, Entities
+    tags: entities, service bus queue auth role, azure
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "queueName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString"]
     subscriptionId:
@@ -396,7 +396,7 @@ bus-topic-auth-role:
     website: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-messaging-overview
     icon: https://symbols.getvecta.com/stencil_27/76_service-bus.97bf6436f8.svg
     publisher: monk.io
-    tags: Azure, Service Bus Topic Auth Role, Entities
+    tags: service bus topic auth role, entities, azure
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "topicName", "authorizationRuleName", "authorizationRuleObject", "primaryConnectionString", "secondaryConnectionString"]
     subscriptionId:

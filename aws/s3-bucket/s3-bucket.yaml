@@ -9,7 +9,7 @@ s3-bucket:
     website: https://aws.amazon.com/s3/
     icon: https://www.svgrepo.com/show/349587/amazon-s3.svg
     publisher: monk.io
-    tags: AWS, S3, Bucket, Amazon, Entities
+    tags: bucket, aws, s3, amazon, entities
   schema:
     required: [ "name", "region" ]
     name:

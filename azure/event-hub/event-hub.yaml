@@ -9,7 +9,7 @@ hub-namespace:
     website: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-features#namespace
     icon: https://symbols.getvecta.com/stencil_28/36_event-hubs.77f99882bf.svg
     publisher: monk.io
-    tags: Azure, Event Hubs Namespace, Entities
+    tags: entities, azure, event hubs namespace
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "namespaceName", "namespaceObject" ]
     subscriptionId:

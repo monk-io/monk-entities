@@ -9,7 +9,7 @@ serviceusage:
     website: https://cloud.google.com/service-usage/docs/reference/rest
     icon: https://symbols.getvecta.com/stencil_4/62_google-generic-gcp.fcb0e50f27.svg
     publisher: monk.io
-    tags: GCP, Service Usage, Entities
+    tags: entities, gcp, service usage
   schema:
     required: [ "project" ]
     name:

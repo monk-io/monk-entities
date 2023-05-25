@@ -9,7 +9,7 @@ firebase-db-instance:
     website: https://firebase.google.com/docs/database
     icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
     publisher: monk.io
-    tags: Firebase, GCP, Realtime Database, Entities
+    tags: entities, realtime database, gcp, firebase
   schema:
     required: [ "name", "location", "project" ]
     name:

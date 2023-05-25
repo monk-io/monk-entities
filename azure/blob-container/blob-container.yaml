@@ -9,7 +9,7 @@ blob-container:
     website: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction
     icon: https://symbols.getvecta.com/stencil_27/86_storage-blob.476c91d0b1.svg
     publisher: monk.io
-    tags: Azure, Blob Storage, Entities
+    tags: entities, azure, blob storage
   schema:
     required: [ "subscriptionId", "resourceGroupName" , "accountName", "containerObject", "containerName" ]
     subscriptionId:

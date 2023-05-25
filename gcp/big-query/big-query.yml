@@ -13,7 +13,7 @@ big-query:
     website: https://cloud.google.com/bigquery
     icon: https://symbols.getvecta.com/stencil_4/10_google-bigquery.0f26b56a8d.svg
     publisher: monk.io
-    tags: GCP, Big Query, Entities
+    tags: entities, gcp, big query
   schema:
     required: [ "dataset" ]
     dataset:

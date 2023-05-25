@@ -13,7 +13,7 @@ cloud-storage:
     website: https://cloud.google.com/storage
     icon: https://symbols.getvecta.com/stencil_4/47_google-cloud-storage.fee263d33a.svg
     publisher: monk.io
-    tags: GCP, Cloud Storage, Entities
+    tags: entities, gcp
   schema:
     required: [ "name", "project" ]
     name:

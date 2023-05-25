@@ -13,7 +13,7 @@ cloud-sql-instance:
     website: https://cloud.google.com/sql
     icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
     publisher: monk.io
-    tags: GCP, Cloud SQL, Instance, Entities
+    tags: instance, entities, gcp
   schema:
     required: [ "name" ]
     name:
@@ -109,7 +109,7 @@ cloud-sql-database:
     website: https://cloud.google.com/sql
     icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
     publisher: monk.io
-    tags: GCP, Cloud SQL, Database, Entities
+    tags: entities, database, gcp
   schema:
     required: [ "instance", "name" ]
     instance:
@@ -184,7 +184,7 @@ cloud-sql-user:
     website: https://cloud.google.com/sql
     icon: https://symbols.getvecta.com/stencil_4/45_google-cloud-sql.35ca1b4c38.svg
     publisher: monk.io
-    tags: GCP, Cloud SQL, User, Entities
+    tags: entities, gcp, user
   schema:
     required: [ "instance", "name", "password-secret" ]
     instance:

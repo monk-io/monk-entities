@@ -9,7 +9,7 @@ firebase-site:
     website: https://firebase.google.com/docs/hosting
     icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
     publisher: monk.io
-    tags: Firebase, GCP, Hosting Site, Entities
+    tags: hosting site, gcp, entities, firebase
   schema:
     required: [ "name", "project" ]
     name:
@@ -30,7 +30,7 @@ firebase-channel:
     website: https://firebase.google.com/docs/hosting
     icon: https://symbols.getvecta.com/stencil_261/16_google-firebase.3828a6e3a4.svg
     publisher: monk.io
-    tags: Firebase, GCP, Hosting Channel, Entities
+    tags: entities, gcp, firebase, hosting channel
   schema:
     required: [ "name", "site" ]
     name:
