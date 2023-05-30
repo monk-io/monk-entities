@@ -11,16 +11,37 @@ myinstance:
   database-version: MYSQL_8_0
   tier: "db-g1-small"
   allow-all: true
+  depends:
+    wait-for:
+      runnables:
+        - gcp/enable-apis
+      timeout: 60
 
 mydb:
   defines: gcp/cloud-sql-database
   name: mydb1
-  instance: <- get-entity("gcp/myinstance") get-member("name")
+  connections:
+    instance:
+      runnable: gcp/myinstance
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp/myinstance
+      timeout: 600
 
 myuser:
   defines: gcp/cloud-sql-user
   name: myuser1
-  instance: <- get-entity("gcp/myinstance") get-member("name")
+  connections:
+    instance:
+      runnable: gcp/myinstance
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp/myinstance
+      timeout: 600
   password-secret: myuser-password
   permitted-secrets:
     myuser-password: true
@@ -29,24 +50,38 @@ wordpress:
   defines: runnable
   permitted-secrets:
     myuser-password: true
+  connections:
+    sql-instance:
+      runnable: gcp/myinstance
+      service: instance
+    sql-db:
+      runnable: gcp/mydb
+      service: db
+    sql-user:
+      runnable: gcp/myuser
+      service: user
+  depends:
+    wait-for:
+      runnables:
+        - gcp/myinstance
+        - gcp/mydb
+        - gcp/myuser
+      timeout: 600
   variables:
-    wordpress_db_host:
-      value: <- get-entity-state("gcp/mydb") get-member("address")
-      type: string
     wordpress_db_name:
-      value: <- get-entity("gcp/mydb") get-member("name")
+      value: <- connection-target("sql-db") entity get-member("name")
       type: string
     wordpress_db_secret:
-      value: <- get-entity("gcp/myuser") get-member("password-secret")
+      value: <- connection-target("sql-user") entity get-member("password-secret")
       type: string
     wordpress_db_password:
       value: <- secret($wordpress_db_secret)
       type: string
     wordpress_db_user:
-      value: <- get-entity("gcp/myuser") get-member("name")
+      value: <- connection-target("sql-user") entity get-member("name")
       type: string
     wordpress_db_addr:
-      value: <- $wordpress_db_host ":3306" concat-all
+      value: <- connection-target("sql-instance") entity-state get-member("address") ":3306" concat
       type: string
     wordpress_table_prefix:
       type: string
@@ -66,3 +101,12 @@ wordpress:
         - 8080:80
       image-tag: <- `${image-tag}`
       image: docker.io/library/wordpress
+
+stack:
+  defines: process-group
+  runnable-list:
+    - gcp/enable-apis
+    - gcp/myinstance
+    - gcp/mydb
+    - gcp/myuser
+    - gcp/wordpress
