@@ -32,10 +32,8 @@ cloud-sql-instance:
   services:
     instance:
       protocol: tcp
-      address: TBD
-      port: 3306
-  #      address: <- entity-state get-member("address") default("TBD")
-  #      port: <- entity-state get-member("port") default(123)
+      address: <- entity-state get-member("address") default("")
+      port: <- entity-state get-member("port") default(0) to-int
   requires:
     - cloud/gcp
   checks:
@@ -61,6 +59,11 @@ cloud-sql-instance:
         }
         
         function main(def, state, ctx) {
+          if (!state.operationName) {
+            state.address = getAddress(gcp.getProject(), def.name);
+            state.ready = true;
+            return state;
+          }
           let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/operations/"+state.operationName);
           if (res.error) {
             throw new Error(res.error + ", body: " + res.body);
@@ -176,12 +179,18 @@ cloud-sql-database:
     required: [ "instance", "name" ]
     instance:
       type: string
+      default: <- connection-target("instance") entity get-member("name")
     name:
       type: string
   connections:
     instance:
       runnable: gcp/cloud-sql-instance
       service: instance
+  services:
+    db:
+      protocol: tcp
+      address: TDB
+      port: 123
   requires:
     - cloud/gcp
   lifecycle:
@@ -195,38 +204,13 @@ cloud-sql-database:
           {"body": JSON.stringify(body)});
       }
 
-      var getAddress = function(project, def) {
-        let res = gcp.get("https://sqladmin.googleapis.com/sql/v1beta4/projects/"+gcp.getProject()+"/instances/"+def.instance);
-        if (res.error) {
-          throw new Error(res.error);
-        }
-        let instance = JSON.parse(res.body);
-        if (!instance.ipAddresses) {
-          throw new Error("instance has no address yet");
-        }
-        let address = ""
-        for (let i = 0; i < instance.ipAddresses.length; i++) {
-          if (instance.ipAddresses[i].type === "PRIMARY") {
-            address = instance.ipAddresses[i].ipAddress;
-            break;
-          }
-        }
-        return address;
-      }
-
       function main(def, state, ctx) {
-        // get instance address
-        let address = getAddress(gcp.getProject(), def)
-        if (!address) {
-          throw new Error("instance address is empty");
-        }
-
         res = createDatabase(gcp.getProject(), def.instance, def.name)
         console.log(JSON.stringify(res))
         if (res.error) {
           throw new Error(res.error + ", body: " + res.body);
         }
-        return {"name": def.name, "address": address}
+        return {"name": def.name}
       }
     purge: |
       var deleteDatabase = function(project, instance, name) {
@@ -255,6 +239,7 @@ cloud-sql-user:
     required: [ "instance", "name", "password-secret" ]
     instance:
       type: string
+      default: <- connection-target("instance") entity get-member("name")
     name:
       type: string
     password-secret:
@@ -263,6 +248,11 @@ cloud-sql-user:
     instance:
       runnable: gcp/cloud-sql-instance
       service: instance
+  services:
+    user:
+      protocol: tcp
+      address: TDB
+      port: 123
   requires:
     - cloud/gcp
     - secret
