@@ -26,7 +26,7 @@ s3-bucket:
   lifecycle:
     create: |
       createBucket = function(name, region) {
-        return aws.put("https://"+name+".s3.amazonaws.com", {"service": "s3", "region": region, "headers": {"x-amz-acl": "public-read"}})
+        return aws.put("https://"+name+".s3.amazonaws.com", {"service": "s3", "region": region})
       }
       
       function main(definition, state, context) {
@@ -54,7 +54,7 @@ s3-bucket:
       var cli = require("cli")
       
       presignUpload = function(name, region, path) {
-        return aws.presign("https://"+name+".s3.amazonaws.com" + path, {"method": "PUT", "expire": "5m", "service": "s3", "region": region, "headers": {"x-amz-acl": "public-read"}})
+        return aws.presign("https://"+name+".s3.amazonaws.com" + path, {"method": "PUT", "expire": "5m", "service": "s3", "region": region})
       }
       
       function main(definition, state, context) {
