@@ -1,0 +1,90 @@
+namespace: aws
+
+myuser:
+  defines: aws/user
+  name: testmyuser
+  path: /division_abc/subdivision_xyz/
+  depends:
+    wait-for:
+      runnables:
+        - aws/mypolicy
+        - aws/mygroup
+      timeout: 60
+  connections[override]:
+    group:
+      runnable: aws/mygroup
+      service: group
+
+mygroup:
+  defines: aws/group
+  name: testmygroup
+  path: /division_abc/subdivision_xyz/
+  depends:
+    wait-for:
+      runnables:
+        - aws/mypolicy
+      timeout: 60
+  connections[override]:
+    policy:
+      runnable: aws/mypolicy
+      service: policy
+
+mypolicy:
+  defines: aws/policy
+  name: testmypolicy
+  statement:
+    Action: "s3:ListBucket"
+    Effect: "Allow"
+    Resource: "arn:aws:s3:::example_bucket"
+
+mykey:
+  defines: aws/accesskey
+  secret: aws-secret
+  permitted-secrets:
+    aws-secret: true
+  depends:
+    wait-for:
+      runnables:
+        - aws/myuser
+      timeout: 60
+  connections[override]:
+    user:
+      runnable: aws/myuser
+      service: user
+
+# example workload that uses access key
+work:
+  defines: runnable
+  permitted-secrets:
+    aws-secret: true
+  connections:
+    accesskey:
+      runnable: aws/mykey
+      service: accesskey
+  depends:
+    wait-for:
+      runnables:
+        - aws/mykey
+      timeout: 600
+  variables:
+    access:
+      value: <- connection-target("accesskey") entity-state get-member("accessKey")
+      env: AWS_ACCESSKEY
+      type: string
+    secret:
+      value: <- connection-target("accesskey") entity get-member("secret") secret
+      env: AWS_SECRETKEY
+      type: string
+  containers:
+    work:
+      image: alpine:latest
+      bash: env && sleep 10m
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws/mypolicy
+    - aws/myuser
+    - aws/mykey
+    - aws/mygroup
+    - aws/work
