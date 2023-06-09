@@ -1,0 +1,3 @@
+REPO service-account
+LOAD service-account.yaml service-account-key.yaml
+RESOURCES service-account-sync.js service-account-key-sync.js

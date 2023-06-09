@@ -21,9 +21,7 @@ group:
       default: <- connection-target("policy") entity-state get-member("arn")
   services:
     group:
-      protocol: tcp
-      address: TBD
-      port: 1234
+      protocol: custom
   connections:
     policy:
       runnable: aws/policy

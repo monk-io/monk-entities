@@ -24,9 +24,7 @@ user:
       default: <- connection-target("group") entity get-member("name") default ""
   services:
     user:
-      protocol: tcp
-      address: TBD
-      port: 1234
+      protocol: custom
   connections:
     group:
       runnable: aws/group

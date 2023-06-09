@@ -27,8 +27,6 @@ policy:
           type: string
   services:
     policy:
-      protocol: tcp
-      address: TBD
-      port: 1234
+      protocol: custom
   lifecycle:
     sync: <<< policy-sync.js

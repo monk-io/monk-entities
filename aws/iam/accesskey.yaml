@@ -20,9 +20,7 @@ accesskey:
       default: <- connection-target("user") entity-state get-member("name")
   services:
     accesskey:
-      protocol: tcp
-      address: TBD
-      port: 1234
+      protocol: custom
   connections:
     user:
       runnable: aws/user

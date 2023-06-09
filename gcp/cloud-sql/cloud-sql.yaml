@@ -188,9 +188,7 @@ cloud-sql-database:
       service: instance
   services:
     db:
-      protocol: tcp
-      address: TDB
-      port: 123
+      protocol: custom
   requires:
     - cloud/gcp
   lifecycle:
@@ -250,9 +248,7 @@ cloud-sql-user:
       service: instance
   services:
     user:
-      protocol: tcp
-      address: TDB
-      port: 123
+      protocol: custom
   requires:
     - cloud/gcp
     - secret
