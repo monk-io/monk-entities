@@ -1,0 +1,32 @@
+namespace: aws
+
+policy:
+  defines: entity
+  metadata:
+    name: IAM Policy
+    description: |
+      With AWS Identity and Access Management (IAM), you can specify who or what can access services and resources in AWS, centrally manage fine-grained permissions, and analyze access to refine permissions across AWS.
+    website: https://aws.amazon.com/iam/
+    icon: https://symbols.getvecta.com/stencil_23/11_iam.19efc297f3.svg
+    publisher: monk.io
+    tags: aws, iam, policy, entities
+  schema:
+    required: [ "name", "statement" ]
+    name:
+      type: string
+    statement:
+      type: object
+      properties:
+        Effect:
+          type: string
+          default: Allow
+        Resource:
+          type: string
+          default: "*"
+        Actions:
+          type: string
+  services:
+    policy:
+      protocol: custom
+  lifecycle:
+    sync: <<< policy-sync.js

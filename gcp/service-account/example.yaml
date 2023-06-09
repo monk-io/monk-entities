@@ -1,0 +1,55 @@
+namespace: gcp
+
+myacc:
+  defines: gcp/service-account
+  name: testmyacc
+  roles:
+  - roles/viewer
+  - roles/storage.objectAdmin
+  - roles/pubsub.serviceAgent
+
+mykey:
+  defines: gcp/service-account-key
+  secret: gcp-secret
+  permitted-secrets:
+    gcp-secret: true
+  depends:
+    wait-for:
+      runnables:
+        - gcp/myacc
+      timeout: 600
+  connections:
+    service-account:
+      runnable: gcp/myacc
+      service: service-account
+
+# example workload that uses access key
+work:
+  defines: runnable
+  permitted-secrets:
+    gcp-secret: true
+  connections:
+    service-account-key:
+      runnable: gcp/mykey
+      service: service-account-key
+  depends:
+    wait-for:
+      runnables:
+        - gcp/mykey
+      timeout: 600
+  variables:
+    secret:
+      value: <- connection-target("service-account-key") entity get-member("secret") secret
+      env: GCP_SECRETKEY
+      type: string
+  containers:
+    work:
+      image: alpine:latest
+      bash: env && sleep 10m
+
+stack:
+  defines: process-group
+  runnable-list:
+    - gcp/myacc
+    - gcp/mykey
+    - gcp/work

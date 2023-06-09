@@ -19,6 +19,9 @@ serviceusage:
         type: string
     project:
       type: string
+    oneOf:
+      - required: [ "apis" ]
+      - required: [ "name" ]
   lifecycle:
     sync: <<< serviceusage-sync.js
   checks:
