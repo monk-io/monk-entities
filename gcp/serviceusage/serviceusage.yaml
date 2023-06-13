@@ -11,6 +11,7 @@ serviceusage:
     publisher: monk.io
     tags: entities, gcp, service usage
   schema:
+    required: [ "name" ]
     name:
       type: string
     apis:
@@ -19,9 +20,6 @@ serviceusage:
         type: string
     project:
       type: string
-    oneOf:
-      - required: [ "apis" ]
-      - required: [ "name" ]
   lifecycle:
     sync: <<< serviceusage-sync.js
   checks:
