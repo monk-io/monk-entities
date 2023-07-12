@@ -29,6 +29,7 @@ cloud-sql-instance:
       default: "us-central1"
     allow-all:
       type: bool
+      default: false
   services:
     instance:
       protocol: tcp
