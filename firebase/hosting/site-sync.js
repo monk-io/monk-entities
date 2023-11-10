@@ -1,4 +1,3 @@
-let gcp = require("cloud/gcp")
 let cli = require("cli")
 let BASE_URL = "https://firebasehosting.googleapis.com/v1beta1"
 

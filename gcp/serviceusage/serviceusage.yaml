@@ -20,6 +20,8 @@ serviceusage:
         type: string
     project:
       type: string
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< serviceusage-sync.js
   checks:

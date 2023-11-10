@@ -32,5 +32,7 @@ user:
     policy:
       runnable: aws/policy
       service: policy
+  requires:
+    - cloud/aws
   lifecycle:
     sync: <<< user-sync.js

@@ -1,4 +1,3 @@
-let gcp = require("cloud/gcp")
 let cli = require("cli")
 let BASE_URL = "https://iam.googleapis.com/v1"
 

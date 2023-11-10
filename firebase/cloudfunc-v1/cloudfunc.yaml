@@ -46,6 +46,8 @@ cloudfunc-v1:
           type: integer
         timeout-seconds:
           type: integer
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< cloudfunc-sync.js
     get: ""

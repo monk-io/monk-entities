@@ -16,6 +16,8 @@ remoteconfig:
       type: string
     variables:
       type: string
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< remoteconfig-sync.js
     get: ""

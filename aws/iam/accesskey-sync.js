@@ -1,4 +1,3 @@
-let aws = require("cloud/aws")
 let parser = require("parser")
 let secret = require("secret")
 let cli = require("cli")
