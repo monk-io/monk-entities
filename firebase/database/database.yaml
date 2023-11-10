@@ -20,6 +20,8 @@ firebase-db-instance:
       type: string
     rules:
       type: string
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< db-instance-sync.js
     # custom actions on instances

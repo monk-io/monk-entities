@@ -25,5 +25,7 @@ accesskey:
     user:
       runnable: aws/user
       service: user
+  requires:
+    - cloud/aws
   lifecycle:
     sync: <<< accesskey-sync.js

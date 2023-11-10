@@ -1,4 +1,3 @@
-let gcp = require("cloud/gcp")
 let BASE_URL = "https://serviceusage.googleapis.com/v1"
 
 function checkApi(projectId, apiName) {

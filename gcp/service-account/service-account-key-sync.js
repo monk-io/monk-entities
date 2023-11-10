@@ -1,4 +1,3 @@
-let gcp = require("cloud/gcp");
 let secret = require("secret");
 let BASE_URL = "https://iam.googleapis.com/v1";
 

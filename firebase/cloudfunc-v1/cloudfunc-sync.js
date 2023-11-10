@@ -1,4 +1,3 @@
-let gcp = require("cloud/gcp");
 let cli = require("cli");
 let fs = require("fs");
 let http = require("http");

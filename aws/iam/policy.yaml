@@ -28,5 +28,7 @@ policy:
   services:
     policy:
       protocol: custom
+  requires:
+    - cloud/aws
   lifecycle:
     sync: <<< policy-sync.js

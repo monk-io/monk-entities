@@ -26,5 +26,7 @@ group:
     policy:
       runnable: aws/policy
       service: policy
+  requires:
+    - cloud/aws
   lifecycle:
     sync: <<< group-sync.js

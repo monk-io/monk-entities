@@ -1,4 +1,3 @@
-let aws = require("cloud/aws")
 let cli = require("cli")
 let parser = require("parser")
 let BASE_URL = "https://iam.amazonaws.com/"

@@ -18,6 +18,8 @@ firebase-site:
       type: string
     keep-on-delete:
       type: bool
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< site-sync.js
 
@@ -45,6 +47,8 @@ firebase-channel:
       type: object
       additionalProperties:
         type: string
+  requires:
+    - cloud/gcp
   lifecycle:
     sync: <<< site-channel-sync.js
     list-releases: ""
