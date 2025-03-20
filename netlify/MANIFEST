@@ -1,0 +1,3 @@
+REPO monk-netlify
+LOAD netlify.yaml site-entity.yaml
+RESOURCES site-sync.js

@@ -1,0 +1,34 @@
+namespace: netlify
+
+deploy:
+  defines: runnable
+  permitted-secrets:
+    default-netlify-pat: true
+  containers:
+    deploy:
+      image: monkimages.azurecr.io/example-netlify-build:latest
+      restart: no
+      bash: /tmp/init.sh
+#      paths:
+#        - <- `blobs://example:/home/node/app`
+  files:
+    init:
+      container: deploy
+      path: /tmp/init.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        {{ v "pre-deploy" }}
+        netlify deploy --prod --dir=/home/node/app/build
+  variables:
+    site-id:
+      env: NETLIFY_SITE_ID
+      type: string
+      value: example
+    token:
+      env: NETLIFY_AUTH_TOKEN
+      type: string
+      value: <- secret("default-netlify-pat")
+    pre-deploy:
+      type: string
+      value: <- `echo "pre-deploy script"`

@@ -1,0 +1,33 @@
+namespace: vercel
+
+deploy:
+  defines: runnable
+  containers:
+    deploy:
+      image: monkimages.azurecr.io/example-vercel-build:latest
+      restart: no
+      bash: /tmp/init.sh
+#      paths:
+#        - <- `blobs://example:/home/node/app`
+  files:
+    init:
+      container: deploy
+      path: /tmp/init.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        {{ v "pre-deploy" }}
+        vercel link --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
+        vercel deploy --prod --public --yes -t $VERCEL_TOKEN
+  variables:
+    project:
+      env: VERCEL_PROJECT
+      type: string
+      value: example
+    token:
+      env: VERCEL_TOKEN
+      type: string
+      value: example
+    pre-deploy:
+      type: string
+      value: <- `echo "pre-deploy script"`
