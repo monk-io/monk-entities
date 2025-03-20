@@ -1,0 +1,16 @@
+namespace: vercel
+
+project:
+  defines: entity
+  schema:
+    required: ["secret_ref", "name"]
+    secret_ref:
+      type: string
+    name:
+      type: string
+  lifecycle:
+    sync: <<< project-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
