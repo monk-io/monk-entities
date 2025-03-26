@@ -3,9 +3,10 @@ namespace: vercel
 project:
   defines: entity
   schema:
-    required: ["secret_ref", "name"]
+    required: ["name"]
     secret_ref:
       type: string
+      default: default-vercel-token
     name:
       type: string
   lifecycle:
