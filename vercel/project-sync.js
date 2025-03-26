@@ -82,6 +82,9 @@ function deleteProject(def, state) {
 
 
 function main(def, state, ctx) {
+    if (!def.secret_ref) {
+        def.secret_ref = "default-vercel-token";
+    }
     switch (ctx.action) {
         case "create":
             state = createProject(def)

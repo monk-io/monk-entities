@@ -2,6 +2,8 @@ namespace: vercel
 
 deploy:
   defines: runnable
+  permitted-secrets:
+    default-vercel-token: true
   containers:
     deploy:
       image: monkimages.azurecr.io/example-vercel-build:latest
@@ -27,7 +29,7 @@ deploy:
     token:
       env: VERCEL_TOKEN
       type: string
-      value: example
+      value: <- secret("default-vercel-token")
     pre-deploy:
       type: string
       value: <- `echo "pre-deploy script"`
