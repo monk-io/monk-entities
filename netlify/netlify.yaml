@@ -19,7 +19,7 @@ deploy:
       contents: |
         #!/bin/sh
         {{ v "pre-deploy" }}
-        netlify deploy --prod --dir=/home/node/app/build
+        netlify deploy --prod --dir=$DEPLOY_DIR
   variables:
     site-id:
       env: NETLIFY_SITE_ID
@@ -29,6 +29,10 @@ deploy:
       env: NETLIFY_AUTH_TOKEN
       type: string
       value: <- secret("default-netlify-pat")
+    deploy-dir:
+      env: DEPLOY_DIR
+      type: string
+      value: /home/node/app/
     pre-deploy:
       type: string
       value: <- `echo "pre-deploy script"`

@@ -19,8 +19,8 @@ deploy:
       contents: |
         #!/bin/sh
         {{ v "pre-deploy" }}
-        vercel link --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
-        vercel deploy --prod --public --yes -t $VERCEL_TOKEN
+        vercel link --cwd $DEPLOY_DIR --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
+        vercel deploy --cwd $DEPLOY_DIR --prod --public --yes -t $VERCEL_TOKEN
   variables:
     project:
       env: VERCEL_PROJECT
@@ -30,6 +30,10 @@ deploy:
       env: VERCEL_TOKEN
       type: string
       value: <- secret("default-vercel-token")
+    deploy-dir:
+      env: DEPLOY_DIR
+      type: string
+      value: /home/node/app/
     pre-deploy:
       type: string
       value: <- `echo "pre-deploy script"`
