@@ -4,6 +4,25 @@ const secret = require("secret");
 
 const BASE_URL = "https://api.vercel.com";
 
+function getProject(def) {
+    const token = secret.get(def.secret_ref);
+
+    let res = http.get(BASE_URL + "/v9/projects/" + def.name,
+        {
+            headers: {
+                "authorization": "Bearer " + token,
+                "content-type": "application/json"
+            }
+        });
+    if (res.error) {
+        throw new Error(res.error + ", body " + res.body);
+    }
+
+    resObj = JSON.parse(res.body);
+
+    return {id: resObj.id, name: resObj.name};
+}
+
 function createProject(def) {
     const token = secret.get(def.secret_ref);
 
@@ -95,17 +114,23 @@ function main(def, state, ctx) {
     }
     switch (ctx.action) {
         case "create":
+            try {
+                const ex = getProject(def);
+                state = ex;
+                state.existing = true
+                break
+            } catch {
+            }
+
             state = createProject(def)
             break;
-        // case "check-readiness":
-        //     let domain = getDomain(def, state);
-        //     state.domain = domain;
-        //     break;
         case "update":
             state = updateProject(def, state);
             break;
         case "purge":
-            deleteProject(def, state);
+            if (!state.existing && state.id) {
+                deleteProject(def, state);
+            }
             break;
         default:
             // no action defined
