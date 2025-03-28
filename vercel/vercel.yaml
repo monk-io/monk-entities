@@ -20,7 +20,7 @@ deploy:
         #!/bin/sh
         {{ v "pre-deploy" }}
         vercel link --cwd $DEPLOY_DIR --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
-        yes | vercel deploy --cwd $DEPLOY_DIR --prod --public --yes -t $VERCEL_TOKEN
+        echo "y\n" | vercel deploy --cwd $DEPLOY_DIR --prod --public --yes -t $VERCEL_TOKEN
   variables:
     project:
       env: VERCEL_PROJECT
