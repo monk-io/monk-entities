@@ -53,8 +53,9 @@ function updateProject(def, state) {
         name: def.name
     };
 
-    let res = http.do("PATCH", BASE_URL + "/v9/projects/" + state.id,
+    let res = http.do(BASE_URL + "/v9/projects/" + state.id,
         {
+            method: "PATCH",
             headers: {
                 "authorization": "Bearer " + token,
                 "content-type": "application/json"
