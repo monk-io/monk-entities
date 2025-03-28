@@ -1,8 +1,31 @@
-const cli = require("cli");
 const http = require("http");
 const secret = require("secret");
 
 const BASE_URL = "https://api.netlify.com/api/v1";
+
+function getSite(def) {
+    const token = secret.get(def.secret_ref);
+
+    let res = http.get(BASE_URL + "/sites?name=" + def.name,
+        {
+            headers: {
+                "authorization": "Bearer " + token,
+                "content-type": "application/json"
+            }
+        });
+    if (res.error) {
+        throw new Error(res.error + ", body " + res.body);
+    }
+
+    resArr = JSON.parse(res.body);
+    for (let i = 0; i < resArr.length; i++) {
+        if (resArr[i].name === def.name) {
+            return {id: resArr[i].id, name: resArr[i].name, url: resArr[i].url};
+        }
+    }
+
+    return null;
+}
 
 function createSite(def) {
     const token = secret.get(def.secret_ref);
@@ -77,13 +100,23 @@ function main(def, state, ctx) {
     }
     switch (ctx.action) {
         case "create":
+            const ex = getSite(def);
+            if (ex !== null) {
+                state = ex;
+                state.existing = true
+                updateSite(def, state);
+                break
+            }
+
             state = createSite(def)
             break;
         case "update":
             updateSite(def, state);
             break;
         case "purge":
-            deleteSite(def, state);
+            if (!state.existing && state.id) {
+                deleteSite(def, state);
+            }
             break;
         default:
             // no action defined
