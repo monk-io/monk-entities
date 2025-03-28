@@ -49,6 +49,11 @@ function getDomain(def, state) {
 function updateProject(def, state) {
     const token = secret.get(def.secret_ref);
 
+    if (state.name === def.name) {
+        return state;
+    }
+    state.name = def.name;
+
     const body = {
         name: def.name
     };
@@ -65,6 +70,8 @@ function updateProject(def, state) {
     if (res.error) {
         throw new Error(res.error + ", body " + res.body);
     }
+
+    return state;
 }
 
 function deleteProject(def, state) {
@@ -95,7 +102,7 @@ function main(def, state, ctx) {
         //     state.domain = domain;
         //     break;
         case "update":
-            updateProject(def, state);
+            state = updateProject(def, state);
             break;
         case "purge":
             deleteProject(def, state);
