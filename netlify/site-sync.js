@@ -20,7 +20,7 @@ function getSite(def) {
     resArr = JSON.parse(res.body);
     for (let i = 0; i < resArr.length; i++) {
         if (resArr[i].name === def.name) {
-            return {id: resArr[i].id, name: resArr[i].name, url: resArr[i].url};
+            return {id: resArr[i].id, name: resArr[i].name, url: resArr[i].url, admin_url: resArr[i].admin_url};
         }
     }
 
@@ -53,7 +53,7 @@ function createSite(def) {
 
     resObj = JSON.parse(res.body);
 
-    return {id: resObj.id, name: resObj.name, url: resObj.url};
+    return {id: resObj.id, name: resObj.name, url: resObj.url, admin_url: resObj.admin_url};
 }
 
 function updateSite(def, state) {
