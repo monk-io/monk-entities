@@ -1,0 +1,3 @@
+REPO monk-neon
+LOAD project.yaml branch.yaml role.yaml db.yaml
+RESOURCES project-sync.js branch-sync.js role-sync.js db-sync.js

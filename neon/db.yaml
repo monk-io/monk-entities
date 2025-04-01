@@ -1,0 +1,23 @@
+namespace: neon
+
+database:
+  defines: entity
+  schema:
+    required: ["name", "role_name", "project_id", "secret_ref"]
+    project_id:
+      type: string
+    branch_id:
+      type: string
+      default: main
+    role_name:
+      type: string
+    secret_ref:
+      type: string
+    name:
+      type: string
+  lifecycle:
+    sync: <<< db-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
