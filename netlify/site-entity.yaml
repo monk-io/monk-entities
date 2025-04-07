@@ -11,6 +11,8 @@ site:
       default: default-netlify-pat
     name:
       type: string
+    team_slug:
+      type: string
     password:
       type: string
     custom_domain:

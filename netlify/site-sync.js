@@ -6,7 +6,12 @@ const BASE_URL = "https://api.netlify.com/api/v1";
 function getSite(def) {
     const token = secret.get(def.secret_ref);
 
-    let res = http.get(BASE_URL + "/sites?name=" + def.name,
+    let url_prefix = "";
+    if (def.team_slug) {
+        url_prefix = "/" + def.team_slug;
+    }
+
+    let res = http.get(BASE_URL + url_prefix + "/sites?name=" + def.name,
         {
             headers: {
                 "authorization": "Bearer " + token,
@@ -38,7 +43,12 @@ function createSite(def) {
         created_via: "monk.io"
     };
 
-    let res = http.post(BASE_URL + "/sites",
+    let url_prefix = "";
+    if (def.team_slug) {
+        url_prefix = "/" + def.team_slug;
+    }
+
+    let res = http.post(BASE_URL + url_prefix + "/sites",
         {
             headers: {
                 "authorization": "Bearer " + token,
