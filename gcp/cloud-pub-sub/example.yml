@@ -1,0 +1,5 @@
+namespace: gcp
+
+my-topic:
+  defines: gcp/cloud-pub-sub
+  name: monk-demo-1
