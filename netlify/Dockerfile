@@ -1,4 +1,5 @@
-FROM node:18-alpine
+ARG NODE_VERSION=18
+FROM node:${NODE_VERSION}-alpine3.21
 
 RUN npm install netlify-cli -g
 
