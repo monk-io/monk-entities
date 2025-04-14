@@ -6,7 +6,8 @@ deploy:
     default-netlify-pat: true
   containers:
     deploy:
-      image: <- `monkimages.azurecr.io/netlify-build:${node-version}`
+      image: monkimages.azurecr.io/netlify-build
+      image-tag: <- $node-version
       restart: no
       bash: /tmp/init.sh
 #      paths:
