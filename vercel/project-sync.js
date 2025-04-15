@@ -112,6 +112,9 @@ function main(def, state, ctx) {
     if (!def.secret_ref) {
         def.secret_ref = "default-vercel-token";
     }
+    if (ctx.action === "update" && !state.id) {
+        ctx.action = "create";
+    }
     switch (ctx.action) {
         case "create":
             try {
