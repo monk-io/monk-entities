@@ -1,0 +1,16 @@
+namespace: redis-cloud
+
+account:
+  defines: entity
+  metadata:
+    name: Redis Cloud Account
+  schema:
+    required: [ "account_key_secret", "user_key_secret" ]
+    account_key_secret:
+      type: string
+    user_key_secret:
+      type: string
+  lifecycle:
+    sync: <<< account-sync.js
+    get-payment-methods: ""
+    get-plans: ""

@@ -1,0 +1,3 @@
+REPO monk-regis-cloud
+LOAD account.yaml subscription.yaml database.yaml
+RESOURCES account-sync.js subscription-sync.js database-sync.js
