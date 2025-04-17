@@ -188,7 +188,7 @@ function checkReadiness(def, state) {
         return state;
     }
 
-    throw "not ready";
+    throw new Error("not ready");
 }
 
 

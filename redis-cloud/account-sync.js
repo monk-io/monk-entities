@@ -48,7 +48,7 @@ function getPlans(def, subscriptionType, cloudProvider, region) {
 function main(def, state, ctx) {
     switch (ctx.action) {
         case "get-payment-methods":
-            res = getPaymentMethods(def);
+            const res = getPaymentMethods(def);
             if (res.error) {
                 throw new Error(res.error + ", body " + res.body);
             }
