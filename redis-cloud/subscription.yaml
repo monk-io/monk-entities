@@ -1,0 +1,35 @@
+namespace: redis-cloud
+
+subscription:
+  defines: entity
+  metadata:
+    name: Redis Cloud Subscription
+  schema:
+    required: [ "account_key_secret", "user_key_secret", "subscription_type", "name", "plan_id"]
+    account_key_secret:
+      type: string
+    user_key_secret:
+      type: string
+    subscription_type:
+      type: string
+      enum:
+        - essentials
+        - pro
+    name:
+      type: string
+    plan_id:
+      type: integer
+    payment_method:
+      type: string
+      enum:
+        - credit-card
+        - marketplace
+    payment_method_id:
+      type: integer
+  lifecycle:
+    sync: <<< subscription-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 10

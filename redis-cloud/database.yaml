@@ -1,0 +1,178 @@
+namespace: redis-cloud
+
+database:
+  defines: entity
+  metadata:
+    name: Redis Cloud Database
+  schema:
+    required: [ "account_key_secret", "user_key_secret", "subscription_id", "subscription_type", "name" ]
+    account_key_secret:
+      type: string
+    user_key_secret:
+      type: string
+    password_secret:
+      type: string
+    subscription_id:
+      type: string
+    subscription_type:
+      type: string
+      enum:
+        - essentials
+        - pro
+    name:
+      type: string
+    protocol:
+      type: string
+      enum:
+        - redis
+        - memcached
+        - stack
+    port:
+      type: integer
+    dataset_size_in_gb:
+      type: integer
+    support_oss_cluster_api:
+      type: bool
+    resp_version:
+      type: string
+      enum:
+        - resp2
+        - resp3
+    use_external_endpoint_for_oss_cluster_api:
+      type: bool
+    enable_database_clustering: # Essentials only
+      type: bool
+    number_of_shards: # Essentials only
+      type: integer
+    data_persistence:
+      type: string
+      enum:
+        - none
+        - aof-every-1-second
+        - aof-every-write
+        - snapshot-every-1-hour
+        - snapshot-every-6-hours
+        - snapshot-every-12-hours
+    data_eviction_policy:
+      type: string
+      enum:
+        - allkeys-lru
+        - allkeys-lfu
+        - allkeys-random
+        - volatile-lru
+        - volatile-lfu
+        - volatile-random
+        - volatile-ttl
+        - noeviction
+    replication:
+      type: bool
+    replica:
+      type: object
+      properties:
+        sync_sources:
+          type: array
+          items:
+            type: object
+            properties:
+              endpoint:
+                type: string
+              encryption:
+                type: bool
+              server_cert:
+                type: string
+    throughput_measurement: # Pro only
+      type: object
+      properties:
+        by:
+          type: string
+        value:
+          type: integer
+    local_throughput_measurement: # Pro only
+      type: array
+      items:
+        type: object
+        properties:
+          region:
+            type: string
+          write_operations_per_second:
+            type: integer
+          read_operations_per_second:
+            type: integer
+    average_item_size_in_bytes: # Pro only
+      type: integer
+    periodic_backup_path: # Essentials only
+      type: string
+    remote_backup: # Pro only
+      type: object
+      properties:
+        active:
+          type: bool
+        interval:
+          type: string
+        time_utc:
+          type: string
+        storage_type:
+          type: string
+        storage_path:
+          type: string
+    source_ips:
+      type: array
+      items:
+        type: string
+    regex_rules: # Essentials only
+      type: array
+      items:
+        type: string
+    client_tls_certificates:
+      type: array
+      items:
+        type: object
+        properties:
+          public_certificate_pem_string:
+            type: string
+    enable_tls:
+      type: bool
+    sasl_username: # Pro only
+      type: string
+    alerts:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+            enum:
+              - dataset-size
+              - datasets-size
+              - throughput-higher-than
+              - throughput-lower-than
+              - latency
+              - syncsource-error
+              - syncsource-lag
+              - connections-limit
+          value:
+            type: integer
+    modules:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          parameters:
+            type: object # ??
+    sharding_type: # Pro only
+      type: string
+      enum:
+        - default-regex-rules
+        - custom-regex-rules
+        - redis-oss-hashing
+    query_performance_factor: # Pro only
+      type: string
+  lifecycle:
+    sync: <<< database-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 10
