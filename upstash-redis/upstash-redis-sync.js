@@ -134,6 +134,8 @@ function syncDatabase(def, state, update) {
         ready: dbObj.state === "active",
         id: dbObj.database_id,
         name: dbObj.database_name,
+        password: dbObj.password,
+        port: dbObj.port,
         publicEndpoint: dbObj.endpoint,
     };
 }
