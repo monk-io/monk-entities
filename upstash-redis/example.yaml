@@ -1,0 +1,13 @@
+namespace: upstash-example
+
+redis:
+  defines: templates/local/upstash-redis/database
+  auth_token_secret: upstash-auth-token
+  email_secret: upstash-email
+  name: "my-redis-db"
+  region: "global"
+  primary_region: "us-east-1"
+  tls: true
+  permitted-secrets:
+    upstash-auth-token: true
+    upstash-email: true
