@@ -1,0 +1,19 @@
+namespace: auth0-example
+
+my-auth0-app:
+  defines: auth0/application
+  domain: "my-tenant.auth0.com"  # Replace with Auth0 domain
+  app-name: "Sergey Web App 3"
+  description: "My Auth0 application"
+  app_type: "regular_web"
+  callback-url: "https://my-app.example.com/callback"
+  allowed_logout_urls:
+    - "https://my-app.example.com/logout"
+  web_origins:
+    - "https://my-app.example.com"
+  management-client-id-secret: auth0-management-my-client-id # Client ID for Management API
+  management-client-token-secret: auth0-management-my-app-token-secret  # Client Secret for Management API
+  management-api: "https://dev-f8y0exae.auth0.com"
+  permitted-secrets:
+      auth0-management-my-client-id: true
+      auth0-management-my-app-token-secret: true

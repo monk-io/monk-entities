@@ -1,0 +1,97 @@
+namespace: auth0
+
+application:
+  defines: entity
+  metadata:
+    name: Auth0 Application
+  schema:
+    required: ["domain", "app-name", "callback-url", "management-client-id-secret", "management-client-token-secret", "management-api"]
+    domain:
+      type: string
+      description: "The Auth0 tenant domain (e.g., your-tenant.auth0.com)"
+    app-name:
+      type: string
+      description: "Name of the Auth0 application"
+    grant-types:
+        type: array
+        items:
+            type: string
+        description: "List of grant types supported for this application (Can include authorization_code, implicit, refresh_token, client_credentials, password)"
+    app_type:
+      type: string
+      description: "Type of application"
+      enum:
+        - native
+        - spa
+        - regular_web
+        - non_interactive
+        - rms
+        - box
+        - cloudbees
+        - concur
+        - dropbox
+        - mscrm
+        - echosign
+        - egnyte
+        - newrelic
+        - office365
+        - salesforce
+        - sentry
+        - sharepoint
+        - slack
+        - springcm
+        - zendesk
+        - zoom
+      default: "regular_web"
+    callback-url:
+      type: string
+      description: "The callback URL for the application"
+    logo-uri:
+      type: string
+      description: "URL for the application logo"
+    allowed-logout-urls:
+      type: array
+      items:
+        type: string
+      description: "List of allowed logout URLs"
+      default: []
+    allowed-origins:
+      type: array
+      items:
+        type: string
+      description: "List of allowed origins for the application"
+      default: []
+    cross-origin-authentication:
+      type: boolean
+      description: "Enable cross-origin authentication"
+      default: false
+    web-origins:
+      type: array
+      items:
+        type: string
+      description: "List of allowed web origins for the application"
+      default: []
+    default-scopes:
+      type: string
+      description: "Default OAuth scopes (e.g., openid profile email)"
+      default: "openid profile email"
+    management-client-id:
+      type: string
+      description: "Client ID for Management API access"
+    management-client-token:
+      type: string
+      description: "Client Secret for Management API access"
+    management-client-id-secret:
+      type: string
+      description: "Secret for client ID for Management API access"
+    management-client-token-secret:
+      type: string
+      description: "Secret for client Secret for Management API access"
+    management-api:
+      type: string
+      description: "Address for management API"
+  requires:
+    - http
+    - secret
+  lifecycle:
+    sync: <<< auth-sync.js
