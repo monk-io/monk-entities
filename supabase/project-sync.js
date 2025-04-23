@@ -17,7 +17,9 @@ function get(token, id) {
         throw new Error(res.error + ", body " + res.body);
     }
 
-    return JSON.parse(res.body)
+    let obj = JSON.parse(res.body);
+    obj.database_host = obj.database.host;
+    return obj;
 }
 
 // API Docs: https://api.supabase.com/api/v1#tag/projects/POST/v1/projects

@@ -76,7 +76,7 @@ backend:
     database-host:
       env: DATABASE_HOST
       type: string
-      value: <- connection-target("project") entity-state get-member("database.host")
+      value: <- connection-target("project") entity-state get-member("database_host")
     database-user:
       env: DATABASE_USER
       type: string
