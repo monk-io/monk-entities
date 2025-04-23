@@ -8,6 +8,8 @@ organization:
       type: string
     name:
       type: string
+    id:
+      type: string
   lifecycle:
     sync: <<< organization-sync.js
     list: <<< organization-list.js

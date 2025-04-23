@@ -24,6 +24,11 @@ function get(token, id) {
 function create(def) {
     const token = secret.get(def.secret_ref);
 
+    // if provided organization id, this mean organization will be managed via UI
+    if (def.id) {
+        return get(token, def.id);
+    }
+
     const body = {
         name: def.name,
     };
@@ -48,6 +53,12 @@ function create(def) {
 
 function update(def, state) {
     const token = secret.get(def.secret_ref);
+
+    // if provided organization id, this mean organization will be managed via UI
+    if (def.id) {
+        return get(token, def.id);
+    }
+
     const o = get(token, state.id);
 
     if (o.name === def.name) {
@@ -81,6 +92,11 @@ function update(def, state) {
 
 function purge(def, state) {
     const token = secret.get(def.secret_ref);
+
+    // if provided organization id, this mean organization will be managed via UI
+    if (def.id) {
+        return get(token, def.id);
+    }
 
     let res = http.do(BASE_URL + "/" + state.id, {
         method: "DELETE",
