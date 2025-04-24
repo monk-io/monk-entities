@@ -96,7 +96,7 @@ function mapApplicationDefinition(def, isUpdate = false) {
 }
 
 function getManagementToken(def) {
-    console.log("Obtaining Management API token", def);
+    console.log(`Obtaining Management API token ${def}`, def);
     let clientID = secret.get(def["management-client-id-secret"]);
     if (!clientID) {
         throw new Error(`Management client ID secret not found: ${def["management-client-id-secret"]}`);
@@ -134,6 +134,8 @@ function syncApplication(def, state, update) {
         },
         body: JSON.stringify(body),
     };
+
+    console.log(`request ${req}`)
 
     let res;
     try {
