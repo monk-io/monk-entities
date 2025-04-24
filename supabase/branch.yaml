@@ -10,6 +10,9 @@ branch:
       type: string
     name:
       type: string
+    slug:
+      description: Resource identifier (Branch ID) OPTIONAL, if specified, all management will be delegated to supabase dashboard
+      type: string
     git_branch:
       type: string
     persistent:

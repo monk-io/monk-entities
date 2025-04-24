@@ -4,6 +4,7 @@ organization:
   defines: supabase/organization
   secret_ref: supabase-token
   name: my-organization-1
+#  slug: kwgofsrdrfshcprqdeiy
   permitted-secrets:
     supabase-token: true
   services:
@@ -15,6 +16,7 @@ project:
   secret_ref: supabase-token
   organization_id: <- connection-target("organization") entity-state get-member("id")
   name: my-project-1
+#  slug: izzpsuamgtwiaaxfurzi
   db_pass_ref: supabase-db-password
   region: us-east-2
   permitted-secrets:
@@ -38,6 +40,7 @@ project:
 #  secret_ref: supabase-token
 #  project_id: <- connection-target("project") entity-state get-member("id")
 #  name: test
+#  slug: twgtfsrdtfshctrqdtiy
 #  permitted-secrets:
 #    supabase-token: true
 #  services:
@@ -76,7 +79,7 @@ backend:
     database-host:
       env: DATABASE_HOST
       type: string
-      value: <- connection-target("project") entity-state get-member("database_host")
+      value: <- connection-target("project") entity-state get-member("database/host")
     database-user:
       env: DATABASE_USER
       type: string

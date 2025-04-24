@@ -10,6 +10,9 @@ project:
       type: string
     name:
       type: string
+    slug: 
+      description: Resource identifier (Project ID) OPTIONAL, if specified, all management will be delegated to supabase dashboard
+      type: string
     db_pass_ref:
       type: string
     region:

@@ -1,11 +1,19 @@
 var cli = require("cli")
 const http = require("http");
 const secret = require("secret");
-const BASE_URL = "https://api.supabase.com/v1/organizations";
+const BASE_URL = "https://api.supabase.com/v1";
+
+function buildURL(organization_id) {
+    let u = BASE_URL + "/organizations";
+    if (organization_id) {
+        u += "/" + organization_id;
+    }
+    return u;
+}
 
 // API Docs: https://api.supabase.com/api/v1#tag/organizations/GET/v1/organizations/{slug}
-function get(token, id) {
-    let res = http.do(BASE_URL + "/" + id, {
+function get(token, organization_id) {
+    let res = http.do(buildURL(organization_id), {
         method: "GET",
         headers: {
             "authorization": "Bearer " + token,
@@ -25,7 +33,7 @@ function get(token, id) {
 function list(def) {
     const token = secret.get(def.secret_ref);
 
-    let res = http.do(BASE_URL, {
+    let res = http.do(buildURL(), {
         method: "GET",
         headers: {
             "authorization": "Bearer " + token,

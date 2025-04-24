@@ -1,13 +1,42 @@
 const http = require("http");
 const secret = require("secret");
+const BASE_URL = "https://api.supabase.com/v1";
 
-function baseURL(project_id) {
-    return "https://api.supabase.com/v1/projects/" + project_id + "/branches";
+function buildURL(project_id, branch_id) {
+    let u = BASE_URL + "/projects/" + project_id + "/branches";
+    if (branch_id) {
+        u += "/" + branch_id;
+    }
+    return u;
+}
+
+// API Docs: https://api.supabase.com/api/v1#tag/environments/GET/v1/branches/{branch_id}
+function get(token, project_id, branch_id) {
+    let res = http.do(buildURL(project_id, branch_id), {
+        method: "GET",
+        headers: {
+            "authorization": "Bearer " + token,
+            "content-type": "application/json",
+            "accept": "application/json"
+        }
+    });
+
+    if (res.error) {
+        throw new Error(res.error + ", body " + res.body);
+    }
+
+    let obj = JSON.parse(res.body);
+    return obj;
 }
 
 // API Docs: https://api.supabase.com/api/v1#tag/environments/POST/v1/projects/{ref}/branches
 function create(def) {
     const token = secret.get(def.secret_ref);
+
+    // if specified, all management will be delegated to supabase dashboard
+    if (def.slug) {
+        return get(token, def.project_id, def.slug);
+    }
 
     const body = {
         branch_name: def.name
@@ -33,7 +62,7 @@ function create(def) {
         body.release_channel = def.release_channel;
     }
 
-    let res = http.post(baseURL(def.project_id), {
+    let res = http.post(buildURL(def.project_id), {
         headers: {
             "authorization": "Bearer " + token,
             "content-type": "application/json",
@@ -46,12 +75,16 @@ function create(def) {
         throw new Error(res.error + ", body " + res.body);
     }
 
-    resObj = JSON.parse(res.body);
-
-    return {id: resObj.branch.id, name: resObj.branch.name};
+    let obj = JSON.parse(res.body);
+    return obj;
 }
 
 function update(def, state) {
+    // if specified, all management will be delegated to supabase dashboard
+    if (def.slug) {
+        return get(token, def.project_id, def.slug);
+    }
+
     // API does not support updating the project
     return state;
 
@@ -67,7 +100,7 @@ function update(def, state) {
         }
     };
 
-    let res = http.do(baseURL(def.project_id) + "/" + state.id, {
+    let res = http.do(buildURL(def.project_id, state.id), {
         method: "PATCH",
         headers: {
             "authorization": "Bearer " + token,
@@ -84,19 +117,22 @@ function update(def, state) {
     return JSON.parse(res.body);
 }
 
+// API Docs: https://api.supabase.com/api/v1#tag/environments/DELETE/v1/branches/{branch_id}
 function purge(def, state) {
     const token = secret.get(def.secret_ref);
 
-    res = http.delete(baseURL(def.project_id) + "/" + state.id, {
-        method: "DELETE",
-        headers: {
-            "authorization": "Bearer " + token,
-            "accept": "application/json"
-        },
-    });
+    // if specified, all management will be delegated to supabase dashboard
+    if (!def.slug) {
+        res = http.delete(buildURL(def.project_id, state.id), {
+            headers: {
+                "authorization": "Bearer " + token,
+                "accept": "application/json"
+            },
+        });
 
-    if (res.error) {
-        throw new Error(res.error + ", body " + res.body);
+        if (res.error) {
+            throw new Error(res.error + ", body " + res.body);
+        }
     }
 }
 

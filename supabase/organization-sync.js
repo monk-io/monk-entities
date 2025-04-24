@@ -1,10 +1,18 @@
 const http = require("http");
 const secret = require("secret");
-const BASE_URL = "https://api.supabase.com/v1/organizations";
+const BASE_URL = "https://api.supabase.com/v1";
+
+function buildURL(organization_id) {
+    let u = BASE_URL + "/organizations";
+    if (organization_id) {
+        u += "/" + organization_id;
+    }
+    return u;
+}
 
 // API Docs: https://api.supabase.com/api/v1#tag/organizations/GET/v1/organizations/{slug}
-function get(token, id) {
-    let res = http.do(BASE_URL + "/" + id, {
+function get(token, organization_id) {
+    let res = http.do(buildURL(organization_id), {
         method: "GET",
         headers: {
             "authorization": "Bearer " + token,
@@ -25,15 +33,15 @@ function create(def) {
     const token = secret.get(def.secret_ref);
 
     // if provided organization id, this mean organization will be managed via UI
-    if (def.id) {
-        return get(token, def.id);
+    if (def.slug) {
+        return get(token, def.slug);
     }
 
     const body = {
         name: def.name,
     };
 
-    let res = http.post(BASE_URL, {
+    let res = http.post(buildURL(), {
         method: "POST",
         headers: {
             "authorization": "Bearer " + token,
@@ -55,12 +63,11 @@ function update(def, state) {
     const token = secret.get(def.secret_ref);
 
     // if provided organization id, this mean organization will be managed via UI
-    if (def.id) {
-        return get(token, def.id);
+    if (def.slug) {
+        return get(token, def.slug);
     }
 
     const o = get(token, state.id);
-
     if (o.name === def.name) {
         // no change
         return state;
@@ -72,7 +79,7 @@ function update(def, state) {
         name: def.name,
     };
 
-    let res = http.do(BASE_URL + "/" + state.id, {
+    let res = http.do(buildURL(state.id), {
         method: "PATCH",
         headers: {
             "authorization": "Bearer " + token,
@@ -94,21 +101,20 @@ function purge(def, state) {
     const token = secret.get(def.secret_ref);
 
     // if provided organization id, this mean organization will be managed via UI
-    if (def.id) {
-        return get(token, def.id);
-    }
+    if (!def.slug) {
+        throw new Error("Unimplemented on the API side");
 
-    let res = http.do(BASE_URL + "/" + state.id, {
-        method: "DELETE",
-        headers: {
-            "authorization": "Bearer " + token,
-            "content-type": "application/json",
-            "accept": "application/json"
+        let res = http.delete(buildURL(state.id), {
+            headers: {
+                "authorization": "Bearer " + token,
+                "content-type": "application/json",
+                "accept": "application/json"
+            }
+        });
+
+        if (res.error) {
+            throw new Error(res.error + ", body " + res.body);
         }
-    });
-
-    if (res.error) {
-        throw new Error(res.error + ", body " + res.body);
     }
 
     return {}
