@@ -1,0 +1,66 @@
+namespace: auth0-example
+
+my-auth0-app:
+  defines: auth0/application
+  domain: "my-tenant.auth0.com"  # Replace with Auth0 domain
+  app-name: "Sergey Web App 6"
+  description: "My Auth0 application"
+  app-type: "regular_web"
+  callback-url: "https://my-app.example.com/callback"
+  allowed-logout-urls:
+    - "https://my-app.example.com/logout"
+  web-origins:
+    - "https://my-app.example.com"
+  allowed-origins:
+    - <- "https://" connection-domain-name("api") concat-all
+  management-client-id-secret: auth0-management-my-client-id # Client ID for Management API
+  management-client-token-secret: auth0-management-my-app-token-secret  # Client Secret for Management API
+  management-api: "https://dev-f8y0exae.auth0.com"
+  permitted-secrets:
+      auth0-management-my-client-id: true
+      auth0-management-my-app-token-secret: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    api:
+      runnable: auth0-example/backend
+      service: api
+
+
+backend:
+  defines: runnable
+  containers:
+    defines: containers
+    foo:
+      image: nginx:latest
+      entrypoint: sleep 36000
+  variables:
+    defines: variables
+    auth0-client-id:
+      type: string
+      value: <- connection-target("auth0") entity-state get-member("client-id")
+      env: AUTH0_CLIENT_ID
+    auth0-client-secret:
+      type: string
+      value: <- connection-target("auth0") entity-state get-member("client-secret")
+      env: AUTH0_CLIENT_SECRET
+  connections:
+    auth0:
+      runnable: auth0-example/my-auth0-app
+      service: data
+  services:
+    api:
+      container: foo
+      port: 80
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - auth0-example/my-auth0-app
+
+stack:
+  defines: process-group
+  members:
+    - auth0-example/my-auth0-app
+    - auth0-example/backend
