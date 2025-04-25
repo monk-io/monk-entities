@@ -40,10 +40,18 @@ front-backend:
       entrypoint: sleep 36000
   variables:
     defines: variables
-    backend-domain:
+    proxy-target-host:
+      value: <- connection-hostname("service-backend")
       type: string
-      value: <- domain-name
-      env: BACKEND_DOMAIN
+      env: PROXY_TARGET_HOST
+    proxy-target-port:
+      value: <- connection-port("service-backend")
+      type: string
+      env: PROXY_TARGET_PORT
+  connections:
+    service-backend:
+      runnable: auth0-example/service-backend
+      service: api
   services:
     api:
       container: foo
@@ -72,6 +80,11 @@ service-backend:
     auth0:
       runnable: auth0-example/my-auth0-app
       service: data
+  services:
+    api:
+      container: foo
+      port: 80
+      protocol: tcp
   depends:
     wait-for:
       runnables:
