@@ -141,19 +141,19 @@ function syncApplication(def, state, update) {
     try {
         if (update && state["client-id"]) {
             const fieldsToUpdate = [
-                "name", "app_type", "callbacks",
-                "allowed_logout_urls", "web_origins", "description",
-                "logo_uri", "allowed_origins", "cross-origin-authentication"];
+                "name", "app-type", "callbacks",
+                "allowed-logout-urls", "web-origins", "description",
+                "logo-uri", "allowed-origins", "cross-origin-authentication"];
             const currentState = {
                 name: state.name,
-                app_type: state.app_type,
-                callbacks: state.callbacks,
-                allowed_logout_urls: state.allowed_logout_urls,
-                web_origins: state.web_origins,
-                description: state.description,
-                logo_uri: state.logo_uri,
-                allowed_origins: state.allowed_origins,
-                cross_origin_authentication: state["cross-origin-authentication"],
+                "app-type": state["app-type"],
+                "callbacks": state["callbacks"],
+                "allowed-logout-urls": state["allowed-logout-urls"],
+                "web-origins": state["web-origins"],
+                description: state["description"],
+                "logo-uri": state["logo-uri"],
+                "allowed-origins": state["allowed-origins"],
+                "cross-origin-authentication": state["cross-origin-authentication"],
             };
             const newConfig = mapApplicationDefinition(def);
             let needsUpdate = false;
@@ -197,18 +197,20 @@ function syncApplication(def, state, update) {
     return {
         ready: true,
         "client-id": appObj.client_id,
-        name: appObj.name,
-        app_type: appObj.app_type,
-        callbacks: appObj.callbacks || [],
-        allowed_logout_urls: appObj.allowed_logout_urls || [],
-        web_origins: appObj.web_origins || [],
-        audience: appObj.audience || "",
-        description: appObj.description || "",
-        logo_uri: appObj.logo_uri || "",
-        allowed_origins: appObj.allowed_origins || [],
-        "cross-origin-authentication": appObj.cross_origin_authentication || false,
+        "name": appObj.name,
+        "client-secret": appObj.client_secret,
+        "app-type": appObj.app_type,
+        "callbacks": appObj.callbacks,
+        "allowed-logout-urls": appObj.allowed_logout_urls,
+        "web-origins": appObj.web_origins,
+        "audience": appObj.audience,
+        "description": appObj.description,
+        "logo-uri": appObj.logo_uri,
+        "allowed-origins": appObj.allowed_origins,
+        "cross-origin-authentication": appObj.cross_origin_authentication,
     };
 }
+
 
 function deleteApplication(def, state) {
     const managementToken = getManagementToken(def);
