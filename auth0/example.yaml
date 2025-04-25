@@ -17,8 +17,8 @@ my-auth0-app:
   management-client-token-secret: auth0-management-my-app-token-secret  # Client Secret for Management API
   management-api: "https://dev-f8y0exae.auth0.com"
   permitted-secrets:
-      auth0-management-my-client-id: true
-      auth0-management-my-app-token-secret: true
+    auth0-management-my-client-id: true
+    auth0-management-my-app-token-secret: true
   services:
     data:
       protocol: custom
@@ -35,6 +35,8 @@ backend:
     foo:
       image: nginx:latest
       entrypoint: sleep 36000
+      hooks:
+        container-started: start
   variables:
     defines: variables
     auth0-client-id:
@@ -45,6 +47,10 @@ backend:
       type: string
       value: <- connection-target("auth0") entity-state get-member("client-secret")
       env: AUTH0_CLIENT_SECRET
+    backend-domain:
+      type: string
+      value: <- domain-name
+      env: BACKEND_DOMAIN
   connections:
     auth0:
       runnable: auth0-example/my-auth0-app
@@ -58,6 +64,10 @@ backend:
     wait-for:
       runnables:
         - auth0-example/my-auth0-app
+  actions:
+    start:
+      description: "Update the value for config variables"
+      code: act("auth0-example/my-auth0-app/patch", `web-origins`, `https://${backend-domain}`, `allowed-origins`, `https://${backend-domain}`, `allowed-logout-urls`, `https://${backend-domain}/logout`)
 
 stack:
   defines: process-group
