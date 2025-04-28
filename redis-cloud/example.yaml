@@ -1,22 +1,26 @@
 namespace: redis-cloud-example
 
-redis-account:
-  defines: redis-cloud/account
-  account_key_secret: redis-cloud-account-key
-  user_key_secret: redis-cloud-user-key
-  permitted-secrets:
-    redis-cloud-account-key: true
-    redis-cloud-user-key: true
-
 redis-subscription:
   defines: redis-cloud/subscription
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
   subscription_type: essentials
   name: My-Fixed-Subscription-Test
-  plan_id: 20927 # 30MB Free AWS us-east-1
-#  payment_method: credit-card # Payment info is not allowed for free plans
-#  payment_method_id: 42073
+  #plan_id: 20927 # 30MB Free AWS us-east-1
+  size: 30
+  provider: AWS
+  region: us-east-1
+  redis_flex: false
+  availability: No replication
+  support_data_persistence: false
+  support_instant_and_daily_backups: false
+  support_replication: false
+  support_clustering: false
+  support_ssl: false
+  #  payment_method: credit-card # Payment info is not allowed for free plans
+  #  payment_method_id: 42073
+  #  OR
+  #  payment_method_type: Visa
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true

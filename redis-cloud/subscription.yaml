@@ -5,7 +5,7 @@ subscription:
   metadata:
     name: Redis Cloud Subscription
   schema:
-    required: [ "account_key_secret", "user_key_secret", "subscription_type", "name", "plan_id"]
+    required: [ "account_key_secret", "user_key_secret", "subscription_type", "name", "provider", "region", "redis_flex", "size", "availability", "support_data_persistence", "support_instant_and_daily_backups", "support_replication", "support_clustering", "support_ssl" ]
     account_key_secret:
       type: string
     user_key_secret:
@@ -17,8 +17,36 @@ subscription:
         - pro
     name:
       type: string
-    plan_id:
+#    plan_id:
+#      type: integer
+    provider:
+      type: string
+      enum:
+        - AWS
+        - GCP
+        - AZURE
+    region:
+      type: string
+    redis_flex:
+      type: bool
+    size:
       type: integer
+    availability:
+      type: string
+      enum:
+        - No replication
+        - Single-zone
+        - Multi-zone
+    support_data_persistence:
+      type: bool
+    support_instant_and_daily_backups:
+      type: bool
+    support_replication:
+      type: bool
+    support_clustering:
+      type: bool
+    support_ssl:
+      type: bool
     payment_method:
       type: string
       enum:
@@ -26,6 +54,8 @@ subscription:
         - marketplace
     payment_method_id:
       type: integer
+    payment_method_type:
+      type: string
   lifecycle:
     sync: <<< subscription-sync.js
   checks:
