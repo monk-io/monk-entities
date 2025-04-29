@@ -24,19 +24,48 @@ my-auth0-app:
       protocol: custom
   connections:
     api:
-      runnable: auth0-example/backend
+      runnable: auth0-example/front-backend
       service: api
+  depends:
+    wait-for:
+      runnables:
+        - auth0-example/front-backend
 
-
-backend:
+front-backend:
   defines: runnable
   containers:
     defines: containers
     foo:
       image: nginx:latest
       entrypoint: sleep 36000
-      hooks:
-        container-started: start
+  variables:
+    defines: variables
+    proxy-target-host:
+      value: <- connection-hostname("service-backend")
+      type: string
+      env: PROXY_TARGET_HOST
+    proxy-target-port:
+      value: <- connection-port("service-backend")
+      type: string
+      env: PROXY_TARGET_PORT
+  connections:
+    service-backend:
+      runnable: auth0-example/service-backend
+      service: api
+  services:
+    api:
+      container: foo
+      port: 80
+      protocol: custom
+
+
+service-backend:
+  defines: runnable
+  containers:
+    defines: containers
+    foo:
+      image: nginx:latest
+      entrypoint: sleep 36000
   variables:
     defines: variables
     auth0-client-id:
@@ -47,10 +76,6 @@ backend:
       type: string
       value: <- connection-target("auth0") entity-state get-member("client-secret")
       env: AUTH0_CLIENT_SECRET
-    backend-domain:
-      type: string
-      value: <- domain-name
-      env: BACKEND_DOMAIN
   connections:
     auth0:
       runnable: auth0-example/my-auth0-app
@@ -59,18 +84,15 @@ backend:
     api:
       container: foo
       port: 80
-      protocol: custom
+      protocol: tcp
   depends:
     wait-for:
       runnables:
         - auth0-example/my-auth0-app
-  actions:
-    start:
-      description: "Update the value for config variables"
-      code: act("auth0-example/my-auth0-app/patch", `web-origins`, `https://${backend-domain}`, `allowed-origins`, `https://${backend-domain}`, `allowed-logout-urls`, `https://${backend-domain}/logout`)
 
-stack:
+stack2:
   defines: process-group
   members:
+    - auth0-example/front-backend
     - auth0-example/my-auth0-app
-    - auth0-example/backend
+    - auth0-example/service-backend

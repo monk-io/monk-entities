@@ -211,7 +211,6 @@ function syncApplication(def, state, update) {
     };
 }
 
-
 function deleteApplication(def, state) {
     const managementToken = getManagementToken(def);
     console.log("Deleting application with ID:", state["client-id"]);
@@ -248,6 +247,99 @@ function checkReadiness(def, state) {
     return state;
 }
 
+function patchApplication(def, state, ctx) {
+    if (!state["client-id"]) {
+        throw new Error("No client-id found in state for patching application");
+    }
+    // todo: update
+    let mergedDef = { ...def };
+    const arrayFields = ["callback-url", "allowed-logout-urls", "web-origins", "allowed-origins"];
+
+    // Smart merge: Handle ctx.args, converting strings to arrays for array fields
+    for (const [key, value] of Object.entries(ctx.args)) {
+        console.log(`Processing key: ${key}, value: ${value} ${typeof value}`);
+        if (arrayFields.includes(key) && typeof value === "string") {
+            // Split by comma if present, otherwise use as single-element array
+            mergedDef[key] = value.includes(",") ? value.split(",").map(item => item.trim()) : [value];
+        } else {
+            mergedDef[key] = value; // Override with ctx.args value for non-array fields
+        }
+    }
+
+    const managementToken = getManagementToken(mergedDef);
+    const body = mapApplicationDefinition(mergedDef, true);
+    console.log("Patch request body:", JSON.stringify(body, null, 2));
+
+    const req = {
+        method: "PATCH",
+        headers: {
+            "Authorization": `Bearer ${managementToken}`,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        body: JSON.stringify(body),
+    };
+
+    const fieldsToUpdate = [
+        "name", "app-type", "callbacks",
+        "allowed-logout-urls", "web-origins", "description",
+        "logo-uri", "allowed-origins", "cross-origin-authentication"];
+    const currentState = {
+        name: state.name,
+        "app-type": "state.app-type",
+        "callbacks": "state.callbacks",
+        "allowed-logout-urls": state["allowed-logout-urls"],
+        "web-origins": state["web-origins"],
+        description: state["description"],
+        "logo-uri": state["logo-uri"],
+        "allowed-origins": state["allowed-origins"],
+        "cross-origin-authentication": state["cross-origin-authentication"],
+    };
+    const newConfig = mapApplicationDefinition(mergedDef);
+    let needsUpdate = false;
+    for (const field of fieldsToUpdate) {
+        if (JSON.stringify(currentState[field]) !== JSON.stringify(newConfig[field])) {
+            needsUpdate = true;
+            break;
+        }
+    }
+
+    if (!needsUpdate){
+        console.log("No changes detected, skipping update");
+        return state;
+    }
+
+    req.method = "PATCH";
+    console.log("Application configuration changed, updating via PATCH /api/v2/clients/{id}");
+    let res = http.do(`${def["management-api"]}/api/v2/clients/${state["client-id"]}`, req);
+    if (res.error) {
+        throw new Error(`API error: status ${res.status}, body: ${res.body}`);
+    }
+
+    let appObj;
+    try {
+        appObj = JSON.parse(res.body);
+    } catch (err) {
+        throw new Error(`Failed to parse response: ${err.message}, body: ${res.body}`);
+    }
+
+    return {
+        ready: true,
+        "client-id": appObj.client_id,
+        "name": appObj.name,
+        "client-secret": appObj.client_secret,
+        "app-type": appObj.app_type,
+        "callbacks": appObj.callbacks,
+        "allowed-logout-urls": appObj.allowed_logout_urls,
+        "web-origins": appObj.web_origins,
+        "audience": appObj.audience,
+        "description": appObj.description,
+        "logo-uri": appObj.logo_uri,
+        "allowed-origins": appObj.allowed_origins,
+        "cross-origin-authentication": appObj.cross_origin_authentication,
+    };
+}
+
 function main(def, state, ctx) {
     switch (ctx.action) {
         case "create":
@@ -267,6 +359,9 @@ function main(def, state, ctx) {
             break;
         case "check-readiness":
             state = checkReadiness(def, state);
+            break;
+        case "patch":
+            state = patchApplication(def, state, ctx);
             break;
         default:
             return state;
