@@ -315,7 +315,10 @@ function checkReadiness(def, state) {
 
     const resObj = JSON.parse(res.body);
     if (resObj.status === "active") {
+        const publicEndpoint = resObj.publicEndpoint.split(":");
         state.publicEndpoint = resObj.publicEndpoint
+        state.publicEndpointHost = publicEndpoint[0]
+        state.publicEndpointPort = publicEndpoint[1]
         state.ready = true;
         return state;
     }
