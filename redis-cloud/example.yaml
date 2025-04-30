@@ -86,6 +86,14 @@ redis-client:
       env: DB_ADDR
       value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpoint")
       type: string
+    redis_cloud_db_host:
+      env: DB_HOST
+      value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpointHost")
+      type: string
+    redis_cloud_db_port:
+      env: DB_PORT
+      value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpointPort")
+      type: string
     image-tag:
       value: latest
       type: string
