@@ -1,0 +1,41 @@
+namespace: upstash-vector
+
+cluster:
+  defines: entity
+  metadata:
+    name: Upstash Vector Database
+  schema:
+    required: ["auth_token_secret", "email_secret", "name", "region", "similarity_function", "dimension_count"]
+    auth_token_secret:
+      type: string
+      description: Authentication token for Upstash API access
+    email_secret:
+      type: string
+      description: Email address for Upstash account
+    name:
+      type: string
+      description: Name of the Upstash Vector database
+    region:
+      type: string
+      enum:
+        - us-east-1
+        - us-west-1
+        - eu-west-1
+        - eu-central-1
+        - ap-southeast-1
+        - ap-northeast-1
+        - sa-east-1
+      description: Region for the Upstash Vector database
+    similarity_function:
+      type: string
+      description: Similarity function for the Upstash Vector database
+    dimension_count:
+      type: int
+      description: Number of dimensions for the Upstash Vector database
+  lifecycle:
+    sync: <<< upstash-vector-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 3
+      attempts: 5
