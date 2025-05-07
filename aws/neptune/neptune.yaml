@@ -1,0 +1,38 @@
+namespace: aws
+
+neptune:
+  defines: entity
+  schema:
+    required: [ "region", "instance", "identifier" ]
+    region:
+      type: string
+    instance:
+      type: string
+    username:
+      type: string
+    identifier:
+      type: string
+    signature-method:
+      type: string
+      default: HmacSHA256
+    signature-version:
+      type: string
+      default: 4
+    skip-final-snapshot:
+      type: string
+      default: true
+    
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< neptune.js
+    update: ""
+    recreate: ""
+    testt: ""
+    create-snapshot: ""
+    get: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15
