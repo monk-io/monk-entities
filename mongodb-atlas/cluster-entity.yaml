@@ -1,0 +1,85 @@
+namespace: mongodb-atlas
+
+cluster:
+  defines: entity
+  schema:
+    type: object
+    required: ["name", "project_id", "secret_ref", "provider", "region", "instance_size"]
+    properties:
+      secret_ref:
+        type: string
+      name:
+        type: string
+      project_id:
+        type: string
+      provider:
+        type: string
+        enum:
+          - AWS
+          - GCP
+          - AZURE
+      region:
+        type: string
+        oneOf:
+          - if:
+              properties:
+                provider:
+                  const: AWS
+            then:
+              properties:
+                region:
+                  enum:
+                    - US_EAST_1
+                    - US_WEST_2
+                    - EU_WEST_1
+                    - EU_CENTRAL_1
+                    - EU_NORTH_1
+                    - AP_SOUTHEAST_1
+          - if:
+              properties:
+                provider:
+                  const: GCP
+            then:
+              properties:
+                region:
+                  enum:
+                    - CENTRAL_US
+                    - WESTERN_EUROPE
+                    - ASIA_EAST_2
+          - if:
+              properties:
+                provider:
+                  const: AZURE
+            then:
+              properties:
+                region:
+                  enum:
+                    - US_EAST_2
+                    - US_WEST
+                    - EUROPE_NORTH
+                    - EUROPE_WEST
+                    - ASIA_EAST
+      instance_size:
+        type: string
+        enum:
+          - M0
+          - M2
+          - M5
+          - M10
+          - M20
+          - M30
+          - M40
+          - M50
+          - M60
+          - M80
+      allow_ips:
+        type: array
+        items:
+          type: string
+  lifecycle:
+    sync: <<< cluster-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 30
