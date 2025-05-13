@@ -1,0 +1,118 @@
+namespace: mongodb-example
+
+project:
+  defines: mongodb-atlas/project
+  name: testproject
+  organization: maksym-org
+  secret_ref: mongo-token
+  permitted-secrets:
+    mongo-token: true
+  services:
+    data:
+      protocol: custom
+
+user:
+  defines: mongodb-atlas/user
+  name: testuser
+  role: atlasAdmin
+  secret_ref: mongo-token
+  password_secret_ref: mongo-user-password
+  permitted-secrets:
+    mongo-token: true
+    mongo-user-password: true
+  project_id: <- connection-target("project") entity-state get-member("id")
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-example/project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-example/project
+      timeout: 60
+
+cluster:
+  defines: mongodb-atlas/cluster
+  name: testcluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AZURE
+  region: EUROPE_WEST
+  instance_size: M0
+  node_count: 3
+  secret_ref: mongo-token
+  allow_ips:
+    - 0.0.0.0/0
+  permitted-secrets:
+    mongo-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-example/project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-example/project
+      timeout: 60
+
+mongo-express:
+  defines: runnable
+  permitted-secrets:
+    mongo-user-password: true
+  connections:
+    db:
+      runnable: mongodb-example/cluster
+      service: data
+    user:
+      runnable: mongodb-example/user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-example/cluster
+        - mongodb-example/user
+      timeout: 360
+  variables:
+    admin_username:
+      env: ME_CONFIG_MONGODB_ADMINUSERNAME
+      value: <- connection-target("user") entity get-member("name")
+      type: string
+    admin_password:
+      env: ME_CONFIG_MONGODB_ADMINPASSWORD
+      value: <- secret("mongo-user-password")
+      type: string
+    url:
+      value: <- connection-target("db") entity-state get-member("connection_srv")
+      type: string
+    auth_part:
+      value: <- `mongodb+srv://${admin_username}:${admin_password}@`
+    url_auth:
+      env: ME_CONFIG_MONGODB_URL
+      value: <- $url replace("mongodb+srv://", $auth_part)
+      type: string
+    enable_ssl:
+      env: ME_CONFIG_MONGODB_SSL
+      value: true
+      type: string
+  containers:
+    mongo-express:
+      image: mongo-express
+  services:
+    mongo-express:
+      container: mongo-express
+      port: 8081
+      protocol: tcp
+      host-port: 8081
+
+stack:
+  defines: process-group
+  runnable-list:
+    - mongodb-example/project
+    - mongodb-example/cluster
+    - mongodb-example/user
+    - mongodb-example/mongo-express
