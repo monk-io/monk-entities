@@ -1,0 +1,105 @@
+namespace: auth0-example
+
+my-auth0-app:
+  defines: auth0/application
+  domain: "monk-demo.us.auth0.com"
+  app-name: "Protected API Client"
+  description: "Application that will access the protected API"
+  app-type: "regular_web"
+  callback-url: "https://my-app.example.com/callback"
+  allowed-logout-urls:
+    - "https://my-app.example.com/logout"
+  web-origins:
+    - "https://my-app.example.com"
+  allowed-origins:
+    - <- "https://" connection-domain-name("api") concat-all
+  management-client-id-secret: auth0-management-my-client-id
+  management-client-token-secret: auth0-management-my-app-token-secret
+  management-api: "https://monk-demo.us.auth0.com"
+  permitted-secrets:
+    auth0-management-my-client-id: true
+    auth0-management-my-app-token-secret: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    api:
+      runnable: auth0-example/protected-api
+      service: api
+
+my-auth0-api:
+  defines: auth0/resource-server
+  domain: "monk-demo.us.auth0.com"
+  name: "Protected API"
+  audience: "https://api.example.com"
+  client-id: <- connection-target("auth0-client") entity-state get-member("client-id")
+  management-client-id-secret: auth0-management-my-client-id
+  management-client-token-secret: auth0-management-my-app-token-secret
+  management-api: "https://monk-demo.us.auth0.com"
+  permitted-secrets:
+    auth0-management-my-client-id: true
+    auth0-management-my-app-token-secret: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    auth0-client:
+      runnable: auth0-example/my-auth0-app
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - auth0-example/my-auth0-app
+
+protected-api:
+  defines: runnable
+  containers:
+    defines: containers
+    api:
+      image: nginx:latest
+      entrypoint: sleep 36000
+  variables:
+    defines: variables
+    auth0-client-id:
+      type: string
+      value: <- connection-target("auth0-client") entity-state get-member("client-id")
+      env: AUTH0_CLIENT_ID
+    auth0-client-secret:
+      type: string
+      value: <- connection-target("auth0-client") entity-state get-member("client-secret")
+      env: AUTH0_CLIENT_SECRET
+    auth0-audience:
+      type: string
+      value: <- connection-target("auth0-api") entity-state get-member("audience")
+      env: AUTH0_AUDIENCE
+    auth0-domain:
+      type: string
+      value: <- connection-target("auth0-api") entity-state get-member("domain")
+      env: AUTH0_DOMAIN
+    api-domain:
+      type: string
+      value: <- domain-name
+      env: API_DOMAIN
+  connections:
+    auth0-client:
+      runnable: auth0-example/my-auth0-app
+      service: data
+    auth0-api:
+      runnable: auth0-example/my-auth0-api
+      service: data
+  services:
+    api:
+      container: api
+      port: 80
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - auth0-example/my-auth0-api
+
+stack:
+  defines: process-group
+  members:
+    - auth0-example/my-auth0-app
+    - auth0-example/my-auth0-api
+    - auth0-example/protected-api

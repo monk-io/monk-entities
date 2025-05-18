@@ -5,7 +5,15 @@ application:
   metadata:
     name: Auth0 Application
   schema:
-    required: ["domain", "app-name", "callback-url", "management-client-id-secret", "management-client-token-secret", "management-api"]
+    required:
+      [
+        "domain",
+        "app-name",
+        "callback-url",
+        "management-client-id-secret",
+        "management-client-token-secret",
+        "management-api",
+      ]
     domain:
       type: string
       description: "The Auth0 tenant domain (e.g., your-tenant.auth0.com)"
@@ -95,4 +103,49 @@ application:
     - secret
   lifecycle:
     sync: <<< auth-sync.js
+    patch: ""
+
+resource-server:
+  defines: entity
+  metadata:
+    name: Auth0 Resource Server (API)
+  schema:
+    required:
+      [
+        "domain",
+        "name",
+        "audience",
+        "client-id",
+        "management-client-id-secret",
+        "management-client-token-secret",
+      ]
+    domain:
+      type: string
+      description: "The Auth0 tenant domain (e.g., your-tenant.auth0.com)"
+    name:
+      type: string
+      description: "Name of the resource server"
+    audience:
+      type: string
+      description: "Audience of the resource server"
+    client-id:
+      type: string
+      description: "Client ID of the resource server"
+    management-client-id-secret:
+      type: string
+      description: "Secret for client ID for Management API access"
+    management-client-token-secret:
+      type: string
+      description: "Secret for client Secret for Management API access"
+    scopes:
+      type: array
+      items:
+        type: string
+      description: "Scopes of the resource server"
+      default: []
+  requires:
+    - http
+    - secret
+  lifecycle:
+    sync: <<< auth-sync-resource-server.js
     patch: ""
