@@ -1,3 +1,3 @@
 REPO monk-auth0
 LOAD auth0-applications.yaml
-RESOURCES auth-sync.js
+RESOURCES auth-sync.js auth-sync-resource-server.js
