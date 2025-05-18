@@ -38,6 +38,7 @@ function createResourceServer(def, managementToken) {
     name: def.name,
     identifier: def.audience,
     scopes: def.scopes || [],
+    skip_consent_for_verifiable_first_party_clients: true,
   };
 
   const req = {
@@ -56,11 +57,7 @@ function createResourceServer(def, managementToken) {
   );
 
   if (res.error) {
-    throw new Error(
-      `Failed to create resource server: ${res.error} ${JSON.stringify(
-        res.body
-      )}`
-    );
+    throw new Error(`Failed to create resource server: ${res.error}`);
   }
 
   return JSON.parse(res.body);
@@ -73,6 +70,7 @@ function updateResourceServer(def, state, managementToken) {
   };
 
   const req = {
+    method: "PATCH",
     headers: {
       Authorization: `Bearer ${managementToken}`,
       "Content-Type": "application/json",
@@ -82,8 +80,8 @@ function updateResourceServer(def, state, managementToken) {
   };
 
   console.log("Updating resource server:", JSON.stringify(body, null, 2));
-  const res = http.patch(
-    `${def["management-api"]}/api/v2/resource-servers/${state.audience}`,
+  const res = http.do(
+    `${def["management-api"]}/api/v2/resource-servers/${state["resource-server-id"]}`,
     req
   );
 
@@ -103,9 +101,9 @@ function deleteResourceServer(def, state, managementToken) {
     },
   };
 
-  console.log("Deleting resource server:", state.audience);
+  console.log("Deleting resource server:", state["resource-server-id"]);
   const res = http.delete(
-    `${def["management-api"]}/api/v2/resource-servers/${state.audience}`,
+    `${def["management-api"]}/api/v2/resource-servers/${state["resource-server-id"]}`,
     req
   );
 
@@ -146,6 +144,7 @@ function updateClientGrant(def, state, managementToken) {
   };
 
   const req = {
+    method: "PATCH",
     headers: {
       Authorization: `Bearer ${managementToken}`,
       "Content-Type": "application/json",
@@ -155,7 +154,7 @@ function updateClientGrant(def, state, managementToken) {
   };
 
   console.log("Updating client grant:", JSON.stringify(body, null, 2));
-  const res = http.patch(
+  const res = http.do(
     `${def["management-api"]}/api/v2/client-grants/${state["grant-id"]}`,
     req
   );
@@ -191,7 +190,7 @@ function syncResourceServer(def, state, update = false) {
   const managementToken = getManagementToken(def);
 
   try {
-    if (update && state.audience) {
+    if (update && state["resource-server-id"]) {
       // Update existing resource server
       const resourceServer = updateResourceServer(def, state, managementToken);
 
@@ -204,6 +203,7 @@ function syncResourceServer(def, state, update = false) {
           audience: resourceServer.identifier,
           scopes: resourceServer.scopes,
           "grant-id": clientGrant.id,
+          "resource-server-id": resourceServer.id,
         };
       }
 
@@ -212,6 +212,7 @@ function syncResourceServer(def, state, update = false) {
         name: resourceServer.name,
         audience: resourceServer.identifier,
         scopes: resourceServer.scopes,
+        "resource-server-id": resourceServer.id,
       };
     } else {
       // Create new resource server
@@ -230,6 +231,7 @@ function syncResourceServer(def, state, update = false) {
         audience: resourceServer.identifier,
         scopes: resourceServer.scopes,
         "grant-id": clientGrant.id,
+        "resource-server-id": resourceServer.id,
       };
     }
   } catch (error) {
@@ -248,7 +250,7 @@ function deleteResourceServerAndGrant(def, state) {
     }
 
     // Then delete resource server
-    if (state.audience) {
+    if (state["resource-server-id"]) {
       deleteResourceServer(def, state, managementToken);
     }
   } catch (error) {
@@ -291,6 +293,9 @@ function main(def, state, ctx) {
       break;
     case "check-readiness":
       state = checkReadiness(def, state);
+      break;
+    case "patch":
+      state = syncResourceServer(def, state, true);
       break;
     default:
       return state;

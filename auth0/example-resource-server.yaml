@@ -6,11 +6,11 @@ my-auth0-app:
   app-name: "Protected API Client"
   description: "Application that will access the protected API"
   app-type: "regular_web"
-  callback-url: "https://my-app.example.com/callback"
+  callback-url: "https://my-app.exampleyyy.com/callback"
   allowed-logout-urls:
-    - "https://my-app.example.com/logout"
+    - "https://my-app.exampleyyy.com/logout"
   web-origins:
-    - "https://my-app.example.com"
+    - "https://my-app.exampleyyy.com"
   allowed-origins:
     - <- "https://" connection-domain-name("api") concat-all
   management-client-id-secret: auth0-management-my-client-id

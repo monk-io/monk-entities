@@ -347,8 +347,8 @@ function patchApplication(def, state, ctx) {
   ];
   const currentState = {
     name: state.name,
-    "app-type": "state.app-type",
-    callbacks: "state.callbacks",
+    "app-type": state["app-type"],
+    callbacks: state.callbacks,
     "allowed-logout-urls": state["allowed-logout-urls"],
     "web-origins": state["web-origins"],
     description: state["description"],
