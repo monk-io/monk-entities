@@ -11,6 +11,7 @@ const FIELD_MAPPING = {
   "logo-uri": "logo_uri",
   "allowed-origins": "allowed_origins",
   "cross-origin-authentication": "cross_origin_authentication",
+  "token-endpoint-auth-method": "token_endpoint_auth_method",
 };
 
 function convertExclamationArrays(obj) {
@@ -181,6 +182,7 @@ function syncApplication(def, state, update) {
         "logo-uri": state["logo-uri"],
         "allowed-origins": state["allowed-origins"],
         "cross-origin-authentication": state["cross-origin-authentication"],
+        "token-endpoint-auth-method": state["token-endpoint-auth-method"],
       };
       const newConfig = mapApplicationDefinition(def);
       let needsUpdate = false;
@@ -245,6 +247,7 @@ function syncApplication(def, state, update) {
     "logo-uri": appObj.logo_uri,
     "allowed-origins": appObj.allowed_origins,
     "cross-origin-authentication": appObj.cross_origin_authentication,
+    "token-endpoint-auth-method": appObj.token_endpoint_auth_method,
   };
 }
 
@@ -344,6 +347,7 @@ function patchApplication(def, state, ctx) {
     "logo-uri",
     "allowed-origins",
     "cross-origin-authentication",
+    "token-endpoint-auth-method",
   ];
   const currentState = {
     name: state.name,
@@ -355,6 +359,7 @@ function patchApplication(def, state, ctx) {
     "logo-uri": state["logo-uri"],
     "allowed-origins": state["allowed-origins"],
     "cross-origin-authentication": state["cross-origin-authentication"],
+    "token-endpoint-auth-method": state["token-endpoint-auth-method"],
   };
   const newConfig = mapApplicationDefinition(mergedDef);
   let needsUpdate = false;
@@ -407,6 +412,7 @@ function patchApplication(def, state, ctx) {
     "logo-uri": appObj.logo_uri,
     "allowed-origins": appObj.allowed_origins,
     "cross-origin-authentication": appObj.cross_origin_authentication,
+    "token-endpoint-auth-method": appObj.token_endpoint_auth_method,
   };
 }
 

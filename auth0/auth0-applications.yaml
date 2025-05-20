@@ -98,6 +98,14 @@ application:
     management-api:
       type: string
       description: "Address for management API"
+    token-endpoint-auth-method:
+      type: string
+      description: "Token endpoint authentication method"
+      default: "none"
+      enum:
+        - none
+        - client_secret_post
+        - client_secret_basic
   requires:
     - http
     - secret
