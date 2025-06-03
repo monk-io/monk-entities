@@ -2,7 +2,7 @@ namespace: mongodb-example
 
 project:
   defines: mongodb-atlas/project
-  name: testproject
+  name: testproject2
   organization: maksym-org
   secret_ref: mongo-token
   permitted-secrets:
@@ -59,6 +59,11 @@ cluster:
       runnables:
         - mongodb-example/project
       timeout: 60
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 30
 
 mongo-express:
   defines: runnable
@@ -91,6 +96,7 @@ mongo-express:
       type: string
     auth_part:
       value: <- `mongodb+srv://${admin_username}:${admin_password}@`
+      type: string
     url_auth:
       env: ME_CONFIG_MONGODB_URL
       value: <- $url replace("mongodb+srv://", $auth_part)

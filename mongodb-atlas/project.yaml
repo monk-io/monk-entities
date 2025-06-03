@@ -1,0 +1,28 @@
+namespace: mongodb-atlas
+project:
+  defines: entity
+  metadata:
+    name: Project
+  schema:
+    required:
+      - name
+      - organization
+      - secret_ref
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    organization:
+      type: string
+      minLength: 1
+      maxLength: 100
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+  lifecycle:
+    sync: <<< project-sync.js
+  requires:
+    - http
+    - secret
+    - cli

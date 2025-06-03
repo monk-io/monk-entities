@@ -1,0 +1,35 @@
+namespace: mongodb-atlas
+user:
+  defines: entity
+  metadata:
+    name: User
+  schema:
+    required:
+      - name
+      - project_id
+      - secret_ref
+      - password_secret_ref
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    project_id:
+      type: string
+      minLength: 1
+      maxLength: 24
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    password_secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    role:
+      type: string
+  lifecycle:
+    sync: <<< user-sync.js
+  requires:
+    - http
+    - secret
+    - cli
