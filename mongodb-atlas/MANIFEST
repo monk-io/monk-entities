@@ -1,3 +1,4 @@
-REPO monk-mongodb-atlas
-LOAD project-entity.yaml cluster-entity.yaml user-entity.yaml
+
+REPO mongodb-atlas
+LOAD project.yaml cluster.yaml user.yaml
 RESOURCES project-sync.js cluster-sync.js user-sync.js
