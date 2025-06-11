@@ -1,0 +1,111 @@
+namespace: supabase-example
+
+organization:
+  defines: supabase/organization
+  secret_ref: supabase-token
+  name: my-organization-1
+#  slug: kwgofsrdrfshcprqdeiy
+  permitted-secrets:
+    supabase-token: true
+  services:
+    data:
+      protocol: custom
+
+project:
+  defines: supabase/project
+  secret_ref: supabase-token
+  organization_id: <- connection-target("organization") entity-state get-member("id")
+  name: my-project-1
+#  slug: izzpsuamgtwiaaxfurzi
+  db_pass_ref: supabase-db-password
+  region: us-east-2
+  permitted-secrets:
+    supabase-token: true
+    supabase-db-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    organization:
+      runnable: supabase-example/organization
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - supabase-example/organization
+      timeout: 60
+
+#branch:
+#  defines: supabase/branch
+#  secret_ref: supabase-token
+#  project_id: <- connection-target("project") entity-state get-member("id")
+#  name: test
+#  slug: twgtfsrdtfshctrqdtiy
+#  permitted-secrets:
+#    supabase-token: true
+#  services:
+#    data:
+#      protocol: custom
+#  connections:
+#    project:
+#      runnable: supabase-example/project
+#      service: data
+#  depends:
+#    wait-for:
+#      runnables:
+#        - supabase-example/project
+#      timeout: 60
+
+backend:
+  defines: runnable
+  services:
+    api:
+      container: backend
+      port: 8080
+      protocol: tcp
+      host-port: 8080
+  containers:
+    backend:
+      image: monkimages.azurecr.io/example-backend:latest
+      restart: always
+      bash: /app/main -docker -db-conn $DB_CONN
+  connections:
+    project:
+      runnable: supabase-example/project
+      service: data
+  permitted-secrets:
+    supabase-db-password: true
+  variables:
+    database-host:
+      env: DATABASE_HOST
+      type: string
+      value: <- connection-target("project") entity-state get-member("database/host")
+    database-user:
+      env: DATABASE_USER
+      type: string
+      value: postgres
+    database-password:
+      env: DATABASE_PASSWORD
+      type: string
+      value: <- secret("supabase-db-password")
+    database-name:
+      env: DATABASE_NAME
+      type: string
+      value: postgres
+    db-conn:
+      env: DB_CONN
+      type: string
+      value: <- `postgresql://${database-user}:${database-password}@${database-host}/${database-name}?sslmode=require`
+  depends:
+    wait-for:
+      runnables:
+        - supabase-example/project
+      timeout: 60
+
+stack:
+  defines: process-group
+  runnable-list:
+    - supabase-example/organization
+    - supabase-example/project
+#    - supabase-example/branch
+    - supabase-example/backend
