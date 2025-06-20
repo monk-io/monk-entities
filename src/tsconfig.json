@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "monkec/base": ["./lib/modules/base.d.ts"],
+      "monkec/http-client": ["./lib/modules/http-client.d.ts"]
+    }
+  },
+  "include": ["./lib/builtins/**/*"]
+}
