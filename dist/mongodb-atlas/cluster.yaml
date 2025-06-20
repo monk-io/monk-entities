@@ -1,0 +1,5 @@
+namespace: input
+
+cluster:
+  defines: module
+  source: <<< cluster.js

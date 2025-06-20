@@ -1,0 +1,3 @@
+REPO monkec
+LOAD base.yaml http-client.yaml
+RESOURCES base.js http-client.js

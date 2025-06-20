@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "strict": true
+    },
+    "imports": {
+        "monkec/base": "./src/lib/modules/base.d.ts",
+        "monkec/http-client": "./src/lib/modules/http-client.d.ts"
+    }
+}

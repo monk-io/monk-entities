@@ -1,0 +1,68 @@
+name: "MongoDB Atlas Development Stack Test"
+description: "Test development stack deployment with MongoDB Atlas entities"
+timeout: 540000
+
+secrets:
+  global:
+    mongodb-atlas-token: "$MONGODB_ATLAS_TOKEN"
+    mongodb-dev-user-password: "dev-secure-password-456"
+
+setup:
+  - name: "Load compiled MongoDB Atlas entities"
+    action: "load"
+    target: "dist/examples/mongodb-atlas/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy development stack"
+    action: "run"
+    target: "mongodb-test-stack/dev-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for development stack readiness"
+    action: "wait"
+    target: "mongodb-test-stack/dev-stack"
+    waitFor:
+      condition: "ready"
+      timeout: 240000
+
+  - name: "Verify development project status"
+    action: "describe"
+    target: "mongodb-test-stack/dev-project"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for connection test to exit"
+    action: "wait"
+    target: "mongodb-test-stack/dev-connection-test"
+    waitFor:
+      condition: "exited"
+      timeout: 150000
+
+  - name: "Check development connection test logs"
+    action: "logs"
+    target: "mongodb-test-stack/dev-connection-test"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connected to MongoDB Atlas DEVELOPMENT successfully!"
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete development stack"
+    action: "delete"
+    target: "mongodb-test-stack/dev-stack"
+    expect:
+      exitCode: 0 

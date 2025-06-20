@@ -1,0 +1,146 @@
+namespace: mongodb-test-stack
+
+# Development Environment Entities
+
+dev-project:
+  defines: mongodb-atlas/project
+  name: monkec-dev-project
+  organization: PD
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+
+dev-cluster:
+  defines: mongodb-atlas/cluster
+  name: monkec-dev-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_WEST_2
+  instance_size: M0
+  secret_ref: mongodb-atlas-token
+  allow_ips:
+    - 0.0.0.0/0  # Allow all IPs for testing
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-test-stack/dev-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-test-stack/dev-project
+      timeout: 120
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
+
+dev-user:
+  defines: mongodb-atlas/user
+  name: monkec-dev-user
+  role: atlasAdmin
+  secret_ref: mongodb-atlas-token
+  password_secret_ref: mongodb-dev-user-password
+  project_id: <- connection-target("project") entity-state get-member("id")
+  permitted-secrets:
+    mongodb-atlas-token: true
+    mongodb-dev-user-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-test-stack/dev-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-test-stack/dev-project
+      timeout: 120
+
+# Stack Definitions - Process Groups
+
+dev-stack:
+  defines: process-group
+  runnable-list:
+    - mongodb-test-stack/dev-project
+    - mongodb-test-stack/dev-cluster
+    - mongodb-test-stack/dev-user
+    - mongodb-test-stack/dev-connection-test
+
+# Connection Test Containers
+
+dev-connection-test:
+  defines: runnable
+  permitted-secrets:
+    mongodb-dev-user-password: true
+  connections:
+    db:
+      runnable: mongodb-test-stack/dev-cluster
+      service: data
+    user:
+      runnable: mongodb-test-stack/dev-user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-test-stack/dev-cluster
+        - mongodb-test-stack/dev-user
+      timeout: 600
+  variables:
+    mongodb_username:
+      env: MONGODB_USERNAME
+      value: <- connection-target("user") entity get-member("name")
+      type: string
+    mongodb_password:
+      env: MONGODB_PASSWORD
+      value: <- secret("mongodb-dev-user-password")
+      type: string
+    mongodb_connection_string:
+      env: MONGODB_CONNECTION_STRING
+      value: <- connection-target("db") entity-state get-member("connection_srv")
+      type: string
+    mongodb_connection_with_auth:
+      env: MONGODB_CONNECTION_WITH_AUTH
+      value: <- $mongodb_connection_string replace("mongodb+srv://", `mongodb+srv://${mongodb_username}:${mongodb_password}@`)
+      type: string
+  containers:
+    mongo-test:
+      image: mongo:7
+      restart: no
+      bash: |
+        echo "Testing MongoDB Atlas DEVELOPMENT connection..."
+        echo "Connection String: $MONGODB_CONNECTION_WITH_AUTH"
+        
+        # Test connection using mongosh
+        mongosh "$MONGODB_CONNECTION_WITH_AUTH" --eval "
+          print('Connected to MongoDB Atlas DEVELOPMENT successfully!');
+          print('Database version:', db.version());
+          print('Available databases:', db.adminCommand('listDatabases'));
+          
+          // Create a test collection and insert a document
+          db.devtest.insertOne({
+            message: 'Hello from MonkeC MongoDB DEVELOPMENT test!', 
+            timestamp: new Date(),
+            environment: 'development'
+          });
+          print('Inserted development test document');
+          
+          // Query the test document
+          var result = db.devtest.findOne();
+          print('Retrieved development document:', JSON.stringify(result));
+          
+          print('MongoDB Atlas DEVELOPMENT test completed successfully!');
+        "
+  services:
+    test:
+      container: mongo-test
+      protocol: custom 
