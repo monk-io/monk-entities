@@ -2,7 +2,7 @@ name: Build and Commit Dist
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'src/**'
   workflow_dispatch:
@@ -35,17 +35,31 @@ jobs:
     - name: Check for dist changes
       id: check-changes
       run: |
-        if git diff --quiet HEAD -- dist/; then
+        echo "### Full git status before check ###"
+        git status
+        echo
+        echo "### Porcelain status for dist/ ###"
+        git status --porcelain dist/
+        echo "------------------------------------"
+
+        if [ -z "$(git status --porcelain dist/)" ]; then
+          echo "Result: No changes detected in dist/."
           echo "no-changes=true" >> $GITHUB_OUTPUT
         else
+          echo "Result: Changes detected in dist/."
           echo "no-changes=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Commit and push dist changes
       if: steps.check-changes.outputs.no-changes == 'false'
       run: |
+        echo "Attempting to commit changes..."
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add dist/
+        echo
+        echo "### Git status after add, before commit ###"
+        git status
+        echo "-------------------------------------------"
         git commit -m "Build: Update dist files [skip ci]"
         git push 
