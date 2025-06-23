@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
+  workflow_dispatch:
+    inputs: {}
 
 permissions:
   contents: write
