@@ -35,7 +35,7 @@ jobs:
     - name: Check for dist changes
       id: check-changes
       run: |
-        if git diff --quiet dist/; then
+        if git diff --quiet HEAD -- dist/; then
           echo "no-changes=true" >> $GITHUB_OUTPUT
         else
           echo "no-changes=false" >> $GITHUB_OUTPUT
