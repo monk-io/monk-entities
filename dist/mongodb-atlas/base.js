@@ -36,7 +36,7 @@ __export(base_exports, {
 });
 module.exports = __toCommonJS(base_exports);
 var import_base = require("monkec/base");
-var import_http_client = require("monkec/http-client");
+var import_http_client = require("monkec/httpClient");
 
 // input/common.ts
 var import_http = __toESM(require("http"));
@@ -71,8 +71,8 @@ function getToken(secretRef) {
   const headers = {
     "Accept": "application/json",
     "Authorization": "Basic " + btoa(serviceAccountToken),
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Cache-Control": "no-cache"
+    "Content-Type": "application/xWwwFormUrlencoded",
+    "Cache-Control": "noCache"
   };
   const res = import_http.default.post("https://cloud.mongodb.com/api/oauth/token", {
     headers,

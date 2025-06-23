@@ -1,5 +1,28 @@
 namespace: input
-
 project:
-  defines: module
-  source: <<< project.js
+  defines: entity
+  metadata:
+    name: Project
+  schema:
+    required:
+      - secret_ref
+      - name
+      - organization
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    organization:
+      type: string
+      minLength: 1
+      maxLength: 100
+  lifecycle:
+    sync: <<< project-sync.js
+  requires:
+    - input/base
+    - input/common
+    - cli

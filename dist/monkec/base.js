@@ -28,7 +28,7 @@ __export(base_exports, {
 module.exports = __toCommonJS(base_exports);
 var ACTION_METADATA_KEY = Symbol("monk:actions");
 function camelToKebab(str) {
-  return str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  return str.replace(/([aZ0-9])([A-Z])/g, "$1-$2").toLowerCase();
 }
 function action(actionName) {
   return function(originalMethod, context) {
@@ -93,7 +93,7 @@ var MonkEntity = class _MonkEntity {
     }
   }
   /**
-   * Try to execute a built-in action if it's implemented
+   * Try to execute a builtIn action if it's implemented
    */
   tryBuiltinAction(action2, _args) {
     switch (action2) {
@@ -127,7 +127,7 @@ var MonkEntity = class _MonkEntity {
           return true;
         }
         break;
-      case "check-readiness":
+      case "checkReadiness":
         if (this.isMethodImplemented("checkReadiness")) {
           const isReady = this.checkReadiness();
           if (!isReady) {

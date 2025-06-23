@@ -1,5 +1,55 @@
 namespace: input
-
 cluster:
-  defines: module
-  source: <<< cluster.js
+  defines: entity
+  metadata:
+    name: Cluster
+  schema:
+    required:
+      - secret_ref
+      - name
+      - project_id
+      - provider
+      - region
+      - instance_size
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    project_id:
+      type: string
+      minLength: 1
+      maxLength: 24
+    provider:
+      type: string
+      enum:
+        - AWS
+        - GCP
+        - AZURE
+    region:
+      type: string
+    instance_size:
+      type: string
+      enum:
+        - M0
+        - M2
+        - M5
+        - M10
+        - M20
+        - M30
+        - M40
+        - M50
+        - M60
+        - M80
+    allow_ips:
+      type: array
+      items:
+        type: string
+  lifecycle:
+    sync: <<< cluster-sync.js
+  requires:
+    - input/base
+    - cli

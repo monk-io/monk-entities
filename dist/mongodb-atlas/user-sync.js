@@ -92,7 +92,7 @@ var _User = class _User extends MongoDBAtlasEntity {
       return;
     }
     if (this.state.existing) {
-      cli.output(`User ${this.definition.name} was pre-existing, not deleting`);
+      cli.output(`User ${this.definition.name} was preExisting, not deleting`);
       return;
     }
     this.deleteResource(`/groups/${this.definition.project_id}/databaseUsers/admin/${this.definition.name}`, "Database User");

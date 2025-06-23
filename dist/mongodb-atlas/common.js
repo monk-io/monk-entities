@@ -69,8 +69,8 @@ function getToken(secretRef) {
   const headers = {
     "Accept": "application/json",
     "Authorization": "Basic " + btoa(serviceAccountToken),
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Cache-Control": "no-cache"
+    "Content-Type": "application/xWwwFormUrlencoded",
+    "Cache-Control": "noCache"
   };
   const res = import_http.default.post("https://cloud.mongodb.com/api/oauth/token", {
     headers,
