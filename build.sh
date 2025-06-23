@@ -1,10 +1,13 @@
 #!/bin/bash
 
+set -ex
+
 # Build script for MonkEC modules
 # Usage: ./build.sh [module1] [module2] ...
 
-# Default modules if none specified
-modules=("${@:-monkec mongodb-atlas}")
+# Default modules if none specified.
+# No quotes around expansion to allow word splitting for the default value.
+modules=(${@:-monkec mongodb-atlas})
 
 for module in "${modules[@]}"; do
     echo "Building $module..."
