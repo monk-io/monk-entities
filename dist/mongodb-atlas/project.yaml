@@ -1,5 +1,0 @@
-namespace: input
-
-project:
-  defines: module
-  source: <<< project.js

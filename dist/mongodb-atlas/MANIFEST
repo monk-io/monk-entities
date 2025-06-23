@@ -1,3 +1,0 @@
-REPO input
-LOAD user.yaml cluster.yaml project.yaml common.yaml base.yaml
-RESOURCES user-sync.js cluster-sync.js project-sync.js common.js base.js user.js cluster.js project.js

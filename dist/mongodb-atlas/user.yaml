@@ -1,5 +1,0 @@
-namespace: input
-
-user:
-  defines: module
-  source: <<< user.js

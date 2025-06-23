@@ -1,5 +1,0 @@
-namespace: input
-
-base:
-  defines: module
-  source: <<< base.js
