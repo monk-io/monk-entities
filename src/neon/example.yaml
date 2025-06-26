@@ -1,0 +1,177 @@
+namespace: examples
+
+my-neon-project:
+  defines: neon/project
+  secret_ref: neon-api-key
+  name: my-neon-project
+  region_id: aws-us-east-2
+  pg_version: 17
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+
+dev-branch:
+  defines: neon/branch
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  name: dev
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: examples/my-neon-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/my-neon-project
+      timeout: 60
+
+dev-compute:
+  defines: neon/compute
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  branchId: <- connection-target("branch") entity-state get-member("id")
+  computeType: "read_write"
+  minCu: 1
+  maxCu: 2
+  poolerEnabled: true
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: examples/my-neon-project
+      service: data
+    branch:
+      runnable: examples/dev-branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/my-neon-project
+        - examples/dev-branch
+      timeout: 60
+
+app-user:
+  defines: neon/role
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  branchId: <- connection-target("branch") entity-state get-member("id")
+  name: app_user
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: examples/my-neon-project
+      service: data
+    branch:
+      runnable: examples/dev-branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/my-neon-project
+        - examples/dev-branch
+      timeout: 60
+
+web-app:
+  defines: runnable
+  permitted-secrets:
+    neon-api-key: true
+  connections:
+    compute:
+      runnable: examples/dev-compute
+      service: data
+    user:
+      runnable: examples/app-user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/dev-compute
+        - examples/app-user
+      timeout: 60
+  variables:
+    db_host:
+      value: <- connection-target("compute") entity-state get-member("host")
+      type: string
+    db_user:
+      value: <- connection-target("user") entity-state get-member("name")
+      type: string
+    db_password:
+      value: <- connection-target("user") entity-state get-member("password")
+      type: string
+    db_url:
+      env: DATABASE_URL
+      value: <- `postgres://${db_user}:${db_password}@${db_host}/neondb`
+      type: string
+  containers:
+    app:
+      image: node:18-alpine
+      environment:
+        - <- `DATABASE_URL=${db_url}`
+      workdir: /app
+      command: |
+        npm install pg express
+        node server.js
+      files:
+        - path: /app/server.js
+          contents: |
+            const express = require('express');
+            const { Pool } = require('pg');
+            
+            const app = express();
+            const port = 3000;
+            
+            const pool = new Pool({
+              connectionString: process.env.DATABASE_URL,
+              ssl: true
+            });
+            
+            app.get('/', async (req, res) => {
+              try {
+                const client = await pool.connect();
+                const result = await client.query('SELECT NOW()');
+                client.release();
+                res.json({
+                  status: 'success',
+                  message: 'Connected to Neon Postgres!',
+                  timestamp: result.rows[0].now
+                });
+              } catch (err) {
+                res.status(500).json({
+                  status: 'error',
+                  message: err.message
+                });
+              }
+            });
+            
+            app.listen(port, () => {
+              console.log(`App listening at http://localhost:${port}`);
+            });
+  services:
+    web:
+      container: app
+      port: 3000
+      protocol: tcp
+      host-port: 3000
+
+stack:
+  defines: process-group
+  runnable-list:
+    - examples/my-neon-project
+    - examples/dev-branch
+    - examples/dev-compute
+    - examples/app-user
+    - examples/web-app 

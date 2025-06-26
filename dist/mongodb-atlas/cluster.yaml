@@ -50,6 +50,11 @@ cluster:
         type: string
   lifecycle:
     sync: <<< cluster-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
   requires:
     - mongodb-atlas/base
     - cli

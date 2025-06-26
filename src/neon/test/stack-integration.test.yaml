@@ -1,0 +1,109 @@
+name: "Neon Database Stack Integration Test"
+description: "Test complete Neon database stack deployment with all resources"
+timeout: 900000
+
+secrets:
+  global:
+    neon-api-key: "$NEON_API_KEY"
+
+setup:
+  - name: "Load compiled Neon entities"
+    action: "load"
+    target: "dist/input/neon/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy complete Neon stack"
+    action: "run"
+    target: "neon-test-stack/dev-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for stack readiness"
+    action: "wait"
+    target: "neon-test-stack/dev-stack"
+    waitFor:
+      condition: "ready"
+      timeout: 600000
+
+  - name: "Test: Get project details action"
+    action: "do"
+    target: "neon-test-stack/dev-project/get-project-details"
+    expect:
+      exitCode: 0
+
+  - name: "Test: List all existing projects"
+    action: "do"
+    target: "neon-test-stack/dev-project/list-all-projects"
+    expect:
+      exitCode: 0
+
+  - name: "Test: List branches action"
+    action: "do"
+    target: "neon-test-stack/dev-project/list-branches-for-this-project"
+    expect:
+      exitCode: 0
+
+  - name: "Test: Create a new branch action"
+    action: "do"
+    target: "neon-test-stack/dev-project/create-a-new-branch"
+    expect:
+      exitCode: 0
+
+  - name: "Verify project status"
+    action: "describe"
+    target: "neon-test-stack/dev-project"
+    expect:
+      exitCode: 0
+
+  - name: "Verify branch status"
+    action: "describe"
+    target: "neon-test-stack/dev-branch"
+    expect:
+      exitCode: 0
+
+  - name: "Verify compute status"
+    action: "describe"
+    target: "neon-test-stack/dev-compute"
+    expect:
+      exitCode: 0
+
+  - name: "Verify role status"
+    action: "describe"
+    target: "neon-test-stack/dev-role"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for connection test to complete"
+    action: "wait"
+    target: "neon-test-stack/dev-connection-test"
+    waitFor:
+      condition: "exited"
+      timeout: 300000
+
+  - name: "Check connection test logs"
+    action: "logs"
+    target: "neon-test-stack/dev-connection-test"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connected to Neon Postgres successfully!"
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete complete Neon stack"
+    action: "delete"
+    target: "neon-test-stack/dev-stack"
+    expect:
+      exitCode: 0 

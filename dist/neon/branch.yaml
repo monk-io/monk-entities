@@ -1,0 +1,37 @@
+namespace: neon
+branch:
+  defines: entity
+  metadata:
+    name: Branch
+  schema:
+    required:
+      - secret_ref
+      - projectId
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    project-id:
+      type: string
+      description: 'The Neon project ID (format: project-name-123456)'
+    name:
+      type: string
+      description: Custom name for the branch
+    parent-id:
+      type: string
+      description: 'The ID of the parent branch (format: br-name-123456)'
+    parent-lsn:
+      type: string
+      description: Log Sequence Number to create branch from
+  lifecycle:
+    sync: <<< branch-sync.js
+    get-branch-details: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - monkec/base
+    - neon/neon-base
+    - cli

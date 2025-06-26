@@ -10,7 +10,7 @@ secrets:
 setup:
   - name: "Load compiled MongoDB Atlas entities"
     action: "load"
-    target: "dist/examples/mongodb-atlas/MANIFEST"
+    target: "dist/input/mongodb-atlas/MANIFEST"
     expect:
       exitCode: 0
 
