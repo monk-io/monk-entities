@@ -3,8 +3,8 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// input/cluster.ts
-const base = require("input/base");
+// input/mongodb-atlas/cluster.ts
+const base = require("mongodb-atlas/base");
 const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
 const cli = require("cli");
 var _Cluster = class _Cluster extends MongoDBAtlasEntity {

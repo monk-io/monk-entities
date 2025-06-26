@@ -3,8 +3,8 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// input/user.ts
-const base = require("input/base");
+// input/mongodb-atlas/user.ts
+const base = require("mongodb-atlas/base");
 const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
 const secret = require("secret");
 const cli = require("cli");
@@ -92,7 +92,7 @@ var _User = class _User extends MongoDBAtlasEntity {
       return;
     }
     if (this.state.existing) {
-      cli.output(`User ${this.definition.name} was preExisting, not deleting`);
+      cli.output(`User ${this.definition.name} was pre-existing, not deleting`);
       return;
     }
     this.deleteResource(`/groups/${this.definition.project_id}/databaseUsers/admin/${this.definition.name}`, "Database User");

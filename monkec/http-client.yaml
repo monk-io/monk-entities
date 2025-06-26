@@ -1,5 +1,0 @@
-namespace: monkec
-
-http-client:
-  defines: module
-  source: <<< http-client.js

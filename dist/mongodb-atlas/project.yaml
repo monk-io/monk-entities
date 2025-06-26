@@ -1,4 +1,4 @@
-namespace: input
+namespace: mongodb-atlas
 project:
   defines: entity
   metadata:
@@ -23,6 +23,6 @@ project:
   lifecycle:
     sync: <<< project-sync.js
   requires:
-    - input/base
-    - input/common
+    - mongodb-atlas/base
+    - mongodb-atlas/common
     - cli

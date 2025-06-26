@@ -27,7 +27,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// input/common.ts
+// input/mongodb-atlas/common.ts
 var common_exports = {};
 __export(common_exports, {
   API_VERSION: () => API_VERSION,
@@ -69,8 +69,8 @@ function getToken(secretRef) {
   const headers = {
     "Accept": "application/json",
     "Authorization": "Basic " + btoa(serviceAccountToken),
-    "Content-Type": "application/xWwwFormUrlencoded",
-    "Cache-Control": "noCache"
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Cache-Control": "no-cache"
   };
   const res = import_http.default.post("https://cloud.mongodb.com/api/oauth/token", {
     headers,

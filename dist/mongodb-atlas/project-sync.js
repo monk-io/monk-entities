@@ -3,10 +3,10 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// input/project.ts
-const base = require("input/base");
+// input/mongodb-atlas/project.ts
+const base = require("mongodb-atlas/base");
 const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
-const common = require("input/common");
+const common = require("mongodb-atlas/common");
 const getOrganization = common.getOrganization;
 const cli = require("cli");
 var _Project = class _Project extends MongoDBAtlasEntity {

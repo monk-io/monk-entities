@@ -1,4 +1,4 @@
-namespace: input
+namespace: mongodb-atlas
 user:
   defines: entity
   metadata:
@@ -30,6 +30,6 @@ user:
   lifecycle:
     sync: <<< user-sync.js
   requires:
-    - input/base
+    - mongodb-atlas/base
     - secret
     - cli

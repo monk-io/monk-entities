@@ -29,7 +29,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// input/httpClient.ts
+// input/monkec/httpClient.ts
 var http_client_exports = {};
 __export(http_client_exports, {
   HttpClient: () => HttpClient
@@ -140,7 +140,7 @@ var HttpClient = class {
    */
   request(method, url, options = {}) {
     if (!url || url.trim() === "") {
-      throw new Error("URL is required and must be a nonEmpty string");
+      throw new Error("URL is required and must be a non-empty string");
     }
     const trimmedUrl = url.trim();
     if (trimmedUrl.length > 2048) {
@@ -242,7 +242,7 @@ var HttpClient = class {
     }
     let data = response.body;
     if (this.options.parseJson && response.body) {
-      const contentType = response.headers?.["contentType"] || response.headers?.["Content-Type"] || "";
+      const contentType = response.headers?.["content-type"] || response.headers?.["Content-Type"] || "";
       if (contentType.includes("application/json")) {
         try {
           data = JSON.parse(response.body);

@@ -29,16 +29,16 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// input/base.ts
+// input/mongodb-atlas/base.ts
 var base_exports = {};
 __export(base_exports, {
   MongoDBAtlasEntity: () => MongoDBAtlasEntity
 });
 module.exports = __toCommonJS(base_exports);
 var import_base = require("monkec/base");
-var import_http_client = require("monkec/httpClient");
+var import_http_client = require("monkec/http-client");
 
-// input/common.ts
+// input/mongodb-atlas/common.ts
 var import_http = __toESM(require("http"));
 var import_secret = __toESM(require("secret"));
 var BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
@@ -71,8 +71,8 @@ function getToken(secretRef) {
   const headers = {
     "Accept": "application/json",
     "Authorization": "Basic " + btoa(serviceAccountToken),
-    "Content-Type": "application/xWwwFormUrlencoded",
-    "Cache-Control": "noCache"
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Cache-Control": "no-cache"
   };
   const res = import_http.default.post("https://cloud.mongodb.com/api/oauth/token", {
     headers,
@@ -96,7 +96,7 @@ function getToken(secretRef) {
   return tokenResponse.access_token;
 }
 
-// input/base.ts
+// input/mongodb-atlas/base.ts
 var import_cli = __toESM(require("cli"));
 var MongoDBAtlasEntity = class extends import_base.MonkEntity {
   constructor() {

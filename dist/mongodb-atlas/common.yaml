@@ -1,4 +1,4 @@
-namespace: input
+namespace: mongodb-atlas
 
 common:
   defines: module
