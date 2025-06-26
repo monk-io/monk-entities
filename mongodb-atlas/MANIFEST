@@ -1,4 +1,0 @@
-
-REPO mongodb-atlas
-LOAD project.yaml cluster.yaml user.yaml
-RESOURCES project-sync.js cluster-sync.js user-sync.js

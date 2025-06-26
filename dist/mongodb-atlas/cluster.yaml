@@ -1,4 +1,4 @@
-namespace: input
+namespace: mongodb-atlas
 cluster:
   defines: entity
   metadata:
@@ -51,5 +51,5 @@ cluster:
   lifecycle:
     sync: <<< cluster-sync.js
   requires:
-    - input/base
+    - mongodb-atlas/base
     - cli

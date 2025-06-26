@@ -1,5 +1,4 @@
 #!/bin/sh
-
 # Wrapper for running MonkEC Docker image for compile/test
 
 MONKEC_IMAGE="${MONKEC_IMAGE:-monkimages.azurecr.io/monkec:main}"
@@ -17,33 +16,39 @@ if [ $# -eq 0 ] || [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; 
   exit 0
 fi
 
-# Create output directory if it doesn't exist
-mkdir -p "$OUTPUT_DIR"
-
 # Get absolute paths
 INPUT_DIR_ABS="$(cd "$INPUT_DIR" && pwd)"
 OUTPUT_DIR_ABS="$(cd "$(dirname "$OUTPUT_DIR")" && pwd)/$(basename "$OUTPUT_DIR")"
-PROJECT_ROOT="$(pwd)"
+# PROJECT_ROOT="$(pwd)"
+# Can be used if you need to mount the project root to test in docker
+#      -v "$PROJECT_ROOT:/monkec" \
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR_ABS"
+
+# Use basename of INPUT_DIR for target directory
+BASENAME="$(basename "$INPUT_DIR_ABS")"
 
 if [ "$1" = "test" ]; then
   # For test, we need to mount the socket and token
   # on linux we may also need to use sudo ./monkec.sh to access the socket
   exec podman run --rm \
-    -v "$INPUT_DIR_ABS:/monkec/input" \
+    -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
+    -v "$OUTPUT_DIR_ABS:/monkec/output/" \
     -v "$MONK_SOCKET:/root/.monk/monkd.sock" \
     -v "$MONK_TOKEN_FOLDER:/root/.monk/" \
-    -e INPUT_DIR="/monkec/input" \
-    -e OUTPUT_DIR="/monkec/output" \
+    -e INPUT_DIR="/monkec/input/$BASENAME" \
+    -e OUTPUT_DIR="/monkec/output/" \
     -w "/monkec" \
     "$MONKEC_IMAGE" "$@"
 else
   # For compile command and others
   # you can go inside the container with ./.monkec.sh sh
   exec podman run -ti --rm \
-    -v "$INPUT_DIR_ABS:/monkec/input" \
-    -v "$OUTPUT_DIR_ABS:/monkec/output" \
-    -e INPUT_DIR="/monkec/input" \
-    -e OUTPUT_DIR="/monkec/output" \
+    -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
+    -v "$OUTPUT_DIR_ABS:/monkec/output/" \
+    -e INPUT_DIR="/monkec/input/$BASENAME" \
+    -e OUTPUT_DIR="/monkec/output/" \
     -w "/monkec" \
     "$MONKEC_IMAGE" "$@"
 fi
