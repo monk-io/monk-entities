@@ -1,0 +1,4 @@
+REPO monk-entities
+DIRS aws/dynamo-db aws/efs aws/rds aws/s3-bucket aws/iam azure/blob-container azure/event-hub azure/service-bus azure/storage-account firebase/cloudfunc-v1 firebase/cloudfunc-v2 firebase/database firebase/hosting gcp/big-query gcp/cloud-sql gcp/cloud-storage gcp/serviceusage gcp/service-account netlify vercel upstash-redis auth0 redis-cloud dist/monkec dist/mongodb-atlas dist/neon
+LOAD site.yaml form.yaml common.yaml netlify-base.yaml
+RESOURCES site-sync.js form-sync.js common.js netlify-base.js

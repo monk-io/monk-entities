@@ -1,0 +1,5 @@
+namespace: monk-entities
+
+common:
+  defines: module
+  source: <<< common.js

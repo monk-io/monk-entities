@@ -4,11 +4,6 @@ role:
   metadata:
     name: Role
   schema:
-    required:
-      - secret_ref
-      - projectId
-      - branchId
-      - name
     secret_ref:
       type: string
       minLength: 1
@@ -30,6 +25,11 @@ role:
       type: string
       description: Name of the secret to store the role's password
       default: app-user-password
+    required:
+      - secret_ref
+      - projectId
+      - branchId
+      - name
   lifecycle:
     sync: <<< role-sync.js
     reset-role-password: ''

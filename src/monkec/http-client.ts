@@ -245,8 +245,17 @@ export class HttpClient {
         ...options.headers,
       };
 
-      // Prepare the body
-      body = this.prepareBody(options.body);
+      // Remove Content-Type for GET and DELETE requests with no body
+      if ((normalizedMethod === "GET" || normalizedMethod === "DELETE") && !options.body && headers["Content-Type"]) {
+        delete headers["Content-Type"];
+      }
+
+      // Prepare the body - skip for DELETE requests unless explicitly provided
+      if (normalizedMethod === "DELETE" && !options.body) {
+        body = undefined;
+      } else {
+        body = this.prepareBody(options.body);
+      }
     } catch (error) {
       throw new Error(
         `Failed to prepare ${normalizedMethod} request to "${trimmedUrl}": ${

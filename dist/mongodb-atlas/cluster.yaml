@@ -4,13 +4,6 @@ cluster:
   metadata:
     name: Cluster
   schema:
-    required:
-      - secret_ref
-      - name
-      - project_id
-      - provider
-      - region
-      - instance_size
     secret_ref:
       type: string
       minLength: 1
@@ -48,6 +41,13 @@ cluster:
       type: array
       items:
         type: string
+    required:
+      - secret_ref
+      - name
+      - project_id
+      - provider
+      - region
+      - instance_size
   lifecycle:
     sync: <<< cluster-sync.js
   checks:

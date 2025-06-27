@@ -4,10 +4,6 @@ compute:
   metadata:
     name: Compute
   schema:
-    required:
-      - secret_ref
-      - projectId
-      - branchId
     secret_ref:
       type: string
       minLength: 1
@@ -44,6 +40,10 @@ compute:
         - session
       description: Mode for the connection pooler
       default: transaction
+    required:
+      - secret_ref
+      - projectId
+      - branchId
   lifecycle:
     sync: <<< compute-sync.js
     restart-compute: ''

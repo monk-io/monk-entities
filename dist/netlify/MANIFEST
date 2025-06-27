@@ -1,0 +1,3 @@
+REPO netlify
+LOAD site.yaml deploy.yaml form.yaml netlify-base.yaml common.yaml account.yaml
+RESOURCES site-sync.js deploy-sync.js form-sync.js netlify-base.js common.js account-sync.js

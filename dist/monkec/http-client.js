@@ -159,7 +159,14 @@ var HttpClient = class {
         ...this.options.headers,
         ...options.headers
       };
-      body = this.prepareBody(options.body);
+      if ((normalizedMethod === "GET" || normalizedMethod === "DELETE") && !options.body && headers["Content-Type"]) {
+        delete headers["Content-Type"];
+      }
+      if (normalizedMethod === "DELETE" && !options.body) {
+        body = void 0;
+      } else {
+        body = this.prepareBody(options.body);
+      }
     } catch (error) {
       throw new Error(
         `Failed to prepare ${normalizedMethod} request to "${trimmedUrl}": ${error instanceof Error ? error.message : "Unknown preparation error"}`

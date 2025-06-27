@@ -1,0 +1,118 @@
+namespace: netlify-example
+
+site:
+  defines: netlify/site
+  name: my-new-very-new-site
+  force_ssl: false
+  permitted-secrets:
+    default-netlify-pat: true
+  services:
+    data:
+      protocol: custom
+
+postgres:
+  defines: runnable
+  services:
+    postgres:
+      container: postgres
+      port: 5432
+      protocol: tcp
+  containers:
+    postgres:
+      image: docker.io/postgres
+      image-tag: "14.4-alpine3.16"
+      environment:
+        - <- `POSTGRES_DB=${db-name}`
+        - <- `POSTGRES_PASSWORD=${db-password}`
+  variables:
+    db-name:
+      type: string
+      value: example
+    db-password:
+      type: string
+      value: postgres
+
+backend:
+  defines: runnable
+  services:
+    api:
+      container: backend
+      port: 8080
+      protocol: tcp
+  containers:
+    backend:
+      image: monkimages.azurecr.io/example-backend:latest
+      restart: always
+      bash: <- `/app/main -docker -db-conn ${db-conn}`
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/postgres
+  connections:
+    postgres:
+      runnable: netlify-example/postgres
+      service: postgres
+  variables:
+    database-host:
+      type: string
+      value: <- connection-hostname("postgres")
+    database-port:
+      type: int
+      value: <- connection-port("postgres")
+    db-conn:
+      type: string
+      value: <- `postgres://postgres:postgres@${database-host}:${database-port}/example?sslmode=disable`
+
+nginx:
+  defines: runnable
+  inherits: nginx/node-proxy
+  connections:
+    backend:
+      runnable: netlify-example/backend
+      service: api
+
+frontend:
+  defines: runnable
+  inherits: netlify/deploy
+
+  containers:
+    deploy:
+      paths:
+        - blobs://frontend:/home/node/app
+
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/nginx
+        - netlify-example/site
+
+  connections:
+    nginx:
+      runnable: netlify-example/nginx
+      service: nginx
+    site:
+      runnable: netlify-example/site
+      service: data
+
+  variables:
+    site-id: <- connection-target("site") entity-state get-member("id")
+    deploy-dir: /home/node/app/build
+
+    backend-url:
+      env: BASE_URL
+      type: string
+      value: <- "https://" connection-domain-name("nginx") concat-all
+
+    pre-deploy: |
+      echo "VITE_BASE_URL=$BASE_URL" > .env && \
+      yarn install --frozen-lockfile && \
+      yarn build-app && \
+
+stack:
+  defines: process-group
+  runnable-list:
+    - netlify-example/postgres
+    - netlify-example/backend
+    - netlify-example/nginx
+    - netlify-example/site
+    - netlify-example/frontend

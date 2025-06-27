@@ -1,0 +1,5 @@
+namespace: netlify
+
+netlify-base:
+  defines: module
+  source: <<< netlify-base.js
