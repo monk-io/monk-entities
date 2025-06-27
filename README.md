@@ -500,6 +500,13 @@ http-client:
 - **Documentation**: See `src/neon/README.md`
 - **Testing**: Full lifecycle testing with operation waiting
 
+### Netlify Entities
+- **Location**: `src/netlify/`
+- **Features**: Site, deployment, and form management
+- **Documentation**: See `src/netlify/README.md`
+- **Testing**: Complete integration tests with site, deploy, and form scenarios
+- **API**: Based on [Netlify API documentation](https://docs.netlify.com/api/get-started/)
+
 ### MonkEC Framework
 - **Location**: `src/monkec/`
 - **Features**: Base classes, HTTP client, and compilation tools

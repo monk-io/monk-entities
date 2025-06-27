@@ -4,11 +4,6 @@ database:
   metadata:
     name: Database
   schema:
-    required:
-      - secret_ref
-      - name
-      - projectId
-      - branchId
     secret_ref:
       type: string
       description: Secret name for Neon API authentication
@@ -26,6 +21,11 @@ database:
       description: >-
         Name of the role that will own the database (optional, defaults to
         project owner)
+    required:
+      - secret_ref
+      - name
+      - projectId
+      - branchId
   lifecycle:
     sync: <<< database-sync.js
     update-database: ''

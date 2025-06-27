@@ -1,0 +1,5 @@
+namespace: netlify
+
+common:
+  defines: module
+  source: <<< common.js

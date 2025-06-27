@@ -1,0 +1,51 @@
+namespace: netlify
+deploy:
+  defines: entity
+  metadata:
+    name: Deploy
+  schema:
+    required:
+      - secret_ref
+      - site_id
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    site_id:
+      type: string
+      description: The Netlify site ID to deploy to
+    dir:
+      type: string
+      description: Directory to deploy from
+    functions_dir:
+      type: string
+      description: Directory containing serverless functions
+    prod:
+      type: boolean
+      description: Whether this is a production deploy
+    draft:
+      type: boolean
+      description: Whether this is a draft deploy
+    branch:
+      type: string
+      description: Git branch to deploy
+    commit_ref:
+      type: string
+      description: Git commit reference
+  lifecycle:
+    sync: <<< deploy-sync.js
+    get-deploy: ''
+    cancel-deploy: ''
+    retry-deploy: ''
+    lock-deploy: ''
+    unlock-deploy: ''
+    get-deploy-log: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - netlify/netlify-base
+    - monkec/base
+    - cli

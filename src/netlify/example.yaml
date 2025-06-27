@@ -1,0 +1,122 @@
+namespace: netlify-example
+
+# Example Netlify site with custom domain and SSL
+my-site:
+  defines: netlify/site
+  secret_ref: netlify-api-token
+  name: my-awesome-site
+  custom_domain: mydomain.com
+  # force_ssl: true  # Only enable if you have SSL certificate provisioned
+  permitted-secrets:
+    netlify-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Production deployment
+prod-deploy:
+  defines: netlify/deploy
+  secret_ref: netlify-api-token
+  site_id: <- connection-target("site") entity-state get-member("id")
+  dir: ./dist
+  prod: true
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    site:
+      runnable: netlify-example/my-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/my-site
+      timeout: 120
+
+# Draft deployment for testing
+draft-deploy:
+  defines: netlify/deploy
+  secret_ref: netlify-api-token
+  site_id: <- connection-target("site") entity-state get-member("id")
+  dir: ./dist
+  draft: true
+  branch: feature/new-feature
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    site:
+      runnable: netlify-example/my-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/my-site
+      timeout: 120
+
+# Contact form management
+contact-form:
+  defines: netlify/form
+  secret_ref: netlify-api-token
+  site_id: <- connection-target("site") entity-state get-member("id")
+  name: contact
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    site:
+      runnable: netlify-example/my-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/my-site
+      timeout: 120
+
+# Newsletter signup form
+newsletter-form:
+  defines: netlify/form
+  secret_ref: netlify-api-token
+  site_id: <- connection-target("site") entity-state get-member("id")
+  name: newsletter
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    site:
+      runnable: netlify-example/my-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/my-site
+      timeout: 120
+
+# Team-specific site (if using teams)
+team-site:
+  defines: netlify/site
+  secret_ref: netlify-api-token
+  name: team-project
+  team_slug: my-team
+  custom_domain: team.mydomain.com
+  # force_ssl: true  # Only enable if you have SSL certificate provisioned
+  permitted-secrets:
+    netlify-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Team site deployment
+team-deploy:
+  defines: netlify/deploy
+  secret_ref: netlify-api-token
+  site_id: <- connection-target("team-site") entity-state get-member("id")
+  dir: ./team-dist
+  prod: true
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    team-site:
+      runnable: netlify-example/team-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/team-site
+      timeout: 120 

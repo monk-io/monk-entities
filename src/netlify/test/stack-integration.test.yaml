@@ -1,0 +1,97 @@
+name: Netlify Full Integration Test
+description: Complete integration test for Netlify Site and Deploy Runnables
+
+secrets:
+  global:
+    netlify-api-token: "$NETLIFY_API_TOKEN"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/netlify/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load test stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # Site Entity Tests
+  - name: Create and start test site
+    action: run
+    target: netlify-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Test get-site action
+    action: action
+    target: netlify-test/site
+    actionName: get-site
+    expect:
+      exitCode: 0
+      output:
+        - "Site:"
+
+  - name: Test list-deploys action
+    action: action
+    target: netlify-test/site
+    actionName: list-deploys
+    expect:
+      exitCode: 0
+      output:
+        - "Deploys for site"
+
+  # Account Entity Tests
+  - name: Test account entity creation
+    action: describe
+    target: netlify-test/account
+    expect:
+      exitCode: 0
+      output:
+        - "accounts"
+
+  - name: Wait for deploy to complete
+    action: wait
+    target: local/netlify-test/deploy
+    waitFor:
+      condition: exited
+      timeout: 120000
+
+  # Connection Test
+  - name: Start test connection runnable
+    action: run
+    target: netlify-test/test-connection
+    expect:
+      exitCode: 0
+
+  - name: Wait for test connection to complete
+    action: wait
+    target: netlify-test/test-connection
+    waitFor:
+      condition: exited
+      timeout: 120000
+
+  - name: Test connection runnable
+    action: logs
+    target: netlify-test/test-connection
+    expect:
+      output:
+        - "Connection test completed successfully"
+      exitCode: 0
+
+cleanup:
+  - name: Delete test site
+    action: delete
+    target: netlify-test/stack
+    expect:
+      exitCode: 0 
+
+  - name: Delete test connection
+    action: delete
+    target: netlify-test/test-connection
+    expect:
+      exitCode: 0
+

@@ -4,8 +4,6 @@ project:
   metadata:
     name: Project
   schema:
-    required:
-      - secret_ref
     secret_ref:
       type: string
       minLength: 1
@@ -26,6 +24,8 @@ project:
       items:
         type: string
       description: List of allowed IP addresses for the project
+    required:
+      - secret_ref
   lifecycle:
     sync: <<< project-sync.js
     get-project-details: ''

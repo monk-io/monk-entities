@@ -4,9 +4,6 @@ branch:
   metadata:
     name: Branch
   schema:
-    required:
-      - secret_ref
-      - projectId
     secret_ref:
       type: string
       minLength: 1
@@ -23,6 +20,9 @@ branch:
     parent-lsn:
       type: string
       description: Log Sequence Number to create branch from
+    required:
+      - secret_ref
+      - projectId
   lifecycle:
     sync: <<< branch-sync.js
     get-branch-details: ''

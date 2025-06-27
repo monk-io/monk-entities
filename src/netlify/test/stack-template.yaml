@@ -1,0 +1,99 @@
+namespace: netlify-test
+
+# Test site entity
+site:
+  defines: netlify/site
+  name: monkec-test-site-123
+  force_ssl: false
+  secret_ref: netlify-api-token
+  permitted-secrets:
+    netlify-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Test account entity
+account:
+  defines: netlify/account
+  secret_ref: netlify-api-token
+  permitted-secrets:
+    netlify-api-token: true
+  services:
+    data:
+      protocol: custom
+
+deploy:
+  defines: runnable
+  inherits: netlify/deploy
+  permitted-secrets:
+    netlify-api-token: true
+
+  depends:
+    wait-for:
+      runnables:
+        - netlify-test/site
+
+  connections:
+    site:
+      runnable: netlify-test/site
+      service: data
+
+  variables:
+    site-id: <- connection-target("site") entity-state get-member("id")
+    deploy-dir: /home/node/app/
+    token: <- secret("netlify-api-token")
+
+  files:
+    index-html:
+      container: deploy
+      mode: 0644
+      path: /home/node/app/index.html
+      contents: |
+        <html>
+          <body>
+            <h1>Hello, World!</h1>
+          </body>
+        </html>
+
+stack:
+  defines: process-group
+  runnable-list:
+    - netlify-test/site
+    - netlify-test/account
+    - netlify-test/deploy
+
+# Connection test container
+test-connection:
+  defines: runnable
+  permitted-secrets:
+    netlify-api-token: true
+  connections:
+    site:
+      runnable: netlify-test/site
+      service: data
+    account:
+      runnable: netlify-test/account
+      service: data
+  variables:
+    site_id:
+      env: SITE_ID
+      value: <- connection-target("site") entity-state get-member("id")
+      type: string
+    site_url:
+      env: SITE_URL
+      value: <- connection-target("site") entity-state get-member("url")
+      type: string
+  containers:
+    connection-test:
+      image: curlimages/curl:latest
+      restart: no
+      bash: |
+        echo "Testing Netlify connections..."
+        echo "Site ID: $SITE_ID"
+        echo "Site URL: $SITE_URL"
+        
+        # Test site accessibility
+        echo "Testing site accessibility..."
+        curl -v "$SITE_URL"
+
+        echo "Connection test completed successfully"
