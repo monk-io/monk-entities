@@ -7,7 +7,7 @@ set -ex
 
 # Default modules if none specified.
 # No quotes around expansion to allow word splitting for the default value.
-modules=(${@:-monkec mongodb-atlas})
+modules=(${@:-monkec mongodb-atlas neon})
 
 for module in "${modules[@]}"; do
     echo "Building $module..."

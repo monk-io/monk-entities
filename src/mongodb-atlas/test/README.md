@@ -6,6 +6,52 @@ This directory contains test configurations and examples for the MongoDB Atlas e
 
 - **`stack-integration.test.yaml`** - Comprehensive functional test configuration for MongoDB Atlas stack deployment
 - **`stack-template.yaml`** - Stack template with MongoDB Atlas project, cluster, user, and connection testing
+- **`env.example`** - Example environment variables file
+
+## Environment Configuration
+
+### Using .env File (Recommended)
+
+The testing framework automatically loads environment variables from a `.env` file in the test directory. This is the recommended approach for managing test secrets.
+
+1. **Copy the example file:**
+   ```bash
+   cp examples/mongodb-atlas/test/env.example examples/mongodb-atlas/test/.env
+   ```
+
+2. **Edit the .env file with your actual values:**
+   ```bash
+   # Required: MongoDB Atlas API Token
+   MONGODB_ATLAS_TOKEN=your-actual-mongodb-atlas-token
+   
+   # Optional: Test configuration
+   MONKEC_VERBOSE=true
+   ```
+
+3. **The .env file is automatically loaded** when running tests:
+   ```bash
+   deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+   ```
+
+### Environment Variables
+
+#### Required Variables
+
+- `MONGODB_ATLAS_TOKEN` - Your MongoDB Atlas API token (starts with `mdb_`)
+
+#### Optional Variables
+
+- `MONKEC_VERBOSE` - Set to `true` to enable verbose output
+- `TEST_TIMEOUT` - Custom timeout for tests (default: 540000ms)
+
+### Alternative: Environment Variables
+
+You can also set environment variables directly in your shell:
+
+```bash
+export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
+deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+```
 
 ## Quick Start
 
@@ -27,16 +73,20 @@ cd dist/examples/mongodb-atlas
 monk load MANIFEST
 ```
 
-### 3. Set Up Secrets
+### 3. Set Up Environment
 
-Configure your MongoDB Atlas credentials:
+Configure your MongoDB Atlas credentials using `.env` file (recommended):
 
 ```bash
-# Your MongoDB Atlas service account token (starts with mdb_)
-monk secret set mongodb-atlas-token "mdb_your_service_account_token_here"
+# Copy and edit the environment file
+cp examples/mongodb-atlas/test/env.example examples/mongodb-atlas/test/.env
+# Edit .env file with your actual MongoDB Atlas token
+```
 
-# Password for database users
-monk secret set mongodb-user-password "your_secure_password_here"
+Or set environment variables directly:
+
+```bash
+export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
 ```
 
 ### 4. Run Functional Tests
@@ -44,14 +94,14 @@ monk secret set mongodb-user-password "your_secure_password_here"
 Use the monkec test runner to execute comprehensive functional tests:
 
 ```bash
-# Set your MongoDB Atlas token
-export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
-
-# Run the functional tests
-deno task test examples/mongodb-atlas
+# Run with automatic .env loading
+deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
 
 # Run with verbose output
-deno task test examples/mongodb-atlas --verbose
+deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml --verbose
+
+# Run with custom environment
+MONGODB_ATLAS_TOKEN="your-token" deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
 ```
 
 Alternatively, run the stack manually:
@@ -121,13 +171,19 @@ monk delete --force mongodb-test-stack/dev-project
    - Verify service account token starts with `mdb_`
    - Check organization name in configuration
    - Ensure token has proper permissions
+   - Verify `MONGODB_ATLAS_TOKEN` is set in `.env` file or environment
 
-2. **Cluster Creation Timeout**
+2. **Environment File Issues**
+   - Ensure `.env` file is in the `test/` directory
+   - Check file permissions and syntax
+   - Verify no extra spaces around `=` in variable assignments
+
+3. **Cluster Creation Timeout**
    - MongoDB Atlas clusters can take 5-10 minutes to deploy
    - Check MongoDB Atlas console for status
    - Increase timeout values if needed
 
-3. **Connection Issues**
+4. **Connection Issues**
    - Verify IP access list includes your IP range
    - Check cluster is in IDLE state before connecting
    - Validate connection strings in entity state
@@ -135,6 +191,12 @@ monk delete --force mongodb-test-stack/dev-project
 ### Debug Commands
 
 ```bash
+# Enable verbose mode in .env file
+echo "MONKEC_VERBOSE=true" >> examples/mongodb-atlas/test/.env
+
+# Run with verbose output
+deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml --verbose
+
 # Check entity state
 monk describe mongodb-test-stack/dev-cluster
 
@@ -144,6 +206,22 @@ monk logs mongodb-test-stack/dev-cluster --follow
 # Decode error messages
 echo "base64_error_string" | monk decode-err
 ```
+
+## Best Practices
+
+### Environment Management
+
+- **Use .env files** - Keep secrets out of version control
+- **Include .env in .gitignore** - Never commit actual secrets
+- **Provide examples** - Include `env.example` files
+- **Document requirements** - Clearly list required variables
+
+### Test Development
+
+- Use descriptive test names
+- Include proper error handling
+- Test both success and failure scenarios
+- Validate resource cleanup
 
 ## Next Steps
 

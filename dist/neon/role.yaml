@@ -1,0 +1,45 @@
+namespace: neon
+role:
+  defines: entity
+  metadata:
+    name: Role
+  schema:
+    required:
+      - secret_ref
+      - projectId
+      - branchId
+      - name
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    project-id:
+      type: string
+      description: 'The Neon project ID (format: project-name-123456)'
+    branch-id:
+      type: string
+      description: 'The Neon branch ID (format: br-name-123456)'
+    name:
+      type: string
+      description: Name for the database role
+    can-login:
+      type: boolean
+      description: 'If false, creates a NOLOGIN role for permission management'
+      default: true
+    password-secret-name:
+      type: string
+      description: Name of the secret to store the role's password
+      default: app-user-password
+  lifecycle:
+    sync: <<< role-sync.js
+    reset-role-password: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - monkec/base
+    - neon/neon-base
+    - secret
+    - cli

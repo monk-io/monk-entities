@@ -1,0 +1,5 @@
+namespace: neon
+
+neon-base:
+  defines: module
+  source: <<< neon-base.js

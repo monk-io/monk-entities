@@ -140,7 +140,3 @@ dev-connection-test:
           
           print('MongoDB Atlas DEVELOPMENT test completed successfully!');
         "
-  services:
-    test:
-      container: mongo-test
-      protocol: custom 

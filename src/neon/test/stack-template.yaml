@@ -1,0 +1,243 @@
+namespace: neon-test-stack
+
+# Development Environment Entities
+
+dev-project:
+  defines: neon/project
+  name: monkec-test-project
+  region_id: aws-us-east-2
+  pg_version: 17
+  secret_ref: neon-api-key
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+
+dev-branch:
+  defines: neon/branch
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  name: dev
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: neon-test-stack/dev-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-test-stack/dev-project
+      timeout: 120
+
+dev-role:
+  defines: neon/role
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  branchId: <- connection-target("branch") entity-state get-member("id")
+  name: app_user
+  canLogin: true
+  passwordSecretName: app-user-password
+  permitted-secrets:
+    neon-api-key: true
+    app-user-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: neon-test-stack/dev-project
+      service: data
+    branch:
+      runnable: neon-test-stack/dev-branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-test-stack/dev-project
+        - neon-test-stack/dev-branch
+      timeout: 120
+
+dev-database:
+  defines: neon/database
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  branchId: <- connection-target("branch") entity-state get-member("id")
+  name: testdb
+  ownerName: <- connection-target("role") entity-state get-member("name")
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: neon-test-stack/dev-project
+      service: data
+    branch:
+      runnable: neon-test-stack/dev-branch
+      service: data
+    role:
+      runnable: neon-test-stack/dev-role
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-test-stack/dev-project
+        - neon-test-stack/dev-branch
+        - neon-test-stack/dev-role
+      timeout: 120
+
+dev-compute:
+  defines: neon/compute
+  secret_ref: neon-api-key
+  projectId: <- connection-target("project") entity-state get-member("id")
+  branchId: <- connection-target("branch") entity-state get-member("id")
+  computeType: "read_write"
+  minCu: 1
+  maxCu: 2
+  poolerEnabled: true
+  poolerMode: "transaction"
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: neon-test-stack/dev-project
+      service: data
+    branch:
+      runnable: neon-test-stack/dev-branch
+      service: data
+    role:
+      runnable: neon-test-stack/dev-role
+      service: data
+    database:
+      runnable: neon-test-stack/dev-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-test-stack/dev-project
+        - neon-test-stack/dev-branch
+        - neon-test-stack/dev-role
+        - neon-test-stack/dev-database
+      timeout: 120
+
+# Stack Definition - Process Group
+
+dev-stack:
+  defines: process-group
+  runnable-list:
+    - neon-test-stack/dev-project
+    - neon-test-stack/dev-branch
+    - neon-test-stack/dev-role
+    - neon-test-stack/dev-database
+    - neon-test-stack/dev-compute
+    - neon-test-stack/dev-connection-test
+
+# Connection Test Container
+
+dev-connection-test:
+  defines: runnable
+  connections:
+    compute:
+      runnable: neon-test-stack/dev-compute
+      service: data
+    user:
+      runnable: neon-test-stack/dev-role
+      service: data
+    database:
+      runnable: neon-test-stack/dev-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-test-stack/dev-compute
+        - neon-test-stack/dev-role
+        - neon-test-stack/dev-database
+      timeout: 300
+  permitted-secrets:
+    app-user-password: true
+  variables:
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("compute") entity-state get-member("host")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("user") entity-state get-member("name")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("app-user-password")
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("database") entity-state get-member("name")
+      type: string
+    db_url:
+      env: DATABASE_URL
+      value: <- `postgres://${db_user}:${db_password}@${db_host}/${db_name}?sslmode=require`
+      type: string
+  containers:
+    postgres-test:
+      image: postgres:15-alpine
+      restart: no
+      bash: |
+        echo "Testing Neon Postgres connection..."
+        echo "Host: $DB_HOST"
+        echo "User: $DB_USER"
+        echo "Password: [HIDDEN]"
+        echo "Database: $DB_NAME"
+        echo "Connection URL: $DATABASE_URL"
+        
+        # Debug: Check if variables are set
+        echo "DEBUG: DB_HOST is set: $([ -n "$DB_HOST" ] && echo "YES" || echo "NO")"
+        echo "DEBUG: DB_USER is set: $([ -n "$DB_USER" ] && echo "YES" || echo "NO")"
+        echo "DEBUG: DB_PASSWORD is set: $([ -n "$DB_PASSWORD" ] && echo "YES" || echo "NO")"
+        echo "DEBUG: DB_NAME is set: $([ -n "$DB_NAME" ] && echo "YES" || echo "NO")"
+        echo "DEBUG: DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo "YES" || echo "NO")"
+        
+        # Install psql client
+        apk add --no-cache postgresql17-client
+        
+        # Test connection using psql
+        PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require" -c "
+          SELECT version();
+        "
+        
+        if [ $? -eq 0 ]; then
+          echo "Connected to Neon Postgres successfully!"
+          
+          # Test basic queries that don't require table creation
+          echo "Testing basic database operations..."
+          
+          # Test current user
+          PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require" -c "
+            SELECT current_user, current_database();
+          "
+          
+          # Test available schemas
+          PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require" -c "
+            SELECT schema_name FROM information_schema.schemata;
+          "
+          
+          # Test if we can create a temporary table (which doesn't require schema permissions)
+          PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require" -c "
+            CREATE TEMP TABLE temp_test (id SERIAL, message TEXT);
+            INSERT INTO temp_test (message) VALUES ('Hello from MonkeC Neon test!');
+            SELECT * FROM temp_test;
+            DROP TABLE temp_test;
+          "
+          
+          echo "Neon Postgres test completed successfully!"
+        else
+          echo "Failed to connect to Neon Postgres"
+          exit 1
+        fi
