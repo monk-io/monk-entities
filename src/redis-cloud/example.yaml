@@ -1,0 +1,69 @@
+namespace: redis-cloud
+
+stack:
+  defines: process-group
+  services:
+    - redis-client
+  entity-instances:
+    - redis-subscription
+    - redis-database
+  actions:
+    run-with:
+      - redis-database
+
+redis-client:
+  defines: runnable
+  image: redis:7-alpine
+  depends-on:
+    entity-instance: redis-database
+  variables:
+    REDIS_HOST: <- get-from("redis-database", "publicEndpoint")
+    REDIS_PORT: <- get-from("redis-database", "port")
+    REDIS_USER: <- get-from("redis-database", "username")
+    REDIS_PASSWORD: <- secret("redis-cloud-db-password")
+    REDIS_URL: <- `redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`
+  bash: |
+    echo "Connecting to Redis Cloud database..."
+    echo "Host: $REDIS_HOST"
+    echo "Port: $REDIS_PORT"
+    echo "User: $REDIS_USER"
+    redis-cli -h $REDIS_HOST -p $REDIS_PORT -a $REDIS_PASSWORD --no-auth-warning ping
+
+redis-subscription:
+  defines: entity-instance
+  entity: 
+    module: ./src/redis-cloud/subscription.ts
+    class: Subscription
+  properties:
+    secret_ref: "redis-cloud-auth"
+    subscription_type: essentials
+    name: "my-redis-subscription"
+    provider: AWS
+    region: "us-west-2"
+    redis_flex: true
+    size: 1
+    availability: "Single-zone"
+    support_data_persistence: true
+    support_instant_and_daily_backups: false
+    support_replication: false
+    support_clustering: false
+    support_ssl: true
+    payment_method: "credit-card"
+
+redis-database:
+  defines: entity-instance
+  entity:
+    module: ./src/redis-cloud/database.ts
+    class: Database
+  properties:
+    secret_ref: "redis-cloud-auth"
+    name: "my-redis-db"
+    subscription_id: "<- get-from=subscription get=id"
+    protocol: redis
+    memory_limit_in_mb: 256
+    high_availability: false
+    data_persistence: true
+    enable_alerts: true
+    alerts:
+      memory_usage_threshold: 80
+      throughput_threshold: 1000 
