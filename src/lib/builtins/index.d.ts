@@ -10,6 +10,7 @@
 /// <reference path="./cli.d.ts" />
 /// <reference path="./parser.d.ts" />
 /// <reference path="./helpers.d.ts" />
+/// <reference path="./crypto.d.ts" />
 
 // Note: Cloud provider modules (aws, gcp, azure, digitalocean) are intentionally
 // left out for now but can be added later as separate files following the same pattern

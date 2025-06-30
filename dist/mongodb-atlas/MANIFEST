@@ -1,3 +1,3 @@
 REPO mongodb-atlas
-LOAD project.yaml common.yaml base.yaml user.yaml cluster.yaml
-RESOURCES base.js cluster-sync.js project-sync.js user-sync.js common.js
+LOAD cluster.yaml project.yaml user.yaml common.yaml base.yaml
+RESOURCES cluster-sync.js project-sync.js user-sync.js base.js common.js

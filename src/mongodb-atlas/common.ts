@@ -1,5 +1,6 @@
 import http from "http";
 import secret from "secret";
+import crypto from "crypto";
 
 export const BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
 export const API_VERSION = "application/vnd.atlas.2023-01-01+json";
@@ -8,27 +9,23 @@ export const API_VERSION_2025 = "application/vnd.atlas.2025-03-12+json";
 /**
  * Get MongoDB Atlas OAuth2 Bearer token from service account credentials
  * Implements token caching to avoid unnecessary OAuth exchanges
+ * Uses SHA256 hash to invalidate cache when secret changes
  */
 export function getToken(secretRef: string): string {
     const now = new Date();
     let cachedToken: string | undefined;
     let cachedTokenExpires: string | undefined;
+    let cachedSecretHash: string | undefined;
 
-    // Try to get cached token and expiration
+    // Try to get cached token, expiration, and secret hash
     try {
         cachedToken = secret.get(secretRef + "_cached_token");
         cachedTokenExpires = secret.get(secretRef + "_cached_token_expires");
+        cachedSecretHash = secret.get(secretRef + "_cached_secret_hash");
     } catch (e) {
         cachedToken = undefined;
         cachedTokenExpires = undefined;
-    }
-
-    // Return cached token if it's still valid
-    if (cachedToken && cachedTokenExpires) {
-        const expires = new Date(cachedTokenExpires);
-        if (now < expires) {
-            return cachedToken;
-        }
+        cachedSecretHash = undefined;
     }
 
     // Get service account token
@@ -39,6 +36,17 @@ export function getToken(secretRef: string): string {
 
     if (!serviceAccountToken.startsWith("mdb_sa_id")) {
         throw new Error("Token is not a service account token");
+    }
+
+    // Calculate current secret hash using SHA256
+    const currentSecretHash = crypto.sha256(serviceAccountToken);
+
+    // Return cached token if it's still valid and secret hasn't changed
+    if (cachedToken && cachedTokenExpires && cachedSecretHash) {
+        const expires = new Date(cachedTokenExpires);
+        if (now < expires && cachedSecretHash === currentSecretHash) {
+            return cachedToken;
+        }
     }
     
     // Exchange service account credentials for OAuth2 Bearer token
@@ -67,11 +75,12 @@ export function getToken(secretRef: string): string {
         throw new Error(`OAuth token exchange failed: no access_token in response, body: ${res.body}`);
     }
 
-    // Cache the token with expiration
+    // Cache the token with expiration and secret hash
     if (tokenResponse.expires_in) {
         const expiresIn = new Date(now.getTime() + (tokenResponse.expires_in * 1000));
         secret.set(secretRef + "_cached_token", tokenResponse.access_token);
         secret.set(secretRef + "_cached_token_expires", expiresIn.toISOString());
+        secret.set(secretRef + "_cached_secret_hash", currentSecretHash);
     }
 
     return tokenResponse.access_token;
