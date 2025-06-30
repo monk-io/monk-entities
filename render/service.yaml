@@ -1,0 +1,109 @@
+namespace: render
+
+service:
+  defines: entity
+  metadata:
+    name: Render Service
+  schema:
+    required: [ "api_key_secret", "workspace_id", "service_type", "name" ]
+    api_key_secret:
+      type: string
+    workspace_id:
+      type: string
+    service_type:
+      type: string
+      enum:
+        - static_site
+        - web_service
+        - private_service
+        - background_worker
+        - cron_job
+    name:
+      type: string
+      description: "A unique name for your web service"
+    repo:
+      type: string
+      description: "Do not include the branch in the repo string"
+    auto_deploy:
+      type: string
+      enum:
+        - yes
+        - no
+    branch:
+      type: string
+      description: "The Git branch to build and deploy"
+    root_dir:
+      type: string
+      description: "If set, Render runs commands from this directory instead of the repository root. Additionally, code changes outside of this directory do not trigger an auto-deploy. Most commonly used with a monorepo"
+    image:
+      type: object
+      properties:
+        workspace_id:
+          type: string
+        registry_credential_id:
+          type: string
+        image_path:
+          type: string
+    service_details:
+      type: object
+      properties:
+        build_command:
+          type: string
+          description: "Render runs this command to build your app before each deploy"
+        publish_path:
+          type: string
+        runtime:
+          type: string
+          enum:
+            - docker
+            - elixir
+            - go
+            - node
+            - python
+            - ruby
+            - rust
+            - image
+        region:
+          type: string
+          description: "Your services in the same region can communicate over a private network"
+          enum:
+            - frankfurt
+            - oregon
+            - ohio
+            - singapore
+            - virginia
+        plan:
+          type: string
+          description: "The plan to use for this service"
+          enum:
+            - starter
+            - standard
+            - pro
+            - pro_plus
+            - pro_max
+            - pro_ultra
+        env_specific_details":
+          type: object
+          properties:
+            build_command:
+              type: string
+              description: "Render runs this command to build your app before each deploy"
+            start_command:
+              type: string
+              description: "Render runs this command to start your app with each deploy"
+            docker_command:
+              type: string
+            docker_context:
+              type: string
+            dockerfile_path:
+              type: string
+            registry_credential_id:
+              type: string
+
+  lifecycle:
+    sync: <<< service-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 100

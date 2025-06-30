@@ -1,0 +1,115 @@
+namespace: render-example
+
+registry-credentials:
+  defines: render/registry_credentials
+  api_key_secret: render-api-key
+  auth_token_secret: docker-access-token
+  workspace_id: tea-d092plc9c44c73ack1v0
+  registry: DOCKER
+  name: registry-credentials
+  username: imanachyn
+  permitted-secrets:
+    render-api-key: true
+    docker-access-token: true
+  services:
+    registry-credentials:
+      protocol: custom
+
+render-examples-create-react-app:
+  defines: render/service
+  api_key_secret: render-api-key
+  workspace_id: tea-d092plc9c44c73ack1v0
+  service_type: static_site
+  name: render-examples-create-react-app
+  repo: https://github.com/manachyn/render-examples-create-react-app
+  branch: master
+  auto_deploy: yes
+  service_details:
+    build_command: "yarn; yarn build"
+    publish_path: build
+  permitted-secrets:
+    render-api-key: true
+
+render-examples-private-image:
+  defines: render/service
+  api_key_secret: render-api-key
+  workspace_id: tea-d092plc9c44c73ack1v0
+  service_type: web_service
+  name: render-examples-private-image
+  auto_deploy: yes
+  image:
+    workspace_id: tea-d092plc9c44c73ack1v0
+    registry_credential_id: <- connection-target("registry-credentials") entity-state get-member("id")
+    image_path: docker.io/imanachyn/docker-gs-ping:v1
+  service_details:
+    runtime: image
+    region: oregon
+    plan: starter
+  permitted-secrets:
+    render-api-key: true
+  connections:
+    registry-credentials:
+      runnable: render-example/registry-credentials
+      service: registry-credentials
+  depends:
+    wait-for:
+      runnables:
+        - render-example/registry-credentials
+      timeout: 60
+
+render-examples-nginx-image:
+  defines: render/service
+  api_key_secret: render-api-key
+  workspace_id: tea-d092plc9c44c73ack1v0
+  service_type: web_service
+  name: render-examples-nginx-image
+  auto_deploy: yes
+  image:
+    workspace_id: tea-d092plc9c44c73ack1v0
+    image_path: docker.io/library/nginx:latest
+  service_details:
+    runtime: image
+    region: oregon
+    plan: starter
+  permitted-secrets:
+    render-api-key: true
+
+render-examples-fastapi:
+  defines: render/service
+  api_key_secret: render-api-key
+  workspace_id: tea-d092plc9c44c73ack1v0
+  service_type: web_service
+  name: render-examples-fastapi
+  repo: https://github.com/manachyn/render-examples-fastapi
+  branch: main
+  auto_deploy: yes
+  service_details:
+    runtime: python
+    region: oregon
+    plan: starter
+    env_specific_details:
+      build_command: "pip install -r requirements.txt"
+      start_command: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+  permitted-secrets:
+    render-api-key: true
+
+render-examples-docker:
+  defines: render/service
+  api_key_secret: render-api-key
+  workspace_id: tea-d092plc9c44c73ack1v0
+  service_type: web_service
+  name: render-examples-docker
+  repo: https://github.com/olliefr/docker-gs-ping
+  branch: main
+  auto_deploy: yes
+  service_details:
+    runtime: docker
+    region: oregon
+    plan: starter
+  permitted-secrets:
+    render-api-key: true
+
+stack:
+  defines: process-group
+  runnable-list:
+    - render-example/test-static-site
