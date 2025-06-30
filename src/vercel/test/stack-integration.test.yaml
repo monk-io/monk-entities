@@ -1,0 +1,115 @@
+name: Vercel Full Integration Test
+description: Complete integration test for Vercel Project and Deploy Runnables
+
+secrets:
+  global:
+    vercel-token: "$VERCEL_TOKEN"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/vercel/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load test stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # Project Entity Tests
+  - name: Create and start test project
+    action: run
+    target: vercel-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Wait for project to be ready
+    action: wait
+    target: vercel-test/project
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test get-project action
+    action: action
+    target: vercel-test/project
+    actionName: get-project
+    expect:
+      exitCode: 0
+      output:
+        - "Project Details:"
+
+  - name: Test list-deployments action
+    action: action
+    target: vercel-test/project
+    actionName: list-deployments
+    expect:
+      exitCode: 0
+      output:
+        - "Listing deployments for project"
+
+  # Deployment Runnable Tests
+  - name: Wait for deploy to complete
+    action: wait
+    target: vercel-test/deploy
+    waitFor:
+      condition: exited
+      timeout: 120000
+
+  - name: Check deploy logs
+    action: logs
+    target: vercel-test/deploy
+    expect:
+      output:
+        - "✅ File ready for deployment"
+        - "Production: https://monkec-test-project-123"
+      exitCode: 0
+
+  - name: Test get-production-urls action
+    action: action
+    target: vercel-test/project
+    actionName: get-production-urls
+    expect:
+      exitCode: 0
+      output:
+        - "Getting production URLs for project"
+        - "Production URLs:"
+
+  # Connection Test
+  - name: Start test connection runnable
+    action: run
+    target: vercel-test/test-connection
+    expect:
+      exitCode: 0
+
+  - name: Wait for test connection to complete
+    action: wait
+    target: vercel-test/test-connection
+    waitFor:
+      condition: exited
+      timeout: 60000
+
+  - name: Test connection runnable
+    action: logs
+    target: vercel-test/test-connection
+    expect:
+      output:
+        - "✅ Deployed URL is serving the correct content"
+        - "Connection test completed successfully"
+      exitCode: 0
+
+cleanup:
+  - name: Delete test project
+    action: delete
+    target: vercel-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Delete test connection
+    action: delete
+    target: vercel-test/test-connection
+    expect:
+      exitCode: 0 

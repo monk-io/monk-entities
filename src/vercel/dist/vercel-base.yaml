@@ -1,0 +1,5 @@
+namespace: vercel
+
+vercel-base:
+  defines: module
+  source: <<< vercel-base.js

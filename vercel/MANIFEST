@@ -1,3 +1,2 @@
 REPO monk-vercel
-LOAD vercel.yaml project-entity.yaml
-RESOURCES project-sync.js
+LOAD vercel.yaml
