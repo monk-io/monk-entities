@@ -41,6 +41,7 @@ var import_http_client = require("monkec/http-client");
 // input/mongodb-atlas/common.ts
 var import_http = __toESM(require("http"));
 var import_secret = __toESM(require("secret"));
+var import_crypto = __toESM(require("crypto"));
 var BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
 var API_VERSION = "application/vnd.atlas.2023-01-01+json";
 var API_VERSION_2025 = "application/vnd.atlas.2025-03-12+json";
@@ -48,18 +49,15 @@ function getToken(secretRef) {
   const now = /* @__PURE__ */ new Date();
   let cachedToken;
   let cachedTokenExpires;
+  let cachedSecretHash;
   try {
     cachedToken = import_secret.default.get(secretRef + "_cached_token");
     cachedTokenExpires = import_secret.default.get(secretRef + "_cached_token_expires");
+    cachedSecretHash = import_secret.default.get(secretRef + "_cached_secret_hash");
   } catch (e) {
     cachedToken = void 0;
     cachedTokenExpires = void 0;
-  }
-  if (cachedToken && cachedTokenExpires) {
-    const expires = new Date(cachedTokenExpires);
-    if (now < expires) {
-      return cachedToken;
-    }
+    cachedSecretHash = void 0;
   }
   const serviceAccountToken = import_secret.default.get(secretRef);
   if (!serviceAccountToken) {
@@ -67,6 +65,13 @@ function getToken(secretRef) {
   }
   if (!serviceAccountToken.startsWith("mdb_sa_id")) {
     throw new Error("Token is not a service account token");
+  }
+  const currentSecretHash = import_crypto.default.sha256(serviceAccountToken);
+  if (cachedToken && cachedTokenExpires && cachedSecretHash) {
+    const expires = new Date(cachedTokenExpires);
+    if (now < expires && cachedSecretHash === currentSecretHash) {
+      return cachedToken;
+    }
   }
   const headers = {
     "Accept": "application/json",
@@ -92,6 +97,7 @@ function getToken(secretRef) {
     const expiresIn = new Date(now.getTime() + tokenResponse.expires_in * 1e3);
     import_secret.default.set(secretRef + "_cached_token", tokenResponse.access_token);
     import_secret.default.set(secretRef + "_cached_token_expires", expiresIn.toISOString());
+    import_secret.default.set(secretRef + "_cached_secret_hash", currentSecretHash);
   }
   return tokenResponse.access_token;
 }
