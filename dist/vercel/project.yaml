@@ -1,0 +1,80 @@
+namespace: vercel
+project:
+  defines: entity
+  metadata:
+    name: Project
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    team_id:
+      type: string
+      description: Team ID for team-specific resources
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    framework:
+      type: string
+      description: Framework preset for the project
+    git_repository:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - github
+            - gitlab
+            - bitbucket
+        repo:
+          type: string
+        production_branch:
+          type: string
+      required:
+        - type
+        - repo
+      additionalProperties: false
+      description: Git repository URL for the project
+    root_directory:
+      type: string
+      description: Root directory for the project
+    build_command:
+      type: string
+      description: Build command for the project
+    output_directory:
+      type: string
+      description: Output directory for the project
+    install_command:
+      type: string
+      description: Install command for the project
+    dev_command:
+      type: string
+      description: Development command for the project
+    env:
+      type: object
+      additionalProperties:
+        type: string
+        description: Environment variables for the project
+      description: Environment variables for the project
+    required:
+      - name
+  lifecycle:
+    sync: <<< project-sync.js
+    get-project: ''
+    list-deployments: ''
+    create-deployment: ''
+    get-deployment: ''
+    list-domains: ''
+    add-domain: ''
+    remove-domain: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - vercel/vercel-base
+    - monkec/base
+    - cli
+    - vercel/common

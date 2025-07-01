@@ -1,0 +1,253 @@
+namespace: vercel-test
+
+# Test project entity (minimal configuration for testing)
+project:
+  defines: vercel/project
+  name: monkec-test-project-123
+  secret_ref: vercel-token
+  permitted-secrets:
+    vercel-token: true
+  services:
+    data:
+      protocol: custom
+
+# Test project with framework (will be applied after creation)
+project-with-framework:
+  defines: vercel/project
+  name: monkec-test-framework-project
+  framework: nextjs
+  secret_ref: vercel-token
+  permitted-secrets:
+    vercel-token: true
+  services:
+    data:
+      protocol: custom
+
+# Test deployment runnable
+deploy:
+  defines: runnable
+  inherits: monk/vercel/deploy
+  permitted-secrets:
+    vercel-token: true
+
+  depends:
+    wait-for:
+      runnables:
+        - vercel-test/project
+
+  connections:
+    project:
+      runnable: vercel-test/project
+      service: data
+
+  variables:
+    project:
+      type: string
+      value: <- connection-target("project") entity-state get-member("name")
+    token: <- secret("vercel-token")
+    deploy-dir: /home/node/app
+    source_path: /home/node/app
+    environment: production
+    pre-deploy: |
+      echo "📦 Setting up deployment file..."
+      ls -l $DEPLOY_DIR
+      echo "✅ File ready for deployment"
+
+  files:
+    index-html:
+      container: deploy
+      mode: 0644
+      path: /home/node/app/index.html
+      contents: |
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Vercel Test Deployment</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 2rem;
+                    line-height: 1.6;
+                    color: #333;
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 2rem;
+                }
+                .status {
+                    background: #f0f9ff;
+                    border: 1px solid #0ea5e9;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin: 1rem 0;
+                }
+                .success {
+                    background: #f0fdf4;
+                    border-color: #22c55e;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🚀 Vercel Test Deployment</h1>
+                <p>Successfully deployed via Monk Infrastructure</p>
+            </div>
+            
+            <div class="status success">
+                <h2>✅ Deployment Successful</h2>
+                <p>This page was deployed using:</p>
+                <ul>
+                    <li><strong>Monk Entities:</strong> Vercel Project & Deployment</li>
+                    <li><strong>Container:</strong> monkimages.azurecr.io/example-vercel-build:latest</li>
+                    <li><strong>Framework:</strong> Static HTML</li>
+                    <li><strong>Deployment Time:</strong> <span id="timestamp"></span></li>
+                </ul>
+            </div>
+            
+            <div class="status">
+                <h2>🔧 Test Information</h2>
+                <p>This is a test deployment to verify that the Monk Vercel entities are working correctly.</p>
+                <p>The deployment process includes:</p>
+                <ul>
+                    <li>Project creation via Vercel API</li>
+                    <li>File mounting and deployment</li>
+                    <li>Vercel CLI integration</li>
+                    <li>Environment configuration</li>
+                </ul>
+            </div>
+
+            <script>
+                document.getElementById('timestamp').textContent = new Date().toLocaleString();
+            </script>
+        </body>
+        </html>
+
+stack:
+  defines: process-group
+  runnable-list:
+    - vercel-test/project
+    - vercel-test/deploy
+
+# Connection test container
+test-connection:
+  defines: runnable
+  permitted-secrets:
+    vercel-token: true
+  connections:
+    project:
+      runnable: vercel-test/project
+      service: data
+    deploy:
+      runnable: vercel-test/deploy
+      service: data
+  variables:
+    project_id:
+      env: PROJECT_ID
+      value: <- connection-target("project") entity-state get-member("id")
+      type: string
+    project_name:
+      env: PROJECT_NAME
+      value: <- connection-target("project") entity-state get-member("name")
+      type: string
+    token:
+      env: VERCEL_TOKEN
+      value: <- secret("vercel-token")
+      type: string
+  containers:
+    connection-test:
+      image: curlimages/curl:latest
+      image-tag: latest
+      restart: no
+      bash: |
+        echo "Testing Vercel connections..."
+        echo "Project ID: $PROJECT_ID"
+        echo "Project Name: $PROJECT_NAME"
+        
+        # Test project accessibility via Vercel API
+        echo "Testing project accessibility..."
+        curl -H "Authorization: Bearer $VERCEL_TOKEN" \
+             "https://api.vercel.com/v1/projects/$PROJECT_ID" \
+             -s | grep -o '"name":"[^"]*"' || echo "Project accessible"
+
+        # Get the latest deployment URL from the project
+        echo "Getting latest deployment URL..."
+        PROJECT_RESPONSE=$(curl -H "Authorization: Bearer $VERCEL_TOKEN" \
+             "https://api.vercel.com/v9/projects/$PROJECT_ID" \
+             -s)
+        
+        echo "Project response: $PROJECT_RESPONSE"
+        
+        # Extract production alias from targets.production.alias
+        PRODUCTION_ALIAS=$(echo "$PROJECT_RESPONSE" | grep -o '"targets":{"production":{"alias":\["[^"]*"' | head -1 | sed 's/.*"alias":\["//;s/"//')
+        
+        if [ -z "$PRODUCTION_ALIAS" ]; then
+          # Try alternative pattern for production alias
+          PRODUCTION_ALIAS=$(echo "$PROJECT_RESPONSE" | grep -o '"production":{"alias":\["[^"]*"' | head -1 | sed 's/.*"alias":\["//;s/"//')
+        fi
+        
+        if [ -z "$PRODUCTION_ALIAS" ]; then
+          # Fallback to deployment URL if no production alias found
+          DEPLOYMENT_URL=$(echo "$PROJECT_RESPONSE" | grep -o '"url":"[^"]*"' | head -1 | sed 's/"url":"//;s/"//')
+          
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            # Try alternative pattern for deployment URL
+            DEPLOYMENT_URL=$(echo "$PROJECT_RESPONSE" | grep -o '"url":"https://[^"]*"' | head -1 | sed 's/"url":"//;s/"//')
+          fi
+          
+          # Ensure URL has https protocol
+          if [ -n "$DEPLOYMENT_URL" ] && [[ ! "$DEPLOYMENT_URL" =~ ^https?:// ]]; then
+            DEPLOYMENT_URL="https://$DEPLOYMENT_URL"
+          fi
+          
+          DEPLOYMENT_URL_TO_TEST="$DEPLOYMENT_URL"
+        else
+          # Use production alias with https
+          DEPLOYMENT_URL_TO_TEST="https://$PRODUCTION_ALIAS"
+        fi
+        
+        if [ -z "$DEPLOYMENT_URL_TO_TEST" ]; then
+          echo "❌ No deployment URL or production alias found in project response"
+          echo "Response content: $PROJECT_RESPONSE"
+          exit 1
+        fi
+        
+        echo "Deployment URL: $DEPLOYMENT_URL_TO_TEST"
+        
+        # Test the deployed URL
+        echo "Testing deployed URL..."
+        RESPONSE=$(curl -s "$DEPLOYMENT_URL_TO_TEST")
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ HTTP request successful"
+          echo "Response content (first 500 chars):"
+          echo "$RESPONSE" | head -c 500
+          echo ""
+          
+          # Check if the response contains our expected content
+          if echo "$RESPONSE" | grep -q "Vercel Test Deployment"; then
+            echo "✅ Found expected title in response"
+          else
+            echo "❌ Expected title not found in response"
+            echo "Full response:"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          
+          if echo "$RESPONSE" | grep -q "Monk Entities"; then
+            echo "✅ Found expected content in response"
+          else
+            echo "❌ Expected content not found in response"
+            exit 1
+          fi
+          
+          echo "✅ Deployed URL is serving the correct content"
+        else
+          echo "❌ HTTP request failed"
+          exit 1
+        fi
+
+        echo "Connection test completed successfully" 

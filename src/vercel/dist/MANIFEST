@@ -1,0 +1,3 @@
+REPO vercel
+LOAD project.yaml deployment.yaml vercel-base.yaml common.yaml
+RESOURCES project-sync.js deployment-sync.js vercel-base.js common.js
