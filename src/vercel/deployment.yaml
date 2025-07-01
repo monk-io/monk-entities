@@ -1,0 +1,71 @@
+namespace: vercel
+
+# Vercel deployment runnable
+deploy:
+  defines: runnable
+  permitted-secrets:
+    default-vercel-token: true
+  containers:
+    deploy:
+      image: monkimages.azurecr.io/example-vercel-build:latest
+      restart: no
+      bash: /tmp/init.sh
+      paths:
+        - <- `blobs://${source_path}:/home/node/app`
+  files:
+    init:
+      container: deploy
+      path: /tmp/init.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        set -e
+        
+        echo "🚀 Starting Vercel deployment..."
+        echo "Project ID: $VERCEL_PROJECT"
+        echo "Deploy directory: $DEPLOY_DIR"
+        
+        # Run pre-deploy script if provided
+        {{ v "pre-deploy" }}
+        
+        # Link to the project
+        echo "📋 Linking to Vercel project..."
+        vercel link --cwd $DEPLOY_DIR --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
+        
+        # Deploy to Vercel
+        echo "🚀 Deploying to Vercel..."
+        if [ "$ENVIRONMENT" = "production" ]; then
+          echo "y\n" | vercel deploy --cwd $DEPLOY_DIR --prod --public --yes -t $VERCEL_TOKEN
+        else
+          echo "y\n" | vercel deploy --cwd $DEPLOY_DIR --public --yes -t $VERCEL_TOKEN
+        fi
+        
+        echo "✅ Deployment completed successfully!"
+  variables:
+    project:
+      env: VERCEL_PROJECT
+      type: string
+      value: example
+    token:
+      env: VERCEL_TOKEN
+      type: string
+      value: <- secret("default-vercel-token")
+    deploy-dir:
+      env: DEPLOY_DIR
+      type: string
+      value: /home/node/app/
+    source_path:
+      type: string
+      value: /path/to/source
+    environment:
+      env: ENVIRONMENT
+      type: string
+      value: production
+    pre-deploy:
+      type: string
+      value: |
+        echo "📦 Running pre-deploy setup..."
+        cd $DEPLOY_DIR
+        if [ -f "package.json" ]; then
+          npm install
+        fi 

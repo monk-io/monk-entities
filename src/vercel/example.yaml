@@ -1,0 +1,66 @@
+namespace: vercel-example
+
+# Example Vercel project
+project:
+  defines: vercel/project
+  name: my-very-very-new-project
+  permitted-secrets:
+    default-vercel-token: true
+
+# Example frontend deployment
+frontend:
+  defines: runnable
+  inherits: vercel/deploy
+  containers:
+    deploy:
+      paths:
+        - blobs://frontend:/home/node/app
+  depends:
+    wait-for:
+      runnables:
+        - vercel-example/project
+  connections:
+    project:
+      runnable: vercel-example/project
+      service: data
+  variables:
+    project: <- connection-target("project") entity-state get-member("name")
+    deploy-dir: /home/node/app
+    source_path: frontend
+    environment: production
+    pre-deploy: |
+      echo "📦 Installing dependencies..."
+      cd $DEPLOY_DIR
+      npm install
+      echo "🔨 Building application..."
+      npm run build
+      echo "📋 Copying Vercel configuration..."
+      cp ./vercel.json ./build/vercel.json
+
+# Alternative deployment for development
+frontend-dev:
+  defines: runnable
+  inherits: vercel/deploy
+  containers:
+    deploy:
+      paths:
+        - blobs://frontend:/home/node/app
+  depends:
+    wait-for:
+      runnables:
+        - vercel-example/project
+  connections:
+    project:
+      runnable: vercel-example/project
+      service: data
+  variables:
+    project: <- connection-target("project") entity-state get-member("name")
+    deploy-dir: /home/node/app
+    source_path: frontend
+    environment: preview
+    pre-deploy: |
+      echo "📦 Installing dependencies..."
+      cd $DEPLOY_DIR
+      npm install
+      echo "🔨 Building application..."
+      npm run build 
