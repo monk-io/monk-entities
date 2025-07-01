@@ -1,0 +1,129 @@
+name: "Redis Cloud Development Stack Test"
+description: "Test development stack deployment with Redis Cloud entities"
+timeout: 540000
+
+secrets:
+  redis-cloud-account-key: "$REDIS_CLOUD_ACCOUNT_KEY"
+  redis-cloud-user-key: "$REDIS_CLOUD_USER_KEY"
+
+setup:
+  - name: "Load compiled Redis Cloud entities"
+    action: "load"
+    target: "dist/input/redis-cloud/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy essentials development stack"
+    action: "run"
+    target: "redis-test-stack/dev-essentials-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for essentials stack readiness"
+    action: "wait"
+    target: "redis-test-stack/dev-essentials-stack"
+    waitFor:
+      condition: "ready"
+      timeout: 300000
+
+  - name: "Verify essentials subscription status"
+    action: "describe"
+    target: "redis-test-stack/dev-essentials-subscription"
+    expect:
+      exitCode: 0
+
+  - name: "Verify essentials database status"
+    action: "describe"
+    target: "redis-test-stack/dev-essentials-database"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for essentials connection test to exit"
+    action: "wait"
+    target: "redis-test-stack/dev-essentials-connection-test"
+    waitFor:
+      condition: "exited"
+      timeout: 150000
+
+  - name: "Check essentials connection test logs"
+    action: "logs"
+    target: "redis-test-stack/dev-essentials-connection-test"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connected to Redis Cloud Essentials successfully!"
+        - "Redis Cloud Essentials test completed successfully!"
+
+  - name: "Deploy pro development stack"
+    action: "run"
+    target: "redis-test-stack/dev-pro-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for pro stack readiness"
+    action: "wait"
+    target: "redis-test-stack/dev-pro-stack"
+    waitFor:
+      condition: "ready"
+      timeout: 300000
+
+  - name: "Verify pro subscription status"
+    action: "describe"
+    target: "redis-test-stack/dev-pro-subscription"
+    expect:
+      exitCode: 0
+
+  - name: "Verify pro database status"
+    action: "describe"
+    target: "redis-test-stack/dev-pro-database"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for pro connection test to exit"
+    action: "wait"
+    target: "redis-test-stack/dev-pro-connection-test"
+    waitFor:
+      condition: "exited"
+      timeout: 150000
+
+  - name: "Check pro connection test logs"
+    action: "logs"
+    target: "redis-test-stack/dev-pro-connection-test"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connected to Redis Cloud Pro successfully!"
+        - "Redis Cloud Pro test completed successfully!"
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete essentials development stack"
+    action: "delete"
+    target: "redis-test-stack/dev-essentials-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Delete pro development stack"
+    action: "delete"
+    target: "redis-test-stack/dev-pro-stack"
+    expect:
+      exitCode: 0
+
+variables: {}
+
+stack-files:
+  - "stack-template.yaml"
+
+# Test configuration
+namespace: redis-test-stack 

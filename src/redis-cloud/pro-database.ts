@@ -7,9 +7,11 @@ import cli from "cli";
  */
 export interface ProDatabaseDefinition extends RedisCloudEntityDefinition {
     /**
-     * Database name
+     * Database name (limited to 40 characters, letters, digits, hyphens only)
+     * Must start with letter and end with letter or digit
      * @minLength 1
-     * @maxLength 100
+     * @maxLength 40
+     * @pattern ^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$
      */
     name: string;
 
@@ -20,139 +22,251 @@ export interface ProDatabaseDefinition extends RedisCloudEntityDefinition {
     subscription_id: string;
 
     /**
+     * Optional. When 'false': Creates and deploys, when 'true': creates read-only plan
+     * @default false
+     */
+    dry_run?: boolean;
+
+    /**
      * Protocol for Redis database
+     * @default "redis"
      */
-    protocol: "redis" | "memcached";
+    protocol?: "redis" | "memcached";
 
     /**
-     * Memory limit for Pro databases (up to 50GB+)
-     * @minimum 1
-     * @maximum 51200
+     * Optional. TCP port on which the database is available (10000-19999)
+     * Generated automatically if not set
+     * @minimum 10000
+     * @maximum 19999
      */
-    memory_limit_in_mb: number;
+    port?: number;
 
     /**
-     * Whether to enable data persistence
+     * Optional. Maximum amount of data in the dataset in GB
+     * If replication is true, total memory will be twice this value
+     * @minimum 0.1
      */
-    data_persistence?: boolean;
+    dataset_size_in_gb?: number;
 
     /**
-     * Database password secret name
+     * Optional. Redis database version
+     * If omitted, will use default version
      */
-    password_secret?: string;
+    redis_version?: string;
 
     /**
-     * Data eviction policy
+     * Optional. Redis Serialization Protocol version
+     * Must be compatible with Redis version
+     */
+    resp_version?: "resp2" | "resp3";
+
+    /**
+     * Optional. Support OSS Cluster API
+     * @default false
+     */
+    support_oss_cluster_api?: boolean;
+
+    /**
+     * Optional. Use external endpoint for OSS Cluster API
+     * Blocks database's private endpoint. Can only be set if supportOSSClusterAPI is true
+     * @default false
+     */
+    use_external_endpoint_for_oss_cluster_api?: boolean;
+
+    /**
+     * Optional. Type and rate of data persistence
+     * @default "none"
+     */
+    data_persistence?: "none" | "aof-every-1-second" | "aof-every-write" | "snapshot-every-1-hour" | "snapshot-every-6-hours" | "snapshot-every-12-hours";
+
+    /**
+     * Optional. Data eviction policy
+     * @default "volatile-lru"
      */
     data_eviction_policy?: "allkeys-lru" | "allkeys-lfu" | "allkeys-random" | "volatile-lru" | "volatile-lfu" | "volatile-random" | "volatile-ttl" | "noeviction";
 
     /**
-     * List of allowed source IPs
+     * Optional. Sets database replication
+     * @default true
      */
-    source_ips?: string[];
+    replication?: boolean;
 
     /**
-     * Whether to enable high availability
+     * Optional. Changes Replica Of (Active-Passive) configuration
      */
-    high_availability?: boolean;
+    replica?: {
+        sync_sources: Array<{
+            /**
+             * Redis URI of source database
+             * Example: 'redis://user:password@host:port' or 'redis://endpoint1:6379'
+             */
+            endpoint: string;
+            /**
+             * Optional. Use encryption to connect to sync source
+             */
+            encryption?: boolean;
+            /**
+             * Optional. TLS/SSL certificate chain of sync source
+             */
+            server_cert?: string;
+        }>;
+    };
 
     /**
-     * Whether to enable multi-zone deployment
+     * Optional. Throughput measurement method
      */
-    multi_zone?: boolean;
-
-    /**
-     * Whether to enable replica
-     */
-    replica?: boolean;
-
-    /**
-     * Number of database replicas
-     * @minimum 0
-     * @maximum 4
-     */
-    replica_count?: number;
-
-    /**
-     * Whether to enable clustering
-     */
-    clustering?: boolean;
-
-    /**
-     * Number of shards for clustering
-     * @minimum 1
-     * @maximum 256
-     */
-    shard_count?: number;
-
-    /**
-     * List of Redis modules to enable
-     */
-    modules?: ("RedisJSON" | "RediSearch" | "RedisTimeSeries" | "RedisBloom" | "RedisGraph")[];
-
-    /**
-     * Client SSL certificate ID
-     */
-    client_ssl_certificate?: string;
-
-    /**
-     * Periodic backup configuration
-     */
-    backup_config?: {
+    throughput_measurement?: {
         /**
-         * Backup interval in hours
-         * @minimum 1
-         * @maximum 24
+         * Throughput measurement method
+         * Use 'operations-per-second' for all new databases
          */
-        interval_hours?: number;
-
+        by: "operations-per-second" | "number-of-shards";
         /**
-         * Backup storage path
+         * Throughput value in selected measurement method
+         */
+        value: number;
+    };
+
+    /**
+     * Optional. Expected throughput per region for Active-Active database
+     * Default: 1000 read and write ops/sec for each region
+     */
+    local_throughput_measurement?: Array<{
+        /**
+         * Cloud provider region for the subscription
+         */
+        region: string;
+        /**
+         * Write operations per second for this region
+         * @default 1000
+         */
+        write_operations_per_second?: number;
+        /**
+         * Read operations per second for this region
+         * @default 1000
+         */
+        read_operations_per_second?: number;
+    }>;
+
+    /**
+     * Optional. Average size in bytes of items stored in database
+     * Relevant only for ram-and-flash (Auto Tiering) subscriptions
+     * @default 1000
+     */
+    average_item_size_in_bytes?: number;
+
+    /**
+     * Optional. Remote backup configuration
+     */
+    remote_backup?: {
+        /**
+         * Optional. Determine if backup should be active
+         */
+        active?: boolean;
+        /**
+         * Required when active is true. Interval between backups
+         * Format: 'every-x-hours' where x is 1, 2, 4, 6, 12, or 24
+         */
+        interval?: "every-1-hours" | "every-2-hours" | "every-4-hours" | "every-6-hours" | "every-12-hours" | "every-24-hours";
+        /**
+         * Optional. Hour when backup starts (UTC)
+         * Available only for "every-12-hours" and "every-24-hours"
+         * Example: "14:00"
+         */
+        time_utc?: string;
+        /**
+         * Required when active is true. Type of storage for backup files
+         */
+        storage_type?: "aws-s3" | "google-blob-storage" | "azure-blob-storage" | "ftp";
+        /**
+         * Required when active is true. Path to backup storage location
          */
         storage_path?: string;
-
-        /**
-         * Number of backups to retain
-         * @minimum 1
-         * @maximum 7
-         */
-        retention_count?: number;
     };
 
     /**
-     * Whether to enable database alerts
+     * Optional. List of source IP addresses or subnet masks to allow
+     * Example: ['192.168.10.0/32', '192.168.12.0/24']
      */
-    enable_alerts?: boolean;
+    source_ip?: string[];
 
     /**
-     * Advanced alert settings for Pro
+     * Optional. List of client TLS/SSL certificates
+     * If specified, mTLS authentication will be required
      */
-    alerts?: {
+    client_tls_certificates?: Array<{
         /**
-         * Memory usage threshold
-         * @minimum 0
-         * @maximum 100
+         * Client certificate public key in PEM format
+         * New line characters should be replaced with '\n'
          */
-        memory_usage_threshold?: number;
+        public_certificate_pem_string: string;
+    }>;
 
-        /**
-         * Throughput threshold
-         * @minimum 0
-         */
-        throughput_threshold?: number;
+    /**
+     * Optional. When true, requires TLS authentication for all connections
+     * @default false
+     */
+    enable_tls?: boolean;
 
-        /**
-         * Connection limit threshold
-         * @minimum 0
-         */
-        connection_limit_threshold?: number;
+    /**
+     * Optional. Password to access the database
+     * If not set, random 32-character password will be generated
+     * Can only be set if protocol is 'redis'
+     */
+    password?: string;
 
+    /**
+     * Optional. Memcached (SASL) Username
+     * If not set, will be 'mc-' prefix + random 5 characters
+     * Can only be set if protocol is 'memcached'
+     */
+    sasl_username?: string;
+
+    /**
+     * Optional. Memcached (SASL) Password
+     * If not set, random 32-character password will be generated
+     * Can only be set if protocol is 'memcached'
+     */
+    sasl_password?: string;
+
+    /**
+     * Optional. Redis database alert details
+     */
+    alerts?: Array<{
         /**
-         * Latency threshold in milliseconds
-         * @minimum 0
+         * Alert type
          */
-        latency_threshold?: number;
-    };
+        name: "dataset-size" | "datasets-size" | "throughput-higher-than" | "throughput-lower-than" | "latency" | "syncsource-error" | "syncsource-lag" | "connections-limit";
+        /**
+         * Value over which alert will be sent
+         */
+        value: number;
+    }>;
+
+    /**
+     * Optional. Redis advanced capabilities (modules) to provision
+     */
+    modules?: Array<{
+        /**
+         * Redis advanced capability name
+         */
+        name: string;
+        /**
+         * Optional. Redis advanced capability parameters
+         */
+        parameters?: Record<string, any>;
+    }>;
+
+    /**
+     * Optional. Database hashing policy
+     */
+    sharding_type?: "default-regex-rules" | "custom-regex-rules" | "redis-oss-hashing";
+
+    /**
+     * Optional. Query performance factor for search and query databases
+     * Adds extra compute power to increase queries per second
+     */
+    query_performance_factor?: string;
 }
 
 /**
@@ -333,24 +447,119 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
 
         const body: any = {
             name: this.definition.name,
-            protocol: this.definition.protocol,
-            memoryLimitInMb: this.definition.memory_limit_in_mb,
-            supportOSSClusterApi: this.definition.clustering || false,
-            useExternalEndpointForOSSClusterApi: false,
-            dataPersistence: this.definition.data_persistence ? "aof-every-1-sec" : "none",
-            dataEvictionPolicy: this.definition.data_eviction_policy || "volatile-lru",
-            replication: this.definition.high_availability || false,
-            password: password,
-            sourceIps: this.definition.source_ips || [],
-            modules: this.buildModulesConfig(),
-            alerts: this.buildAdvancedAlertsConfig()
+            protocol: this.definition.protocol || "redis",
+            dryRun: this.definition.dry_run || false
         };
 
-        // Add clustering configuration if enabled
-        if (this.definition.clustering && this.definition.shard_count) {
-            body.clustering = {
-                numberOfShards: this.definition.shard_count
+        // Handle memory configuration
+        if (this.definition.dataset_size_in_gb !== undefined) {
+            body.datasetSizeInGb = this.definition.dataset_size_in_gb;
+        }
+
+        // Optional configurations
+        if (this.definition.port !== undefined) {
+            body.port = this.definition.port;
+        }
+
+        if (this.definition.redis_version !== undefined) {
+            body.redisVersion = this.definition.redis_version;
+        }
+
+        if (this.definition.resp_version !== undefined) {
+            body.respVersion = this.definition.resp_version;
+        }
+
+        body.supportOSSClusterApi = this.definition.support_oss_cluster_api || false;
+        body.useExternalEndpointForOSSClusterApi = this.definition.use_external_endpoint_for_oss_cluster_api || false;
+        body.dataPersistence = this.mapDataPersistence();
+        body.dataEvictionPolicy = this.definition.data_eviction_policy || "volatile-lru";
+        body.replication = this.definition.replication ?? true;
+        body.password = password;
+        body.sourceIp = this.definition.source_ip || [];
+        
+        // Handle modules
+        if (this.definition.modules && this.definition.modules.length > 0) {
+            body.modules = [...this.definition.modules];
+        }
+
+        // Handle alerts
+        if (this.definition.alerts && this.definition.alerts.length > 0) {
+            body.alerts = [...this.definition.alerts];
+        }
+
+        // Handle replica configuration
+        if (this.definition.replica) {
+            body.replica = {
+                syncSources: this.definition.replica.sync_sources.map(source => ({
+                    endpoint: source.endpoint,
+                    encryption: source.encryption,
+                    serverCert: source.server_cert
+                }))
             };
+        }
+
+        // Handle throughput measurement
+        if (this.definition.throughput_measurement) {
+            body.throughputMeasurement = {
+                by: this.definition.throughput_measurement.by,
+                value: this.definition.throughput_measurement.value
+            };
+        }
+
+        // Handle local throughput measurement for Active-Active
+        if (this.definition.local_throughput_measurement) {
+            body.localThroughputMeasurement = this.definition.local_throughput_measurement.map(ltp => ({
+                region: ltp.region,
+                writeOperationsPerSecond: ltp.write_operations_per_second || 1000,
+                readOperationsPerSecond: ltp.read_operations_per_second || 1000
+            }));
+        }
+
+        // Handle average item size
+        if (this.definition.average_item_size_in_bytes !== undefined) {
+            body.averageItemSizeInBytes = this.definition.average_item_size_in_bytes;
+        }
+
+        // Handle backup configuration
+        if (this.definition.remote_backup) {
+            body.remoteBackup = {
+                active: this.definition.remote_backup.active,
+                interval: this.definition.remote_backup.interval,
+                timeUTC: this.definition.remote_backup.time_utc,
+                storageType: this.definition.remote_backup.storage_type,
+                storagePath: this.definition.remote_backup.storage_path
+            };
+        }
+
+        // Handle TLS certificates
+        if (this.definition.client_tls_certificates) {
+            body.clientTlsCertificates = this.definition.client_tls_certificates.map(cert => ({
+                publicCertificatePEMString: cert.public_certificate_pem_string
+            }));
+        }
+
+        if (this.definition.enable_tls !== undefined) {
+            body.enableTls = this.definition.enable_tls;
+        }
+
+        // Handle memcached SASL
+        if (this.definition.protocol === "memcached") {
+            if (this.definition.sasl_username !== undefined) {
+                body.saslUsername = this.definition.sasl_username;
+            }
+            if (this.definition.sasl_password !== undefined) {
+                body.saslPassword = this.definition.sasl_password;
+            }
+        }
+
+        // Handle sharding type
+        if (this.definition.sharding_type !== undefined) {
+            body.shardingType = this.definition.sharding_type;
+        }
+
+        // Handle query performance factor
+        if (this.definition.query_performance_factor !== undefined) {
+            body.queryPerformanceFactor = this.definition.query_performance_factor;
         }
 
         const response = this.makeRequest("POST", `/subscriptions/${this.definition.subscription_id}/databases`, body);
@@ -360,18 +569,22 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
         this.state.status = "pending";
         this.state.task_id = response.taskId;
         this.state.password = password;
-        this.state.memory_limit_in_mb = this.definition.memory_limit_in_mb;
+        this.state.memory_limit_in_mb = (this.definition.dataset_size_in_gb || 1) * 1024;
 
-        // Set Pro-specific state
-        if (this.definition.clustering) {
+        // Set clustering state if configured
+        if (this.definition.support_oss_cluster_api) {
             this.state.cluster_info = {
-                shard_count: this.definition.shard_count,
+                shard_count: this.definition.throughput_measurement?.value,
                 status: "initializing"
             };
         }
 
         cli.output(`✅ Pro database creation initiated: ${this.state.name} (${this.state.id})`);
         cli.output(`📋 Task ID: ${this.state.task_id}`);
+    }
+
+    private mapDataPersistence(): string {
+        return this.definition.data_persistence || "none";
     }
 
     private findExistingDatabase(): any {
@@ -385,12 +598,9 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
     }
 
     private getOrGeneratePassword(): string {
-        if (this.definition.password_secret) {
-            try {
-                return this.credentials.secretKey; // Use existing secret system
-            } catch (error) {
-                cli.output(`⚠️ Could not retrieve password from secret, generating new one`);
-            }
+        // Use explicit password first
+        if (this.definition.password) {
+            return this.definition.password;
         }
         
         // Generate a random password
@@ -400,54 +610,6 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return password;
-    }
-
-    private buildModulesConfig(): any[] {
-        if (!this.definition.modules || this.definition.modules.length === 0) {
-            return [];
-        }
-
-        return this.definition.modules.map(module => ({
-            name: module
-        }));
-    }
-
-    private buildAdvancedAlertsConfig(): any[] {
-        if (!this.definition.enable_alerts || !this.definition.alerts) {
-            return [];
-        }
-
-        const alerts = [];
-        
-        if (this.definition.alerts.memory_usage_threshold) {
-            alerts.push({
-                name: "dataset-size",
-                value: this.definition.alerts.memory_usage_threshold
-            });
-        }
-
-        if (this.definition.alerts.throughput_threshold) {
-            alerts.push({
-                name: "throughput-higher-than",
-                value: this.definition.alerts.throughput_threshold
-            });
-        }
-
-        if (this.definition.alerts.connection_limit_threshold) {
-            alerts.push({
-                name: "connections-limit",
-                value: this.definition.alerts.connection_limit_threshold
-            });
-        }
-
-        if (this.definition.alerts.latency_threshold) {
-            alerts.push({
-                name: "latency",
-                value: this.definition.alerts.latency_threshold
-            });
-        }
-
-        return alerts;
     }
 
     override start(): void {
@@ -493,7 +655,7 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
             }
 
             // Update alerts if needed
-            if (this.definition.enable_alerts && this.definition.alerts) {
+            if (this.definition.alerts && this.definition.alerts.length > 0) {
                 this.updateAdvancedAlerts();
             }
         }
@@ -502,7 +664,7 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
     private updateAdvancedAlerts(): void {
         if (!this.state.id) return;
         
-        const alerts = this.buildAdvancedAlertsConfig();
+        const alerts = this.definition.alerts || [];
         if (alerts.length > 0) {
             try {
                 this.makeRequest("PUT", `/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}/alerts`, { alerts });

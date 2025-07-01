@@ -1,0 +1,5 @@
+namespace: redis-cloud
+
+common:
+  defines: module
+  source: <<< common.js

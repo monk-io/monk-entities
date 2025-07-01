@@ -1,0 +1,231 @@
+namespace: redis-cloud
+pro-database:
+  defines: entity
+  metadata:
+    name: ProDatabase
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+      pattern: '^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$'
+    subscription_id:
+      type: string
+      minLength: 1
+    dry_run:
+      type: boolean
+      default: false
+    protocol:
+      type: string
+      enum:
+        - redis
+        - memcached
+      default: redis
+    port:
+      type: number
+      minimum: 10000
+      maximum: 19999
+    dataset_size_in_gb:
+      type: number
+      minimum: 0
+    redis_version:
+      type: string
+    resp_version:
+      type: string
+      enum:
+        - resp2
+        - resp3
+    support_oss_cluster_api:
+      type: boolean
+      default: false
+    use_external_endpoint_for_oss_cluster_api:
+      type: boolean
+      default: false
+    data_persistence:
+      type: string
+      enum:
+        - none
+        - aof-every-1-second
+        - aof-every-write
+        - snapshot-every-1-hour
+        - snapshot-every-6-hours
+        - snapshot-every-12-hours
+      default: none
+    data_eviction_policy:
+      type: string
+      enum:
+        - allkeys-lru
+        - allkeys-lfu
+        - allkeys-random
+        - volatile-lru
+        - volatile-lfu
+        - volatile-random
+        - volatile-ttl
+        - noeviction
+      default: volatile-lru
+    replication:
+      type: boolean
+      default: true
+    replica:
+      type: object
+      properties:
+        sync_sources:
+          type: array
+          items:
+            type: object
+            properties:
+              endpoint:
+                type: string
+              encryption:
+                type: boolean
+              server_cert:
+                type: string
+            required:
+              - endpoint
+            additionalProperties: false
+      required:
+        - sync_sources
+      additionalProperties: false
+    throughput_measurement:
+      type: object
+      properties:
+        by:
+          type: string
+          enum:
+            - operations-per-second
+            - number-of-shards
+        value:
+          type: number
+      required:
+        - by
+        - value
+      additionalProperties: false
+    local_throughput_measurement:
+      type: array
+      items:
+        type: object
+        properties:
+          region:
+            type: string
+          write_operations_per_second:
+            type: number
+            default: 1000
+          read_operations_per_second:
+            type: number
+            default: 1000
+        required:
+          - region
+        additionalProperties: false
+    average_item_size_in_bytes:
+      type: number
+      default: 1000
+    remote_backup:
+      type: object
+      properties:
+        active:
+          type: boolean
+        interval:
+          type: string
+          enum:
+            - every-1-hours
+            - every-2-hours
+            - every-4-hours
+            - every-6-hours
+            - every-12-hours
+            - every-24-hours
+        time_utc:
+          type: string
+        storage_type:
+          type: string
+          enum:
+            - aws-s3
+            - google-blob-storage
+            - azure-blob-storage
+            - ftp
+        storage_path:
+          type: string
+      additionalProperties: false
+    source_ip:
+      type: array
+      items:
+        type: string
+    client_tls_certificates:
+      type: array
+      items:
+        type: object
+        properties:
+          public_certificate_pem_string:
+            type: string
+        required:
+          - public_certificate_pem_string
+        additionalProperties: false
+    enable_tls:
+      type: boolean
+      default: false
+    password:
+      type: string
+    sasl_username:
+      type: string
+    sasl_password:
+      type: string
+    alerts:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+            enum:
+              - dataset-size
+              - datasets-size
+              - throughput-higher-than
+              - throughput-lower-than
+              - latency
+              - syncsource-error
+              - syncsource-lag
+              - connections-limit
+          value:
+            type: number
+        required:
+          - name
+          - value
+        additionalProperties: false
+    modules:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          parameters:
+            type: object
+            additionalProperties: {}
+        required:
+          - name
+        additionalProperties: false
+    sharding_type:
+      type: string
+      enum:
+        - default-regex-rules
+        - custom-regex-rules
+        - redis-oss-hashing
+    query_performance_factor:
+      type: string
+    required:
+      - secret_ref
+      - name
+      - subscription_id
+  lifecycle:
+    sync: <<< pro-database-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - redis-cloud/base
+    - cli
