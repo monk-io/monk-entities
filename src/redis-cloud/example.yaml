@@ -5,21 +5,21 @@ stack:
   services:
     - redis-client
   entity-instances:
-    - redis-subscription
-    - redis-database
+    - essentials-subscription
+    - essentials-database
   actions:
     run-with:
-      - redis-database
+      - essentials-database
 
 redis-client:
   defines: runnable
   image: redis:7-alpine
   depends-on:
-    entity-instance: redis-database
+    entity-instance: essentials-database
   variables:
-    REDIS_HOST: <- get-from("redis-database", "publicEndpoint")
-    REDIS_PORT: <- get-from("redis-database", "port")
-    REDIS_USER: <- get-from("redis-database", "username")
+    REDIS_HOST: <- get-from("essentials-database", "publicEndpointHost")
+    REDIS_PORT: <- get-from("essentials-database", "publicEndpointPort")
+    REDIS_USER: <- get-from("essentials-database", "username")
     REDIS_PASSWORD: <- secret("redis-cloud-db-password")
     REDIS_URL: <- `redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`
   bash: |
@@ -29,41 +29,97 @@ redis-client:
     echo "User: $REDIS_USER"
     redis-cli -h $REDIS_HOST -p $REDIS_PORT -a $REDIS_PASSWORD --no-auth-warning ping
 
-redis-subscription:
-  defines: entity-instance
-  entity: 
-    module: ./src/redis-cloud/subscription.ts
-    class: Subscription
-  properties:
+# Essentials subscription with simplified features
+essentials-subscription:
+  type: redis-cloud/subscription
+  with:
     secret_ref: "redis-cloud-auth"
     subscription_type: essentials
-    name: "my-redis-subscription"
+    name: "my-essentials-subscription"
+    #plan_id: 20927 # 30MB Free AWS us-east-1
+    size: 30
     provider: AWS
-    region: "us-west-2"
-    redis_flex: true
-    size: 1
-    availability: "Single-zone"
-    support_data_persistence: true
+    region: us-east-1
+    redis_flex: false
+    availability: No replication
+    support_data_persistence: false
     support_instant_and_daily_backups: false
     support_replication: false
     support_clustering: false
+    support_ssl: false
+    payment_method: "credit-card"
+
+# Pro subscription with advanced features
+pro-subscription:
+  type: redis-cloud/subscription
+  with:
+    secret_ref: "redis-cloud-auth"
+    subscription_type: pro
+    name: "my-pro-subscription"
+    provider: AWS
+    region: "us-west-2" 
+    redis_flex: true
+    size: 5
+    availability: "Multi-zone"
+    support_data_persistence: true
+    support_instant_and_daily_backups: true
+    support_replication: true
+    support_clustering: true
     support_ssl: true
     payment_method: "credit-card"
 
-redis-database:
-  defines: entity-instance
-  entity:
-    module: ./src/redis-cloud/database.ts
-    class: Database
-  properties:
+# Essentials database with API-compliant fields
+# Requires separate secrets:
+# - redis-cloud-account-key: containing the Redis Cloud API account key
+# - redis-cloud-user-key: containing the Redis Cloud API user key
+# - redis-cloud-db-password: (optional) database password, will be auto-generated if not provided
+essentials-database:
+  type: redis-cloud/essentials-database
+  with:
+    account_key_secret: "redis-cloud-account-key"
+    user_key_secret: "redis-cloud-user-key"
+    name: "my-essentials-db"
+    subscription_id: "<- get-from=essentials-subscription get=id"
+    protocol: stack  # Use 'stack' for advanced Redis capabilities
+    dataset_size_in_gb: 0.25  # 256MB dataset
+    data_persistence: "aof-every-1-second"
+    data_eviction_policy: "volatile-lru"
+    enable_tls: true
+    replication: false
+    redis_version: "7.2"
+    resp_version: "resp3"
+    source_ips:
+      - "192.168.10.0/24"
+      - "10.0.0.0/8"
+    password_secret: "redis-cloud-db-password"  # Optional: store password in secret
+    alerts:
+      - name: "dataset-size"
+        value: 80  # Alert when dataset reaches 80% of limit
+      - name: "throughput-higher-than"
+        value: 1000  # Alert when throughput exceeds 1000 ops/sec
+
+# Pro database with advanced features
+pro-database:
+  type: redis-cloud/pro-database
+  with:
     secret_ref: "redis-cloud-auth"
-    name: "my-redis-db"
-    subscription_id: "<- get-from=subscription get=id"
+    name: "my-pro-db"
+    subscription_id: "<- get-from=pro-subscription get=id"
     protocol: redis
-    memory_limit_in_mb: 256
-    high_availability: false
+    memory_limit_in_mb: 2048
+    high_availability: true
     data_persistence: true
+    clustering: true
+    shard_count: 3
+    modules:
+      - RedisJSON
+      - RediSearch
+    backup_config:
+      interval_hours: 12
+      retention_count: 3
     enable_alerts: true
     alerts:
-      memory_usage_threshold: 80
-      throughput_threshold: 1000 
+      memory_usage_threshold: 85
+      throughput_threshold: 5000
+      connection_limit_threshold: 1000
+      latency_threshold: 10 

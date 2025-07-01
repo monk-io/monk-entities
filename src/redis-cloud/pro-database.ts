@@ -2,11 +2,10 @@ import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } f
 import cli from "cli";
 
 /**
- * Represents a Redis Cloud database entity.
- * This entity allows interaction with Redis Cloud databases via its API.
- * @interface DatabaseDefinition
+ * Pro database definition - full-featured schema for Pro subscriptions
+ * @interface ProDatabaseDefinition
  */
-export interface DatabaseDefinition extends RedisCloudEntityDefinition {
+export interface ProDatabaseDefinition extends RedisCloudEntityDefinition {
     /**
      * Database name
      * @minLength 1
@@ -26,16 +25,11 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     protocol: "redis" | "memcached";
 
     /**
-     * Memory limit in MB
+     * Memory limit for Pro databases (up to 50GB+)
      * @minimum 1
      * @maximum 51200
      */
     memory_limit_in_mb: number;
-
-    /**
-     * Whether to enable high availability
-     */
-    high_availability?: boolean;
 
     /**
      * Whether to enable data persistence
@@ -48,7 +42,22 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     password_secret?: string;
 
     /**
-     * Whether to enable multi-zone
+     * Data eviction policy
+     */
+    data_eviction_policy?: "allkeys-lru" | "allkeys-lfu" | "allkeys-random" | "volatile-lru" | "volatile-lfu" | "volatile-random" | "volatile-ttl" | "noeviction";
+
+    /**
+     * List of allowed source IPs
+     */
+    source_ips?: string[];
+
+    /**
+     * Whether to enable high availability
+     */
+    high_availability?: boolean;
+
+    /**
+     * Whether to enable multi-zone deployment
      */
     multi_zone?: boolean;
 
@@ -65,11 +74,6 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     replica_count?: number;
 
     /**
-     * Data eviction policy
-     */
-    data_eviction_policy?: "allkeys-lru" | "allkeys-lfu" | "allkeys-random" | "volatile-lru" | "volatile-lfu" | "volatile-random" | "volatile-ttl" | "noeviction";
-
-    /**
      * Whether to enable clustering
      */
     clustering?: boolean;
@@ -84,12 +88,7 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     /**
      * List of Redis modules to enable
      */
-    modules?: string[];
-
-    /**
-     * List of allowed source IPs
-     */
-    source_ips?: string[];
+    modules?: ("RedisJSON" | "RediSearch" | "RedisTimeSeries" | "RedisBloom" | "RedisGraph")[];
 
     /**
      * Client SSL certificate ID
@@ -97,9 +96,28 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     client_ssl_certificate?: string;
 
     /**
-     * Periodic backup path
+     * Periodic backup configuration
      */
-    periodic_backup_path?: string;
+    backup_config?: {
+        /**
+         * Backup interval in hours
+         * @minimum 1
+         * @maximum 24
+         */
+        interval_hours?: number;
+
+        /**
+         * Backup storage path
+         */
+        storage_path?: string;
+
+        /**
+         * Number of backups to retain
+         * @minimum 1
+         * @maximum 7
+         */
+        retention_count?: number;
+    };
 
     /**
      * Whether to enable database alerts
@@ -107,7 +125,7 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
     enable_alerts?: boolean;
 
     /**
-     * Alert settings
+     * Advanced alert settings for Pro
      */
     alerts?: {
         /**
@@ -128,15 +146,20 @@ export interface DatabaseDefinition extends RedisCloudEntityDefinition {
          * @minimum 0
          */
         connection_limit_threshold?: number;
+
+        /**
+         * Latency threshold in milliseconds
+         * @minimum 0
+         */
+        latency_threshold?: number;
     };
 }
 
 /**
- * Represents the mutable runtime state of a Redis Cloud database entity.
- * This state can change during the entity's lifecycle.
- * @interface DatabaseState
+ * Pro database state with advanced features
+ * @interface ProDatabaseState
  */
-export interface DatabaseState extends RedisCloudEntityState {
+export interface ProDatabaseState extends RedisCloudEntityState {
     /**
      * Database ID
      */
@@ -188,6 +211,31 @@ export interface DatabaseState extends RedisCloudEntityState {
     task_id?: string;
 
     /**
+     * High availability status
+     */
+    high_availability_status?: string;
+
+    /**
+     * Replication status
+     */
+    replication_status?: string;
+
+    /**
+     * Cluster information
+     */
+    cluster_info?: {
+        /**
+         * Number of shards
+         */
+        shard_count?: number;
+
+        /**
+         * Cluster status
+         */
+        status?: string;
+    };
+
+    /**
      * SSL certificate details
      */
     ssl_certificate?: {
@@ -215,10 +263,20 @@ export interface DatabaseState extends RedisCloudEntityState {
          * Last backup timestamp
          */
         last_backup?: string;
+
+        /**
+         * Backup status
+         */
+        status?: string;
     };
 
     /**
-     * Current alert settings
+     * Enabled modules
+     */
+    enabled_modules?: string[];
+
+    /**
+     * Advanced alert status
      */
     current_alerts?: {
         /**
@@ -235,16 +293,25 @@ export interface DatabaseState extends RedisCloudEntityState {
          * Connection limit alert enabled
          */
         connection_limit_enabled?: boolean;
+
+        /**
+         * Latency alert enabled
+         */
+        latency_enabled?: boolean;
     };
 }
 
-export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState> {
+/**
+ * Pro Database Entity
+ * Manages Redis Cloud databases for Pro subscriptions with full-featured configuration options.
+ */
+export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProDatabaseState> {
     
     protected getEntityName(): string {
-        return this.definition.name;
+        return `Pro Database: ${this.definition.name}`;
     }
 
-    /** Create a new Redis Cloud database */
+    /** Create a new Redis Cloud Pro database */
     override create(): void {
         // Check if database already exists
         const existingDatabase = this.findExistingDatabase();
@@ -257,14 +324,14 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
             this.state.private_endpoint = existingDatabase.privateEndpoint;
             this.state.port = existingDatabase.port;
             this.state.memory_limit_in_mb = existingDatabase.memoryLimitInMb;
-            cli.output(`✅ Using existing database: ${existingDatabase.name} (${existingDatabase.databaseId})`);
+            cli.output(`✅ Using existing Pro database: ${existingDatabase.name} (${existingDatabase.databaseId})`);
             return;
         }
 
         // Generate password if not provided
         const password = this.getOrGeneratePassword();
 
-        const body = {
+        const body: any = {
             name: this.definition.name,
             protocol: this.definition.protocol,
             memoryLimitInMb: this.definition.memory_limit_in_mb,
@@ -275,9 +342,16 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
             replication: this.definition.high_availability || false,
             password: password,
             sourceIps: this.definition.source_ips || [],
-            modules: this.definition.modules || [],
-            alerts: this.buildAlertsConfig()
+            modules: this.buildModulesConfig(),
+            alerts: this.buildAdvancedAlertsConfig()
         };
+
+        // Add clustering configuration if enabled
+        if (this.definition.clustering && this.definition.shard_count) {
+            body.clustering = {
+                numberOfShards: this.definition.shard_count
+            };
+        }
 
         const response = this.makeRequest("POST", `/subscriptions/${this.definition.subscription_id}/databases`, body);
 
@@ -288,7 +362,15 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
         this.state.password = password;
         this.state.memory_limit_in_mb = this.definition.memory_limit_in_mb;
 
-        cli.output(`✅ Database creation initiated: ${this.state.name} (${this.state.id})`);
+        // Set Pro-specific state
+        if (this.definition.clustering) {
+            this.state.cluster_info = {
+                shard_count: this.definition.shard_count,
+                status: "initializing"
+            };
+        }
+
+        cli.output(`✅ Pro database creation initiated: ${this.state.name} (${this.state.id})`);
         cli.output(`📋 Task ID: ${this.state.task_id}`);
     }
 
@@ -304,7 +386,6 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
 
     private getOrGeneratePassword(): string {
         if (this.definition.password_secret) {
-            // Try to get existing password from secret
             try {
                 return this.credentials.secretKey; // Use existing secret system
             } catch (error) {
@@ -321,7 +402,17 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
         return password;
     }
 
-    private buildAlertsConfig(): any[] {
+    private buildModulesConfig(): any[] {
+        if (!this.definition.modules || this.definition.modules.length === 0) {
+            return [];
+        }
+
+        return this.definition.modules.map(module => ({
+            name: module
+        }));
+    }
+
+    private buildAdvancedAlertsConfig(): any[] {
         if (!this.definition.enable_alerts || !this.definition.alerts) {
             return [];
         }
@@ -349,6 +440,13 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
             });
         }
 
+        if (this.definition.alerts.latency_threshold) {
+            alerts.push({
+                name: "latency",
+                value: this.definition.alerts.latency_threshold
+            });
+        }
+
         return alerts;
     }
 
@@ -359,7 +457,7 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
         if (this.state.task_id) {
             try {
                 this.waitForTask(this.state.task_id);
-                cli.output(`✅ Database ${this.state.name} is ready`);
+                cli.output(`✅ Pro database ${this.state.name} is ready`);
             } catch (error) {
                 cli.output(`⚠️ Database creation may still be in progress: ${error}`);
             }
@@ -382,21 +480,33 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
             this.state.port = databaseData.port;
             this.state.memory_usage_in_mb = databaseData.memoryUsageInMb;
             
+            // Update Pro-specific state
+            if (databaseData.clustering) {
+                this.state.cluster_info = {
+                    shard_count: databaseData.clustering.numberOfShards,
+                    status: databaseData.clustering.status
+                };
+            }
+
+            if (databaseData.modules) {
+                this.state.enabled_modules = databaseData.modules.map((m: any) => m.name);
+            }
+
             // Update alerts if needed
             if (this.definition.enable_alerts && this.definition.alerts) {
-                this.updateAlerts();
+                this.updateAdvancedAlerts();
             }
         }
     }
 
-    private updateAlerts(): void {
+    private updateAdvancedAlerts(): void {
         if (!this.state.id) return;
         
-        const alerts = this.buildAlertsConfig();
+        const alerts = this.buildAdvancedAlertsConfig();
         if (alerts.length > 0) {
             try {
                 this.makeRequest("PUT", `/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}/alerts`, { alerts });
-                cli.output(`✅ Updated alerts for database ${this.state.name}`);
+                cli.output(`✅ Updated alerts for Pro database ${this.state.name}`);
             } catch (error) {
                 cli.output(`⚠️ Failed to update alerts: ${error}`);
             }
@@ -405,11 +515,11 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
 
     override delete(): void {
         if (!this.state.id) {
-            cli.output("Database does not exist, nothing to delete");
+            cli.output("Pro database does not exist, nothing to delete");
             return;
         }
 
-        this.deleteResource(`/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`, `Database ${this.state.name}`);
+        this.deleteResource(`/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`, `Pro Database ${this.state.name}`);
     }
 
     override checkReadiness(): boolean {
@@ -430,6 +540,19 @@ export class Database extends RedisCloudEntity<DatabaseDefinition, DatabaseState
             this.state.private_endpoint = databaseData.privateEndpoint;
             this.state.port = databaseData.port;
             this.state.memory_usage_in_mb = databaseData.memoryUsageInMb;
+            
+            // Update Pro-specific readiness state
+            if (databaseData.clustering) {
+                this.state.cluster_info = {
+                    shard_count: databaseData.clustering.numberOfShards,
+                    status: databaseData.clustering.status
+                };
+            }
+
+            if (databaseData.modules) {
+                this.state.enabled_modules = databaseData.modules.map((m: any) => m.name);
+            }
+
             return true;
         }
 

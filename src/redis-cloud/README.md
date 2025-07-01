@@ -6,160 +6,300 @@ This directory contains the TypeScript implementation of Redis Cloud entities fo
 
 The Redis Cloud entities provide programmatic access to Redis Cloud resources through the Redis Cloud API. The implementation follows the MonkeC entity pattern with clear separation between immutable configuration (Definition) and mutable runtime state (State).
 
+**Key Features**:
+- Type-safe Redis Cloud API integration
+- Separate entities for Essentials and Pro subscription tiers
+- Automatic task waiting for async operations
+- Comprehensive error handling and logging
+- Support for all Redis Cloud features
+
 ## Entities
 
 ### Subscription Entity
 
-The `Subscription` entity manages Redis Cloud subscriptions, which are the containers for Redis databases.
+The `Subscription` entity manages Redis Cloud subscriptions, which are containers for Redis databases.
 
-**Key Features:**
+**Features:**
 - Support for both Essentials and Pro subscription types
 - Automatic plan selection based on requirements
-- Payment method configuration
+- Payment method configuration (credit card or marketplace)
 - Multi-cloud provider support (AWS, GCP, Azure)
+- Flexible sizing and availability options
 
-**Definition Properties:**
-- `secret_ref` - Secret reference containing Redis Cloud API credentials
-- `subscription_type` - Type of subscription ("essentials" or "pro")
-- `name` - Subscription name
-- `provider` - Cloud provider ("AWS", "GCP", or "AZURE")
-- `region` - Cloud provider region
-- `redis_flex` - Whether Redis Flex is enabled
-- `size` - Subscription size in GB
-- `availability` - Availability configuration
-- Support flags for various features (persistence, backups, replication, etc.)
-- Payment method configuration
+### Database Entities
 
-### Database Entity
+Redis Cloud databases have different capabilities based on subscription type, so we provide separate entities:
 
-The `Database` entity manages individual Redis databases within subscriptions.
+#### EssentialsDatabase Entity
+
+API-compliant database entity for **Essentials subscriptions** matching the Redis Cloud API schema.
 
 **Key Features:**
-- Comprehensive configuration options for Redis databases
-- Support for both Redis and Memcached protocols
-- Automatic password generation
-- High availability and clustering support
-- Backup and persistence configuration
-- Module and alert configuration
+- Protocol support: Redis, Memcached, or Stack (advanced Redis capabilities)
+- Flexible memory configuration: `dataset_size_in_gb` or `memory_limit_in_gb`
+- Pay-as-you-go features: OSS Cluster API, database clustering, sharding
+- Data persistence options: AOF (every 1 sec/write) or snapshots (hourly, 6h, 12h)
+- Advanced security: TLS/SSL with client certificates, IP restrictions
+- Backup support: Periodic backup to custom storage paths
+- Replication and clustering support
+- Redis modules and version selection
+- Comprehensive alerting system
 
-**Definition Properties:**
-- `secret_ref` - Secret reference containing Redis Cloud API credentials
-- `subscription_id` - ID of the subscription to create database in
-- `name` - Database name
-- `protocol` - Database protocol ("redis" or "memcached")
-- `memory_limit_in_mb` - Memory limit in MB
-- `high_availability` - Enable high availability
-- `data_persistence` - Enable data persistence
-- Security configuration (SSL certificates, IP restrictions)
-- Alert configuration for monitoring
+**Use Cases:**
+- Development and testing environments
+- Pay-as-you-go Redis deployments
+- Small to medium production applications
+- Advanced Redis features (when using 'stack' protocol)
 
-## Usage Example
+#### ProDatabase Entity
+
+Full-featured database entity for **Pro subscriptions** with advanced Redis capabilities.
+
+**Key Features:**
+- Memory limits up to 50GB+
+- High availability and replication
+- Multi-zone deployment
+- Redis clustering and sharding
+- Redis modules (RedisJSON, RediSearch, RedisTimeSeries, RedisBloom, RedisGraph)
+- Advanced backup configurations
+- Client SSL certificates
+- Comprehensive alerting (memory, throughput, connections, latency)
+
+**Use Cases:**
+- Production applications
+- High-availability requirements
+- Advanced Redis features (search, JSON, time series)
+- Large-scale deployments
+- Enterprise applications
+
+## Configuration
+
+### Authentication
+
+All entities use a unified authentication approach through a secret reference:
 
 ```yaml
-namespace: redis-cloud
+secret_ref: "redis-cloud-auth"
+```
 
-subscription:
+The secret should contain:
+```json
+{
+  "access_key": "your_redis_cloud_access_key",
+  "secret_key": "your_redis_cloud_secret_key"
+}
+```
+
+### Basic Usage
+
+#### Essentials Setup
+```yaml
+# Create Essentials subscription
+essentials-subscription:
   type: redis-cloud/subscription
   with:
     secret_ref: "redis-cloud-auth"
     subscription_type: essentials
-    name: "my-redis-subscription"
+    name: "my-essentials-subscription"
     provider: AWS
-    region: "us-west-2" 
-    redis_flex: true
-    size: 1
-    availability: "Single-zone"
-    support_data_persistence: true
-    support_instant_and_daily_backups: false
-    support_replication: false
-    support_clustering: false
-    support_ssl: true
-    payment_method: "credit-card"
+    region: "us-west-2"
 
-database:
-  type: redis-cloud/database
+# Create Essentials database
+essentials-db:
+  type: redis-cloud/essentials-database
   with:
     secret_ref: "redis-cloud-auth"
-    name: "my-redis-db"
-    subscription_id: "<- get-from=subscription get=id"
+    name: "my-essentials-db"
+    subscription_id: "<- get-from=essentials-subscription get=id"
     protocol: redis
     memory_limit_in_mb: 256
-    high_availability: false
     data_persistence: true
-    enable_alerts: true
-    alerts:
-      memory_usage_threshold: 80
-      throughput_threshold: 1000
+    enable_tls: true
 ```
 
-## Authentication
+#### Pro Setup
+```yaml
+# Create Pro subscription
+pro-subscription:
+  type: redis-cloud/subscription
+  with:
+    secret_ref: "redis-cloud-auth"
+    subscription_type: pro
+    name: "my-pro-subscription"
+    provider: AWS
+    region: "us-west-2"
 
-Both entities require Redis Cloud API credentials stored as secrets. The credentials consist of:
-
-1. **Access Key** - Your Redis Cloud access key
-2. **Secret Key** - Your Redis Cloud secret key
-
-These should be stored as separate secrets with the naming pattern `{secret_ref}_access_key` and `{secret_ref}_secret_key`:
-
-```bash
-monk secrets add -g redis-cloud-auth_access_key="your-access-key"
-monk secrets add -g redis-cloud-auth_secret_key="your-secret-key"
+# Create Pro database with advanced features
+pro-db:
+  type: redis-cloud/pro-database
+  with:
+    secret_ref: "redis-cloud-auth"
+    name: "my-pro-db"
+    subscription_id: "<- get-from=pro-subscription get=id"
+    protocol: redis
+    memory_limit_in_mb: 2048
+    high_availability: true
+    clustering: true
+    shard_count: 3
+    modules:
+      - RedisJSON
+      - RediSearch
+    backup_config:
+      interval_hours: 12
+      retention_count: 3
 ```
 
-## Architecture
+## Entity Comparison
 
-The implementation follows the MongoDB Atlas and Neon entity patterns:
+| Feature | Essentials | Pro |
+|---------|------------|-----|
+| **Memory Limit** | Up to 30GB | Up to 50GB+ |
+| **High Availability** | ❌ | ✅ |
+| **Clustering** | ❌ | ✅ |
+| **Redis Modules** | ❌ | ✅ |
+| **Multi-zone** | ❌ | ✅ |
+| **Advanced Backups** | ❌ | ✅ |
+| **SSL Certificates** | ❌ | ✅ |
+| **TLS Support** | ✅ | ✅ |
+| **Basic Alerts** | ✅ | ✅ |
+| **Advanced Alerts** | ❌ | ✅ |
 
-### Files Structure
-- `common.ts` - Shared constants, types, and helper functions
-- `base.ts` - Base class with common Redis Cloud functionality  
-- `subscription.ts` - Subscription entity implementation
-- `database.ts` - Database entity implementation
-- `example.yaml` - Usage example
-- `MANIFEST` - MonkeC load manifest
+## API Documentation
 
-### Base Class Pattern
-All entities extend `RedisCloudEntity` which provides:
-- Authentication and HTTP client setup
-- Common API request handling
-- Task waiting functionality
-- Error handling and resource management
+### Subscription Entity
 
-### Schema Generation
-The entities use TypeScript interfaces that are automatically converted to YAML schemas by the MonkeC compiler, providing:
-- Type-safe configuration
-- Automatic validation
-- IDE support with IntelliSense
+```typescript
+interface SubscriptionDefinition {
+  secret_ref: string;
+  subscription_type: "essentials" | "pro";
+  name: string;
+  provider: "AWS" | "GCP" | "AZURE";
+  region: string;
+  // ... additional configuration
+}
+```
 
-## API Compatibility
+### EssentialsDatabase Entity
 
-The entities are compatible with Redis Cloud API v1 and support both Essentials and Pro subscription types. The implementation handles:
+```typescript
+interface EssentialsDatabaseDefinition {
+  secret_ref: string;
+  name: string; // Max 40 chars, letters/digits/hyphens only
+  subscription_id: string;
+  protocol?: "redis" | "memcached" | "stack"; // Default: "stack"
+  
+  // Memory configuration (choose one)
+  dataset_size_in_gb?: number; // Recommended for Pay-as-you-go
+  memory_limit_in_gb?: number; // Deprecated
+  
+  // Redis configuration
+  redis_version?: string;
+  resp_version?: "resp2" | "resp3";
+  
+  // Pay-as-you-go features
+  support_oss_cluster_api?: boolean;
+  enable_database_clustering?: boolean;
+  number_of_shards?: number;
+  regex_rules?: string[]; // For clustering
+  
+  // Data management
+  data_persistence?: "none" | "aof-every-1-second" | "aof-every-write" | 
+                    "snapshot-every-1-hour" | "snapshot-every-6-hours" | "snapshot-every-12-hours";
+  data_eviction_policy?: "allkeys-lru" | "allkeys-lfu" | "allkeys-random" | 
+                        "volatile-lru" | "volatile-lfu" | "volatile-random" | "volatile-ttl" | "noeviction";
+  replication?: boolean;
+  periodic_backup_path?: string;
+  
+  // Security
+  enable_tls?: boolean;
+  client_tls_certificates?: Array<{name?: string; certificate: string}>;
+  source_ips?: string[]; // CIDR blocks
+  
+  // Advanced features
+  replica?: {uris?: string[]; encryptionInTransit?: boolean};
+  modules?: Array<{name: string; parameters?: Record<string, any>}>;
+  alerts?: Array<{name: string; value: number}>;
+  
+  // Authentication
+  password?: string; // Or auto-generated 32-char password
+  password_secret?: string; // Alternative to password
+}
+```
 
-- Basic authentication with access/secret key pairs
-- Task-based async operations with proper polling
-- Error handling and retry logic
-- Resource existence checking and state management
+### ProDatabase Entity
 
-## Migration from YAML/JS Entities
+```typescript
+interface ProDatabaseDefinition {
+  secret_ref: string;
+  name: string;
+  subscription_id: string;
+  protocol: "redis" | "memcached";
+  memory_limit_in_mb: number; // max 51200
+  high_availability?: boolean;
+  clustering?: boolean;
+  shard_count?: number;
+  modules?: Array<"RedisJSON" | "RediSearch" | "RedisTimeSeries" | "RedisBloom" | "RedisGraph">;
+  backup_config?: {
+    interval_hours?: number;
+    storage_path?: string;
+    retention_count?: number;
+  };
+  alerts?: {
+    memory_usage_threshold?: number;
+    throughput_threshold?: number;
+    connection_limit_threshold?: number;
+    latency_threshold?: number;
+  };
+}
+```
 
-The TypeScript entities replace the original YAML/JavaScript versions with several improvements:
+## Error Handling
 
-### Key Changes
-1. **Unified Authentication**: Single `secret_ref` instead of separate account/user key secrets
-2. **Type Safety**: Compile-time type checking for all configuration options
-3. **Better Structure**: Clear base class hierarchy following established patterns
-4. **Enhanced Validation**: Comprehensive field validation with JSDoc annotations
+All entities include comprehensive error handling:
+- API authentication failures
+- Resource creation/update failures
+- Network connectivity issues
+- Task timeout handling
+- Resource not found scenarios
 
-### Migration Steps
-1. Update secret storage to use the new naming pattern (`{secret_ref}_access_key`, `{secret_ref}_secret_key`)
-2. Replace `account_key_secret` and `user_key_secret` with single `secret_ref` field
-3. Update field names to match new schema (e.g., `dataset_size_in_gb` → `memory_limit_in_mb`)
-4. Use the new entity type references (`redis-cloud/subscription`, `redis-cloud/database`)
+## Supported Redis Cloud Features
+
+### Essentials Tier
+- ✅ Basic Redis database creation
+- ✅ Memory management and eviction policies
+- ✅ Data persistence (AOF)
+- ✅ TLS encryption
+- ✅ IP source restrictions
+- ✅ Basic monitoring and alerts
+
+### Pro Tier
+- ✅ All Essentials features
+- ✅ High availability and replication
+- ✅ Redis clustering and sharding
+- ✅ Redis modules (JSON, Search, TimeSeries, Bloom, Graph)
+- ✅ Multi-zone deployment
+- ✅ Advanced backup configurations
+- ✅ Client SSL certificates
+- ✅ Advanced monitoring and alerts
 
 ## Development
 
-The entities follow MonkeC best practices:
-- Extend the common `RedisCloudEntity` base class
-- Implement required lifecycle methods (`create`, `update`, `delete`, `checkReadiness`)
-- Use proper TypeScript types with comprehensive JSDoc annotations
-- Follow established patterns from other entity implementations (MongoDB Atlas, Neon) 
+### Building
+```bash
+bash build.sh redis-cloud
+```
+
+### File Structure
+```
+src/redis-cloud/
+├── base.ts                    # Base classes and interfaces
+├── common.ts                  # Shared utilities and constants
+├── subscription.ts            # Subscription entity
+├── essentials-database.ts     # Essentials database entity
+├── pro-database.ts           # Pro database entity
+├── MANIFEST                  # MonkeC load manifest
+├── example.yaml              # Usage examples
+└── README.md                 # This file
+```
+
+The entities are compiled to `dist/redis-cloud/` with generated YAML schemas and JavaScript sync files. 
