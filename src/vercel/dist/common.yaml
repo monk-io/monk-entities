@@ -1,5 +1,0 @@
-namespace: vercel
-
-common:
-  defines: module
-  source: <<< common.js
