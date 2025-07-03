@@ -192,15 +192,9 @@ export interface EssentialsDatabaseDefinition extends RedisCloudEntityDefinition
     enable_tls?: boolean;
 
     /**
-     * Password to access the database
-     * If not set, a random 32-character alphanumeric password will be automatically generated
+     * Database password secret name
      */
-    password?: string;
-
-    /**
-     * Database password secret name (alternative to password field)
-     */
-    password_secret?: string;
+    password_secret_ref?: string;
 
     /**
      * Redis database alert details
@@ -253,11 +247,6 @@ export interface EssentialsDatabaseState extends RedisCloudEntityState {
      * Task ID for database creation (temporary, used during creation)
      */
     task_id?: string;
-
-    /**
-     * Database password (temporary, used during creation)
-     */
-    password?: string;
 }
 
 /**
@@ -296,7 +285,7 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
         const body: any = {
             name: this.definition.name,
             protocol: this.definition.protocol || "stack",
-            password: this.getOrGeneratePassword()
+            password: this.getOrCreatePassword()
         };
 
         // Add optional fields only if defined
@@ -393,7 +382,6 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
         // Initial response contains taskId, not resourceId
         this.state.task_id = response.taskId;
         this.state.name = this.definition.name;
-        this.state.password = body.password;
 
         cli.output(`✅ Essentials database creation initiated: ${this.state.name}`);
         cli.output(`📋 Task ID: ${this.state.task_id}`);
@@ -439,31 +427,22 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
         }
     }
 
-    private getOrGeneratePassword(): string {
-        // Use explicitly provided password first
-        if (this.definition.password) {
-            return this.definition.password;
-        }
-
-        // Try to get password from secret
-        if (this.definition.password_secret) {
-            try {
-                const passwordFromSecret = secret.get(this.definition.password_secret);
-                if (passwordFromSecret) {
-                    return passwordFromSecret;
-                }
-            } catch (error) {
-                cli.output(`⚠️ Could not retrieve password from secret, generating new one`);
-            }
+    private getOrCreatePassword(): string {
+        if (!this.definition.password_secret_ref) {
+            throw new Error("Password secret reference not defined");
         }
         
-        // Generate a random 32-character alphanumeric password (as per API docs)
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        let password = "";
-        for (let i = 0; i < 32; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        try {
+            const storedPassword = secret.get(this.definition.password_secret_ref);
+            if (!storedPassword) {
+                throw new Error("Password not found");
+            }
+            return storedPassword;
+        } catch (e) {
+            const password = secret.randString(16);
+            secret.set(this.definition.password_secret_ref, password);
+            return password;
         }
-        return password;
     }
 
     override start(): void {

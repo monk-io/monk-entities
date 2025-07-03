@@ -4,9 +4,10 @@ var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 // input/redis-cloud/proDatabase.ts
+const cli = require("cli");
+const secret = require("secret");
 const base = require("redis-cloud/base");
 const RedisCloudEntity = base.RedisCloudEntity;
-const cli = require("cli");
 var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
   getEntityName() {
     return `Pro Database: ${this.definition.name}`;
@@ -26,7 +27,7 @@ var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
       cli.output(`\u2705 Using existing Pro database: ${existingDatabase.name} (${existingDatabase.databaseId})`);
       return;
     }
-    const password = this.getOrGeneratePassword();
+    const password = this.getOrCreatePassword();
     const body = {
       name: this.definition.name,
       protocol: this.definition.protocol || "redis",
@@ -116,7 +117,6 @@ var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
     const response = this.makeRequest("POST", `/subscriptions/${this.definition.subscription_id}/databases`, body);
     this.state.task_id = response.taskId;
     this.state.name = this.definition.name;
-    this.state.password = password;
     this.state.memory_limit_in_mb = (this.definition.dataset_size_in_gb || 1) * 1024;
     cli.output(`\u2705 Pro database creation initiated: ${this.state.name}`);
     cli.output(`\u{1F4CB} Task ID: ${this.state.task_id}`);
@@ -158,16 +158,21 @@ var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
       return null;
     }
   }
-  getOrGeneratePassword() {
-    if (this.definition.password) {
-      return this.definition.password;
+  getOrCreatePassword() {
+    if (!this.definition.password_secret_ref) {
+      throw new Error("Password secret reference not defined");
     }
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-    let password = "";
-    for (let i = 0; i < 16; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    try {
+      const storedPassword = secret.get(this.definition.password_secret_ref);
+      if (!storedPassword) {
+        throw new Error("Password not found");
+      }
+      return storedPassword;
+    } catch (e) {
+      const password = secret.randString(16);
+      secret.set(this.definition.password_secret_ref, password);
+      return password;
     }
-    return password;
   }
   start() {
     super.start();

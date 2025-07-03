@@ -170,8 +170,6 @@ pro-database:
     enable_tls:
       type: boolean
       default: false
-    password:
-      type: string
     sasl_username:
       type: string
     sasl_password:
@@ -219,6 +217,8 @@ pro-database:
         - redis-oss-hashing
     query_performance_factor:
       type: string
+    password_secret_ref:
+      type: string
     required:
       - name
       - subscription_id
@@ -230,5 +230,6 @@ pro-database:
       initialDelay: 2
       attempts: 10
   requires:
-    - redis-cloud/base
     - cli
+    - secret
+    - redis-cloud/base

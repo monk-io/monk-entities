@@ -102,9 +102,7 @@ essentials-database:
         additionalProperties: false
     enable_tls:
       type: boolean
-    password:
-      type: string
-    password_secret:
+    password_secret_ref:
       type: string
     alerts:
       type: array

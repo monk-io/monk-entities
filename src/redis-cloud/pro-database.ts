@@ -1,5 +1,7 @@
-import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
 import cli from "cli";
+import secret from "secret";
+
+import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
 
 /**
  * Pro database definition - full-featured schema for Pro subscriptions
@@ -209,13 +211,6 @@ export interface ProDatabaseDefinition extends RedisCloudEntityDefinition {
     enable_tls?: boolean;
 
     /**
-     * Optional. Password to access the database
-     * If not set, random 32-character password will be generated
-     * Can only be set if protocol is 'redis'
-     */
-    password?: string;
-
-    /**
      * Optional. Memcached (SASL) Username
      * If not set, will be 'mc-' prefix + random 5 characters
      * Can only be set if protocol is 'memcached'
@@ -267,6 +262,11 @@ export interface ProDatabaseDefinition extends RedisCloudEntityDefinition {
      * Adds extra compute power to increase queries per second
      */
     query_performance_factor?: string;
+
+    /**
+     * Database password secret name
+     */
+    password_secret_ref?: string;
 }
 
 /**
@@ -313,11 +313,6 @@ export interface ProDatabaseState extends RedisCloudEntityState {
      * Current memory limit in MB
      */
     memory_limit_in_mb?: number;
-
-    /**
-     * Database password
-     */
-    password?: string;
 
     /**
      * Task ID for database creation
@@ -443,7 +438,7 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
         }
 
         // Generate password if not provided
-        const password = this.getOrGeneratePassword();
+        const password = this.getOrCreatePassword();
 
         const body: any = {
             name: this.definition.name,
@@ -567,7 +562,6 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
         // Initial response contains taskId, not resourceId
         this.state.task_id = response.taskId;
         this.state.name = this.definition.name;
-        this.state.password = password;
         this.state.memory_limit_in_mb = (this.definition.dataset_size_in_gb || 1) * 1024;
 
         cli.output(`✅ Pro database creation initiated: ${this.state.name}`);
@@ -622,19 +616,22 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
         }
     }
 
-    private getOrGeneratePassword(): string {
-        // Use explicit password first
-        if (this.definition.password) {
-            return this.definition.password;
+    private getOrCreatePassword(): string {
+        if (!this.definition.password_secret_ref) {
+            throw new Error("Password secret reference not defined");
         }
         
-        // Generate a random password
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-        let password = "";
-        for (let i = 0; i < 16; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        try {
+            const storedPassword = secret.get(this.definition.password_secret_ref);
+            if (!storedPassword) {
+                throw new Error("Password not found");
+            }
+            return storedPassword;
+        } catch (e) {
+            const password = secret.randString(16);
+            secret.set(this.definition.password_secret_ref, password);
+            return password;
         }
-        return password;
     }
 
     override start(): void {

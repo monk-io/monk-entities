@@ -32,7 +32,7 @@ var _EssentialsDatabase = class _EssentialsDatabase extends RedisCloudEntity {
     const body = {
       name: this.definition.name,
       protocol: this.definition.protocol || "stack",
-      password: this.getOrGeneratePassword()
+      password: this.getOrCreatePassword()
     };
     if (this.definition.dataset_size_in_gb !== void 0) {
       body.datasetSizeInGb = this.definition.dataset_size_in_gb;
@@ -106,7 +106,6 @@ var _EssentialsDatabase = class _EssentialsDatabase extends RedisCloudEntity {
     const response = this.makeRequest("POST", `/fixed/subscriptions/${this.definition.subscription_id}/databases`, body);
     this.state.task_id = response.taskId;
     this.state.name = this.definition.name;
-    this.state.password = body.password;
     cli.output(`\u2705 Essentials database creation initiated: ${this.state.name}`);
     cli.output(`\u{1F4CB} Task ID: ${this.state.task_id}`);
     if (!this.state.task_id) {
@@ -140,26 +139,21 @@ var _EssentialsDatabase = class _EssentialsDatabase extends RedisCloudEntity {
       return null;
     }
   }
-  getOrGeneratePassword() {
-    if (this.definition.password) {
-      return this.definition.password;
+  getOrCreatePassword() {
+    if (!this.definition.password_secret_ref) {
+      throw new Error("Password secret reference not defined");
     }
-    if (this.definition.password_secret) {
-      try {
-        const passwordFromSecret = secret.get(this.definition.password_secret);
-        if (passwordFromSecret) {
-          return passwordFromSecret;
-        }
-      } catch (error) {
-        cli.output(`\u26A0\uFE0F Could not retrieve password from secret, generating new one`);
+    try {
+      const storedPassword = secret.get(this.definition.password_secret_ref);
+      if (!storedPassword) {
+        throw new Error("Password not found");
       }
+      return storedPassword;
+    } catch (e) {
+      const password = secret.randString(16);
+      secret.set(this.definition.password_secret_ref, password);
+      return password;
     }
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let password = "";
-    for (let i = 0; i < 32; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
   }
   start() {
     super.start();

@@ -33,7 +33,7 @@ essentials-database:
   subscription_id: <- connection-target("subscription") entity-state get-member("id")
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
-  password_secret: redis-cloud-db-password
+  password_secret_ref: redis-cloud-db-password
   name: Essentials-database
   permitted-secrets:
     redis-cloud-account-key: true
@@ -54,6 +54,8 @@ essentials-database:
 
 redis-client:
   defines: runnable
+  permitted-secrets:
+    redis-cloud-db-password: true
   connections:
     db:
       runnable: redis-cloud-example/essentials-database
@@ -69,11 +71,11 @@ redis-client:
       value: <- connection-target("db") entity get-member("name")
       type: string
     redis_password_secret:
-      value: <- connection-target("db") entity get-member("password_secret")
+      value: <- connection-target("db") entity get-member("password_secret_ref")
       type: string
     redis_password:
       env: REDIS_PASSWORD
-      value: <- secret($redis_password_secret)
+      value: <- secret("redis-cloud-db-password")
       type: string
     redis_user:
       env: REDIS_USER

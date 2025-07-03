@@ -1,8 +1,5 @@
-namespace: redis-cloud
+namespace: redis-cloud-example
 
-# Development Environment Entities
-
-# Essentials Subscription - Free tier for testing
 essentials-subscription:
   defines: redis-cloud/subscription
   account_key_secret: redis-cloud-account-key
@@ -62,7 +59,7 @@ essentials-database:
   subscription_id: <- connection-target("subscription") entity-state get-member("id")
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
-  password_secret: redis-cloud-db-password
+  password_secret_ref: redis-cloud-db-password
   name: Essentials-database
   permitted-secrets:
     redis-cloud-account-key: true
@@ -73,12 +70,12 @@ essentials-database:
       protocol: custom
   connections:
     subscription:
-      runnable: redis-cloud/essentials-subscription
+      runnable: redis-cloud-example/essentials-subscription
       service: subscription
   depends:
     wait-for:
       runnables:
-        - redis-cloud/redis-subscription
+        - redis-cloud-example/essentials-subscription
       timeout: 60
 
 
@@ -109,12 +106,12 @@ dev-pro-database:
       protocol: custom
   connections:
     subscription:
-      runnable: redis-cloud/pro-subscription
+      runnable: redis-cloud-example/pro-subscription
       service: data
   depends:
     wait-for:
       runnables:
-        - redis-cloud/pro-subscription
+        - redis-cloud-example/pro-subscription
       timeout: 300
 
 
@@ -123,39 +120,22 @@ dev-pro-database:
 essentials-stack:
   defines: process-group
   runnable-list:
-    - redis-cloud/essentials-subscription
-    - redis-cloud/essentials-database
-    - redis-cloud/essentials-connection-test
-
-pro-stack:
-  defines: process-group
-  runnable-list:
-    - redis-cloud/pro-subscription
-    - redis-cloud/pro-database
-    - redis-cloud/pro-connection-test
-
-stack:
-  defines: process-group
-  runnable-list:
-    - redis-cloud/essentials-subscription
-    - redis-cloud/essentials-database
-    - redis-cloud/essentials-connection-test
-    - redis-cloud/pro-subscription
-    - redis-cloud/pro-database
-    - redis-cloud/pro-connection-test
-
-# Connection Test Containers
+    - redis-cloud-example/essentials-subscription
+    - redis-cloud-example/essentials-database
+    - redis-cloud-example/essentials-connection-test
 
 essentials-connection-test:
   defines: runnable
+  permitted-secrets:
+    redis-cloud-db-password: true
   connections:
     db:
-      runnable: redis-cloud/essentials-database
+      runnable: redis-cloud-example/essentials-database
       service: db
   depends:
     wait-for:
       runnables:
-        - redis-cloud/essentials-database
+        - redis-cloud-example/essentials-database
       timeout: 180
   variables:
     redis_db:
@@ -163,11 +143,11 @@ essentials-connection-test:
       value: <- connection-target("db") entity get-member("name")
       type: string
     redis_password_secret:
-      value: <- connection-target("db") entity get-member("password_secret")
+      value: <- connection-target("db") entity get-member("password_secret_ref")
       type: string
     redis_password:
       env: REDIS_PASSWORD
-      value: <- secret($redis_password_secret)
+      value: <- secret("redis-cloud-db-password")
       type: string
     redis_user:
       env: REDIS_USER
