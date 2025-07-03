@@ -1,11 +1,11 @@
-namespace: redis-cloud
+namespace: redis-cloud-example
 
-redis-subscription:
+essentials-subscription:
   defines: redis-cloud/subscription
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
   subscription_type: essentials
-  name: My-Fixed-Subscription
+  name: Essentials-Subscription
   #plan_id: 20927 # 30MB Free AWS us-east-1
   size: 30
   provider: AWS
@@ -28,13 +28,13 @@ redis-subscription:
     subscription:
       protocol: custom
 
-redis-database:
+essentials-database:
   defines: redis-cloud/essentials-database
-  subscription_id: <- connection-target("redis-cloud-subscription") entity-state get-member("id")
+  subscription_id: <- connection-target("subscription") entity-state get-member("id")
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
   password_secret: redis-cloud-db-password
-  name: Redis-database-minimal
+  name: Essentials-database
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
@@ -43,80 +43,63 @@ redis-database:
     db:
       protocol: custom
   connections:
-    redis-cloud-subscription:
-      runnable: redis-cloud/redis-subscription
+    subscription:
+      runnable: redis-cloud-example/essentials-subscription
       service: subscription
   depends:
     wait-for:
       runnables:
-        - redis-cloud/redis-subscription
+        - redis-cloud-example/essentials-subscription
       timeout: 60
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 10
-      attempts: 24
 
 redis-client:
   defines: runnable
-  permitted-secrets:
-    redis-cloud-db-password: true
   connections:
-    redis-cloud-db:
-      runnable: redis-cloud/redis-database
+    db:
+      runnable: redis-cloud-example/essentials-database
       service: db
   depends:
     wait-for:
       runnables:
-        - redis-cloud/redis-database
+        - redis-cloud-example/essentials-database
       timeout: 180
   variables:
-    redis_cloud_db_name:
-      env: DB_NAME
-      value: <- connection-target("redis-cloud-db") entity get-member("name")
+    redis_db:
+      env: REDIS_DB
+      value: <- connection-target("db") entity get-member("name")
       type: string
-    redis_cloud_db_secret:
-      value: <- connection-target("redis-cloud-db") entity get-member("password_secret")
+    redis_password_secret:
+      value: <- connection-target("db") entity get-member("password_secret")
       type: string
-    redis_cloud_db_password:
-      env: DB_PASSWORD
-      value: <- secret($redis_cloud_db_secret)
+    redis_password:
+      env: REDIS_PASSWORD
+      value: <- secret($redis_password_secret)
       type: string
-    redis_cloud_db_user:
-      env: DB_USER
-      value: <- connection-target("redis-cloud-db") entity-state get-member("username")
+    redis_user:
+      env: REDIS_USER
+      value: <- connection-target("db") entity-state get-member("username")
       type: string
-    redis_cloud_db_addr:
-      env: DB_ADDR
-      value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpoint")
+    redis_addr:
+      env: REDIS_ADDR
+      value: <- connection-target("db") entity-state get-member("publicEndpoint")
       type: string
-    redis_cloud_db_host:
-      env: DB_HOST
-      value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpointHost")
+    redis_host:
+      env: REDIS_HOST
+      value: <- connection-target("db") entity-state get-member("publicEndpointHost")
       type: string
-    redis_cloud_db_port:
-      env: DB_PORT
-      value: <- connection-target("redis-cloud-db") entity-state get-member("publicEndpointPort")
+    redis_port:
+      env: REDIS_PORT
+      value: <- connection-target("db") entity-state get-member("publicEndpointPort")
       type: string
-    image-tag:
-      value: redis:7-alpine
-      type: string
+
   containers:
     redis:
-      image: docker.io/library/redis:7-alpine
-      entrypoint: |
-        bash -c "
-        echo 'Connecting to Redis Cloud database...'
-        echo 'Host: $DB_HOST'
-        echo 'Port: $DB_PORT'
-        echo 'User: $DB_USER'
-        redis-cli -h $DB_HOST -p $DB_PORT -a $DB_PASSWORD --no-auth-warning ping
-        sleep 36000
-        "
+      image: docker.io/library/redis:latest
+      entrypoint: sleep 36000
 
 stack:
   defines: process-group
   runnable-list:
-    - redis-cloud/redis-client
-    - redis-cloud/redis-database
-    - redis-cloud/redis-subscription 
+    - redis-cloud-example/redis-client
+    - redis-cloud-example/redis-database
+    - redis-cloud-example/redis-subscription 

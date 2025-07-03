@@ -1,35 +1,35 @@
-namespace: redis-test-stack
+namespace: redis-cloud
 
 # Development Environment Entities
 
 # Essentials Subscription - Free tier for testing
-dev-essentials-subscription:
+essentials-subscription:
   defines: redis-cloud/subscription
-  name: monkec-dev-essentials
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
   subscription_type: essentials
+  name: Essentials-Subscription
+  #plan_id: 20927 # 30MB Free AWS us-east-1
+  size: 30
   provider: AWS
   region: us-east-1
   redis_flex: false
-  size: 30
   availability: No replication
   support_data_persistence: false
   support_instant_and_daily_backups: false
   support_replication: false
   support_clustering: false
   support_ssl: false
-  account_key_secret: redis-cloud-account-key
-  user_key_secret: redis-cloud-user-key
+  #  payment_method: credit-card # Payment info is not allowed for free plans
+  #  payment_method_id: 42073
+  #  OR
+  #  payment_method_type: Visa
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
   services:
-    data:
+    subscription:
       protocol: custom
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 10
 
 # Pro Subscription - Paid tier for advanced features testing
 dev-pro-subscription:
@@ -53,50 +53,34 @@ dev-pro-subscription:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
   services:
-    data:
+    subscription:
       protocol: custom
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 10
 
 # Essentials Database - Free tier testing
-dev-essentials-database:
+essentials-database:
   defines: redis-cloud/essentials-database
-  name: monkec-dev-essentials
   subscription_id: <- connection-target("subscription") entity-state get-member("id")
-  protocol: redis
-  redis_version: "7.2"
-  resp_version: resp3
-  data_persistence: none
-  data_eviction_policy: volatile-lru
-  replication: false
-  password: "dev-essentials-password-123"
-  source_ips:
-    - 0.0.0.0/0  # Allow all IPs for testing
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
+  password_secret: redis-cloud-db-password
+  name: Essentials-database
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
+    redis-cloud-db-password: true
   services:
-    data:
+    db:
       protocol: custom
   connections:
     subscription:
-      runnable: redis-test-stack/dev-essentials-subscription
-      service: data
+      runnable: redis-cloud/essentials-subscription
+      service: subscription
   depends:
     wait-for:
       runnables:
-        - redis-test-stack/dev-essentials-subscription
-      timeout: 300
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 10
+        - redis-cloud/redis-subscription
+      timeout: 60
+
 
 # Pro Database - Advanced features testing
 dev-pro-database:
@@ -125,59 +109,74 @@ dev-pro-database:
       protocol: custom
   connections:
     subscription:
-      runnable: redis-test-stack/dev-pro-subscription
+      runnable: redis-cloud/pro-subscription
       service: data
   depends:
     wait-for:
       runnables:
-        - redis-test-stack/dev-pro-subscription
+        - redis-cloud/pro-subscription
       timeout: 300
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 10
+
 
 # Stack Definitions - Process Groups
 
-dev-essentials-stack:
+essentials-stack:
   defines: process-group
   runnable-list:
-    - redis-test-stack/dev-essentials-subscription
-    # - redis-test-stack/dev-essentials-database
-    # - redis-test-stack/dev-essentials-connection-test
+    - redis-cloud/essentials-subscription
+    - redis-cloud/essentials-database
+    - redis-cloud/essentials-connection-test
 
-dev-pro-stack:
+pro-stack:
   defines: process-group
   runnable-list:
-    - redis-test-stack/dev-pro-subscription
-    - redis-test-stack/dev-pro-database
-    - redis-test-stack/dev-pro-connection-test
+    - redis-cloud/pro-subscription
+    - redis-cloud/pro-database
+    - redis-cloud/pro-connection-test
 
-dev-stack:
+stack:
   defines: process-group
   runnable-list:
-    - redis-test-stack/dev-essentials-subscription
-    - redis-test-stack/dev-essentials-database
-    - redis-test-stack/dev-essentials-connection-test
-    - redis-test-stack/dev-pro-subscription
-    - redis-test-stack/dev-pro-database
-    - redis-test-stack/dev-pro-connection-test
+    - redis-cloud/essentials-subscription
+    - redis-cloud/essentials-database
+    - redis-cloud/essentials-connection-test
+    - redis-cloud/pro-subscription
+    - redis-cloud/pro-database
+    - redis-cloud/pro-connection-test
 
 # Connection Test Containers
 
-dev-essentials-connection-test:
+essentials-connection-test:
   defines: runnable
   connections:
     db:
-      runnable: redis-test-stack/dev-essentials-database
-      service: data
+      runnable: redis-cloud/essentials-database
+      service: db
   depends:
     wait-for:
       runnables:
-        - redis-test-stack/dev-essentials-database
-      timeout: 600
+        - redis-cloud/essentials-database
+      timeout: 180
   variables:
+    redis_db:
+      env: REDIS_DB
+      value: <- connection-target("db") entity get-member("name")
+      type: string
+    redis_password_secret:
+      value: <- connection-target("db") entity get-member("password_secret")
+      type: string
+    redis_password:
+      env: REDIS_PASSWORD
+      value: <- secret($redis_password_secret)
+      type: string
+    redis_user:
+      env: REDIS_USER
+      value: <- connection-target("db") entity-state get-member("username")
+      type: string
+    redis_addr:
+      env: REDIS_ADDR
+      value: <- connection-target("db") entity-state get-member("publicEndpoint")
+      type: string
     redis_host:
       env: REDIS_HOST
       value: <- connection-target("db") entity-state get-member("publicEndpointHost")
@@ -185,10 +184,6 @@ dev-essentials-connection-test:
     redis_port:
       env: REDIS_PORT
       value: <- connection-target("db") entity-state get-member("publicEndpointPort")
-      type: string
-    redis_password:
-      env: REDIS_PASSWORD
-      value: <- connection-target("db") entity-state get-member("password")
       type: string
   containers:
     redis-test:
