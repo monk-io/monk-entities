@@ -33,7 +33,6 @@ essentials-database:
       minimum: 0
     support_oss_cluster_api:
       type: boolean
-      default: false
     redis_version:
       type: string
     resp_version:
@@ -43,10 +42,8 @@ essentials-database:
         - resp3
     use_external_endpoint_for_oss_cluster_api:
       type: boolean
-      default: false
     enable_database_clustering:
       type: boolean
-      default: false
     number_of_shards:
       type: number
     data_persistence:
@@ -105,7 +102,6 @@ essentials-database:
         additionalProperties: false
     enable_tls:
       type: boolean
-      default: false
     password:
       type: string
     password_secret:

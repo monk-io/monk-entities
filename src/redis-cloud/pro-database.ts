@@ -564,23 +564,48 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
 
         const response = this.makeRequest("POST", `/subscriptions/${this.definition.subscription_id}/databases`, body);
 
-        this.state.id = response.resourceId;
-        this.state.name = this.definition.name;
-        this.state.status = "pending";
+        // Initial response contains taskId, not resourceId
         this.state.task_id = response.taskId;
+        this.state.name = this.definition.name;
         this.state.password = password;
         this.state.memory_limit_in_mb = (this.definition.dataset_size_in_gb || 1) * 1024;
 
-        // Set clustering state if configured
-        if (this.definition.support_oss_cluster_api) {
-            this.state.cluster_info = {
-                shard_count: this.definition.throughput_measurement?.value,
-                status: "initializing"
-            };
-        }
-
-        cli.output(`✅ Pro database creation initiated: ${this.state.name} (${this.state.id})`);
+        cli.output(`✅ Pro database creation initiated: ${this.state.name}`);
         cli.output(`📋 Task ID: ${this.state.task_id}`);
+
+        // Wait for the task to complete and get the resource ID
+        if (!this.state.task_id) {
+            throw new Error("No task ID returned from database creation request");
+        }
+        const taskResult = this.waitForTask(this.state.task_id);
+        
+        if (taskResult && taskResult.response && taskResult.response.resourceId) {
+            this.state.id = taskResult.response.resourceId;
+            cli.output(`✅ Database created with ID: ${this.state.id}`);
+            
+            // Now fetch the complete database details to get the endpoint
+            const databaseData = this.makeRequest("GET", `/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`);
+            
+            if (databaseData) {
+                this.state.status = databaseData.status;
+                this.state.public_endpoint = databaseData.publicEndpoint;
+                this.state.private_endpoint = databaseData.privateEndpoint;
+                this.state.port = databaseData.port;
+                this.state.memory_usage_in_mb = databaseData.memoryUsageInMb;
+                
+                // Set clustering state if configured
+                if (this.definition.support_oss_cluster_api && databaseData.clustering) {
+                    this.state.cluster_info = {
+                        shard_count: databaseData.clustering.numberOfShards,
+                        status: databaseData.clustering.status
+                    };
+                }
+                
+                cli.output(`✅ Pro database ready: ${this.state.name} (${databaseData.status})`);
+            }
+        } else {
+            throw new Error("Task completed but no resource ID was returned");
+        }
     }
 
     private mapDataPersistence(): string {
@@ -614,16 +639,7 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
 
     override start(): void {
         super.start();
-        
-        // Wait for database creation to complete
-        if (this.state.task_id) {
-            try {
-                this.waitForTask(this.state.task_id);
-                cli.output(`✅ Pro database ${this.state.name} is ready`);
-            } catch (error) {
-                cli.output(`⚠️ Database creation may still be in progress: ${error}`);
-            }
-        }
+        // Task waiting is now handled directly in the create method
     }
 
     override update(): void {

@@ -38,12 +38,14 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     while (attempts < maxAttempts) {
       try {
         const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+        cli.output(`\u{1F50D} Full task response: ${JSON.stringify(taskData, null, 2)}`);
         cli.output(`Task ${taskId} status: ${taskData.status} (attempt ${attempts + 1}/${maxAttempts})`);
-        if (taskData.status === "completed") {
+        if (taskData.status === "processing-completed") {
           return taskData.resourceId;
         }
-        if (taskData.status === "failed") {
-          throw new Error(`Task ${taskId} failed: ${taskData.description || "Unknown error"}`);
+        if (taskData.status === "failed" || taskData.status === "processing-error") {
+          cli.output(`\u274C Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+          throw new Error(`PERMANENT_FAILURE: Task ${taskId} failed: ${taskData.description || "Unknown error"}`);
         }
         attempts++;
         if (attempts < maxAttempts) {
@@ -76,7 +78,7 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     const plans = plansData.plans || [];
     for (const plan of plans) {
       if (this.planMatches(plan, criteria)) {
-        cli.output(`Selected plan: ${JSON.stringify(plan)}`);
+        cli.output(`Selected plan: ${plan.name} (ID: ${plan.id}, Size: ${plan.size}${plan.sizeMeasurementUnit}, Price: ${plan.price})`);
         return plan.id;
       }
     }
@@ -86,7 +88,15 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
    * Check if a plan matches the given criteria
    */
   planMatches(plan, criteria) {
-    return plan.provider === criteria.provider && plan.region === criteria.region && plan.redisFlex === criteria.redis_flex && plan.size === criteria.size && plan.availability === criteria.availability && plan.supportDataPersistence === criteria.support_data_persistence && plan.supportInstantAndDailyBackups === criteria.support_instant_and_daily_backups && plan.supportReplication === criteria.support_replication && plan.supportClustering === criteria.support_clustering && plan.supportSsl === criteria.support_ssl;
+    let sizeMatches = false;
+    if (plan.sizeMeasurementUnit === "MB" && criteria.size === 30) {
+      sizeMatches = plan.size === 30;
+    } else if (plan.sizeMeasurementUnit === "GB") {
+      sizeMatches = plan.size === criteria.size;
+    } else {
+      sizeMatches = plan.size === criteria.size;
+    }
+    return plan.provider === criteria.provider && plan.region === criteria.region && plan.redisFlex === criteria.redis_flex && sizeMatches && plan.availability === criteria.availability && plan.supportDataPersistence === criteria.support_data_persistence && plan.supportInstantAndDailyBackups === criteria.support_instant_and_daily_backups && plan.supportReplication === criteria.support_replication && plan.supportClustering === criteria.support_clustering && plan.supportSsl === criteria.support_ssl;
   }
   /**
    * Select the appropriate payment method

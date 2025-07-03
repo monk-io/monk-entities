@@ -114,20 +114,37 @@ var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
       body.queryPerformanceFactor = this.definition.query_performance_factor;
     }
     const response = this.makeRequest("POST", `/subscriptions/${this.definition.subscription_id}/databases`, body);
-    this.state.id = response.resourceId;
-    this.state.name = this.definition.name;
-    this.state.status = "pending";
     this.state.task_id = response.taskId;
+    this.state.name = this.definition.name;
     this.state.password = password;
     this.state.memory_limit_in_mb = (this.definition.dataset_size_in_gb || 1) * 1024;
-    if (this.definition.support_oss_cluster_api) {
-      this.state.cluster_info = {
-        shard_count: this.definition.throughput_measurement?.value,
-        status: "initializing"
-      };
-    }
-    cli.output(`\u2705 Pro database creation initiated: ${this.state.name} (${this.state.id})`);
+    cli.output(`\u2705 Pro database creation initiated: ${this.state.name}`);
     cli.output(`\u{1F4CB} Task ID: ${this.state.task_id}`);
+    if (!this.state.task_id) {
+      throw new Error("No task ID returned from database creation request");
+    }
+    const taskResult = this.waitForTask(this.state.task_id);
+    if (taskResult && taskResult.response && taskResult.response.resourceId) {
+      this.state.id = taskResult.response.resourceId;
+      cli.output(`\u2705 Database created with ID: ${this.state.id}`);
+      const databaseData = this.makeRequest("GET", `/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`);
+      if (databaseData) {
+        this.state.status = databaseData.status;
+        this.state.public_endpoint = databaseData.publicEndpoint;
+        this.state.private_endpoint = databaseData.privateEndpoint;
+        this.state.port = databaseData.port;
+        this.state.memory_usage_in_mb = databaseData.memoryUsageInMb;
+        if (this.definition.support_oss_cluster_api && databaseData.clustering) {
+          this.state.cluster_info = {
+            shard_count: databaseData.clustering.numberOfShards,
+            status: databaseData.clustering.status
+          };
+        }
+        cli.output(`\u2705 Pro database ready: ${this.state.name} (${databaseData.status})`);
+      }
+    } else {
+      throw new Error("Task completed but no resource ID was returned");
+    }
   }
   mapDataPersistence() {
     return this.definition.data_persistence || "none";
@@ -154,14 +171,6 @@ var _ProDatabase = class _ProDatabase extends RedisCloudEntity {
   }
   start() {
     super.start();
-    if (this.state.task_id) {
-      try {
-        this.waitForTask(this.state.task_id);
-        cli.output(`\u2705 Pro database ${this.state.name} is ready`);
-      } catch (error) {
-        cli.output(`\u26A0\uFE0F Database creation may still be in progress: ${error}`);
-      }
-    }
   }
   update() {
     if (!this.state.id) {

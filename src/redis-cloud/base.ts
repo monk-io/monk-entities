@@ -1,7 +1,8 @@
 import { MonkEntity } from "monkec/base";
 import { HttpClient } from "monkec/http-client";
-import { BASE_URL, CONTENT_TYPE, DEFAULT_TASK_TIMEOUT, DEFAULT_POLLING_INTERVAL, getCredentials, createAuthString } from "./common.ts";
+import { BASE_URL, CONTENT_TYPE, DEFAULT_TASK_TIMEOUT, DEFAULT_POLLING_INTERVAL, getCredentials } from "./common.ts";
 import cli from "cli";
+import secret from "secret";
 
 /**
  * Redis Cloud subscription types
@@ -80,11 +81,25 @@ export type AlertType =
  */
 export interface RedisCloudEntityDefinition {
     /**
-     * Secret Reference for Redis Cloud API authentication
+     * Secret Reference for Redis Cloud API authentication (legacy)
      * @minLength 1
      * @maxLength 24
      */
-    secret_ref: string;
+    secret_ref?: string;
+
+    /**
+     * Account key secret for Redis Cloud API authentication
+     * @minLength 1
+     * @maxLength 24
+     */
+    account_key_secret?: string;
+
+    /**
+     * User key secret for Redis Cloud API authentication
+     * @minLength 1
+     * @maxLength 24
+     */
+    user_key_secret?: string;
 }
 
 /**
@@ -120,19 +135,43 @@ export abstract class RedisCloudEntity<
      * Initialize authentication and HTTP client before any operations
      */
     protected override before(): void {
-        this.credentials = getCredentials(this.definition.secret_ref);
-        
-        const authString = createAuthString(this.credentials.accessKey, this.credentials.secretKey);
+        this.credentials = this.getEntityCredentials();
 
         this.httpClient = new HttpClient({
             baseUrl: BASE_URL,
             headers: {
-                "authorization": "Basic " + authString,
+                "x-api-key": this.credentials.accessKey,
+                "x-api-secret-key": this.credentials.secretKey,
                 "content-type": CONTENT_TYPE,
             },
             parseJson: true,
             stringifyJson: true,
         });
+    }
+
+    /**
+     * Get credentials using either new or legacy authentication method
+     */
+    private getEntityCredentials(): { accessKey: string; secretKey: string } {
+        // Try new method first (account_key + user_key)
+        if (this.definition.account_key_secret && this.definition.user_key_secret) {
+            const accountKey = secret.get(this.definition.account_key_secret);
+            const userKey = secret.get(this.definition.user_key_secret);
+            
+            if (!accountKey || !userKey) {
+                throw new Error(`Redis Cloud credentials not found. Expected secrets: ${this.definition.account_key_secret} and ${this.definition.user_key_secret}`);
+            }
+            
+            // Account key is used as x-api-key header, User key is used as x-api-secret-key header
+            return { accessKey: accountKey, secretKey: userKey };
+        }
+        
+        // Fall back to legacy method
+        if (this.definition.secret_ref) {
+            return getCredentials(this.definition.secret_ref);
+        }
+        
+        throw new Error("Redis Cloud authentication not configured. Provide either 'secret_ref' or both 'account_key_secret' and 'user_key_secret'");
     }
 
     /**
@@ -164,7 +203,8 @@ export abstract class RedisCloudEntity<
             const response = this.httpClient.request(method as any, path, { 
                 body,
                 headers: {
-                    "authorization": "Basic " + createAuthString(this.credentials.accessKey, this.credentials.secretKey),
+                    "x-api-key": this.credentials.accessKey,
+                    "x-api-secret-key": this.credentials.secretKey,
                     "content-type": CONTENT_TYPE,
                 }
             });
@@ -238,6 +278,9 @@ export abstract class RedisCloudEntity<
             try {
                 const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
                 
+                // Print full task response for debugging
+                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
+                
                 if (taskData && taskData.status) {
                     if (taskData.status === "processing-completed") {
                         cli.output(`✅ Task ${taskId} completed successfully`);
@@ -245,13 +288,18 @@ export abstract class RedisCloudEntity<
                     }
                     
                     if (taskData.status === "processing-error") {
-                        throw new Error(`Task failed: ${taskData.description || 'Unknown error'}`);
+                        cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+                        throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || 'Unknown error'}`);
                     }
                     
                     // Task is still processing
                     cli.output(`⏳ Task ${taskId} status: ${taskData.status}`);
                 }
             } catch (error) {
+                // If this is a processing-error, re-throw to exit immediately
+                if (error instanceof Error && error.message.includes("PERMANENT_FAILURE:")) {
+                    throw error;
+                }
                 cli.output(`⚠️ Error checking task status: ${error}`);
             }
 

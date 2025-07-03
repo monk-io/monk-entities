@@ -110,17 +110,22 @@ var _EssentialsDatabase = class _EssentialsDatabase extends MonkEntity {
     while (Date.now() - startTime < timeout) {
       try {
         const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+        cli.output(`\u{1F50D} Full task response: ${JSON.stringify(taskData, null, 2)}`);
         if (taskData && taskData.status) {
           if (taskData.status === "processing-completed") {
             cli.output(`\u2705 Task ${taskId} completed successfully`);
             return taskData;
           }
           if (taskData.status === "processing-error") {
-            throw new Error(`Task failed: ${taskData.description || "Unknown error"}`);
+            cli.output(`\u274C Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+            throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || "Unknown error"}`);
           }
           cli.output(`\u23F3 Task ${taskId} status: ${taskData.status}`);
         }
       } catch (error) {
+        if (error instanceof Error && error.message.includes("PERMANENT_FAILURE:")) {
+          throw error;
+        }
         cli.output(`\u26A0\uFE0F Error checking task status: ${error}`);
       }
       const currentTime = Date.now();

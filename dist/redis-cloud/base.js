@@ -52,12 +52,10 @@ function getCredentials(secretRef) {
   }
   return { accessKey: accessKeySecret, secretKey: secretKeySecret };
 }
-function createAuthString(accessKey, secretKey) {
-  return btoa(`${accessKey}:${secretKey}`);
-}
 
 // input/redis-cloud/base.ts
 var import_cli = __toESM(require("cli"));
+var import_secret2 = __toESM(require("secret"));
 var RedisCloudEntity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -74,17 +72,34 @@ var RedisCloudEntity = class extends import_base.MonkEntity {
    * Initialize authentication and HTTP client before any operations
    */
   before() {
-    this.credentials = getCredentials(this.definition.secret_ref);
-    const authString = createAuthString(this.credentials.accessKey, this.credentials.secretKey);
+    this.credentials = this.getEntityCredentials();
     this.httpClient = new import_http_client.HttpClient({
       baseUrl: BASE_URL,
       headers: {
-        "authorization": "Basic " + authString,
+        "x-api-key": this.credentials.accessKey,
+        "x-api-secret-key": this.credentials.secretKey,
         "content-type": CONTENT_TYPE
       },
       parseJson: true,
       stringifyJson: true
     });
+  }
+  /**
+   * Get credentials using either new or legacy authentication method
+   */
+  getEntityCredentials() {
+    if (this.definition.account_key_secret && this.definition.user_key_secret) {
+      const accountKey = import_secret2.default.get(this.definition.account_key_secret);
+      const userKey = import_secret2.default.get(this.definition.user_key_secret);
+      if (!accountKey || !userKey) {
+        throw new Error(`Redis Cloud credentials not found. Expected secrets: ${this.definition.account_key_secret} and ${this.definition.user_key_secret}`);
+      }
+      return { accessKey: accountKey, secretKey: userKey };
+    }
+    if (this.definition.secret_ref) {
+      return getCredentials(this.definition.secret_ref);
+    }
+    throw new Error("Redis Cloud authentication not configured. Provide either 'secret_ref' or both 'account_key_secret' and 'user_key_secret'");
   }
   /**
    * Standard start implementation for Redis Cloud entities
@@ -106,7 +121,8 @@ var RedisCloudEntity = class extends import_base.MonkEntity {
       const response = this.httpClient.request(method, path, {
         body,
         headers: {
-          "authorization": "Basic " + createAuthString(this.credentials.accessKey, this.credentials.secretKey),
+          "x-api-key": this.credentials.accessKey,
+          "x-api-secret-key": this.credentials.secretKey,
           "content-type": CONTENT_TYPE
         }
       });
@@ -167,17 +183,22 @@ var RedisCloudEntity = class extends import_base.MonkEntity {
     while (Date.now() - startTime < timeout) {
       try {
         const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+        import_cli.default.output(`\u{1F50D} Full task response: ${JSON.stringify(taskData, null, 2)}`);
         if (taskData && taskData.status) {
           if (taskData.status === "processing-completed") {
             import_cli.default.output(`\u2705 Task ${taskId} completed successfully`);
             return taskData;
           }
           if (taskData.status === "processing-error") {
-            throw new Error(`Task failed: ${taskData.description || "Unknown error"}`);
+            import_cli.default.output(`\u274C Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+            throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || "Unknown error"}`);
           }
           import_cli.default.output(`\u23F3 Task ${taskId} status: ${taskData.status}`);
         }
       } catch (error) {
+        if (error instanceof Error && error.message.includes("PERMANENT_FAILURE:")) {
+          throw error;
+        }
         import_cli.default.output(`\u26A0\uFE0F Error checking task status: ${error}`);
       }
       const currentTime = Date.now();

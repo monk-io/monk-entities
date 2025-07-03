@@ -203,7 +203,7 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
     /**
      * Make authenticated HTTP request to Redis Cloud API
      */
-    protected makeRequest(method: string, path: string, body?: any): any {
+    protected override makeRequest(method: string, path: string, body?: any): any {
         try {
             const response = this.httpClient.request(method as any, path, { body });
             
@@ -221,7 +221,7 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
     /**
      * Wait for a Redis Cloud task to complete
      */
-    protected waitForTask(taskId: string): string {
+    protected override waitForTask(taskId: string): string {
         const maxAttempts = 60; // 5 minutes with 5 second intervals
         let attempts = 0;
 
@@ -229,14 +229,18 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
             try {
                 const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
                 
+                // Print full task response for debugging
+                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
+                
                 cli.output(`Task ${taskId} status: ${taskData.status} (attempt ${attempts + 1}/${maxAttempts})`);
                 
-                if (taskData.status === "completed") {
+                if (taskData.status === "processing-completed") {
                     return taskData.resourceId;
                 }
                 
-                if (taskData.status === "failed") {
-                    throw new Error(`Task ${taskId} failed: ${taskData.description || 'Unknown error'}`);
+                if (taskData.status === "failed" || taskData.status === "processing-error") {
+                    cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+                    throw new Error(`PERMANENT_FAILURE: Task ${taskId} failed: ${taskData.description || 'Unknown error'}`);
                 }
                 
                 // Wait 5 seconds before next check
@@ -280,7 +284,7 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
 
         for (const plan of plans) {
             if (this.planMatches(plan, criteria)) {
-                cli.output(`Selected plan: ${JSON.stringify(plan)}`);
+                cli.output(`Selected plan: ${plan.name} (ID: ${plan.id}, Size: ${plan.size}${plan.sizeMeasurementUnit}, Price: ${plan.price})`);
                 return plan.id;
             }
         }
@@ -292,11 +296,24 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
      * Check if a plan matches the given criteria
      */
     private planMatches(plan: any, criteria: PlanCriteria): boolean {
+        // Handle size conversion between MB and GB for free plans
+        let sizeMatches = false;
+        if (plan.sizeMeasurementUnit === "MB" && criteria.size === 30) {
+            // Free plan: 30MB matches size criteria of 30
+            sizeMatches = plan.size === 30.0;
+        } else if (plan.sizeMeasurementUnit === "GB") {
+            // Paid plan: direct size comparison in GB
+            sizeMatches = plan.size === criteria.size;
+        } else {
+            // Direct comparison for other cases
+            sizeMatches = plan.size === criteria.size;
+        }
+
         return (
             plan.provider === criteria.provider &&
             plan.region === criteria.region &&
             plan.redisFlex === criteria.redis_flex &&
-            plan.size === criteria.size &&
+            sizeMatches &&
             plan.availability === criteria.availability &&
             plan.supportDataPersistence === criteria.support_data_persistence &&
             plan.supportInstantAndDailyBackups === criteria.support_instant_and_daily_backups &&

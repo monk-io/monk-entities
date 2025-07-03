@@ -3,8 +3,9 @@ description: "Test development stack deployment with Redis Cloud entities"
 timeout: 540000
 
 secrets:
-  redis-cloud-account-key: "$REDIS_CLOUD_ACCOUNT_KEY"
-  redis-cloud-user-key: "$REDIS_CLOUD_USER_KEY"
+  global:
+    redis-cloud-account-key: "$REDIS_CLOUD_ACCOUNT_KEY"
+    redis-cloud-user-key: "$REDIS_CLOUD_USER_KEY"
 
 setup:
   - name: "Load compiled Redis Cloud entities"
@@ -118,12 +119,4 @@ cleanup:
     action: "delete"
     target: "redis-test-stack/dev-pro-stack"
     expect:
-      exitCode: 0
-
-variables: {}
-
-stack-files:
-  - "stack-template.yaml"
-
-# Test configuration
-namespace: redis-test-stack 
+      exitCode: 0 

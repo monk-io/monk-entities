@@ -8,6 +8,14 @@ pro-database:
       type: string
       minLength: 1
       maxLength: 24
+    account_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    user_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
     name:
       type: string
       minLength: 1
@@ -216,7 +224,6 @@ pro-database:
     query_performance_factor:
       type: string
     required:
-      - secret_ref
       - name
       - subscription_id
   lifecycle:

@@ -124,7 +124,6 @@ export interface EssentialsDatabaseDefinition {
 
     /**
      * (Pay-as-you-go subscriptions only) Support Redis OSS Cluster API
-     * @default false
      */
     support_oss_cluster_api?: boolean;
 
@@ -143,13 +142,11 @@ export interface EssentialsDatabaseDefinition {
     /**
      * (Pay-as-you-go subscriptions only) If set to 'true', the database will use the external endpoint for OSS Cluster API.
      * This setting blocks the database's private endpoint. Can only be set if 'support_oss_cluster_api' is 'true'.
-     * @default false
      */
     use_external_endpoint_for_oss_cluster_api?: boolean;
 
     /**
      * (Pay-as-you-go subscriptions only) Distributes database data to different cloud instances
-     * @default false
      */
     enable_database_clustering?: boolean;
 
@@ -206,7 +203,6 @@ export interface EssentialsDatabaseDefinition {
     /**
      * When 'true', requires TLS authentication for all connections
      * mTLS with valid clientTlsCertificates, regular TLS when clientTlsCertificates is not provided
-     * @default false
      */
     enable_tls?: boolean;
 
@@ -332,33 +328,33 @@ export class EssentialsDatabase extends MonkEntity<EssentialsDatabaseDefinition,
     /**
      * Helper method to make authenticated HTTP requests with consistent error handling
      */
-    protected makeRequest(method: string, path: string, body?: any): any {
+    private makeRequest(method: string, path: string, body?: any): any {
         try {
-            const response = this.httpClient.request(method as any, path, { 
+            const response = this.httpClient.request(method as any, path, {
                 body,
                 headers: {
-                    "accept": "application/json",
-                    "x-api-key": this.credentials.accountKey,
-                    "x-api-secret-key": this.credentials.userKey,
-                    "content-type": CONTENT_TYPE,
+                    'accept': 'application/json',
+                    'x-api-key': this.credentials.accountKey,
+                    'x-api-secret-key': this.credentials.userKey,
+                    'content-type': CONTENT_TYPE
                 }
             });
-            
+
             if (!response.ok) {
                 const errorBody = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
                 throw new Error(`Redis Cloud API error: ${response.statusCode} ${response.status}. Body: ${errorBody || response.raw}`);
             }
-            
-            // Handle JSON parsing issue in Goja runtime
+
+            // Parse response data
             let responseData = response.data;
             if (typeof responseData === 'string') {
                 try {
                     responseData = JSON.parse(responseData);
                 } catch (e) {
-                    // If parsing fails, return the string as-is
+                    // Response is not JSON, keep as string
                 }
             }
-            
+
             return responseData;
         } catch (error) {
             if (error instanceof Error) {
@@ -384,7 +380,7 @@ export class EssentialsDatabase extends MonkEntity<EssentialsDatabaseDefinition,
     /**
      * Wait for task completion with timeout
      */
-    protected waitForTask(taskId: string, timeoutSeconds: number = DEFAULT_TASK_TIMEOUT): any {
+    private waitForTask(taskId: string, timeoutSeconds: number = DEFAULT_TASK_TIMEOUT): any {
         if (!taskId) {
             return null;
         }
@@ -394,33 +390,36 @@ export class EssentialsDatabase extends MonkEntity<EssentialsDatabaseDefinition,
 
         while (Date.now() - startTime < timeout) {
             try {
-                const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
-                
+                const taskData = this.makeRequest('GET', `/tasks/${taskId}`);
+                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
+
                 if (taskData && taskData.status) {
-                    if (taskData.status === "processing-completed") {
+                    if (taskData.status === 'processing-completed') {
                         cli.output(`✅ Task ${taskId} completed successfully`);
                         return taskData;
                     }
-                    
-                    if (taskData.status === "processing-error") {
-                        throw new Error(`Task failed: ${taskData.description || 'Unknown error'}`);
+
+                    if (taskData.status === 'processing-error') {
+                        cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
+                        throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || 'Unknown error'}`);
                     }
-                    
-                    // Task is still processing
+
                     cli.output(`⏳ Task ${taskId} status: ${taskData.status}`);
                 }
             } catch (error) {
+                if (error instanceof Error && error.message.includes('PERMANENT_FAILURE:')) {
+                    throw error;
+                }
                 cli.output(`⚠️ Error checking task status: ${error}`);
             }
 
-            // Wait before next check
+            // Simple polling delay
             const currentTime = Date.now();
             const elapsed = currentTime - startTime;
             if (elapsed + DEFAULT_POLLING_INTERVAL < timeout) {
-                // Simple delay implementation
                 const endTime = currentTime + DEFAULT_POLLING_INTERVAL;
                 while (Date.now() < endTime) {
-                    // Busy wait - not ideal but works in this environment
+                    // Busy wait for polling interval
                 }
             } else {
                 break;

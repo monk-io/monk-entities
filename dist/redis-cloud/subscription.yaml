@@ -8,6 +8,14 @@ subscription:
       type: string
       minLength: 1
       maxLength: 24
+    account_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    user_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
     subscription_type:
       type: string
       enum:
@@ -67,7 +75,6 @@ subscription:
       type: string
       description: Type of payment method to auto-select
     required:
-      - secret_ref
       - subscription_type
       - name
       - provider
