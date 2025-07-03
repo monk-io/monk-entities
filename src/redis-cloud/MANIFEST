@@ -1,1 +1,1 @@
-LOAD subscription.yaml essentials-database.yaml pro-database.yaml 
+LOAD essentials-subscription.yaml essentials-database.yaml pro-database.yaml 

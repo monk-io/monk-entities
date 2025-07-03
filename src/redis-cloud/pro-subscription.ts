@@ -1,5 +1,6 @@
-import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
 import cli from "cli";
+
+import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
 
 /**
  * Redis Cloud subscription types
@@ -24,76 +25,12 @@ export type PaymentMethodType = "credit-card" | "marketplace";
 /**
  * Defines the immutable configuration properties for a Redis Cloud subscription entity.
  */
-export interface SubscriptionDefinition extends RedisCloudEntityDefinition {
-    /**
-     * Subscription type
-     */
-    subscription_type: SubscriptionType;
+export interface ProSubscriptionDefinition extends RedisCloudEntityDefinition {
     /**
      * Subscription name
      * @description Name of the subscription
      */
     name: string;
-
-    /**
-     * Cloud provider
-     * @description Cloud provider for the subscription (AWS, GCP, or AZURE)
-     */
-    provider: CloudProvider;
-
-    /**
-     * Region
-     * @description Cloud provider region where the subscription will be created
-     */
-    region: string;
-
-    /**
-     * Redis Flex enabled
-     * @description Whether Redis Flex is enabled for this subscription
-     */
-    redis_flex: boolean;
-
-    /**
-     * Size
-     * @description Size of the subscription (memory size in GB)
-     */
-    size: number;
-
-    /**
-     * Availability
-     * @description Availability configuration for the subscription
-     */
-    availability: AvailabilityType;
-
-    /**
-     * Support data persistence
-     * @description Whether the subscription supports data persistence
-     */
-    support_data_persistence: boolean;
-
-    /**
-     * Support instant and daily backups
-     * @description Whether the subscription supports instant and daily backups
-     */
-    support_instant_and_daily_backups: boolean;
-
-    /**
-     * Support replication
-     * @description Whether the subscription supports replication
-     */
-    support_replication: boolean;
-
-    /**
-     * Support clustering
-     * @description Whether the subscription supports clustering
-     */
-    support_clustering: boolean;
-
-    /**
-     * Support SSL
-     * @description Whether the subscription supports SSL encryption
-     */
-    support_ssl: boolean;
 
     /**
      * Payment method
@@ -117,7 +54,7 @@ export interface SubscriptionDefinition extends RedisCloudEntityDefinition {
 /**
  * Represents the mutable runtime state of a Redis Cloud subscription entity.
  */
-export interface SubscriptionState extends RedisCloudEntityState {
+export interface ProSubscriptionState extends RedisCloudEntityState {
     /**
      * Entity ID from Redis Cloud
      */
@@ -139,65 +76,23 @@ export interface SubscriptionState extends RedisCloudEntityState {
     status?: string;
 
     /**
-     * Plan ID used by the subscription
-     */
-    plan_id?: number;
-
-    /**
      * Payment method ID used by the subscription
      */
     payment_method_id?: number;
-
-    /**
-     * Cloud provider information
-     */
-    provider?: CloudProvider;
-
-    /**
-     * Region information
-     */
-    region?: string;
-
-    /**
-     * Subscription type
-     */
-    type?: string;
-
-    /**
-     * Number of databases in the subscription
-     */
-    database_count?: number;
-}
-
-/**
- * Plan selection criteria interface
- */
-interface PlanCriteria {
-    provider: CloudProvider;
-    region: string;
-    redis_flex: boolean;
-    size: number;
-    availability: AvailabilityType;
-    support_data_persistence: boolean;
-    support_instant_and_daily_backups: boolean;
-    support_replication: boolean;
-    support_clustering: boolean;
-    support_ssl: boolean;
 }
 
 /**
  * Redis Cloud Subscription Entity
  * 
  * Manages Redis Cloud subscriptions which are containers for Redis databases.
- * Supports both Essentials and Pro subscription types with automatic plan selection.
  */
-export class Subscription extends RedisCloudEntity<SubscriptionDefinition, SubscriptionState> {
+export class ProSubscription extends RedisCloudEntity<ProSubscriptionDefinition, ProSubscriptionState> {
 
     /**
      * Get subscription prefix for API calls (essentials uses /fixed)
      */
     protected getSubscriptionPrefix(): string {
-        return this.definition.subscription_type === "essentials" ? "/fixed" : "";
+        return "";
     }
 
     /**
@@ -221,58 +116,6 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
     protected getEntityName(): string {
         return `Redis Cloud Subscription: ${this.definition.name}`;
     }
-
-    /**
-     * Select the appropriate plan based on subscription requirements
-     */
-    private selectPlan(criteria: PlanCriteria): number {
-        const subscriptionPrefix = this.getSubscriptionPrefix();
-        const queryParams = `provider=${criteria.provider}&redisFlex=${criteria.redis_flex.toString()}`;
-
-        const plansData = this.makeRequest("GET", `${subscriptionPrefix}/plans?${queryParams}`);
-        const plans = plansData.plans || [];
-
-        for (const plan of plans) {
-            if (this.planMatches(plan, criteria)) {
-                cli.output(`Selected plan: ${plan.name} (ID: ${plan.id}, Size: ${plan.size}${plan.sizeMeasurementUnit}, Price: ${plan.price})`);
-                return plan.id;
-            }
-        }
-
-        throw new Error("No matching plan found for the given subscription requirements");
-    }
-
-    /**
-     * Check if a plan matches the given criteria
-     */
-    private planMatches(plan: any, criteria: PlanCriteria): boolean {
-        // Handle size conversion between MB and GB for free plans
-        let sizeMatches = false;
-        if (plan.sizeMeasurementUnit === "MB" && criteria.size === 30) {
-            // Free plan: 30MB matches size criteria of 30
-            sizeMatches = plan.size === 30.0;
-        } else if (plan.sizeMeasurementUnit === "GB") {
-            // Paid plan: direct size comparison in GB
-            sizeMatches = plan.size === criteria.size;
-        } else {
-            // Direct comparison for other cases
-            sizeMatches = plan.size === criteria.size;
-        }
-
-        return (
-            plan.provider === criteria.provider &&
-            plan.region === criteria.region &&
-            plan.redisFlex === criteria.redis_flex &&
-            sizeMatches &&
-            plan.availability === criteria.availability &&
-            plan.supportDataPersistence === criteria.support_data_persistence &&
-            plan.supportInstantAndDailyBackups === criteria.support_instant_and_daily_backups &&
-            plan.supportReplication === criteria.support_replication &&
-            plan.supportClustering === criteria.support_clustering &&
-            plan.supportSsl === criteria.support_ssl
-        );
-    }
-
     /**
      * Select the appropriate payment method
      */
@@ -302,25 +145,10 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
      * Create the subscription body for API requests
      */
     private createSubscriptionBody(): any {
-        const planCriteria: PlanCriteria = {
-            provider: this.definition.provider,
-            region: this.definition.region,
-            redis_flex: this.definition.redis_flex,
-            size: this.definition.size,
-            availability: this.definition.availability,
-            support_data_persistence: this.definition.support_data_persistence,
-            support_instant_and_daily_backups: this.definition.support_instant_and_daily_backups,
-            support_replication: this.definition.support_replication,
-            support_clustering: this.definition.support_clustering,
-            support_ssl: this.definition.support_ssl
-        };
-
-        const planId = this.selectPlan(planCriteria);
         const paymentMethodId = this.selectPaymentMethod();
 
         return {
             name: this.definition.name,
-            planId,
             paymentMethod: this.definition.payment_method,
             paymentMethodId
         };
@@ -329,7 +157,7 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
     /**
      * Sync subscription with Redis Cloud API
      */
-    private syncSubscription(isUpdate: boolean = false): SubscriptionState {
+    private syncSubscription(isUpdate: boolean = false): ProSubscriptionState {
         const subscriptionPrefix = this.getSubscriptionPrefix();
         const body = this.createSubscriptionBody();
 
@@ -352,18 +180,14 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
         cli.output(`Subscription details: ${JSON.stringify(subscriptionData)}`);
 
         // Transform response to state format
-        const newState: SubscriptionState = {
-            ...subscriptionData,
+        const newState: ProSubscriptionState = {
             id: subscriptionData.id,
             name: subscriptionData.name,
             status: subscriptionData.status,
             ready: subscriptionData.status === "active",
-            type: this.definition.subscription_type,
+            payment_method_id: subscriptionData.paymentMethodId,
             existing: false
         };
-
-        // Clean up response data
-        delete (newState as any).links;
 
         return newState;
     }
@@ -405,9 +229,11 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
                 if (sub.name === this.definition.name) {
                     cli.output(`Subscription ${this.definition.name} already exists with ID: ${sub.id}`);
                     this.state = {
-                        ...sub,
+                        id: sub.id,
+                        name: sub.name,
+                        status: sub.status,
                         ready: sub.status === "active",
-                        type: this.definition.subscription_type,
+                        payment_method_id: sub.paymentMethodId,
                         existing: true
                     };
                     return;
@@ -446,10 +272,10 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
             return;
         }
 
-        // if (this.state.existing) {
-        //     cli.output("Subscription existed before entity management - not deleting");
-        //     return;
-        // }
+        if (this.state.existing) {
+            cli.output("Subscription existed before entity management - not deleting");
+            return;
+        }
 
         cli.output(`Deleting Redis Cloud subscription: ${this.definition.name} (ID: ${this.state.id})`);
         

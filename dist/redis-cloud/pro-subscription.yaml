@@ -1,0 +1,41 @@
+namespace: redis-cloud
+pro-subscription:
+  defines: entity
+  metadata:
+    name: ProSubscription
+  schema:
+    account_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    user_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    name:
+      type: string
+      description: Name of the subscription
+    payment_method:
+      type: string
+      enum:
+        - credit-card
+        - marketplace
+      description: Payment method type (credit-card or marketplace)
+    payment_method_id:
+      type: number
+      description: Specific payment method ID if known
+    payment_method_type:
+      type: string
+      description: Type of payment method to auto-select
+    required:
+      - name
+  lifecycle:
+    sync: <<< pro-subscription-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - cli
+    - redis-cloud/base

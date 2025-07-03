@@ -1,10 +1,9 @@
 namespace: redis-cloud-example
 
 essentials-subscription:
-  defines: redis-cloud/subscription
+  defines: redis-cloud/essentials-subscription
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
-  subscription_type: essentials
   name: Essentials-Subscription
   #plan_id: 20927 # 30MB Free AWS us-east-1
   size: 30
@@ -21,6 +20,25 @@ essentials-subscription:
   #  payment_method_id: 42073
   #  OR
   #  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    subscription:
+      protocol: custom
+
+pro-subscription:
+  defines: redis-cloud/pro-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Pro-Subscription
+  size: 1
+  provider: AWS
+  region: us-east-1
+  #  payment_method: credit-card
+  #  payment_method_id: 42073
+  #  OR
+  payment_method_type: Visa
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true

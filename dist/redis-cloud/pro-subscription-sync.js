@@ -3,16 +3,16 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// input/redis-cloud/subscription.ts
+// input/redis-cloud/proSubscription.ts
+const cli = require("cli");
 const base = require("redis-cloud/base");
 const RedisCloudEntity = base.RedisCloudEntity;
-const cli = require("cli");
-var _Subscription = class _Subscription extends RedisCloudEntity {
+var _ProSubscription = class _ProSubscription extends RedisCloudEntity {
   /**
    * Get subscription prefix for API calls (essentials uses /fixed)
    */
   getSubscriptionPrefix() {
-    return this.definition.subscription_type === "essentials" ? "/fixed" : "";
+    return "";
   }
   /**
    * Make authenticated HTTP request to Redis Cloud API
@@ -31,36 +31,6 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
   }
   getEntityName() {
     return `Redis Cloud Subscription: ${this.definition.name}`;
-  }
-  /**
-   * Select the appropriate plan based on subscription requirements
-   */
-  selectPlan(criteria) {
-    const subscriptionPrefix = this.getSubscriptionPrefix();
-    const queryParams = `provider=${criteria.provider}&redisFlex=${criteria.redis_flex.toString()}`;
-    const plansData = this.makeRequest("GET", `${subscriptionPrefix}/plans?${queryParams}`);
-    const plans = plansData.plans || [];
-    for (const plan of plans) {
-      if (this.planMatches(plan, criteria)) {
-        cli.output(`Selected plan: ${plan.name} (ID: ${plan.id}, Size: ${plan.size}${plan.sizeMeasurementUnit}, Price: ${plan.price})`);
-        return plan.id;
-      }
-    }
-    throw new Error("No matching plan found for the given subscription requirements");
-  }
-  /**
-   * Check if a plan matches the given criteria
-   */
-  planMatches(plan, criteria) {
-    let sizeMatches = false;
-    if (plan.sizeMeasurementUnit === "MB" && criteria.size === 30) {
-      sizeMatches = plan.size === 30;
-    } else if (plan.sizeMeasurementUnit === "GB") {
-      sizeMatches = plan.size === criteria.size;
-    } else {
-      sizeMatches = plan.size === criteria.size;
-    }
-    return plan.provider === criteria.provider && plan.region === criteria.region && plan.redisFlex === criteria.redis_flex && sizeMatches && plan.availability === criteria.availability && plan.supportDataPersistence === criteria.support_data_persistence && plan.supportInstantAndDailyBackups === criteria.support_instant_and_daily_backups && plan.supportReplication === criteria.support_replication && plan.supportClustering === criteria.support_clustering && plan.supportSsl === criteria.support_ssl;
   }
   /**
    * Select the appropriate payment method
@@ -86,23 +56,9 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
    * Create the subscription body for API requests
    */
   createSubscriptionBody() {
-    const planCriteria = {
-      provider: this.definition.provider,
-      region: this.definition.region,
-      redis_flex: this.definition.redis_flex,
-      size: this.definition.size,
-      availability: this.definition.availability,
-      support_data_persistence: this.definition.support_data_persistence,
-      support_instant_and_daily_backups: this.definition.support_instant_and_daily_backups,
-      support_replication: this.definition.support_replication,
-      support_clustering: this.definition.support_clustering,
-      support_ssl: this.definition.support_ssl
-    };
-    const planId = this.selectPlan(planCriteria);
     const paymentMethodId = this.selectPaymentMethod();
     return {
       name: this.definition.name,
-      planId,
       paymentMethod: this.definition.payment_method,
       paymentMethodId
     };
@@ -125,15 +81,13 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     const subscriptionData = this.makeRequest("GET", `${subscriptionPrefix}/subscriptions/${resourceId}`);
     cli.output(`Subscription details: ${JSON.stringify(subscriptionData)}`);
     const newState = {
-      ...subscriptionData,
       id: subscriptionData.id,
       name: subscriptionData.name,
       status: subscriptionData.status,
       ready: subscriptionData.status === "active",
-      type: this.definition.subscription_type,
+      payment_method_id: subscriptionData.paymentMethodId,
       existing: false
     };
-    delete newState.links;
     return newState;
   }
   /**
@@ -166,9 +120,11 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
         if (sub.name === this.definition.name) {
           cli.output(`Subscription ${this.definition.name} already exists with ID: ${sub.id}`);
           this.state = {
-            ...sub,
+            id: sub.id,
+            name: sub.name,
+            status: sub.status,
             ready: sub.status === "active",
-            type: this.definition.subscription_type,
+            payment_method_id: sub.paymentMethodId,
             existing: true
           };
           return;
@@ -233,12 +189,12 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     }
   }
 };
-__name(_Subscription, "Subscription");
-var Subscription = _Subscription;
+__name(_ProSubscription, "ProSubscription");
+var ProSubscription = _ProSubscription;
 
 
 
 function main(def, state, ctx) {
-  const entity = new Subscription(def, state, ctx);
+  const entity = new ProSubscription(def, state, ctx);
   return entity.main(ctx);
 }

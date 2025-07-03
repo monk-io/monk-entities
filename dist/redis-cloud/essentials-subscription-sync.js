@@ -3,16 +3,16 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// input/redis-cloud/subscription.ts
+// input/redis-cloud/essentialsSubscription.ts
+const cli = require("cli");
 const base = require("redis-cloud/base");
 const RedisCloudEntity = base.RedisCloudEntity;
-const cli = require("cli");
-var _Subscription = class _Subscription extends RedisCloudEntity {
+var _EssentialsSubscription = class _EssentialsSubscription extends RedisCloudEntity {
   /**
    * Get subscription prefix for API calls (essentials uses /fixed)
    */
   getSubscriptionPrefix() {
-    return this.definition.subscription_type === "essentials" ? "/fixed" : "";
+    return "/fixed";
   }
   /**
    * Make authenticated HTTP request to Redis Cloud API
@@ -125,15 +125,14 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     const subscriptionData = this.makeRequest("GET", `${subscriptionPrefix}/subscriptions/${resourceId}`);
     cli.output(`Subscription details: ${JSON.stringify(subscriptionData)}`);
     const newState = {
-      ...subscriptionData,
       id: subscriptionData.id,
       name: subscriptionData.name,
       status: subscriptionData.status,
       ready: subscriptionData.status === "active",
-      type: this.definition.subscription_type,
+      plan_id: subscriptionData.planId,
+      payment_method_id: subscriptionData.paymentMethodId,
       existing: false
     };
-    delete newState.links;
     return newState;
   }
   /**
@@ -166,9 +165,12 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
         if (sub.name === this.definition.name) {
           cli.output(`Subscription ${this.definition.name} already exists with ID: ${sub.id}`);
           this.state = {
-            ...sub,
+            id: sub.id,
+            name: sub.name,
+            status: sub.status,
             ready: sub.status === "active",
-            type: this.definition.subscription_type,
+            plan_id: sub.planId,
+            payment_method_id: sub.paymentMethodId,
             existing: true
           };
           return;
@@ -233,12 +235,12 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
     }
   }
 };
-__name(_Subscription, "Subscription");
-var Subscription = _Subscription;
+__name(_EssentialsSubscription, "EssentialsSubscription");
+var EssentialsSubscription = _EssentialsSubscription;
 
 
 
 function main(def, state, ctx) {
-  const entity = new Subscription(def, state, ctx);
+  const entity = new EssentialsSubscription(def, state, ctx);
   return entity.main(ctx);
 }
