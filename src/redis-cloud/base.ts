@@ -1,6 +1,6 @@
 import { MonkEntity } from "monkec/base";
 import { HttpClient } from "monkec/http-client";
-import { BASE_URL, CONTENT_TYPE, DEFAULT_TASK_TIMEOUT, DEFAULT_POLLING_INTERVAL, getCredentials } from "./common.ts";
+import { BASE_URL, CONTENT_TYPE, DEFAULT_TASK_TIMEOUT, DEFAULT_POLLING_INTERVAL } from "./common.ts";
 import cli from "cli";
 import secret from "secret";
 
@@ -81,13 +81,6 @@ export type AlertType =
  */
 export interface RedisCloudEntityDefinition {
     /**
-     * Secret Reference for Redis Cloud API authentication (legacy)
-     * @minLength 1
-     * @maxLength 24
-     */
-    secret_ref?: string;
-
-    /**
      * Account key secret for Redis Cloud API authentication
      * @minLength 1
      * @maxLength 24
@@ -166,12 +159,7 @@ export abstract class RedisCloudEntity<
             return { accessKey: accountKey, secretKey: userKey };
         }
         
-        // Fall back to legacy method
-        if (this.definition.secret_ref) {
-            return getCredentials(this.definition.secret_ref);
-        }
-        
-        throw new Error("Redis Cloud authentication not configured. Provide either 'secret_ref' or both 'account_key_secret' and 'user_key_secret'");
+        throw new Error("Redis Cloud authentication not configured. Provide 'account_key_secret' and 'user_key_secret'");
     }
 
     /**
@@ -278,9 +266,6 @@ export abstract class RedisCloudEntity<
             try {
                 const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
                 
-                // Print full task response for debugging
-                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
-                
                 if (taskData && taskData.status) {
                     if (taskData.status === "processing-completed") {
                         cli.output(`✅ Task ${taskId} completed successfully`);
@@ -288,8 +273,7 @@ export abstract class RedisCloudEntity<
                     }
                     
                     if (taskData.status === "processing-error") {
-                        cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
-                        throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || 'Unknown error'}`);
+                        throw new Error(`Task processing error: ${JSON.stringify(taskData.response.error)}`);
                     }
                     
                     // Task is still processing
@@ -297,7 +281,7 @@ export abstract class RedisCloudEntity<
                 }
             } catch (error) {
                 // If this is a processing-error, re-throw to exit immediately
-                if (error instanceof Error && error.message.includes("PERMANENT_FAILURE:")) {
+                if (error instanceof Error && error.message.includes("Task processing error:")) {
                     throw error;
                 }
                 cli.output(`⚠️ Error checking task status: ${error}`);

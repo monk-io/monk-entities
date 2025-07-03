@@ -218,56 +218,6 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
         }
     }
 
-    /**
-     * Wait for a Redis Cloud task to complete
-     */
-    protected override waitForTask(taskId: string): string {
-        const maxAttempts = 60; // 5 minutes with 5 second intervals
-        let attempts = 0;
-
-        while (attempts < maxAttempts) {
-            try {
-                const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
-                
-                // Print full task response for debugging
-                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
-                
-                cli.output(`Task ${taskId} status: ${taskData.status} (attempt ${attempts + 1}/${maxAttempts})`);
-                
-                if (taskData.status === "processing-completed") {
-                    return taskData.resourceId;
-                }
-                
-                if (taskData.status === "failed" || taskData.status === "processing-error") {
-                    cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
-                    throw new Error(`PERMANENT_FAILURE: Task ${taskId} failed: ${taskData.description || 'Unknown error'}`);
-                }
-                
-                // Wait 5 seconds before next check
-                attempts++;
-                if (attempts < maxAttempts) {
-                    // Sleep for 5 seconds (in a real implementation, this would use proper async sleep)
-                    const start = Date.now();
-                    while (Date.now() - start < 5000) {
-                        // Busy wait - not ideal but works for sync operations
-                    }
-                }
-            } catch (error) {
-                if (attempts === maxAttempts - 1) {
-                    throw error;
-                }
-                attempts++;
-                // Brief wait before retry
-                const start = Date.now();
-                while (Date.now() - start < 1000) {
-                    // Busy wait
-                }
-            }
-        }
-        
-        throw new Error(`Task ${taskId} did not complete within timeout period`);
-    }
-
     protected getEntityName(): string {
         return `Redis Cloud Subscription: ${this.definition.name}`;
     }
@@ -393,7 +343,8 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
         cli.output(`Subscription API response: ${JSON.stringify(response)}`);
 
         // Wait for task completion
-        const resourceId = this.waitForTask(response.taskId);
+        const task = this.waitForTask(response.taskId);
+        const resourceId = task.response.resourceId;
 
         // Get the subscription details
         const subscriptionData = this.makeRequest("GET", `${subscriptionPrefix}/subscriptions/${resourceId}`);
@@ -495,10 +446,10 @@ export class Subscription extends RedisCloudEntity<SubscriptionDefinition, Subsc
             return;
         }
 
-        if (this.state.existing) {
-            cli.output("Subscription existed before entity management - not deleting");
-            return;
-        }
+        // if (this.state.existing) {
+        //     cli.output("Subscription existed before entity management - not deleting");
+        //     return;
+        // }
 
         cli.output(`Deleting Redis Cloud subscription: ${this.definition.name} (ID: ${this.state.id})`);
         

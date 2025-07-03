@@ -4,10 +4,6 @@ pro-database:
   metadata:
     name: ProDatabase
   schema:
-    secret_ref:
-      type: string
-      minLength: 1
-      maxLength: 24
     account_key_secret:
       type: string
       minLength: 1

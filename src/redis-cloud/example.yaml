@@ -5,7 +5,7 @@ redis-subscription:
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
   subscription_type: essentials
-  name: My-Redis-Subscription
+  name: My-Fixed-Subscription
   #plan_id: 20927 # 30MB Free AWS us-east-1
   size: 30
   provider: AWS
@@ -17,18 +17,16 @@ redis-subscription:
   support_replication: false
   support_clustering: false
   support_ssl: false
-  #payment_method: credit-card # Payment info is not allowed for free plans
+  #  payment_method: credit-card # Payment info is not allowed for free plans
+  #  payment_method_id: 42073
+  #  OR
+  #  payment_method_type: Visa
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
   services:
     subscription:
       protocol: custom
-  checks:
-    readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 12
 
 redis-database:
   defines: redis-cloud/essentials-database

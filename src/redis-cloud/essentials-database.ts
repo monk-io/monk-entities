@@ -1,8 +1,7 @@
-import { MonkEntity } from "monkec/base";
-import { HttpClient } from "monkec/http-client";
-import { BASE_URL, CONTENT_TYPE, DEFAULT_TASK_TIMEOUT, DEFAULT_POLLING_INTERVAL } from "./common.ts";
 import secret from "secret";
 import cli from "cli";
+
+import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
 
 /**
  * Client TLS certificate specification
@@ -68,21 +67,7 @@ interface ReplicaOfSpec {
  * Essentials database definition - matches Redis Cloud API schema for creating Essentials databases
  * @interface EssentialsDatabaseDefinition
  */
-export interface EssentialsDatabaseDefinition {
-    /**
-     * Secret name for Redis Cloud API account key
-     * @minLength 1
-     * @maxLength 24
-     */
-    account_key_secret: string;
-
-    /**
-     * Secret name for Redis Cloud API user key
-     * @minLength 1
-     * @maxLength 24
-     */
-    user_key_secret: string;
-
+export interface EssentialsDatabaseDefinition extends RedisCloudEntityDefinition {
     /**
      * Database name (required)
      * Database name is limited to 40 characters or less and must include only letters, digits, and hyphens ('-'). 
@@ -233,11 +218,7 @@ export interface EssentialsDatabaseDefinition {
  * Essentials database state
  * @interface EssentialsDatabaseState
  */
-export interface EssentialsDatabaseState {
-    /**
-     * Indicates if the resource already existed before this entity managed it
-     */
-    existing?: boolean;
+export interface EssentialsDatabaseState extends RedisCloudEntityState {
     /**
      * Database ID
      */
@@ -283,150 +264,10 @@ export interface EssentialsDatabaseState {
  * Essentials Database Entity
  * Manages Redis Cloud databases for Essentials subscriptions with API-compliant configuration options.
  */
-export class EssentialsDatabase extends MonkEntity<EssentialsDatabaseDefinition, EssentialsDatabaseState> {
-    
-    /**
-     * HTTP client configured for Redis Cloud API
-     */
-    protected httpClient!: HttpClient;
-
-    /**
-     * Authentication credentials
-     */
-    protected credentials!: { accountKey: string; userKey: string };
-
-    /**
-     * Initialize authentication and HTTP client before any operations
-     */
-    protected override before(): void {
-        const accountKey = secret.get(this.definition.account_key_secret);
-        const userKey = secret.get(this.definition.user_key_secret);
-        
-        if (!accountKey || !userKey) {
-            throw new Error(`Redis Cloud credentials not found. Expected secrets: ${this.definition.account_key_secret} and ${this.definition.user_key_secret}`);
-        }
-
-        this.credentials = { accountKey, userKey };
-        
-        this.httpClient = new HttpClient({
-            baseUrl: BASE_URL,
-            headers: {
-                "accept": "application/json",
-                "x-api-key": accountKey,
-                "x-api-secret-key": userKey,
-                "content-type": CONTENT_TYPE,
-            },
-            parseJson: true,
-            stringifyJson: true,
-        });
-    }
+export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefinition, EssentialsDatabaseState> {
 
     protected getEntityName(): string {
         return `Essentials Database: ${this.definition.name}`;
-    }
-
-    /**
-     * Helper method to make authenticated HTTP requests with consistent error handling
-     */
-    private makeRequest(method: string, path: string, body?: any): any {
-        try {
-            const response = this.httpClient.request(method as any, path, {
-                body,
-                headers: {
-                    'accept': 'application/json',
-                    'x-api-key': this.credentials.accountKey,
-                    'x-api-secret-key': this.credentials.userKey,
-                    'content-type': CONTENT_TYPE
-                }
-            });
-
-            if (!response.ok) {
-                const errorBody = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                throw new Error(`Redis Cloud API error: ${response.statusCode} ${response.status}. Body: ${errorBody || response.raw}`);
-            }
-
-            // Parse response data
-            let responseData = response.data;
-            if (typeof responseData === 'string') {
-                try {
-                    responseData = JSON.parse(responseData);
-                } catch (e) {
-                    // Response is not JSON, keep as string
-                }
-            }
-
-            return responseData;
-        } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`Redis Cloud ${method} request to ${path} failed: ${error.message}`);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Helper method to check if a resource exists by making a GET request
-     * Returns the resource data if it exists, null otherwise
-     */
-    protected checkResourceExists(path: string): any | null {
-        try {
-            return this.makeRequest("GET", path);
-        } catch (error) {
-            // Resource doesn't exist or other error
-            return null;
-        }
-    }
-
-    /**
-     * Wait for task completion with timeout
-     */
-    private waitForTask(taskId: string, timeoutSeconds: number = DEFAULT_TASK_TIMEOUT): any {
-        if (!taskId) {
-            return null;
-        }
-
-        const startTime = Date.now();
-        const timeout = timeoutSeconds * 1000;
-
-        while (Date.now() - startTime < timeout) {
-            try {
-                const taskData = this.makeRequest('GET', `/tasks/${taskId}`);
-                cli.output(`🔍 Full task response: ${JSON.stringify(taskData, null, 2)}`);
-
-                if (taskData && taskData.status) {
-                    if (taskData.status === 'processing-completed') {
-                        cli.output(`✅ Task ${taskId} completed successfully`);
-                        return taskData;
-                    }
-
-                    if (taskData.status === 'processing-error') {
-                        cli.output(`❌ Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
-                        throw new Error(`PERMANENT_FAILURE: Task failed: ${taskData.description || 'Unknown error'}`);
-                    }
-
-                    cli.output(`⏳ Task ${taskId} status: ${taskData.status}`);
-                }
-            } catch (error) {
-                if (error instanceof Error && error.message.includes('PERMANENT_FAILURE:')) {
-                    throw error;
-                }
-                cli.output(`⚠️ Error checking task status: ${error}`);
-            }
-
-            // Simple polling delay
-            const currentTime = Date.now();
-            const elapsed = currentTime - startTime;
-            if (elapsed + DEFAULT_POLLING_INTERVAL < timeout) {
-                const endTime = currentTime + DEFAULT_POLLING_INTERVAL;
-                while (Date.now() < endTime) {
-                    // Busy wait for polling interval
-                }
-            } else {
-                break;
-            }
-        }
-
-        throw new Error(`Task ${taskId} timed out after ${timeoutSeconds} seconds`);
     }
 
     /** Create a new Redis Cloud Essentials database */

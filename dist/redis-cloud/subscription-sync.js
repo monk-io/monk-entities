@@ -29,42 +29,6 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
       throw new Error(`${method} request to ${path} failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  /**
-   * Wait for a Redis Cloud task to complete
-   */
-  waitForTask(taskId) {
-    const maxAttempts = 60;
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-      try {
-        const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
-        cli.output(`\u{1F50D} Full task response: ${JSON.stringify(taskData, null, 2)}`);
-        cli.output(`Task ${taskId} status: ${taskData.status} (attempt ${attempts + 1}/${maxAttempts})`);
-        if (taskData.status === "processing-completed") {
-          return taskData.resourceId;
-        }
-        if (taskData.status === "failed" || taskData.status === "processing-error") {
-          cli.output(`\u274C Task failed with full details: ${JSON.stringify(taskData, null, 2)}`);
-          throw new Error(`PERMANENT_FAILURE: Task ${taskId} failed: ${taskData.description || "Unknown error"}`);
-        }
-        attempts++;
-        if (attempts < maxAttempts) {
-          const start = Date.now();
-          while (Date.now() - start < 5e3) {
-          }
-        }
-      } catch (error) {
-        if (attempts === maxAttempts - 1) {
-          throw error;
-        }
-        attempts++;
-        const start = Date.now();
-        while (Date.now() - start < 1e3) {
-        }
-      }
-    }
-    throw new Error(`Task ${taskId} did not complete within timeout period`);
-  }
   getEntityName() {
     return `Redis Cloud Subscription: ${this.definition.name}`;
   }
@@ -156,7 +120,8 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
       response = this.makeRequest("POST", `${subscriptionPrefix}/subscriptions`, body);
     }
     cli.output(`Subscription API response: ${JSON.stringify(response)}`);
-    const resourceId = this.waitForTask(response.taskId);
+    const task = this.waitForTask(response.taskId);
+    const resourceId = task.response.resourceId;
     const subscriptionData = this.makeRequest("GET", `${subscriptionPrefix}/subscriptions/${resourceId}`);
     cli.output(`Subscription details: ${JSON.stringify(subscriptionData)}`);
     const newState = {
@@ -231,10 +196,6 @@ var _Subscription = class _Subscription extends RedisCloudEntity {
   delete() {
     if (!this.state.id) {
       cli.output("No subscription to delete");
-      return;
-    }
-    if (this.state.existing) {
-      cli.output("Subscription existed before entity management - not deleting");
       return;
     }
     cli.output(`Deleting Redis Cloud subscription: ${this.definition.name} (ID: ${this.state.id})`);

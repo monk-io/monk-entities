@@ -133,8 +133,6 @@ essentials-database:
           - name
         additionalProperties: false
     required:
-      - account_key_secret
-      - user_key_secret
       - name
       - subscription_id
   lifecycle:
@@ -145,8 +143,6 @@ essentials-database:
       initialDelay: 2
       attempts: 10
   requires:
-    - monkec/base
-    - monkec/http-client
-    - redis-cloud/common
     - secret
     - cli
+    - redis-cloud/base
