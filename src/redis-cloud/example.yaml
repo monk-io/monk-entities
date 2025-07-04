@@ -27,24 +27,18 @@ essentials-subscription:
     subscription:
       protocol: custom
 
-pro-subscription:
-  defines: redis-cloud/pro-subscription
-  account_key_secret: redis-cloud-account-key
-  user_key_secret: redis-cloud-user-key
-  name: Pro-Subscription
-  size: 1
-  provider: AWS
-  region: us-east-1
-  #  payment_method: credit-card
-  #  payment_method_id: 42073
-  #  OR
-  payment_method_type: Visa
-  permitted-secrets:
-    redis-cloud-account-key: true
-    redis-cloud-user-key: true
-  services:
-    subscription:
-      protocol: custom
+# pro-subscription:
+#   defines: redis-cloud/pro-subscription
+#   account_key_secret: redis-cloud-account-key
+#   user_key_secret: redis-cloud-user-key
+#   name: Pro-Subscription
+#   payment_method_type: Visa
+#   permitted-secrets:
+#     redis-cloud-account-key: true
+#     redis-cloud-user-key: true
+#   services:
+#     subscription:
+#       protocol: custom
 
 essentials-database:
   defines: redis-cloud/essentials-database
@@ -121,5 +115,5 @@ stack:
   defines: process-group
   runnable-list:
     - redis-cloud-example/redis-client
-    - redis-cloud-example/redis-database
-    - redis-cloud-example/redis-subscription 
+    - redis-cloud-example/essentials-database
+    - redis-cloud-example/essentials-subscription 

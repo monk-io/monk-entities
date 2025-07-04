@@ -45,5 +45,5 @@ sudo INPUT_DIR=./src/redis-cloud/ ./monkec.sh test
 sudo INPUT_DIR=./src/redis-cloud/ ./monkec.sh test --verbose
 
 # Test specific test file
-sudo INPUT_DIR=./src/redis-cloud/ ./monkec.sh test --test-file test/stack-integration.test.yaml
+sudo INPUT_DIR=./src/redis-cloud/ ./monkec.sh test --test-file stack-integration.test.yaml
 ```

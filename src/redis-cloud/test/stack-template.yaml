@@ -27,24 +27,12 @@ essentials-subscription:
     subscription:
       protocol: custom
 
-# Pro Subscription - Paid tier for advanced features testing
 pro-subscription:
-  defines: redis-cloud/subscription
-  name: monkec-dev-pro
-  subscription_type: pro
-  provider: AWS
-  region: us-east-1
-  redis_flex: false
-  size: 1
-  availability: "Single-zone"
-  support_data_persistence: true
-  support_instant_and_daily_backups: true
-  support_replication: true
-  support_clustering: true
-  support_ssl: true
-  payment_method: credit-card
+  defines: redis-cloud/pro-subscription
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
+  name: Pro-Subscription
+  payment_method_type: Visa
   permitted-secrets:
     redis-cloud-account-key: true
     redis-cloud-user-key: true
@@ -122,6 +110,12 @@ essentials-stack:
     - redis-cloud-example/essentials-subscription
     - redis-cloud-example/essentials-database
     - redis-cloud-example/essentials-connection-test
+
+
+pro-stack:
+  defines: process-group
+  runnable-list:
+    - redis-cloud-example/pro-subscription
 
 essentials-connection-test:
   defines: runnable

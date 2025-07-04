@@ -273,7 +273,7 @@ export abstract class RedisCloudEntity<
                     }
                     
                     if (taskData.status === "processing-error") {
-                        throw new Error(`Task processing error: ${JSON.stringify(taskData.response.error)}`);
+                        throw new Error(`Task processing error: ${JSON.stringify(taskData)}`);
                     }
                     
                     // Task is still processing

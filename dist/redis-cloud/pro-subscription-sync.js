@@ -39,29 +39,49 @@ var _ProSubscription = class _ProSubscription extends RedisCloudEntity {
     if (this.definition.payment_method_id) {
       return this.definition.payment_method_id;
     }
-    if (!this.definition.payment_method_type) {
+    const paymentMethodType = this.definition.payment_method || this.definition.payment_method_type;
+    if (!paymentMethodType) {
       return void 0;
     }
     const paymentMethodsData = this.makeRequest("GET", "/payment-methods");
     const paymentMethods = paymentMethodsData.paymentMethods || [];
     for (const paymentMethod of paymentMethods) {
-      if (paymentMethod.type === this.definition.payment_method_type) {
+      if (paymentMethod.type === paymentMethodType) {
         cli.output(`Selected payment method: ${JSON.stringify(paymentMethod)}`);
         return paymentMethod.id;
       }
     }
-    throw new Error(`No matching payment method found for type: ${this.definition.payment_method_type}`);
+    throw new Error(`No matching payment method found for type: ${paymentMethodType}`);
   }
   /**
    * Create the subscription body for API requests
    */
   createSubscriptionBody() {
     const paymentMethodId = this.selectPaymentMethod();
-    return {
+    const paymentMethod = this.definition.payment_method;
+    const body = {
       name: this.definition.name,
-      paymentMethod: this.definition.payment_method,
       paymentMethodId
     };
+    if (paymentMethod) {
+      body.paymentMethod = paymentMethod;
+    }
+    if (this.definition.dry_run !== void 0) {
+      body.dryRun = this.definition.dry_run;
+    }
+    if (this.definition.deployment_type) {
+      body.deploymentType = this.definition.deployment_type;
+    }
+    if (this.definition.memory_storage) {
+      body.memoryStorage = this.definition.memory_storage;
+    }
+    if (this.definition.persistent_storage_encryption_type) {
+      body.persistentStorageEncryptionType = this.definition.persistent_storage_encryption_type;
+    }
+    if (this.definition.redis_version) {
+      body.redisVersion = this.definition.redis_version;
+    }
+    return body;
   }
   /**
    * Sync subscription with Redis Cloud API

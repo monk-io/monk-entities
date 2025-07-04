@@ -62,47 +62,6 @@ tests:
         - "Connected to Redis Cloud Essentials successfully!"
         - "Redis Cloud Essentials test completed successfully!"
 
-  # - name: "Deploy pro development stack"
-  #   action: "run"
-  #   target: "redis-test-stack/dev-pro-stack"
-  #   expect:
-  #     exitCode: 0
-
-  # - name: "Wait for pro stack readiness"
-  #   action: "wait"
-  #   target: "redis-test-stack/dev-pro-stack"
-  #   waitFor:
-  #     condition: "ready"
-  #     timeout: 300000
-
-  # - name: "Verify pro subscription status"
-  #   action: "describe"
-  #   target: "redis-test-stack/dev-pro-subscription"
-  #   expect:
-  #     exitCode: 0
-
-  # - name: "Verify pro database status"
-  #   action: "describe"
-  #   target: "redis-test-stack/dev-pro-database"
-  #   expect:
-  #     exitCode: 0
-
-  # - name: "Wait for pro connection test to exit"
-  #   action: "wait"
-  #   target: "redis-test-stack/dev-pro-connection-test"
-  #   waitFor:
-  #     condition: "exited"
-  #     timeout: 150000
-
-  # - name: "Check pro connection test logs"
-  #   action: "logs"
-  #   target: "redis-test-stack/dev-pro-connection-test"
-  #   expect:
-  #     exitCode: 0
-  #     contains:
-  #       - "Connected to Redis Cloud Pro successfully!"
-  #       - "Redis Cloud Pro test completed successfully!"
-
   - name: "Verify all entities are running"
     action: "ps"
     expect:
@@ -114,9 +73,3 @@ cleanup:
     target: "redis-cloud-example/essentials-stack"
     expect:
       exitCode: 0
-
-  # - name: "Delete pro development stack"
-  #   action: "delete"
-  #   target: "redis-cloud-example/pro-stack"
-  #   expect:
-  #     exitCode: 0 

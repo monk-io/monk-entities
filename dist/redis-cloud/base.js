@@ -177,7 +177,7 @@ var RedisCloudEntity = class extends import_base.MonkEntity {
             return taskData;
           }
           if (taskData.status === "processing-error") {
-            throw new Error(`Task processing error: ${JSON.stringify(taskData.response.error)}`);
+            throw new Error(`Task processing error: ${JSON.stringify(taskData)}`);
           }
           import_cli.default.output(`\u23F3 Task ${taskId} status: ${taskData.status}`);
         }
