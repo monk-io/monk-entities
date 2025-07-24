@@ -1,0 +1,21 @@
+namespace: aws-lambda-test
+
+test-lambda-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: test-lambda-code
+  function_name: test-lambda-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::065217599764:role/lambda-execution-role
+  handler: index.handler
+  summary: "Test Lambda function for aws-lambda entity"
+  timeout: 30
+  memory_size: 128
+  environment:
+    variables:
+      TEST_ENV: "true"
+      NODE_ENV: "test"
+  tags:
+    Environment: test
+    Entity: aws-lambda
+    Purpose: testing 

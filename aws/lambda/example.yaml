@@ -1,0 +1,27 @@
+namespace: lambda-example
+
+lambda-execution-policy:
+  defines: aws/policy
+  name: lambda-execution-policy
+  statement:
+    Effect: "Allow"
+    Action: ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+    Resource: "*"
+  services:
+    policy:
+      protocol: custom
+
+lambda-execution-role:
+  defines: aws/role
+  name: lambda-execution-role
+  assumeRolePolicyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["lambda.amazonaws.com"]},"Action":["sts:AssumeRole"]}]}'
+  policyArn: "arn:aws:iam::065217599764:policy/lambda-execution-policy"
+  connections:
+    policy:
+      runnable: lambda-example/lambda-execution-policy
+      service: policy
+
+stack:
+  defines: process-group
+  runnable-list:
+    - lambda-example/lambda-execution-policy

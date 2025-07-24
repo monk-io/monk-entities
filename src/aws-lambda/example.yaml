@@ -1,0 +1,175 @@
+namespace: aws-lambda-examples
+
+# Basic Lambda function example
+hello-world:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: hello-world-code
+  function_name: hello-world-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::065217599764:role/lambda-execution-role
+  handler: index.handler
+  description: "Simple Hello World Lambda function"
+  timeout: 10
+  memory_size: 128
+  tags:
+    Environment: example
+    Project: monk-entities
+
+# Advanced Lambda function with full configuration
+data-processor:
+  defines: aws-lambda/lambda-function
+  region: us-west-2
+  blob_name: data-processor-code
+  function_name: data-processor-function
+  runtime: python3.11
+  role: arn:aws:iam::065217599764:role/data-processor-role
+  handler: app.lambda_handler
+  description: "Data processing Lambda with advanced configuration"
+  timeout: 300
+  memory_size: 1024
+  environment:
+    variables:
+      ENV: production
+      LOG_LEVEL: INFO
+      S3_BUCKET: my-data-bucket
+      DATABASE_URL: postgresql://user:pass@host:5432/db
+      API_KEY_SECRET: arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key
+  dead_letter_config:
+    target_arn: arn:aws:sqs:us-west-2:123456789012:my-dlq
+  kms_key_arn: arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012
+  tracing_config:
+    mode: Active
+  tags:
+    Environment: production
+    Team: data-engineering
+    CostCenter: engineering
+  layers:
+    - arn:aws:lambda:us-west-2:123456789012:layer:pandas-numpy:1
+    - arn:aws:lambda:us-west-2:123456789012:layer:observability:2
+  architectures:
+    - arm64
+  ephemeral_storage:
+    size: 1024
+  logging_config:
+    log_format: JSON
+    application_log_level: INFO
+    system_log_level: WARN
+    log_group: /aws/lambda/custom-log-group
+
+# Java Lambda function with layers
+api-handler:
+  defines: aws-lambda/function
+  region: eu-central-1
+  blob_name: api-handler-code
+  function_name: api-handler-function
+  runtime: java21
+  role: arn:aws:iam::123456789012:role/api-handler-role
+  handler: com.example.ApiHandler::handleRequest
+  description: "Java API handler with AWS SDK"
+  timeout: 30
+  memory_size: 512
+  environment:
+    variables:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: production
+  layers:
+    - arn:aws:lambda:eu-central-1:123456789012:layer:aws-lambda-java-libs:3
+    - arn:aws:lambda:eu-central-1:123456789012:layer:spring-boot:1
+  architectures:
+    - x86_64
+  tracing_config:
+    mode: Active
+  tags:
+    Environment: production
+    Framework: spring-boot
+    Language: java
+
+# Container image Lambda function
+container-function:
+  defines: aws-lambda/function
+  region: eu-west-1
+  blob_name: container-function-code
+  function_name: container-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::123456789012:role/container-function-role
+  handler: index.handler
+  description: "Container-based Lambda function"
+  package_type: Image
+  timeout: 60
+  memory_size: 256
+  image_config:
+    entry_point:
+      - "/lambda-entrypoint.sh"
+    command:
+      - "index.handler"
+    working_directory: "/var/task"
+  environment:
+    variables:
+      NODE_ENV: production
+  tags:
+    Environment: production
+    DeploymentType: container
+
+# Lambda with EFS file system
+ml-inference:
+  defines: aws-lambda/function
+  region: us-east-2
+  blob_name: ml-inference-code
+  function_name: ml-inference-function
+  runtime: python3.11
+  role: arn:aws:iam::123456789012:role/ml-inference-role
+  handler: inference.handler
+  description: "ML inference Lambda with EFS storage"
+  timeout: 900
+  memory_size: 3008
+  environment:
+    variables:
+      MODEL_PATH: /mnt/efs/models
+      PYTHONPATH: /mnt/efs/libs
+  file_system_configs:
+    - arn: arn:aws:elasticfilesystem:us-east-2:123456789012:access-point/fsap-12345678
+      local_mount_path: /mnt/efs
+  layers:
+    - arn:aws:lambda:us-east-2:123456789012:layer:scipy:1
+    - arn:aws:lambda:us-east-2:123456789012:layer:torch:2
+  architectures:
+    - x86_64
+  ephemeral_storage:
+    size: 2048
+  tags:
+    Environment: production
+    UseCase: ml-inference
+    Team: ml-engineering
+
+# ARM64 Lambda with SnapStart
+serverless-api:
+  defines: aws-lambda/function
+  region: us-west-1
+  blob_name: serverless-api-code
+  function_name: serverless-api-function
+  runtime: java17
+  role: arn:aws:iam::123456789012:role/serverless-api-role
+  handler: com.example.ServerlessApiHandler::handleRequest
+  description: "High-performance serverless API with SnapStart"
+  timeout: 29
+  memory_size: 1024
+  environment:
+    variables:
+      MICRONAUT_ENVIRONMENTS: aws,lambda
+      DATABASE_URL: jdbc:postgresql://...
+  snap_start:
+    apply_on: PublishedVersions
+  architectures:
+    - arm64
+  tracing_config:
+    mode: Active
+  logging_config:
+    log_format: JSON
+    application_log_level: INFO
+    system_log_level: WARN
+  publish: true
+  tags:
+    Environment: production
+    Framework: micronaut
+    Performance: snapstart 

@@ -1,0 +1,94 @@
+name: "AWS Lambda Entity Integration Test"
+description: "Complete integration test for AWS Lambda entity including blob creation, deployment, and invocation testing"
+timeout: 300000
+
+setup:
+  # - name: "Create blob from test Lambda code"
+  #   action: "exec"
+  #   command: "/home/ivan/Work/monk/dist/monk blobs store --name test-lambda-code lambda-test-code/"
+  #   expect:
+  #     exitCode: 0
+
+  - name: "Load AWS Lambda entity manifest"
+    action: "load"
+    target: "dist/input/aws-lambda/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy Lambda function"
+    action: "run"
+    target: "aws-lambda-test/test-lambda-function"
+    expect:
+      exitCode: 0
+
+  # - name: "Wait for Lambda function readiness"
+  #   action: "wait"
+  #   target: "aws-lambda-test/test-lambda-function"
+  #   waitFor:
+  #     condition: "ready"
+  #     timeout: 60000
+
+  - name: "Verify Lambda function deployment"
+    action: "describe"
+    target: "aws-lambda-test/test-lambda-function"
+    expect:
+      exitCode: 0
+
+  - name: "Test Lambda function invocation - simple payload"
+    action: "do"
+    target: "aws-lambda-test/test-lambda-function/invoke"
+    args:
+      payload: '{"name":"World","source":"integration-test","action":"simple-test"}'
+    expect:
+      exitCode: 0
+      contains:
+        - "Function invoked successfully"
+        - "Hello from AWS Lambda test function!"
+
+  - name: "Test Lambda function invocation - complex payload"
+    action: "do" 
+    target: "aws-lambda-test/test-lambda-function/invoke"
+    args:
+      payload: '{"action":"integration-test","data":{"numbers":[1,2,3,4,5],"success":true,"metadata":{"test":"aws-lambda-entity","framework":"monkec"}}}'
+    expect:
+      exitCode: 0
+      contains:
+        - "Function invoked successfully"
+        - "integration-test"
+
+  - name: "Test get-logs action"
+    action: "do"
+    target: "aws-lambda-test/test-lambda-function/get-logs"
+    expect:
+      exitCode: 0
+      contains:
+        - "CloudWatch Log Group"
+        - "/aws/lambda/"
+
+  - name: "Test update-code action"
+    action: "do"
+    target: "aws-lambda-test/test-lambda-function/update-code"
+    expect:
+      exitCode: 0
+      contains:
+        - "Successfully updated Lambda function code"
+
+cleanup:
+  - name: "Delete Lambda function"
+    action: "delete"
+    target: "aws-lambda-test/test-lambda-function"
+    expect:
+      exitCode: 0
+
+  # - name: "Remove test blob"
+  #   action: "exec"
+  #   command: "sudo /home/ivan/Work/monk/dist/monk blobs remove test-lambda-code"
+  #   expect:
+  #     exitCode: 0
