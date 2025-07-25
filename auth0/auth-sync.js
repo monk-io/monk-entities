@@ -235,6 +235,7 @@ function syncApplication(def, state, update) {
 
   return {
     ready: true,
+    "issuer": `${def.domain}`,
     "client-id": appObj.client_id,
     name: appObj.name,
     "client-secret": appObj.client_secret,
@@ -400,6 +401,7 @@ function patchApplication(def, state, ctx) {
 
   return {
     ready: true,
+    "issuer": `${def.domain}`,
     "client-id": appObj.client_id,
     name: appObj.name,
     "client-secret": appObj.client_secret,
