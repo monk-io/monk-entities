@@ -1,0 +1,3 @@
+REPO aws-lambda-test
+LOAD stack-template.yaml
+BLOBS lambda-test-code:lambda-test-code/

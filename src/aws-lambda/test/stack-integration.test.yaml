@@ -3,12 +3,6 @@ description: "Complete integration test for AWS Lambda entity including blob cre
 timeout: 300000
 
 setup:
-  # - name: "Create blob from test Lambda code"
-  #   action: "exec"
-  #   command: "/home/ivan/Work/monk/dist/monk blobs store --name test-lambda-code lambda-test-code/"
-  #   expect:
-  #     exitCode: 0
-
   - name: "Load AWS Lambda entity manifest"
     action: "load"
     target: "dist/input/aws-lambda/MANIFEST"
@@ -17,7 +11,7 @@ setup:
 
   - name: "Load test stack template"
     action: "load"
-    target: "stack-template.yaml"
+    target: "MANIFEST"
     expect:
       exitCode: 0
 
@@ -86,9 +80,4 @@ cleanup:
     target: "aws-lambda-test/test-lambda-function"
     expect:
       exitCode: 0
-
-  # - name: "Remove test blob"
-  #   action: "exec"
-  #   command: "sudo /home/ivan/Work/monk/dist/monk blobs remove test-lambda-code"
-  #   expect:
-  #     exitCode: 0
+      
