@@ -1,0 +1,107 @@
+namespace: iam-examples
+
+# Basic S3 read-only policy
+s3-readonly-policy:
+  defines: aws/iam/iam-policy
+  region: us-east-1
+  policy_name: S3ReadOnlyAccess
+  policy_description: "Provides read-only access to S3 buckets"
+  path: "/application/"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:ListBucket
+        Resource:
+          - "arn:aws:s3:::my-application-bucket/*"
+          - "arn:aws:s3:::my-application-bucket"
+  tags:
+    Environment: production
+    Application: my-app
+    ManagedBy: monk
+
+# EC2 management policy with conditions
+ec2-admin-policy:
+  defines: aws/iam/iam-policy
+  region: us-east-1
+  policy_name: EC2AdminWithConditions
+  policy_description: "EC2 admin access with IP and time restrictions"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - ec2:DescribeInstances
+          - ec2:DescribeImages
+          - ec2:DescribeSecurityGroups
+          - ec2:DescribeVpcs
+        Resource: "*"
+      - Effect: Allow
+        Action:
+          - ec2:StartInstances
+          - ec2:StopInstances
+          - ec2:RebootInstances
+        Resource: "arn:aws:ec2:*:*:instance/*"
+        Condition:
+          StringEquals:
+            "ec2:InstanceType": ["t3.micro", "t3.small", "t3.medium"]
+          IpAddress:
+            "aws:SourceIp": "203.0.113.0/24"
+          Bool:
+            "aws:SecureTransport": "true"
+  tags:
+    Department: DevOps
+    Security: restricted
+
+# Lambda function execution policy
+lambda-execution-policy:
+  defines: aws/iam/iam-policy
+  region: us-east-1
+  policy_name: LambdaExecutionRole
+  policy_description: "Basic execution policy for Lambda functions"
+  path: "/service-role/"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        Resource: "arn:aws:logs:*:*:*"
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:PutObject
+        Resource: 
+          - "arn:aws:s3:::lambda-deployment-bucket/*"
+          - "arn:aws:s3:::lambda-assets-bucket/*"
+  tags:
+    Service: lambda
+    Runtime: nodejs
+
+# Cross-account access policy
+cross-account-policy:
+  defines: aws/iam/iam-policy
+  region: us-east-1
+  policy_name: CrossAccountAssumeRole
+  policy_description: "Allows assuming roles in other AWS accounts"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - sts:AssumeRole
+        Resource:
+          - "arn:aws:iam::123456789012:role/ReadOnlyRole"
+          - "arn:aws:iam::987654321098:role/DeveloperRole"
+        Condition:
+          StringEquals:
+            "aws:RequestedRegion": ["us-east-1", "us-west-2"]
+          StringLike:
+            "aws:userid": "*:${aws:username}"
+  tags:
+    Access: cross-account
+    Purpose: delegation 

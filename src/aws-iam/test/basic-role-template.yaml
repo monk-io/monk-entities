@@ -1,0 +1,23 @@
+namespace: aws-iam-test
+
+test-basic-iam-role:
+  defines: aws-iam/iam-role
+  
+  variables:
+    region: "us-east-1"
+    role_name: "test-basic-iam-role-entity"
+    path: "/test/"
+    max_session_duration: 3600
+    
+    # Basic trust policy allowing EC2 to assume this role
+    assume_role_policy_document:
+      Version: "2012-10-17"
+      Statement:
+        - Effect: "Allow"
+          Principal:
+            Service: "ec2.amazonaws.com"
+          Action: "sts:AssumeRole"
+
+    tags:
+      Owner: "monk-framework"
+      Purpose: "basic-testing" 

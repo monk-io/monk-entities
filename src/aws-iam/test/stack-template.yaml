@@ -1,0 +1,40 @@
+namespace: aws-iam-test
+
+test-iam-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: test-iam-policy-entity
+  policy_description: "Test IAM policy for aws/iam entity integration testing"
+  path: "/test/"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Sid: "S3ObjectAccess"
+        Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:PutObject
+        Resource:
+          - "arn:aws:s3:::monk-test-bucket/*"
+      - Sid: "S3BucketAccess"
+        Effect: Allow
+        Action:
+          - s3:ListBucket
+        Resource:
+          - "arn:aws:s3:::monk-test-bucket"
+        Condition:
+          StringEquals:
+            "s3:prefix": ["public/", "uploads/"]
+      - Sid: "CloudWatchLogsAccess"
+        Effect: Allow
+        Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        Resource:
+          - "arn:aws:logs:us-east-1:*:log-group:/monk/test/*"
+  tags:
+    Environment: test
+    Entity: aws-iam
+    Purpose: integration-testing
+    Owner: monk-framework 

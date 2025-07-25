@@ -1,0 +1,36 @@
+namespace: aws-iam-examples
+
+test-iam-role:
+  defines: aws-iam/iam-role
+  
+  variables:
+    region: us-east-1
+    role_name: test-iam-role-entity
+    path: /test/
+    description: Test IAM role for aws/iam entity integration testing
+    max_session_duration: 3600  # 1 hour
+    
+    # Trust policy allowing EC2 and Lambda to assume this role
+    assume_role_policy_document:
+      Version: "2012-10-17"
+      Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - ec2.amazonaws.com
+              - lambda.amazonaws.com
+          Action: sts:AssumeRole
+          Condition:
+            StringEquals:
+              "aws:RequestedRegion": "us-east-1"
+
+    # List of policy ARNs to attach to this role
+    policies:
+      - "arn:aws:iam::aws:policy/ReadOnlyAccess"
+      - "arn:aws:iam::065217599764:policy/test/test-iam-policy-entity"  # Custom policy created by our policy entity
+
+    tags:
+      Owner: monk-framework
+      Purpose: integration-testing
+      Entity: aws-iam
+      Environment: test 
