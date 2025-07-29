@@ -1,5 +1,0 @@
-namespace: monk-entities
-
-http-client:
-  defines: module
-  source: <<< http-client.js

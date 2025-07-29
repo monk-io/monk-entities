@@ -56,8 +56,8 @@ const action = base.action;
 const cli = require("cli");
 const common = require("vercel/common");
 const VERCEL_API_ENDPOINTS = common.VERCEL_API_ENDPOINTS;
-var _removeDomain_dec, _addDomain_dec, _listDomains_dec, _getDeployment_dec, _createDeployment_dec, _listDeployments_dec, _getProject_dec, _a, _init;
-var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [action("get-project")], _listDeployments_dec = [action("list-deployments")], _createDeployment_dec = [action("create-deployment")], _getDeployment_dec = [action("get-deployment")], _listDomains_dec = [action("list-domains")], _addDomain_dec = [action("add-domain")], _removeDomain_dec = [action("remove-domain")], _a) {
+var _getProductionUrls_dec, _removeDomain_dec, _addDomain_dec, _listDomains_dec, _getDeployment_dec, _createDeployment_dec, _listDeployments_dec, _getProject_dec, _a, _init;
+var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [action("get-project")], _listDeployments_dec = [action("list-deployments")], _createDeployment_dec = [action("create-deployment")], _getDeployment_dec = [action("get-deployment")], _listDomains_dec = [action("list-domains")], _addDomain_dec = [action("add-domain")], _removeDomain_dec = [action("remove-domain")], _getProductionUrls_dec = [action("get-production-urls")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -176,7 +176,7 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       root_directory: createObj.rootDirectory,
       existing: false
     };
-    cli.output(`\u2705 Created Vercel project: ${createObj.name} (${createObj.url})`);
+    cli.output(`\u2705 Created Vercel project: ${createObj.name}`);
   }
   update() {
     if (!this.state.id) {
@@ -279,10 +279,8 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
     cli.output(`\u2705 Project Details:`);
     cli.output(`   ID: ${project.id}`);
     cli.output(`   Name: ${project.name}`);
-    cli.output(`   URL: ${project.url}`);
-    cli.output(`   Status: ${project.status}`);
-    cli.output(`   Created: ${project.created_at}`);
-    cli.output(`   Updated: ${project.updated_at}`);
+    cli.output(`   Framework: ${project.framework || "None"}`);
+    cli.output(`   Created: ${project.createdAt || "Unknown"}`);
     if (project.domains && project.domains.length > 0) {
       cli.output(`   Domains: ${project.domains.join(", ")}`);
     }
@@ -386,6 +384,21 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
     this.makeRequest("DELETE", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains/${domain}`);
     cli.output(`\u2705 Domain removed successfully!`);
   }
+  getProductionUrls() {
+    if (!this.state.id) {
+      throw new Error("Project ID not available");
+    }
+    cli.output(`\u{1F517} Getting production URLs for project: ${this.definition.name}`);
+    const project = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`);
+    if (project.targets && project.targets.production && project.targets.production.alias) {
+      cli.output(`\u2705 Production URLs:`);
+      project.targets.production.alias.forEach((url, index) => {
+        cli.output(`   ${index + 1}. https://${url}`);
+      });
+    } else {
+      cli.output(`\u2139\uFE0F  No production URLs available yet. Deploy the project first.`);
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getProject", _getProject_dec, _Project);
@@ -395,6 +408,7 @@ __decorateElement(_init, 1, "getDeployment", _getDeployment_dec, _Project);
 __decorateElement(_init, 1, "listDomains", _listDomains_dec, _Project);
 __decorateElement(_init, 1, "addDomain", _addDomain_dec, _Project);
 __decorateElement(_init, 1, "removeDomain", _removeDomain_dec, _Project);
+__decorateElement(_init, 1, "getProductionUrls", _getProductionUrls_dec, _Project);
 __decoratorMetadata(_init, _Project);
 __name(_Project, "Project");
 var Project = _Project;

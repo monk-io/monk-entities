@@ -1,4 +1,0 @@
-REPO monk-entities
-DIRS aws/dynamo-db aws/efs aws/rds aws/s3-bucket aws/iam azure/blob-container azure/event-hub azure/service-bus azure/storage-account firebase/cloudfunc-v1 firebase/cloudfunc-v2 firebase/database firebase/hosting gcp/big-query gcp/cloud-sql gcp/cloud-storage gcp/serviceusage gcp/service-account netlify vercel upstash-redis auth0 redis-cloud dist/monkec dist/mongodb-atlas dist/neon
-LOAD project.yaml branch.yaml compute.yaml database.yaml role.yaml neon-base.yaml
-RESOURCES project-sync.js branch-sync.js compute-sync.js database-sync.js role-sync.js neon-base.js
