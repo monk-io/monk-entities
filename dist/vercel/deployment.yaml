@@ -1,8 +1,8 @@
 namespace: vercel
-deploy:
+deployment:
   defines: entity
   metadata:
-    name: Deploy
+    name: Deployment
   schema:
     secret_ref:
       type: string
@@ -33,7 +33,7 @@ deploy:
       - project_id
       - source_path
   lifecycle:
-    sync: <<< deploy-sync.js
+    sync: <<< deployment-sync.js
     get-deployment-details: ''
     get-deployment-logs: ''
   checks:

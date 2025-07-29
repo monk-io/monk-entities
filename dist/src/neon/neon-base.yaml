@@ -1,5 +1,0 @@
-namespace: monk-entities
-
-neon-base:
-  defines: module
-  source: <<< neon-base.js

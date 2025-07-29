@@ -68,6 +68,7 @@ project:
     list-domains: ''
     add-domain: ''
     remove-domain: ''
+    get-production-urls: ''
   checks:
     readiness:
       period: 15

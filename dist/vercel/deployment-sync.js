@@ -48,112 +48,101 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// input/monk-entities/src/neon/role.ts
+// input/vercel/deployment.ts
+const vercelBase = require("vercel/vercel-base");
+const VercelEntity = vercelBase.VercelEntity;
 const base = require("monkec/base");
 const action = base.action;
-const neonBase = require("monk-entities/neon-base");
-const NeonEntity = neonBase.NeonEntity;
-const secret = require("secret");
 const cli = require("cli");
-var _resetPassword_dec, _a, _init;
-var _Role = class _Role extends (_a = NeonEntity, _resetPassword_dec = [action("Reset role password")], _a) {
+const common = require("vercel/common");
+const VERCEL_API_ENDPOINTS = common.VERCEL_API_ENDPOINTS;
+var _getLogs_dec, _getDeployment_dec, _a, _init;
+var _Deployment = class _Deployment extends (_a = VercelEntity, _getDeployment_dec = [action("Get deployment details")], _getLogs_dec = [action("Get deployment logs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
   }
   getEntityName() {
-    return `Neon Role ${this.definition.name} in branch ${this.definition.branchId}`;
+    return `deploy-${this.definition.project_id}`;
   }
-  /** Get password secret name */
-  getPasswordSecretName() {
-    return this.definition.passwordSecretName || "app-user-password";
-  }
-  create() {
-    const roleData = {
-      role: {
-        name: this.definition.name,
-        no_login: !this.definition.canLogin
-      }
-    };
-    const response = this.makeRequest(
-      "POST",
-      `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles`,
-      roleData
-    );
-    const role = response.role;
-    this.state.name = role.name;
-    this.state.protected = role.protected;
-    this.state.createdAt = role.created_at;
-    this.state.updatedAt = role.updated_at;
-    if (role.password) {
-      secret.set(this.getPasswordSecretName(), role.password);
-    }
-    if (response.operations && response.operations.length > 0) {
-      this.state.operationId = response.operations[0].id;
-    }
-  }
+  /** Start the deployment process */
   start() {
-    if (this.state.operationId) {
-      this.waitForOperation(this.definition.projectId, this.state.operationId);
-    }
+    cli.output(`\u{1F680} Starting Vercel deployment for project: ${this.definition.project_id}`);
+    cli.output(`\u{1F4C1} Source directory: ${this.definition.source_path}`);
+    cli.output(`\u{1F3ED} Production: ${this.definition.production || false}`);
   }
-  resetPassword(_args) {
-    if (!this.state.name) {
-      throw new Error("Role name not available");
-    }
-    cli.output(`\u{1F510} Resetting password for role ${this.state.name}...`);
-    const response = this.makeRequest(
-      "POST",
-      `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}/reset_password`
-    );
-    if (response.role && response.role.password) {
-      secret.set(this.getPasswordSecretName(), response.role.password);
-      cli.output(`\u2705 Password reset successfully for role ${this.state.name}`);
-    } else {
-      cli.output(`\u26A0\uFE0F No password returned for role ${this.state.name}`);
-    }
+  /** Stop the deployment process */
+  stop() {
+    cli.output(`\u{1F6D1} Stopping Vercel deployment for project: ${this.definition.project_id}`);
   }
-  delete() {
-    if (!this.state.name) {
-      cli.output("No role name available for deletion");
-      return;
-    }
-    this.deleteResource(
-      `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}`,
-      `Role ${this.state.name}`
-    );
-  }
+  /** Check if deployment is ready */
   checkReadiness() {
-    if (!this.state.name) {
+    if (!this.state.id) {
       return false;
     }
     try {
-      const role = this.makeRequest(
-        "GET",
-        `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}`
-      );
-      if (role.role) {
-        cli.output(`\u2705 Role ${this.state.name} is ready`);
-        return true;
-      } else {
-        cli.output(`\u23F3 Role ${this.state.name} is not ready yet`);
-        return false;
-      }
+      const deployment = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.DEPLOYMENTS_V13}/${this.state.id}`);
+      this.state.status = deployment.status;
+      this.state.ready_at = deployment.ready_at;
+      this.state.build_status = deployment.build_status;
+      this.state.error = deployment.error;
+      return deployment.status === "ready";
     } catch (error) {
-      cli.output(`\u274C Error checking role readiness: ${error}`);
       return false;
+    }
+  }
+  getDeployment() {
+    if (!this.state.id) {
+      throw new Error("Deployment ID not available");
+    }
+    cli.output(`\u{1F4CB} Getting details for deployment: ${this.state.id}`);
+    const deployment = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.DEPLOYMENTS_V13}/${this.state.id}`);
+    cli.output(`\u2705 Deployment Details:`);
+    cli.output(`   ID: ${deployment.id}`);
+    cli.output(`   URL: ${deployment.url}`);
+    cli.output(`   Status: ${deployment.status}`);
+    cli.output(`   Created: ${deployment.created_at}`);
+    cli.output(`   Ready: ${deployment.ready_at || "Not ready"}`);
+    cli.output(`   Build Status: ${deployment.build_status || "Unknown"}`);
+    if (deployment.error) {
+      cli.output(`   Error: ${deployment.error}`);
+    }
+  }
+  getLogs(args) {
+    if (!this.state.id) {
+      throw new Error("Deployment ID not available");
+    }
+    const functionId = args?.function_id;
+    const path = args?.path || "/";
+    cli.output(`\u{1F4CB} Getting logs for deployment: ${this.state.id}`);
+    let logsUrl = `/v2/deployments/${this.state.id}/logs`;
+    if (functionId) {
+      logsUrl += `?functionId=${functionId}`;
+    }
+    if (path && path !== "/") {
+      logsUrl += `${functionId ? "&" : "?"}path=${encodeURIComponent(path)}`;
+    }
+    const logs = this.makeRequest("GET", logsUrl);
+    if (logs && Array.isArray(logs)) {
+      cli.output(`\u{1F4CB} Deployment Logs:`);
+      logs.forEach((log) => {
+        cli.output(`   [${log.timestamp}] ${log.message}`);
+      });
+    } else {
+      cli.output(`\u2139\uFE0F  No logs available`);
     }
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "resetPassword", _resetPassword_dec, _Role);
-__decoratorMetadata(_init, _Role);
-__name(_Role, "Role");
-var Role = _Role;
+__decorateElement(_init, 1, "getDeployment", _getDeployment_dec, _Deployment);
+__decorateElement(_init, 1, "getLogs", _getLogs_dec, _Deployment);
+__decoratorMetadata(_init, _Deployment);
+__name(_Deployment, "Deployment");
+var Deployment = _Deployment;
 
 
 
 function main(def, state, ctx) {
-  const entity = new Role(def, state, ctx);
+  const entity = new Deployment(def, state, ctx);
   return entity.main(ctx);
 }

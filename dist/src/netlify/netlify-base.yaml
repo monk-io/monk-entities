@@ -1,5 +1,0 @@
-namespace: monk-entities
-
-netlify-base:
-  defines: module
-  source: <<< netlify-base.js

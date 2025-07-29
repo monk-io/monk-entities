@@ -1,5 +1,0 @@
-namespace: monk-entities
-
-base:
-  defines: module
-  source: <<< base.js
