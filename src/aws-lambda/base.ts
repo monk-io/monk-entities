@@ -275,12 +275,25 @@ export abstract class AWSLambdaEntity<
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 const response = this.checkFunctionExists(functionName);
-                if (response && response.State === targetState) {
-                    return true;
-                }
-                
-                if (response && response.State === "Failed") {
-                    throw new Error(`Function ${functionName} is in Failed state: ${response.StateReason}`);
+                if (response) {
+                    // Handle nested Configuration structure from AWS Lambda API
+                    const config = (response as any).Configuration || response; // Use type assertion to handle nested structure
+                    
+                    // For Lambda functions, we need to check both State and LastUpdateStatus
+                    // to ensure the function is truly ready for the next operation
+                    const isTargetState = config.State === targetState;
+                    const isUpdateComplete = config.LastUpdateStatus === "Successful";
+                    
+                    if (isTargetState && isUpdateComplete) {
+                        return true;
+                    }
+                    
+                    if (config.State === "Failed" || config.LastUpdateStatus === "Failed") {
+                        throw new Error(`Function ${functionName} is in Failed state. State: ${config.State}, LastUpdateStatus: ${config.LastUpdateStatus}, Reason: ${config.StateReason}`);
+                    }
+                    
+                    // Log current status for debugging
+                    console.log(`Waiting for function ${functionName} - State: ${config.State}, LastUpdateStatus: ${config.LastUpdateStatus}, Target: ${targetState}`);
                 }
 
                 // Wait 5 seconds before next attempt
@@ -294,6 +307,7 @@ export abstract class AWSLambdaEntity<
                 }
             }
         }
+        
         return false;
     }
 } 

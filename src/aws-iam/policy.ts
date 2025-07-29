@@ -23,8 +23,8 @@ export interface IAMPolicyState extends AWSIAMState {
 
 export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState> {
     
-    // Customize readiness check parameters
-    static readonly readiness = { period: 5, initialDelay: 1, attempts: 10 };
+    // Customize readiness check parameters - IAM policies can take longer to propagate
+    static readonly readiness = { period: 10, initialDelay: 5, attempts: 18 };
     
     protected getPolicyName(): string {
         return this.definition.policy_name;
@@ -138,17 +138,14 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
                     policy_arn: response.Policy.Arn,
                     policy_id: response.Policy.PolicyId,
                     default_version_id: response.Policy.DefaultVersionId,
-                    attachment_count: 0,
                     create_date: response.Policy.CreateDate,
                     update_date: response.Policy.UpdateDate,
-                    existing: false
                 };
-                
+
                 cli.output(`Successfully created IAM Policy: ${this.definition.policy_name}`);
                 cli.output(`Policy ARN: ${this.state.policy_arn}`);
-                cli.output(`Policy ID: ${this.state.policy_id}`);
             } else {
-                throw new Error("Unexpected response format from CreatePolicy");
+                throw new Error("No policy information in CreatePolicy response");
             }
         } catch (error) {
             throw new Error(`Failed to create IAM Policy ${this.definition.policy_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -213,23 +210,6 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
             this.deletePolicy(this.state.policy_arn, this.definition.policy_name);
         } catch (error) {
             throw new Error(`Failed to delete IAM Policy ${this.definition.policy_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    override checkReadiness(): boolean {
-        if (!this.state.policy_arn) {
-            return false;
-        }
-
-        try {
-            const response = this.makeAWSRequest("POST", "GetPolicy", {
-                PolicyArn: this.state.policy_arn
-            });
-            
-            return response.Policy != null;
-        } catch (error) {
-            cli.output(`Policy readiness check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return false;
         }
     }
 

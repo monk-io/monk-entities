@@ -79,3 +79,39 @@ lambda-function:
       runnables:
         - aws-lambda-test/lambda-execution-role
       timeout: 60
+
+lambda-go-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: lambda-go-test-code
+  function_name: lambda-go-function
+  runtime: provided.al2023
+  role: <- connection-target("execution-role") entity-state get-member("role_arn")
+  handler: bootstrap
+  summary: "Test Go Lambda function"
+  timeout: 30
+  memory_size: 128
+  environment:
+    variables:
+      TEST_ENV: "true"
+      GO_ENV: "test"
+  tags:
+    Owner: integration-test
+    Runtime: go
+  connections:
+    execution-role:
+      runnable: aws-lambda-test/lambda-execution-role
+      service: execution-role
+  depends:
+    wait-for:
+      runnables:
+        - aws-lambda-test/lambda-execution-role
+      timeout: 60
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws-lambda-test/lambda-go-function
+    # - aws-lambda-test/lambda-function
+    - aws-lambda-test/lambda-execution-role
+    - aws-lambda-test/lambda-execution-policy

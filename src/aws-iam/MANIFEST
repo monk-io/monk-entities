@@ -1,3 +1,0 @@
-REPO aws-iam
-LOAD policy.yaml
-RESOURCES policy.js 

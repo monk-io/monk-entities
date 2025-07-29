@@ -22,7 +22,46 @@ export interface IAMRoleState extends AWSIAMState {
 export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
     
     // Customize readiness check parameters
-    static readonly readiness = { period: 5, initialDelay: 1, attempts: 10 };
+    static readonly readiness = { period: 5, initialDelay: 5, attempts: 10 };
+    
+    override checkReadiness(): boolean {
+        try {
+            cli.output(`Checking readiness for IAM Role: ${this.definition.role_name}`);
+            
+            // Check if role exists and get its current state
+            const roleInfo = this.checkRoleExists(this.definition.role_name);
+            
+            if (!roleInfo?.Role) {
+                cli.output(`Role ${this.definition.role_name} does not exist yet`);
+                return false;
+            }
+            
+            // Verify role ARN is available in state
+            if (!this.state.role_arn) {
+                cli.output(`Role ARN not yet available in state`);
+                return false;
+            }
+            
+            // Check if all specified policies are properly attached
+            if (this.definition.attached_policies && this.definition.attached_policies.length > 0) {
+                const attachedPolicies = this.getAttachedPolicies();
+                
+                for (const expectedPolicy of this.definition.attached_policies) {
+                    if (!attachedPolicies.includes(expectedPolicy)) {
+                        cli.output(`Policy ${expectedPolicy} not yet attached to role`);
+                        return false;
+                    }
+                }
+            }
+            
+            cli.output(`IAM Role ${this.definition.role_name} is ready`);
+            return true;
+            
+        } catch (error) {
+            cli.output(`Readiness check failed for role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return false;
+        }
+    }
     
     protected getPolicyName(): string {
         // This method is inherited from base class but not applicable for roles

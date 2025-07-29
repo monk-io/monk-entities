@@ -319,23 +319,26 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     private updateStateFromResponse(response: any): void {
+        // Handle nested Configuration structure from AWS Lambda API
+        const config = response.Configuration || response; // Fallback to flat structure for backward compatibility
+        
         this.state = {
             ...this.state,
-            function_name: response.FunctionName,
-            function_arn: response.FunctionArn,
-            code_sha256: response.CodeSha256,
-            last_modified: response.LastModified,
-            state: response.State,
-            state_reason: response.StateReason,
-            runtime: response.Runtime,
-            role: response.Role,
-            handler: response.Handler,
-            timeout: response.Timeout,
-            memory_size: response.MemorySize,
-            code_size: response.CodeSize,
-            version: response.Version,
-            last_update_status: response.LastUpdateStatus,
-            revision_id: response.RevisionId,
+            function_name: config.FunctionName,
+            function_arn: config.FunctionArn,
+            code_sha256: config.CodeSha256,
+            last_modified: config.LastModified,
+            state: config.State,
+            state_reason: config.StateReason,
+            runtime: config.Runtime,
+            role: config.Role,
+            handler: config.Handler,
+            timeout: config.Timeout,
+            memory_size: config.MemorySize,
+            code_size: config.CodeSize,
+            version: config.Version,
+            last_update_status: config.LastUpdateStatus,
+            revision_id: config.RevisionId,
         };
     }
 
@@ -397,21 +400,56 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             
             cli.output("Updated Lambda function code");
 
-            // Wait for function to be active before updating configuration
+            // Wait for function to be active and update to complete before updating configuration
+            cli.output("Waiting for function to be ready for configuration update...");
             if (!this.waitForFunctionState(this.definition.function_name, "Active")) {
                 throw new Error("Function did not become active after code update");
             }
 
-            // Update function configuration
+            // Update function configuration with retry logic for 409 conflicts
             const configRequest = this.buildUpdateConfigurationRequest();
-            const configResponse = this.makeAWSRequest(
-                "PUT",
-                `/2015-03-31/functions/${encodeURIComponent(this.definition.function_name)}/configuration`,
-                configRequest
-            );
+            const maxRetries = 5;
+            let configResponse;
+            
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    configResponse = this.makeAWSRequest(
+                        "PUT",
+                        `/2015-03-31/functions/${encodeURIComponent(this.definition.function_name)}/configuration`,
+                        configRequest
+                    );
+                    break; // Success, exit retry loop
+                } catch (error) {
+                    const isConflictError = error instanceof Error && 
+                        (error.message.includes('409') || 
+                         error.message.includes('ResourceConflictException') ||
+                         error.message.includes('update is in progress'));
+                    
+                    if (isConflictError && attempt < maxRetries - 1) {
+                        cli.output(`Received 409 conflict (attempt ${attempt + 1}/${maxRetries}), retrying in 10 seconds...`);
+                        
+                        // Wait 10 seconds before retry
+                        const start = Date.now();
+                        while (Date.now() - start < 10000) {
+                            // Simple busy wait
+                        }
+                        
+                        // Check function state again before retrying
+                        if (!this.waitForFunctionState(this.definition.function_name, "Active")) {
+                            throw new Error("Function became unavailable during retry");
+                        }
+                        continue;
+                    }
+                    
+                    // If it's not a 409 error or we've exhausted retries, throw the error
+                    throw error;
+                }
+            }
             
             cli.output("Updated Lambda function configuration");
-            this.updateStateFromResponse(configResponse);
+            if (configResponse) {
+                this.updateStateFromResponse(configResponse);
+            }
         } catch (error) {
             throw new Error(`Failed to update Lambda function ${this.definition.function_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -436,21 +474,25 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             if (!response) {
                 return false;
             }
+            console.log(`Function exists: ${JSON.stringify(response)}`);
 
             // Function is ready when it's Active and last update was successful
-            const isActive = response.State === "Active";
-            const updateSuccessful = response.LastUpdateStatus === "Successful";
+            // Access properties from the Configuration object in the response
+            const config = (response as any).Configuration || response; // Use type assertion to handle nested structure
+            const isActive = config.State === "Active";
+            const updateSuccessful = config.LastUpdateStatus === "Successful";
             
             if (isActive && updateSuccessful) {
                 this.updateStateFromResponse(response);
+                console.log(`FUNTION STATE: ${config.State}, Last update status: ${config.LastUpdateStatus}`);
                 return true;
             }
 
             // Log current state for debugging
-            cli.output(`Function state: ${response.State}, Last update status: ${response.LastUpdateStatus}`);
+            console.log(`Function state: ${config.State}, Last update status: ${config.LastUpdateStatus}`);
             return false;
         } catch (error) {
-            cli.output(`Error checking readiness: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.log(`Error checking readiness: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }

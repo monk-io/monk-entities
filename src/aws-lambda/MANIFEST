@@ -1,3 +1,0 @@
-REPO aws-lambda
-LOAD function.yaml
-RESOURCES function.js 

@@ -329,7 +329,7 @@ api-lambda:
     mode: Active
 ```
 
-## Testing
+## Integration testing
 
 See the `test/` directory for comprehensive integration tests that demonstrate:
 
@@ -381,3 +381,35 @@ The AWS credentials need the following Lambda permissions:
   ]
 }
 ``` 
+
+## Manual testing
+
+1. Create cluster, add AWS provider
+
+2. Upload templates
+
+```
+monk load ./dist/aws-iam/MANIFEST 
+monk load ./dist/aws-lambda/MANIFEST 
+monk load ./src/aws-lambda/test/MANIFEST 
+```
+
+3. Run the test stack
+
+```
+monk run aws-lambda-test/stack
+```
+
+### Update lambda code
+
+1. Build code
+
+2. Load template (update blob)
+```
+monk load ./src/aws-lambda/test/MANIFEST 
+```
+
+3. Update lambda function code
+```
+monk do aws-lambda-test/lambda-go-function/update-code
+``
