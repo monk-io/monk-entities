@@ -386,6 +386,12 @@ The AWS credentials need the following Lambda permissions:
 
 1. Create cluster, add AWS provider
 
+2. Build test lambda code
+```
+cd ./src/aws-lambda/test/lambda-go-test-code
+GOOS=linux GOARCH=amd64 go build -tags lambda.norpc -o bootstrap main.go
+```
+
 2. Upload templates
 
 ```
@@ -402,7 +408,7 @@ monk run aws-lambda-test/stack
 
 ### Update lambda code
 
-1. Build code
+1. Rebuild code
 
 2. Load template (update blob)
 ```
@@ -413,3 +419,9 @@ monk load ./src/aws-lambda/test/MANIFEST
 ```
 monk do aws-lambda-test/lambda-go-function/update-code
 ``
+
+4. Invoke lambda function
+```
+monk do aws-lambda-test/lambda-function/invoke
+monk do aws-lambda-test/lambda-go-function/invoke
+```

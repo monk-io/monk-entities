@@ -1,5 +1,4 @@
 import { MonkEntity } from "monkec/base";
-import cli from "cli";
 import aws from "cloud/aws";
 import blobs from "blobs";
 
@@ -17,10 +16,6 @@ export interface AWSLambdaState {
     state?: string;
     state_reason?: string;
 }
-
-
-
-
 
 interface LambdaResponse {
     FunctionName?: string;
@@ -127,30 +122,13 @@ export abstract class AWSLambdaEntity<
                 throw new Error(`Blob not found: ${this.definition.blob_name}`);
             }
 
-            cli.output(`Found blob: ${blobMeta.name} (${blobMeta.size} bytes)`);
-
             // Get ZIP archive content from blob
             const zipContent = blobs.zip(this.definition.blob_name);
             if (!zipContent) {
                 throw new Error(`Failed to get ZIP content from blob: ${this.definition.blob_name}`);
             }
 
-            // AWS Lambda requires ZipFile to be base64-encoded
-            // blobs.zip() returns raw binary bytes as a string, so we need to convert to base64
-            let base64Content: string;
-            try {
-                cli.output(`Original ZIP content length: ${zipContent.length} bytes`);
-                
-                // Convert binary string to base64 using btoa()
-                // btoa() expects a binary string where each character represents a byte
-                base64Content = btoa(zipContent);
-                cli.output(`Converted binary ZIP content to base64`);
-                cli.output(`Base64 content length: ${base64Content.length} chars`);
-            } catch (error) {
-                throw new Error(`Failed to encode ZIP content to base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-
-            return base64Content;
+            return zipContent;
         } catch (error) {
             throw new Error(`Failed to retrieve Lambda code from blob ${this.definition.blob_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -159,7 +137,7 @@ export abstract class AWSLambdaEntity<
     protected makeAWSRequest(method: string, path: string, body?: any): LambdaResponse {
         const url = `https://lambda.${this.region}.amazonaws.com${path}`;
         
-        // Follow the same pattern as other entities (efs.js, rds.js, dynamo-db.yaml)
+        // Follow the same pattern as other entities
         const options: any = {
             service: "lambda",
             region: this.region,
@@ -172,23 +150,10 @@ export abstract class AWSLambdaEntity<
             options.body = JSON.stringify(body);
         }
 
-        cli.output(`Making AWS Request: ${method} ${url}`);
-        cli.output(`Request Options: ${JSON.stringify({...options, body: body ? '[BODY_PRESENT]' : undefined}, null, 2)}`);
-        if (body) {
-            // Don't log the full body for create requests as it contains large base64 data
-            if (method === "POST" && body.Code?.ZipFile) {
-                const logBody = { ...body };
-                logBody.Code = { ZipFile: `[BASE64_DATA_${body.Code.ZipFile.length}_chars]` };
-                cli.output(`Request Body: ${JSON.stringify(logBody, null, 2)}`);
-            } else {
-                cli.output(`Request Body: ${JSON.stringify(body, null, 2)}`);
-            }
-        }
-
         try {
             let response: any;
             
-            // Use specific HTTP methods like other entities, not aws.do()
+            // Use specific HTTP methods
             if (method === "GET") {
                 response = aws.get(url, options);
             } else if (method === "POST") {
@@ -201,12 +166,8 @@ export abstract class AWSLambdaEntity<
                 throw new Error(`Unsupported HTTP method: ${method}`);
             }
             
-            cli.output(`AWS Response: Status ${response.statusCode} ${response.status}`);
-            cli.output(`Response Headers: ${JSON.stringify(response.headers || {}, null, 2)}`);
-            
             if (response.statusCode >= 400) {
                 let errorMessage = `AWS Lambda API error: ${response.statusCode} ${response.status}`;
-                cli.output(`Raw AWS Error Response Body: ${response.body}`);
                 
                 try {
                     const errorBody = JSON.parse(response.body);
@@ -222,9 +183,7 @@ export abstract class AWSLambdaEntity<
                     if (errorBody.__type) {
                         errorMessage += ` - ErrorType: ${errorBody.__type}`;
                     }
-                    cli.output(`Parsed AWS Error Details: ${JSON.stringify(errorBody, null, 2)}`);
                 } catch (parseError) {
-                    cli.output(`Failed to parse error response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
                     errorMessage += ` - Raw: ${response.body}`;
                 }
                 throw new Error(errorMessage);
@@ -259,13 +218,11 @@ export abstract class AWSLambdaEntity<
 
     protected deleteLambdaFunction(functionName: string): void {
         if (this.state.existing) {
-            cli.output(`Lambda function ${functionName} wasn't created by this entity, skipping delete`);
             return;
         }
 
         try {
             this.makeAWSRequest("DELETE", `/2015-03-31/functions/${encodeURIComponent(functionName)}`);
-            cli.output(`Successfully deleted Lambda function: ${functionName}`);
         } catch (error) {
             throw new Error(`Failed to delete Lambda function ${functionName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -291,9 +248,6 @@ export abstract class AWSLambdaEntity<
                     if (config.State === "Failed" || config.LastUpdateStatus === "Failed") {
                         throw new Error(`Function ${functionName} is in Failed state. State: ${config.State}, LastUpdateStatus: ${config.LastUpdateStatus}, Reason: ${config.StateReason}`);
                     }
-                    
-                    // Log current status for debugging
-                    console.log(`Waiting for function ${functionName} - State: ${config.State}, LastUpdateStatus: ${config.LastUpdateStatus}, Target: ${targetState}`);
                 }
 
                 // Wait 5 seconds before next attempt

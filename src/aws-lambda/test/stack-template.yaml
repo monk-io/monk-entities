@@ -112,6 +112,6 @@ stack:
   defines: process-group
   runnable-list:
     - aws-lambda-test/lambda-go-function
-    # - aws-lambda-test/lambda-function
+    - aws-lambda-test/lambda-function
     - aws-lambda-test/lambda-execution-role
     - aws-lambda-test/lambda-execution-policy

@@ -1,5 +1,4 @@
 import { MonkEntity } from "monkec/base";
-import cli from "cli";
 import aws from "cloud/aws";
 
 export interface AWSIAMDefinition {
@@ -117,16 +116,6 @@ export abstract class AWSIAMEntity<
 
         options.body = formData;
 
-                    cli.output("Making AWS IAM Request: " + method + " " + url);
-                    cli.output("Action: " + action);
-        cli.output(`Request Options: ${JSON.stringify({...options, body: '[FORM_DATA]'}, null, 2)}`);
-        
-        if (body) {
-            // Log form data for debugging (mask sensitive data if needed)
-            const logFormData = formData.replace(/PolicyDocument=([^&]*)/g, 'PolicyDocument=[POLICY_DOCUMENT]');
-            cli.output(`Form Data: ${logFormData}`);
-        }
-
         try {
             let response: any;
             
@@ -143,12 +132,8 @@ export abstract class AWSIAMEntity<
                 throw new Error("Unsupported HTTP method: " + method);
             }
             
-            cli.output(`AWS IAM Response: Status ${response.statusCode} ${response.status}`);
-            cli.output(`Response Headers: ${JSON.stringify(response.headers || {}, null, 2)}`);
-            
             if (response.statusCode >= 400) {
                 let errorMessage = "AWS IAM API error: " + response.statusCode + " " + response.status;
-                cli.output(`Raw AWS IAM Error Response Body: ${response.body}`);
                 
                 try {
                     // IAM returns XML error responses
@@ -159,9 +144,7 @@ export abstract class AWSIAMEntity<
                     if (errorBody.Error?.Code) {
                         errorMessage += ` - Code: ${errorBody.Error.Code}`;
                     }
-                    cli.output(`Parsed AWS IAM Error Details: ${JSON.stringify(errorBody, null, 2)}`);
                 } catch (parseError) {
-                    cli.output(`Failed to parse error response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
                     errorMessage += ` - Raw: ${response.body}`;
                 }
                 throw new Error(errorMessage);
@@ -184,7 +167,6 @@ export abstract class AWSIAMEntity<
 
     private parseXMLError(xmlBody: string): IAMErrorResponse {
         // Simple XML parsing for IAM error responses
-        // This is a basic implementation - in production, you might want a more robust XML parser
         const errorMatch = xmlBody.match(/<Error>(.*?)<\/Error>/s);
         if (!errorMatch) {
             return {};
@@ -205,12 +187,6 @@ export abstract class AWSIAMEntity<
     }
 
     private parseXMLResponse(xmlBody: string): any {
-        // Simple XML parsing for IAM responses
-        // This is a basic implementation - for production use, consider a robust XML parser
-        
-        // Add debugging to see the actual response
-        cli.output(`Raw AWS IAM Response Body: ${xmlBody}`);
-        
         // For now, we'll handle the most common IAM policy responses
         // Use indexOf to handle xmlns attributes in XML elements
         if (xmlBody.indexOf('<CreatePolicyResponse') !== -1) {
@@ -250,13 +226,11 @@ export abstract class AWSIAMEntity<
         }
         
         if (!policyMatch) {
-            cli.output(`DEBUG: No Policy element found in CreatePolicy response. XML structure might be different.`);
-            cli.output(`DEBUG: Response contains: ${xmlBody.substring(0, 500)}...`);
             return {};
         }
 
         const policyContent = policyMatch[1];
-        const result = {
+        return {
             Policy: {
                 PolicyName: this.extractXMLValue(policyContent, 'PolicyName'),
                 PolicyId: this.extractXMLValue(policyContent, 'PolicyId'),
@@ -267,14 +241,9 @@ export abstract class AWSIAMEntity<
                 UpdateDate: this.extractXMLValue(policyContent, 'UpdateDate'),
             }
         };
-        
-        cli.output(`DEBUG: Parsed Policy Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
     }
 
     private parseCreatePolicyVersionResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing CreatePolicyVersion response`);
-        
         // Look for the PolicyVersion element within CreatePolicyVersionResult
         let versionMatch = xmlBody.match(/<PolicyVersion>(.*?)<\/PolicyVersion>/s);
         
@@ -287,27 +256,20 @@ export abstract class AWSIAMEntity<
         }
         
         if (!versionMatch) {
-            cli.output(`DEBUG: No PolicyVersion element found in CreatePolicyVersion response. XML structure might be different.`);
-            cli.output(`DEBUG: Response contains: ${xmlBody.substring(0, 500)}...`);
             return {};
         }
 
         const versionContent = versionMatch[1];
-        const result = {
+        return {
             PolicyVersion: {
                 VersionId: this.extractXMLValue(versionContent, 'VersionId'),
                 IsDefaultVersion: this.extractXMLValue(versionContent, 'IsDefaultVersion') === 'true',
                 CreateDate: this.extractXMLValue(versionContent, 'CreateDate'),
             }
         };
-        
-        cli.output(`DEBUG: Parsed CreatePolicyVersion Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
     }
 
     private parseCreateRoleResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing CreateRole response`);
-        
         // Look for the Role element within CreateRoleResult
         let roleMatch = xmlBody.match(/<Role>(.*?)<\/Role>/s);
         
@@ -320,13 +282,11 @@ export abstract class AWSIAMEntity<
         }
         
         if (!roleMatch) {
-            cli.output(`DEBUG: No Role element found in CreateRole response. XML structure might be different.`);
-            cli.output(`DEBUG: Response contains: ${xmlBody.substring(0, 500)}...`);
             return {};
         }
 
         const roleContent = roleMatch[1];
-        const result = {
+        return {
             Role: {
                 RoleName: this.extractXMLValue(roleContent, 'RoleName'),
                 RoleId: this.extractXMLValue(roleContent, 'RoleId'),
@@ -338,14 +298,9 @@ export abstract class AWSIAMEntity<
                 CreateDate: this.extractXMLValue(roleContent, 'CreateDate'),
             }
         };
-        
-        cli.output(`DEBUG: Parsed CreateRole Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
     }
 
     private parseGetRoleResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing GetRole response`);
-        
         // Look for the Role element within GetRoleResult
         let roleMatch = xmlBody.match(/<Role>(.*?)<\/Role>/s);
         
@@ -358,13 +313,11 @@ export abstract class AWSIAMEntity<
         }
         
         if (!roleMatch) {
-            cli.output(`DEBUG: No Role element found in GetRole response. XML structure might be different.`);
-            cli.output(`DEBUG: Response contains: ${xmlBody.substring(0, 500)}...`);
             return {};
         }
 
         const roleContent = roleMatch[1];
-        const result = {
+        return {
             Role: {
                 RoleName: this.extractXMLValue(roleContent, 'RoleName'),
                 RoleId: this.extractXMLValue(roleContent, 'RoleId'),
@@ -376,18 +329,12 @@ export abstract class AWSIAMEntity<
                 CreateDate: this.extractXMLValue(roleContent, 'CreateDate'),
             }
         };
-        
-        cli.output(`DEBUG: Parsed GetRole Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
     }
 
     private parseListAttachedRolePoliciesResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing ListAttachedRolePolicies response`);
-        
         // Look for AttachedPolicies within ListAttachedRolePoliciesResult
         const resultMatch = xmlBody.match(/<ListAttachedRolePoliciesResult>(.*?)<\/ListAttachedRolePoliciesResult>/s);
         if (!resultMatch) {
-            cli.output(`DEBUG: No ListAttachedRolePoliciesResult found`);
             return { AttachedPolicies: [] };
         }
 
@@ -409,18 +356,13 @@ export abstract class AWSIAMEntity<
             }
         }
 
-        const result = { AttachedPolicies: attachedPolicies };
-        cli.output(`DEBUG: Parsed ListAttachedRolePolicies Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
+        return { AttachedPolicies: attachedPolicies };
     }
 
     private parseListRolePoliciesResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing ListRolePolicies response`);
-        
         // Look for PolicyNames within ListRolePoliciesResult
         const resultMatch = xmlBody.match(/<ListRolePoliciesResult>(.*?)<\/ListRolePoliciesResult>/s);
         if (!resultMatch) {
-            cli.output(`DEBUG: No ListRolePoliciesResult found`);
             return { PolicyNames: [] };
         }
 
@@ -441,15 +383,11 @@ export abstract class AWSIAMEntity<
             }
         }
 
-        const result = { PolicyNames: policyNames };
-        cli.output(`DEBUG: Parsed ListRolePolicies Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
+        return { PolicyNames: policyNames };
     }
 
     private parseGetPolicyResponse(xmlBody: string): IAMPolicyResponse {
-        cli.output(`DEBUG: Parsing GetPolicy response`);
-        
-        // Look for the Policy element within GetPolicyResult (not CreatePolicyResult)
+        // Look for the Policy element within GetPolicyResult
         let policyMatch = xmlBody.match(/<Policy>(.*?)<\/Policy>/s);
         
         // If not found, try looking within GetPolicyResult
@@ -461,13 +399,11 @@ export abstract class AWSIAMEntity<
         }
         
         if (!policyMatch) {
-            cli.output(`DEBUG: No Policy element found in GetPolicy response. XML structure might be different.`);
-            cli.output(`DEBUG: Response contains: ${xmlBody.substring(0, 500)}...`);
             return {};
         }
 
         const policyContent = policyMatch[1];
-        const result = {
+        return {
             Policy: {
                 PolicyName: this.extractXMLValue(policyContent, 'PolicyName'),
                 PolicyId: this.extractXMLValue(policyContent, 'PolicyId'),
@@ -479,9 +415,6 @@ export abstract class AWSIAMEntity<
                 UpdateDate: this.extractXMLValue(policyContent, 'UpdateDate'),
             }
         };
-        
-        cli.output(`DEBUG: Parsed GetPolicy Response: ${JSON.stringify(result, null, 2)}`);
-        return result;
     }
 
     private parseListPoliciesResponse(_xmlBody: string): IAMListPoliciesResponse {
@@ -516,15 +449,12 @@ export abstract class AWSIAMEntity<
             const path = definition.path || "/";
             const policyArn = `arn:aws:iam::${this.getAccountId()}:policy${path}${policyName}`;
             
-            cli.output(`DEBUG: Checking if policy exists: ${policyArn}`);
             const result = this.makeAWSRequest("POST", "GetPolicy", {
                 PolicyArn: policyArn
             });
             
-            cli.output(`DEBUG: checkPolicyExists result: ${JSON.stringify(result, null, 2)}`);
             return result;
         } catch (error) {
-            cli.output(`DEBUG: Policy doesn't exist or error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
             // Policy doesn't exist
             return null;
         }
@@ -532,7 +462,6 @@ export abstract class AWSIAMEntity<
 
     protected deletePolicy(policyArn: string, policyName: string): void {
         if (this.state.existing) {
-            cli.output(`IAM Policy ${policyName} wasn't created by this entity, skipping delete`);
             return;
         }
 
@@ -540,7 +469,6 @@ export abstract class AWSIAMEntity<
             this.makeAWSRequest("POST", "DeletePolicy", {
                 PolicyArn: policyArn
             });
-            cli.output(`Successfully deleted IAM Policy: ${policyName}`);
         } catch (error) {
             throw new Error(`Failed to delete IAM Policy ${policyName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -548,21 +476,16 @@ export abstract class AWSIAMEntity<
 
     // Helper method to get AWS account ID using STS GetCallerIdentity
     private getAccountId(): string {
-        cli.output(`DEBUG: getAccountId() called`);
         try {
-            cli.output(`DEBUG: Attempting STS GetCallerIdentity call`);
             const response = this.makeSTSRequest("POST", "GetCallerIdentity", {});
-            cli.output(`DEBUG: STS response received: ${JSON.stringify(response)}`);
             if (response.Account) {
-                cli.output(`DEBUG: Found account ID: ${response.Account}`);
                 return response.Account;
             }
         } catch (error) {
-            cli.output(`Warning: Failed to get account ID from STS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Continue with fallback
         }
         
         // Fallback to placeholder if STS call fails
-        cli.output(`DEBUG: Falling back to placeholder account ID`);
         return "123456789012";
     }
 
@@ -591,7 +514,6 @@ export abstract class AWSIAMEntity<
         options.body = formData;
         
         try {
-            cli.output(`DEBUG: Making STS request: ${method} ${url}`);
             let response: any;
             if (method === "POST") {
                 response = aws.post(url, options);
@@ -601,19 +523,12 @@ export abstract class AWSIAMEntity<
                 throw new Error("Unsupported HTTP method for STS: " + method);
             }
             
-            cli.output(`DEBUG: STS response status: ${response.statusCode}`);
-            cli.output(`DEBUG: STS response body type: ${typeof response.body}`);
-            cli.output(`DEBUG: STS response body length: ${response.body ? response.body.length : 'null'}`);
-            
             if (response.statusCode >= 400) {
                 throw new Error(`STS API error: ${response.statusCode} ${response.status}`);
             }
             
             if (response.body) {
-                cli.output(`DEBUG: About to call parseSTSResponse`);
-                const parsed = this.parseSTSResponse(response.body);
-                cli.output(`DEBUG: parseSTSResponse returned: ${JSON.stringify(parsed)}`);
-                return parsed;
+                return this.parseSTSResponse(response.body);
             }
             
             return response;
@@ -624,17 +539,12 @@ export abstract class AWSIAMEntity<
 
     // Simple XML parser for STS GetCallerIdentity response
     private parseSTSResponse(xmlBody: string): any {
-        cli.output(`DEBUG: Parsing STS response: ${xmlBody.substring(0, 200)}...`);
-        
         // Use a simple regex to extract the Account directly from the XML
         const accountMatch = xmlBody.match(/<Account>([^<]+)<\/Account>/);
         if (accountMatch && accountMatch[1]) {
-            const account = accountMatch[1];
-            cli.output(`DEBUG: Found account ID in XML: ${account}`);
-            return { Account: account };
+            return { Account: accountMatch[1] };
         }
         
-        cli.output(`DEBUG: Failed to parse account from STS response`);
         return { rawBody: xmlBody };
     }
 } 

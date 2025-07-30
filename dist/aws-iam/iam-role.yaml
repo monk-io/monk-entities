@@ -1,0 +1,37 @@
+namespace: aws-iam
+iam-role:
+  defines: entity
+  metadata:
+    name: IAMRole
+  schema:
+    region:
+      type: string
+    role_name:
+      type: string
+    assume_role_policy_document: {}
+    path:
+      type: string
+    role_description:
+      type: string
+    max_session_duration:
+      type: number
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    attached_policies:
+      type: array
+      items:
+        type: string
+    required:
+      - region
+      - role_name
+  lifecycle:
+    sync: <<< iam-role-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 10
+  requires:
+    - aws-iam/base

@@ -1,0 +1,5 @@
+namespace: aws-lambda
+
+base:
+  defines: module
+  source: <<< base.js

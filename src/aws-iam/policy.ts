@@ -19,8 +19,6 @@ export interface IAMPolicyState extends AWSIAMState {
     update_date?: string;
 }
 
-
-
 export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState> {
     
     // Customize readiness check parameters - IAM policies can take longer to propagate
@@ -80,14 +78,11 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
         return result;
     }
 
-    override create(): void {
-        cli.output(`Creating IAM Policy: ${this.definition.policy_name}`);
-        
+    override create(): void {        
         // Check if policy already exists
         const existing = this.checkPolicyExists(this.definition.policy_name);
         
         if (existing?.Policy) {
-            cli.output(`IAM Policy ${this.definition.policy_name} already exists, importing`);
             this.state = {
                 policy_arn: existing.Policy.Arn,
                 policy_id: existing.Policy.PolicyId,
@@ -104,8 +99,6 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
         const policyDocument = typeof this.definition.policy_document === 'string' 
             ? this.definition.policy_document 
             : this.customJSONStringify(this.definition.policy_document);
-        
-        cli.output(`DEBUG - Policy Document JSON: ${policyDocument}`);
 
         const params: any = {
             PolicyName: this.definition.policy_name,
@@ -141,9 +134,6 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
                     create_date: response.Policy.CreateDate,
                     update_date: response.Policy.UpdateDate,
                 };
-
-                cli.output(`Successfully created IAM Policy: ${this.definition.policy_name}`);
-                cli.output(`Policy ARN: ${this.state.policy_arn}`);
             } else {
                 throw new Error("No policy information in CreatePolicy response");
             }
@@ -154,12 +144,9 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
 
     override update(): void {
         if (!this.state.policy_arn) {
-            cli.output("Policy doesn't exist, creating instead of updating");
             this.create();
             return;
         }
-
-        cli.output(`Updating IAM Policy: ${this.definition.policy_name}`);
 
         // IAM policies are updated by creating a new version and setting it as default
         const policyDocument = typeof this.definition.policy_document === 'string' 
@@ -178,9 +165,6 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
             if (response.PolicyVersion) {
                 this.state.default_version_id = response.PolicyVersion.VersionId;
                 this.state.update_date = response.PolicyVersion.CreateDate;
-                
-                cli.output(`Successfully updated IAM Policy: ${this.definition.policy_name}`);
-                cli.output(`New version: ${this.state.default_version_id}`);
             } else {
                 throw new Error("Unexpected response format from CreatePolicyVersion");
             }
@@ -191,11 +175,8 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
 
     override delete(): void {
         if (!this.state.policy_arn) {
-            cli.output("IAM Policy does not exist, nothing to delete");
             return;
         }
-        
-        cli.output(`Deleting IAM Policy: ${this.definition.policy_name}`);
         
         try {
             // First check if policy has attachments
@@ -229,14 +210,13 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
                             PolicyArn: this.state.policy_arn,
                             VersionId: version.VersionId
                         });
-                        cli.output(`Deleted policy version: ${version.VersionId}`);
                     } catch (error) {
-                        cli.output(`Warning: Failed to delete policy version ${version.VersionId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        // Continue with other versions if one fails
                     }
                 }
             }
         } catch (error) {
-            cli.output(`Warning: Failed to list policy versions for cleanup: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Log warning but don't fail the operation
         }
     }
 } 

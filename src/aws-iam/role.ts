@@ -1,5 +1,4 @@
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
-import cli from "cli";
 
 // IAM Role specific interfaces
 export interface IAMRoleDefinition extends AWSIAMDefinition {
@@ -26,19 +25,15 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
     
     override checkReadiness(): boolean {
         try {
-            cli.output(`Checking readiness for IAM Role: ${this.definition.role_name}`);
-            
             // Check if role exists and get its current state
             const roleInfo = this.checkRoleExists(this.definition.role_name);
             
             if (!roleInfo?.Role) {
-                cli.output(`Role ${this.definition.role_name} does not exist yet`);
                 return false;
             }
             
             // Verify role ARN is available in state
             if (!this.state.role_arn) {
-                cli.output(`Role ARN not yet available in state`);
                 return false;
             }
             
@@ -48,17 +43,14 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
                 
                 for (const expectedPolicy of this.definition.attached_policies) {
                     if (!attachedPolicies.includes(expectedPolicy)) {
-                        cli.output(`Policy ${expectedPolicy} not yet attached to role`);
                         return false;
                     }
                 }
             }
             
-            cli.output(`IAM Role ${this.definition.role_name} is ready`);
             return true;
             
         } catch (error) {
-            cli.output(`Readiness check failed for role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }
@@ -124,14 +116,11 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         return result;
     }
 
-    override create(): void {
-        cli.output(`Creating IAM Role: ${this.definition.role_name}`);
-        
+    override create(): void {        
         // Check if role already exists
         const existing = this.checkRoleExists(this.definition.role_name);
         
         if (existing?.Role) {
-            cli.output(`IAM Role ${this.definition.role_name} already exists, importing`);
             this.state = {
                 role_arn: existing.Role.Arn,
                 role_id: existing.Role.RoleId,
@@ -148,8 +137,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         const assumeRolePolicyDocument = typeof this.definition.assume_role_policy_document === 'string' 
             ? this.definition.assume_role_policy_document 
             : this.customJSONStringify(this.definition.assume_role_policy_document);
-        
-        cli.output(`DEBUG - Assume Role Policy Document JSON: ${assumeRolePolicyDocument}`);
 
         const params: any = {
             RoleName: this.definition.role_name,
@@ -187,9 +174,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
                     role_id: response.Role.RoleId,
                     create_date: response.Role.CreateDate
                 };
-
-                cli.output(`Successfully created IAM Role: ${this.definition.role_name}`);
-                cli.output(`Role ARN: ${this.state.role_arn}`);
                 
                 // Attach policies to the newly created role
                 this.managePolicyAttachments();
@@ -205,8 +189,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         if (!this.state.role_arn) {
             throw new Error("Role ARN not available. Role may not exist.");
         }
-
-        cli.output(`Updating IAM Role: ${this.definition.role_name}`);
 
         // Update assume role policy document if needed
         const assumeRolePolicyDocument = typeof this.definition.assume_role_policy_document === 'string' 
@@ -231,8 +213,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
 
             // Update policy attachments
             this.updatePolicyAttachments();
-
-            cli.output(`Successfully updated IAM Role: ${this.definition.role_name}`);
         } catch (error) {
             throw new Error(`Failed to update IAM Role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -240,36 +220,26 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
 
     override delete(): void {
         if (!this.state.role_arn) {
-            cli.output("Role ARN not available. Role may not exist.");
             return;
         }
-
-        cli.output(`Deleting IAM Role: ${this.definition.role_name}`);
 
         try {
             // First, detach all managed policies
             const attachedPolicies = this.getAttachedPolicies();
-            cli.output(`Found ${attachedPolicies.length} attached managed policies`);
             for (const policyArn of attachedPolicies) {
                 this.detachPolicyFromRoleStrict(policyArn);
             }
             
             // Then, delete all inline policies
             const inlinePolicies = this.getInlinePolicies();
-            cli.output(`Found ${inlinePolicies.length} inline policies`);
             for (const policyName of inlinePolicies) {
                 this.deleteInlinePolicyStrict(policyName);
             }
-            
-            // Wait a moment for AWS to process the policy changes
-            cli.output("Waiting for policy detachment to complete...");
             
             // Delete the role
             this.makeAWSRequest("POST", "DeleteRole", {
                 RoleName: this.definition.role_name
             });
-
-            cli.output(`Successfully deleted IAM Role: ${this.definition.role_name}`);
         } catch (error) {
             throw new Error(`Failed to delete IAM Role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -277,27 +247,22 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
 
     private checkRoleExists(roleName: string): any {
         try {
-            cli.output(`DEBUG: Checking if role exists: ${roleName}`);
             const result = this.makeAWSRequest("POST", "GetRole", {
                 RoleName: roleName
             });
             
-            cli.output(`DEBUG: checkRoleExists result: ${JSON.stringify(result, null, 2)}`);
             return result;
         } catch (error) {
-            cli.output(`DEBUG: Role doesn't exist or error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return null;
         }
     }
 
     private attachPolicyToRole(policyArn: string): void {
         try {
-            cli.output(`Attaching policy ${policyArn} to role ${this.definition.role_name}`);
             this.makeAWSRequest("POST", "AttachRolePolicy", {
                 RoleName: this.definition.role_name,
                 PolicyArn: policyArn
             });
-            cli.output(`Successfully attached policy ${policyArn}`);
         } catch (error) {
             throw new Error(`Failed to attach policy ${policyArn} to role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -305,26 +270,21 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
 
     private detachPolicyFromRole(policyArn: string): void {
         try {
-            cli.output(`Detaching policy ${policyArn} from role ${this.definition.role_name}`);
             this.makeAWSRequest("POST", "DetachRolePolicy", {
                 RoleName: this.definition.role_name,
                 PolicyArn: policyArn
             });
-            cli.output(`Successfully detached policy ${policyArn}`);
         } catch (error) {
             // Log error but don't throw - policy might already be detached
-            cli.output(`Warning: Failed to detach policy ${policyArn}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
     private detachPolicyFromRoleStrict(policyArn: string): void {
         try {
-            cli.output(`Detaching policy ${policyArn} from role ${this.definition.role_name}`);
             this.makeAWSRequest("POST", "DetachRolePolicy", {
                 RoleName: this.definition.role_name,
                 PolicyArn: policyArn
             });
-            cli.output(`Successfully detached policy ${policyArn}`);
         } catch (error) {
             throw new Error(`Failed to detach policy ${policyArn} from role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -341,7 +301,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
             }
             return [];
         } catch (error) {
-            cli.output(`Warning: Failed to list attached policies: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return [];
         }
     }
@@ -357,19 +316,16 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
             }
             return [];
         } catch (error) {
-            cli.output(`Warning: Failed to list inline policies: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return [];
         }
     }
 
     private deleteInlinePolicyStrict(policyName: string): void {
         try {
-            cli.output(`Deleting inline policy ${policyName} from role ${this.definition.role_name}`);
             this.makeAWSRequest("POST", "DeleteRolePolicy", {
                 RoleName: this.definition.role_name,
                 PolicyName: policyName
             });
-            cli.output(`Successfully deleted inline policy ${policyName}`);
         } catch (error) {
             throw new Error(`Failed to delete inline policy ${policyName} from role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -379,8 +335,6 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         if (!this.definition.attached_policies || this.definition.attached_policies.length === 0) {
             return;
         }
-
-        cli.output(`Managing policy attachments for role ${this.definition.role_name}`);
         
         // Attach each specified policy
         for (const policyArn of this.definition.attached_policies) {

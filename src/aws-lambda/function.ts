@@ -343,10 +343,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     override create(): void {
-        cli.output(`Creating Lambda function: ${this.definition.function_name}`);
-
         // Check if function already exists
-        cli.output(`Checking if function exists...`);
         const existingFunction = this.checkFunctionExists(this.definition.function_name);
         
         if (existingFunction) {
@@ -355,23 +352,15 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             this.state.existing = true;
             return;
         }
-
-        cli.output(`Function doesn't exist, proceeding to create...`);
         
         // Create new function
-        cli.output(`Building create function request...`);
         const createRequest = this.buildCreateFunctionRequest();
-        cli.output(`Create request built successfully`);
         
         try {
-            cli.output(`Making POST request to create function...`);
-            const response = this.makeAWSRequest("POST", "/2015-03-31/functions", createRequest);
-            cli.output(`Successfully created Lambda function: ${this.definition.function_name}`);
-            
+            const response = this.makeAWSRequest("POST", "/2015-03-31/functions", createRequest);      
             this.updateStateFromResponse(response);
             this.state.existing = false;
         } catch (error) {
-            cli.output(`Error during function creation: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw new Error(`Failed to create Lambda function ${this.definition.function_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
@@ -382,8 +371,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             this.create();
             return;
         }
-
-        cli.output(`Updating Lambda function: ${this.definition.function_name}`);
 
         try {
             // Update function code from blob
@@ -397,11 +384,8 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                 `/2015-03-31/functions/${encodeURIComponent(this.definition.function_name)}/code`,
                 updateCodeRequest
             );
-            
-            cli.output("Updated Lambda function code");
 
             // Wait for function to be active and update to complete before updating configuration
-            cli.output("Waiting for function to be ready for configuration update...");
             if (!this.waitForFunctionState(this.definition.function_name, "Active")) {
                 throw new Error("Function did not become active after code update");
             }
@@ -426,8 +410,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                          error.message.includes('update is in progress'));
                     
                     if (isConflictError && attempt < maxRetries - 1) {
-                        cli.output(`Received 409 conflict (attempt ${attempt + 1}/${maxRetries}), retrying in 10 seconds...`);
-                        
                         // Wait 10 seconds before retry
                         const start = Date.now();
                         while (Date.now() - start < 10000) {
@@ -446,7 +428,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                 }
             }
             
-            cli.output("Updated Lambda function configuration");
             if (configResponse) {
                 this.updateStateFromResponse(configResponse);
             }
@@ -474,7 +455,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             if (!response) {
                 return false;
             }
-            console.log(`Function exists: ${JSON.stringify(response)}`);
 
             // Function is ready when it's Active and last update was successful
             // Access properties from the Configuration object in the response
@@ -484,15 +464,11 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             
             if (isActive && updateSuccessful) {
                 this.updateStateFromResponse(response);
-                console.log(`FUNTION STATE: ${config.State}, Last update status: ${config.LastUpdateStatus}`);
                 return true;
             }
 
-            // Log current state for debugging
-            console.log(`Function state: ${config.State}, Last update status: ${config.LastUpdateStatus}`);
             return false;
         } catch (error) {
-            console.log(`Error checking readiness: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }
@@ -507,8 +483,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         const payload = args?.payload || "{}";
         const invocationType = args?.invocationType || "RequestResponse";
 
-        cli.output(`Invoking Lambda function: ${this.definition.function_name}`);
-
         try {
             const response = this.makeAWSRequest(
                 "POST",
@@ -516,7 +490,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                 payload
             );
 
-            cli.output(`Function invoked successfully`);
             if (response && typeof response === 'object') {
                 cli.output(`Response: ${JSON.stringify(response, null, 2)}`);
             }
@@ -543,8 +516,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             throw new Error("Function does not exist, cannot update code");
         }
 
-        cli.output(`Updating Lambda function code: ${this.definition.function_name}`);
-
         try {
             const zipContent = this.getLambdaZipFromBlob();
             const updateCodeRequest = {
@@ -557,7 +528,6 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                 updateCodeRequest
             );
             
-            cli.output("Successfully updated Lambda function code");
             this.updateStateFromResponse(response);
         } catch (error) {
             throw new Error(`Failed to update function code: ${error instanceof Error ? error.message : 'Unknown error'}`);
