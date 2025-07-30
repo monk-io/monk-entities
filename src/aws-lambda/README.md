@@ -418,7 +418,7 @@ monk load ./src/aws-lambda/test/MANIFEST
 3. Update lambda function code
 ```
 monk do aws-lambda-test/lambda-go-function/update-code
-``
+```
 
 4. Invoke lambda function
 ```
