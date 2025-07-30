@@ -1,0 +1,117 @@
+namespace: aws-lambda-test
+
+lambda-execution-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: lambda-execution-policy
+  policy_description: "Lambda execution IAM policy"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Sid: "CloudWatchLogsAccess"
+        Effect: Allow
+        Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        Resource:
+          - "*"
+  tags:
+    Owner: integration-test 
+  services:
+    execution-policy:
+      protocol: custom
+
+lambda-execution-role:
+  defines: aws-iam/iam-role
+  region: "us-east-1"
+  role_name: "lambda-execution-role"
+  role_description: "Lambda execution IAM role"
+  # Basic trust policy allowing Lambda to assume this role
+  assume_role_policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: "Allow"
+        Principal:
+          Service: "lambda.amazonaws.com"
+        Action: "sts:AssumeRole"
+  # Policies to attach to this role
+  attached_policies:
+    - <- connection-target("execution-policy") entity-state get-member("policy_arn")
+  tags:
+    Owner: integration-test
+  services:
+    execution-role:
+      protocol: custom
+  connections:
+    execution-policy:
+      runnable: aws-lambda-test/lambda-execution-policy
+      service: execution-policy
+  depends:
+    wait-for:
+      runnables:
+        - aws-lambda-test/lambda-execution-policy
+      timeout: 60
+
+lambda-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: lambda-test-code
+  function_name: lambda-function
+  runtime: nodejs20.x
+  role: <- connection-target("execution-role") entity-state get-member("role_arn")
+  handler: index.handler
+  summary: "Test Lambda function"
+  timeout: 30
+  memory_size: 128
+  environment:
+    variables:
+      TEST_ENV: "true"
+      NODE_ENV: "test"
+  tags:
+    Owner: integration-test
+  connections:
+    execution-role:
+      runnable: aws-lambda-test/lambda-execution-role
+      service: execution-role
+  depends:
+    wait-for:
+      runnables:
+        - aws-lambda-test/lambda-execution-role
+      timeout: 60
+
+lambda-go-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: lambda-go-test-code
+  function_name: lambda-go-function
+  runtime: provided.al2023
+  role: <- connection-target("execution-role") entity-state get-member("role_arn")
+  handler: bootstrap
+  summary: "Test Go Lambda function"
+  timeout: 30
+  memory_size: 128
+  environment:
+    variables:
+      TEST_ENV: "true"
+      GO_ENV: "test"
+  tags:
+    Owner: integration-test
+    Runtime: go
+  connections:
+    execution-role:
+      runnable: aws-lambda-test/lambda-execution-role
+      service: execution-role
+  depends:
+    wait-for:
+      runnables:
+        - aws-lambda-test/lambda-execution-role
+      timeout: 60
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws-lambda-test/lambda-go-function
+    - aws-lambda-test/lambda-function
+    - aws-lambda-test/lambda-execution-role
+    - aws-lambda-test/lambda-execution-policy

@@ -1,0 +1,5 @@
+namespace: aws-iam
+
+common:
+  defines: module
+  source: <<< common.js

@@ -1,0 +1,136 @@
+namespace: aws-lambda
+lambda-function:
+  defines: entity
+  metadata:
+    name: LambdaFunction
+  schema:
+    region:
+      type: string
+    blob_name:
+      type: string
+    function_name:
+      type: string
+    runtime:
+      type: string
+    role:
+      type: string
+    handler:
+      type: string
+    summary:
+      type: string
+    timeout:
+      type: number
+    memory_size:
+      type: number
+    environment:
+      type: object
+      properties:
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+      additionalProperties: false
+    dead_letter_config:
+      type: object
+      properties:
+        target_arn:
+          type: string
+      additionalProperties: false
+    kms_key_arn:
+      type: string
+    tracing_config:
+      type: object
+      properties:
+        mode:
+          type: string
+      additionalProperties: false
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    layers:
+      type: array
+      items:
+        type: string
+    file_system_configs:
+      type: array
+      items:
+        type: object
+        properties:
+          arn:
+            type: string
+          local_mount_path:
+            type: string
+        required:
+          - arn
+          - local_mount_path
+        additionalProperties: false
+    image_config:
+      type: object
+      properties:
+        entry_point:
+          type: array
+          items:
+            type: string
+        command:
+          type: array
+          items:
+            type: string
+        working_directory:
+          type: string
+      additionalProperties: false
+    code_signing_config_arn:
+      type: string
+    architectures:
+      type: array
+      items:
+        type: string
+    ephemeral_storage:
+      type: object
+      properties:
+        size:
+          type: number
+      additionalProperties: false
+    snap_start:
+      type: object
+      properties:
+        apply_on:
+          type: string
+      additionalProperties: false
+    logging_config:
+      type: object
+      properties:
+        log_format:
+          type: string
+        application_log_level:
+          type: string
+        system_log_level:
+          type: string
+        log_group:
+          type: string
+      additionalProperties: false
+    package_type:
+      type: string
+    publish:
+      type: boolean
+    required:
+      - region
+      - blob_name
+      - function_name
+      - runtime
+      - role
+      - handler
+  lifecycle:
+    sync: <<< lambda-function-sync.js
+    invoke: ''
+    get-logs: ''
+    update-code: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+  requires:
+    - aws-lambda/base
+    - monkec/base
+    - cli

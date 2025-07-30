@@ -1,0 +1,42 @@
+name: "AWS IAM Policy Entity Integration Test"
+description: "Complete integration test for AWS IAM Policy entity including policy creation, updates, and deletion"
+timeout: 300000
+
+setup:
+  - name: "Load AWS IAM entity manifest"
+    action: "load"
+    target: "dist/input/aws-iam/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Create IAM policy"
+    action: "run"
+    target: "aws-iam-test/test-iam-policy"
+    expect:
+      exitCode: 0
+
+  - name: "Verify IAM policy creation"
+    action: "describe"
+    target: "aws-iam-test/test-iam-policy"
+    expect:
+      exitCode: 0
+
+  - name: "Update IAM policy"
+    action: "update"
+    target: "aws-iam-test/test-iam-policy"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete IAM policy"
+    action: "delete"
+    target: "aws-iam-test/test-iam-policy"
+    expect:
+      exitCode: 0 

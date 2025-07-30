@@ -1,0 +1,58 @@
+namespace: aws
+
+role:
+  defines: entity
+  metadata:
+    name: IAM Role
+    description: |
+      AWS IAM roles are a secure way to grant permissions to entities that you trust. 
+      Examples of entities include AWS services, users, and applications. 
+      Roles enable you to delegate access with defined permissions to trusted entities without having to share long-term access keys.
+    website: https://aws.amazon.com/iam/
+    icon: https://symbols.getvecta.com/stencil_23/11_iam.19efc297f3.svg
+    publisher: monk.io
+    tags: aws, iam, role, entities, permissions
+  schema:
+    required: [ "name", "path" ]
+    name:
+      type: string
+      description: The name of the IAM role
+    path:
+      type: string
+      default: "/"
+      description: The path for the role
+    trustedService:
+      type: string
+      default: "lambda.amazonaws.com"
+      description: The AWS service that can assume this role (e.g., lambda.amazonaws.com, ec2.amazonaws.com)
+    assumeRolePolicyDocument:
+      type: object
+      description: |
+        Custom assume role policy document (trust policy). 
+        If not provided, a default policy allowing the specified trustedService will be created.
+      properties:
+        Version:
+          type: string
+          default: "2012-10-17"
+        Statement:
+          type: array
+    policyArn:
+      type: string
+      default: <- connection-target("policy") entity-state get-member("arn") default ""
+      description: ARN of managed policy to attach to this role
+    roleDescription:
+      type: string
+      default: ""
+      description: Description for the IAM role
+  services:
+    role:
+      protocol: custom
+  connections:
+    policy:
+      runnable: aws/policy
+      service: policy
+      description: Connect to IAM policies to attach to this role
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< role-sync.js 

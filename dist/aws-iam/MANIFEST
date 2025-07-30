@@ -1,0 +1,3 @@
+REPO aws-iam
+LOAD iam-policy.yaml base.yaml common.yaml iam-role.yaml
+RESOURCES common.js iam-policy-sync.js iam-role-sync.js base.js

@@ -1,0 +1,5 @@
+namespace: aws-lambda
+
+common:
+  defines: module
+  source: <<< common.js

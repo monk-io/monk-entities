@@ -1,0 +1,17 @@
+namespace: aws-iam-test
+
+test-minimal-iam-role:
+  defines: aws-iam/iam-role
+  
+  variables:
+    region: us-east-1
+    role_name: test-minimal-iam-role-entity
+    
+    # Basic trust policy allowing EC2 to assume this role
+    assume_role_policy_document:
+      Version: "2012-10-17"
+      Statement:
+        - Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole 

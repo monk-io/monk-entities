@@ -1,0 +1,27 @@
+namespace: aws-iam
+iam-policy:
+  defines: entity
+  metadata:
+    name: IAMPolicy
+  schema:
+    region:
+      type: string
+    policy_name:
+      type: string
+    policy_document: {}
+    path:
+      type: string
+    policy_description:
+      type: string
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - policy_name
+  lifecycle:
+    sync: <<< iam-policy-sync.js
+  requires:
+    - aws-iam/base
+    - cli
