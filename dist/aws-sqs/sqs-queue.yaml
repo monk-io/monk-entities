@@ -1,0 +1,84 @@
+namespace: aws-sqs
+sqs-queue:
+  defines: entity
+  metadata:
+    name: SQSQueue
+  schema:
+    region:
+      type: string
+    queue_name:
+      type: string
+    delay_seconds:
+      type: number
+    maximum_message_size:
+      type: number
+    message_retention_period:
+      type: number
+    receive_message_wait_time_seconds:
+      type: number
+    visibility_timeout:
+      type: number
+    fifo_queue:
+      type: boolean
+    content_based_deduplication:
+      type: boolean
+    kms_master_key_id:
+      type: string
+    kms_data_key_reuse_period_seconds:
+      type: number
+    redrive_policy:
+      type: object
+      properties:
+        dead_letter_target_arn:
+          type: string
+        max_receive_count:
+          type: number
+      required:
+        - dead_letter_target_arn
+        - max_receive_count
+      additionalProperties: false
+    redrive_allow_policy:
+      type: object
+      properties:
+        redrive_permission:
+          type: string
+          enum:
+            - allowAll
+            - denyAll
+            - byQueue
+        source_queue_arns:
+          type: array
+          items:
+            type: string
+      required:
+        - redrive_permission
+      additionalProperties: false
+    sqs_managed_sse_enabled:
+      type: boolean
+    policy:
+      type: string
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - queue_name
+  lifecycle:
+    sync: <<< sqs-queue-sync.js
+    get-queue-information-and-attributes: ''
+    send-a-test-message-to-the-queue: ''
+    receive-messages-from-the-queue: ''
+    purge-all-messages-from-the-queue: ''
+    get-queue-statistics-and-metrics: ''
+    list-queue-tags: ''
+    set-queue-tags: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-sqs/base
+    - monkec/base
+    - aws-sqs/common

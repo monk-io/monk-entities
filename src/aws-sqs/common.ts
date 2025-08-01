@@ -1,7 +1,7 @@
 /**
  * Common utilities and helper functions for AWS SQS entities
  */
-import cli from "cli";
+
 
 export interface QueueAttributes {
     DelaySeconds?: number;
@@ -57,7 +57,7 @@ export function validateQueueName(name: string): boolean {
         return false;
     }
     
-    const validPattern = /^[a-zA-Z0-9_-]+(\\.fifo)?$/;
+    const validPattern = /^[a-zA-Z0-9_-]+(\.fifo)?$/;
     return validPattern.test(name);
 }
 
@@ -115,7 +115,10 @@ export function convertAttributesToApiFormat(attributes: QueueAttributes): Recor
     if (attributes.VisibilityTimeout !== undefined) {
         apiAttributes.VisibilityTimeout = attributes.VisibilityTimeout.toString();
     }
-    // FifoQueue is determined by queue name (ending with .fifo), not sent as attribute
+    // FifoQueue attribute is sent to AWS API for FIFO queue creation
+    if (attributes.FifoQueue !== undefined) {
+        apiAttributes.FifoQueue = attributes.FifoQueue.toString();
+    }
     // ContentBasedDeduplication is only valid for FIFO queues
     if (attributes.ContentBasedDeduplication !== undefined) {
         apiAttributes.ContentBasedDeduplication = attributes.ContentBasedDeduplication.toString();
@@ -177,16 +180,16 @@ export function convertAttributesFromApiFormat(apiAttributes: Record<string, str
     }
     if (apiAttributes.RedrivePolicy) {
         try {
-            attributes.RedrivePolicy = JSON.parse(apiAttributes.RedrivePolicy);
+                        attributes.RedrivePolicy = JSON.parse(apiAttributes.RedrivePolicy);
         } catch (error) {
-            cli.output(`[DEBUG] Failed to parse RedrivePolicy: ${error}`);
+            // Ignore parsing errors
         }
     }
     if (apiAttributes.RedriveAllowPolicy) {
         try {
             attributes.RedriveAllowPolicy = JSON.parse(apiAttributes.RedriveAllowPolicy);
         } catch (error) {
-            cli.output(`[DEBUG] Failed to parse RedriveAllowPolicy: ${error}`);
+                // Ignore parsing errors
         }
     }
     if (apiAttributes.SqsManagedSseEnabled) {
@@ -295,8 +298,8 @@ export const DEFAULT_STANDARD_QUEUE_ATTRIBUTES: QueueAttributes = {
     MaximumMessageSize: 262144, // 256 KiB
     MessageRetentionPeriod: 345600, // 4 days
     ReceiveMessageWaitTimeSeconds: 0,
-    VisibilityTimeout: 30,
-    FifoQueue: false
+    VisibilityTimeout: 30
+    // Note: FifoQueue is not included as AWS rejects this attribute for standard queues
 };
 
 /**

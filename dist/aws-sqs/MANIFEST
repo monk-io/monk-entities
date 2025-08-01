@@ -1,0 +1,3 @@
+REPO aws-sqs
+LOAD base.yaml sqs-queue.yaml common.yaml
+RESOURCES common.js base.js sqs-queue-sync.js
