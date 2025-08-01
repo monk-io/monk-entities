@@ -1,0 +1,89 @@
+namespace: aws-sqs-test
+
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-sqs-queue
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 60
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: test
+    Owner: integration-test
+    Updated: "true"
+
+test-fifo-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-sqs-fifo-queue
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 30
+  fifo_queue: true
+  content_based_deduplication: true
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: test
+    Owner: integration-test
+    QueueType: fifo 
+
+# Dead Letter Queue - Created first, exposes ARN via service
+test-dlq:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-dlq
+  message_retention_period: 1209600  # 14 days - longer retention for failed messages
+  visibility_timeout: 60
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: test
+    Owner: integration-test
+    Purpose: dead-letter-queue
+  services:
+    dlq-service:
+      protocol: custom
+
+# Main Queue with DLQ - Uses connection-target to get DLQ ARN
+test-queue-with-dlq:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-queue-with-dlq
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 345600  # 4 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 30
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  # Use connection-target to get DLQ ARN from the connected DLQ entity
+  redrive_policy:
+    dead_letter_target_arn: <- connection-target("dlq-service") entity-state get-member("queue_arn")
+    max_receive_count: 3
+  tags:
+    Environment: test
+    Owner: integration-test
+    Purpose: main-queue-with-dlq
+  connections:
+    dlq-service:
+      runnable: aws-sqs-test/test-dlq
+      service: dlq-service
+  depends:
+    wait-for:
+      runnables:
+        - aws-sqs-test/test-dlq
+      timeout: 60
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws-sqs-test/test-queue
+    - aws-sqs-test/test-fifo-queue
+    - aws-sqs-test/test-dlq
+    - aws-sqs-test/test-queue-with-dlq

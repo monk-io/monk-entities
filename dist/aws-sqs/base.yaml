@@ -1,0 +1,5 @@
+namespace: aws-sqs
+
+base:
+  defines: module
+  source: <<< base.js

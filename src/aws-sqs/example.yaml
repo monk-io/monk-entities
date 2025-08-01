@@ -1,0 +1,99 @@
+namespace: aws-sqs-examples
+
+# Standard SQS Queue Example
+standard-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: standard-example-queue
+  delay_seconds: 0
+  maximum_message_size: 262144  # 256 KiB
+  message_retention_period: 345600  # 4 days
+  receive_message_wait_time_seconds: 20  # Long polling
+  visibility_timeout: 30
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: example
+    Type: standard
+    Owner: monk-framework
+
+# FIFO SQS Queue Example  
+fifo-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: fifo-example-queue.fifo
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 60
+  fifo_queue: true
+  content_based_deduplication: true
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: example
+    Type: fifo
+    Owner: monk-framework
+
+# Queue with Dead Letter Queue Configuration
+main-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: main-processing-queue
+  delay_seconds: 5
+  maximum_message_size: 262144
+  message_retention_period: 345600
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 30
+  redrive_policy:
+    dead_letter_target_arn: "arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"
+    max_receive_count: 3
+  tags:
+    Environment: example
+    Type: main-with-dlq
+    Owner: monk-framework
+
+# Dead Letter Queue
+dead-letter-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: dead-letter-queue
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days - longer retention for investigation
+  receive_message_wait_time_seconds: 0
+  visibility_timeout: 60
+  redrive_allow_policy:
+    redrive_permission: byQueue
+    source_queue_arns:
+      - "arn:aws:sqs:us-east-1:123456789012:main-processing-queue"
+  tags:
+    Environment: example
+    Type: dead-letter
+    Owner: monk-framework
+
+# High-throughput Queue with Custom Encryption
+high-throughput-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: high-throughput-queue
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 86400  # 1 day
+  receive_message_wait_time_seconds: 0  # Short polling for high throughput
+  visibility_timeout: 15  # Shorter timeout for faster processing
+  kms_master_key_id: "alias/aws/sqs"
+  kms_data_key_reuse_period_seconds: 300  # 5 minutes
+  tags:
+    Environment: example
+    Type: high-throughput
+    Owner: monk-framework
+
+# Simple test queue for development
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-queue
+  tags:
+    Environment: test
+    Owner: monk-framework 
