@@ -66,13 +66,10 @@ sqs-queue:
       - queue_name
   lifecycle:
     sync: <<< sqs-queue-sync.js
-    get-queue-information-and-attributes: ''
-    send-a-test-message-to-the-queue: ''
-    receive-messages-from-the-queue: ''
-    purge-all-messages-from-the-queue: ''
-    get-queue-statistics-and-metrics: ''
-    list-queue-tags: ''
-    set-queue-tags: ''
+    send-message: ''
+    receive-messages: ''
+    purge-messages: ''
+    get-statistics: ''
   checks:
     readiness:
       period: 5
@@ -81,4 +78,5 @@ sqs-queue:
   requires:
     - aws-sqs/base
     - monkec/base
+    - cli
     - aws-sqs/common

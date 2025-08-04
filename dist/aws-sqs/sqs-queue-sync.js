@@ -52,16 +52,16 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 const base = require("aws-sqs/base");
 const AWSSQSEntity = base.AWSSQSEntity;
 const MonkecBase = require("monkec/base");
+const cli = require("cli");
 const common = require("aws-sqs/common");
 const validateQueueName = common.validateQueueName;
 const convertAttributesToApiFormat = common.convertAttributesToApiFormat;
-const convertAttributesFromApiFormat = common.convertAttributesFromApiFormat;
 const validateMessageBodySize = common.validateMessageBodySize;
 const DEFAULT_STANDARD_QUEUE_ATTRIBUTES = common.DEFAULT_STANDARD_QUEUE_ATTRIBUTES;
 const DEFAULT_FIFO_QUEUE_ATTRIBUTES = common.DEFAULT_FIFO_QUEUE_ATTRIBUTES;
 var action2 = MonkecBase.action;
-var _setQueueTags_dec, _listQueueTags_dec, _getQueueStatistics_dec, _purgeQueue_dec, _receiveMessages_dec, _sendTestMessage_dec, _getQueueInfo_dec, _a, _init;
-var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _getQueueInfo_dec = [action2("Get queue information and attributes")], _sendTestMessage_dec = [action2("Send a test message to the queue")], _receiveMessages_dec = [action2("Receive messages from the queue")], _purgeQueue_dec = [action2("Purge all messages from the queue")], _getQueueStatistics_dec = [action2("Get queue statistics and metrics")], _listQueueTags_dec = [action2("List queue tags")], _setQueueTags_dec = [action2("Set queue tags")], _a) {
+var _getQueueStatistics_dec, _purgeQueue_dec, _receiveMessagesAction_dec, _sendMessageAction_dec, _a, _init;
+var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _sendMessageAction_dec = [action2("send-message")], _receiveMessagesAction_dec = [action2("receive-messages")], _purgeQueue_dec = [action2("purge-messages")], _getQueueStatistics_dec = [action2("get-statistics")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -163,37 +163,29 @@ var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _getQueueInfo_dec = 
       return false;
     }
   }
-  getQueueInfo() {
+  sendMessageAction(args) {
+    const body = args?.body || args?.message;
+    if (!body) {
+      throw new Error("Message body is required");
+    }
     if (!this.state.queue_url) {
-      return null;
+      return;
     }
     try {
-      const response = this.getQueueAttributes(this.state.queue_url);
-      return convertAttributesFromApiFormat(response.Attributes || {});
-    } catch (error) {
-      return null;
-    }
-  }
-  sendTestMessage(messageBody = "Test message from SQS queue entity") {
-    if (!this.state.queue_url) {
-      return { success: false, error: "Queue URL not available" };
-    }
-    try {
-      if (!validateMessageBodySize(messageBody)) {
-        return { success: false, error: "Message body too large" };
+      if (!validateMessageBodySize(body)) {
+        return;
       }
-      const response = this.sendMessage(this.state.queue_url, messageBody);
-      return {
-        success: true,
-        messageId: response.MessageId
-      };
+      const response = this.sendMessage(this.state.queue_url, body);
+      cli.output(`Message sent: ${response.MessageId}`);
     } catch (error) {
-      return { success: false, error: error.toString() };
+      throw new Error(`Failed to send message: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  receiveMessages(maxMessages = 1, waitTimeSeconds = 0) {
+  receiveMessagesAction(args) {
+    const maxMessages = args?.maxMessages ? Math.min(parseInt(args.maxMessages), 10) : 1;
+    const waitTimeSeconds = args?.waitTimeSeconds ? parseInt(args.waitTimeSeconds) : 0;
     if (!this.state.queue_url) {
-      return { success: false, error: "Queue URL not available" };
+      return;
     }
     try {
       const response = this.receiveMessage(this.state.queue_url, maxMessages, waitTimeSeconds);
@@ -207,17 +199,15 @@ var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _getQueueInfo_dec = 
         MD5OfMessageAttributes: void 0,
         MessageAttributes: msg.MessageAttributes || {}
       }));
-      return {
-        success: true,
-        messages
-      };
+      cli.output(`Received ${messages.length} messages`);
+      cli.output(JSON.stringify(messages, null, 2));
     } catch (error) {
-      return { success: false, error: error.toString() };
+      throw new Error(`Failed to receive messages: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   purgeQueue() {
     if (!this.state.queue_url) {
-      return { success: false, error: "Queue URL not available" };
+      return;
     }
     try {
       let totalPurged = 0;
@@ -233,13 +223,14 @@ var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _getQueueInfo_dec = 
               this.deleteMessage(this.state.queue_url, message.ReceiptHandle);
               totalPurged++;
             } catch (error) {
+              cli.output(`Failed to delete message: ${error instanceof Error ? error.message : "Unknown error"}`);
             }
           }
         }
       }
-      return { success: true };
+      cli.output(`Purged ${totalPurged} messages`);
     } catch (error) {
-      return { success: false, error: error.toString() };
+      throw new Error(`Failed to purge messages: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   getQueueStatistics() {
@@ -257,43 +248,26 @@ var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _getQueueInfo_dec = 
       if (!attributes.Attributes) {
         return { success: false, error: "No attributes returned" };
       }
-      return {
-        success: true,
-        statistics: {
-          approximateNumberOfMessages: parseInt(attributes.Attributes.ApproximateNumberOfMessages || "0"),
-          approximateNumberOfMessagesNotVisible: parseInt(attributes.Attributes.ApproximateNumberOfMessagesNotVisible || "0"),
-          approximateNumberOfMessagesDelayed: parseInt(attributes.Attributes.ApproximateNumberOfMessagesDelayed || "0"),
-          createdTimestamp: parseInt(attributes.Attributes.CreatedTimestamp || "0"),
-          lastModifiedTimestamp: parseInt(attributes.Attributes.LastModifiedTimestamp || "0"),
-          queueArn: this.state.queue_arn
-          // Use stored ARN from state
-        }
+      const statistics = {
+        approximateNumberOfMessages: parseInt(attributes.Attributes.ApproximateNumberOfMessages || "0"),
+        approximateNumberOfMessagesNotVisible: parseInt(attributes.Attributes.ApproximateNumberOfMessagesNotVisible || "0"),
+        approximateNumberOfMessagesDelayed: parseInt(attributes.Attributes.ApproximateNumberOfMessagesDelayed || "0"),
+        createdTimestamp: parseInt(attributes.Attributes.CreatedTimestamp || "0"),
+        lastModifiedTimestamp: parseInt(attributes.Attributes.LastModifiedTimestamp || "0"),
+        queueArn: this.state.queue_arn
+        // Use stored ARN from state
       };
+      return statistics;
     } catch (error) {
-      return { success: false, error: error.toString() };
+      throw new Error(`Failed to get queue statistics: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-  }
-  listQueueTags() {
-    if (!this.state.queue_url) {
-      return { success: false, error: "Queue URL not available" };
-    }
-    return { success: true, tags: this.definition.tags || {} };
-  }
-  setQueueTags(_tags) {
-    if (!this.state.queue_url) {
-      return { success: false, error: "Queue URL not available" };
-    }
-    return { success: true };
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getQueueInfo", _getQueueInfo_dec, _SQSQueue);
-__decorateElement(_init, 1, "sendTestMessage", _sendTestMessage_dec, _SQSQueue);
-__decorateElement(_init, 1, "receiveMessages", _receiveMessages_dec, _SQSQueue);
+__decorateElement(_init, 1, "sendMessageAction", _sendMessageAction_dec, _SQSQueue);
+__decorateElement(_init, 1, "receiveMessagesAction", _receiveMessagesAction_dec, _SQSQueue);
 __decorateElement(_init, 1, "purgeQueue", _purgeQueue_dec, _SQSQueue);
 __decorateElement(_init, 1, "getQueueStatistics", _getQueueStatistics_dec, _SQSQueue);
-__decorateElement(_init, 1, "listQueueTags", _listQueueTags_dec, _SQSQueue);
-__decorateElement(_init, 1, "setQueueTags", _setQueueTags_dec, _SQSQueue);
 __decoratorMetadata(_init, _SQSQueue);
 __name(_SQSQueue, "SQSQueue");
 var SQSQueue = _SQSQueue;

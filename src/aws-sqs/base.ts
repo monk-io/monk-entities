@@ -136,8 +136,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
         });
 
         if (response.statusCode !== 200) {
-            const errorMessage = parseSQSError(response.body);
-            throw new Error(`Failed to create queue: ${errorMessage}`);
+            throw new Error(`Failed to create queue: ${response.body}`);
         }
 
         // Parse XML response to extract queue URL
@@ -259,8 +258,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
         });
 
         if (response.statusCode !== 200) {
-            const errorMessage = parseSQSError(response.body);
-            throw new Error(`Failed to send message: ${errorMessage}`);
+            throw new Error(`Failed to send message: ${response.body}`);
         }
 
         // Parse XML response to extract message ID
@@ -274,7 +272,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
     }
 
     protected receiveMessage(queueUrl: string, maxNumberOfMessages: number = 1, waitTimeSeconds: number = 0): SQSReceiveMessageResponse {
-        let body = `Action=ReceiveMessage&QueueUrl=${encodeURIComponent(queueUrl)}&MaxNumberOfMessages=${maxNumberOfMessages}&WaitTimeSeconds=${waitTimeSeconds}&Version=2012-11-05`;
+        const body = `Action=ReceiveMessage&QueueUrl=${encodeURIComponent(queueUrl)}&MaxNumberOfMessages=${maxNumberOfMessages}&WaitTimeSeconds=${waitTimeSeconds}&Version=2012-11-05`;
 
         const response = aws.post(queueUrl, {
             service: 'sqs',
@@ -286,8 +284,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
         });
 
         if (response.statusCode !== 200) {
-            const errorMessage = parseSQSError(response.body);
-            throw new Error(`Failed to receive messages: ${errorMessage}`);
+            throw new Error(`Failed to receive messages: ${response.body}`);
         }
 
         // Parse XML response - simplified for now
@@ -295,7 +292,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
     }
 
     protected deleteMessage(queueUrl: string, receiptHandle: string): void {
-        let body = `Action=DeleteMessage&QueueUrl=${encodeURIComponent(queueUrl)}&ReceiptHandle=${encodeURIComponent(receiptHandle)}&Version=2012-11-05`;
+        const body = `Action=DeleteMessage&QueueUrl=${encodeURIComponent(queueUrl)}&ReceiptHandle=${encodeURIComponent(receiptHandle)}&Version=2012-11-05`;
 
         const response = aws.post(queueUrl, {
             service: 'sqs',
@@ -307,8 +304,7 @@ export abstract class AWSSQSEntity<TDefinition extends AWSSQSDefinition, TState 
         });
 
         if (response.statusCode !== 200) {
-            const errorMessage = parseSQSError(response.body);
-            throw new Error(`Failed to delete message: ${errorMessage}`);
+            throw new Error(`Failed to delete message: ${response.body}`);
         }
     }
 

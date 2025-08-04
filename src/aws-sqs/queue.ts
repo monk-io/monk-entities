@@ -1,13 +1,12 @@
 import { AWSSQSEntity, AWSSQSDefinition, AWSSQSState } from "./base.ts";
 import * as MonkecBase from "monkec/base";
-
+import cli from "cli";
 const action = MonkecBase.action;
 import {
     QueueAttributes,
     SQSMessage,
     validateQueueName,
     convertAttributesToApiFormat,
-    convertAttributesFromApiFormat,
     validateMessageBodySize,
     DEFAULT_STANDARD_QUEUE_ATTRIBUTES,
     DEFAULT_FIFO_QUEUE_ATTRIBUTES
@@ -180,47 +179,38 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
         }
     }
 
-    // Custom actions
-    @action("Get queue information and attributes")
-    getQueueInfo(): QueueAttributes | null {
+    @action("send-message")
+    sendMessageAction(args?: MonkecBase.Args): void {
+        const body = args?.body || args?.message;
+        if (!body) {
+            throw new Error("Message body is required");
+        }
+
         if (!this.state.queue_url) {
-            return null;
+            return;
         }
 
         try {
-            const response = this.getQueueAttributes(this.state.queue_url);
-            return convertAttributesFromApiFormat(response.Attributes || {});
-        } catch (error) {
-            return null;
-        }
-    }
-
-    @action("Send a test message to the queue")
-    sendTestMessage(messageBody: string = "Test message from SQS queue entity"): { success: boolean; messageId?: string; error?: string } {
-        if (!this.state.queue_url) {
-            return { success: false, error: "Queue URL not available" };
-        }
-
-        try {
-            if (!validateMessageBodySize(messageBody)) {
-                return { success: false, error: "Message body too large" };
+            if (!validateMessageBodySize(body)) {
+                return;
             }
 
-            const response = this.sendMessage(this.state.queue_url, messageBody);
+            const response = this.sendMessage(this.state.queue_url, body);
+
+            cli.output(`Message sent: ${response.MessageId}`);
             
-            return {
-                success: true,
-                messageId: response.MessageId
-            };
         } catch (error) {
-            return { success: false, error: (error as Error).toString() };
+            throw new Error(`Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
-    @action("Receive messages from the queue")
-    receiveMessages(maxMessages: number = 1, waitTimeSeconds: number = 0): { success: boolean; messages?: SQSMessage[]; error?: string } {
+    @action("receive-messages")
+    receiveMessagesAction(args?: MonkecBase.Args): void {
+        const maxMessages = args?.maxMessages ? Math.min(parseInt(args.maxMessages), 10) : 1;
+        const waitTimeSeconds = args?.waitTimeSeconds ? parseInt(args.waitTimeSeconds) : 0;
+
         if (!this.state.queue_url) {
-            return { success: false, error: "Queue URL not available" };
+            return;
         }
 
         try {
@@ -236,19 +226,17 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
                 MessageAttributes: msg.MessageAttributes || {}
             }));
 
-            return {
-                success: true,
-                messages: messages
-            };
+            cli.output(`Received ${messages.length} messages`);
+            cli.output(JSON.stringify(messages, null, 2));
         } catch (error) {
-            return { success: false, error: (error as Error).toString() };
+            throw new Error(`Failed to receive messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
-    @action("Purge all messages from the queue")
-    purgeQueue(): { success: boolean; error?: string } {
+    @action("purge-messages")
+    purgeQueue(): void {
         if (!this.state.queue_url) {
-            return { success: false, error: "Queue URL not available" };
+            return;
         }
 
         try {
@@ -271,20 +259,20 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
                             this.deleteMessage(this.state.queue_url, message.ReceiptHandle);
                             totalPurged++;
                         } catch (error) {
-                            // Continue with other messages
+                            cli.output(`Failed to delete message: ${error instanceof Error ? error.message : 'Unknown error'}`);
                         }
                     }
                 }
             }
 
-            return { success: true };
+            cli.output(`Purged ${totalPurged} messages`);
         } catch (error) {
-            return { success: false, error: (error as Error).toString() };
+            throw new Error(`Failed to purge messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
-    @action("Get queue statistics and metrics")
-    getQueueStatistics(): { success: boolean; statistics?: any; error?: string } {
+    @action("get-statistics")
+    getQueueStatistics(): any {
         if (!this.state.queue_url) {
             return { success: false, error: "Queue URL not available" };
         }
@@ -302,9 +290,7 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
                 return { success: false, error: "No attributes returned" };
             }
 
-            return {
-                success: true,
-                statistics: {
+            const statistics = {
                     approximateNumberOfMessages: parseInt(attributes.Attributes.ApproximateNumberOfMessages || "0"),
                     approximateNumberOfMessagesNotVisible: parseInt(attributes.Attributes.ApproximateNumberOfMessagesNotVisible || "0"),
                     approximateNumberOfMessagesDelayed: parseInt(attributes.Attributes.ApproximateNumberOfMessagesDelayed || "0"),
@@ -312,31 +298,9 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
                     lastModifiedTimestamp: parseInt(attributes.Attributes.LastModifiedTimestamp || "0"),
                     queueArn: this.state.queue_arn // Use stored ARN from state
                 }
-            };
+            return statistics;
         } catch (error) {
-            return { success: false, error: (error as Error).toString() };
+            throw new Error(`Failed to get queue statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-    }
-
-    @action("List queue tags")
-    listQueueTags(): { success: boolean; tags?: Record<string, string>; error?: string } {
-        if (!this.state.queue_url) {
-            return { success: false, error: "Queue URL not available" };
-        }
-
-        // For now, return the tags from definition
-        // TODO: Implement actual tag retrieval from AWS API
-        return { success: true, tags: this.definition.tags || {} };
-    }
-
-    @action("Set queue tags")
-    setQueueTags(_tags: Record<string, string>): { success: boolean; error?: string } {
-        if (!this.state.queue_url) {
-            return { success: false, error: "Queue URL not available" };
-        }
-
-        // For now, just acknowledge the request
-        // TODO: Implement actual tag setting via AWS API
-        return { success: true };
     }
 } 

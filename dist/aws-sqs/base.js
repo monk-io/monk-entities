@@ -113,8 +113,7 @@ var AWSSQSEntity = class extends import_base.MonkEntity {
       body
     });
     if (response.statusCode !== 200) {
-      const errorMessage = parseSQSError(response.body);
-      throw new Error(`Failed to create queue: ${errorMessage}`);
+      throw new Error(`Failed to create queue: ${response.body}`);
     }
     const urlMatch = /<QueueUrl>(.*?)<\/QueueUrl>/.exec(response.body);
     if (urlMatch && urlMatch[1]) {
@@ -211,8 +210,7 @@ var AWSSQSEntity = class extends import_base.MonkEntity {
       body
     });
     if (response.statusCode !== 200) {
-      const errorMessage = parseSQSError(response.body);
-      throw new Error(`Failed to send message: ${errorMessage}`);
+      throw new Error(`Failed to send message: ${response.body}`);
     }
     const messageIdMatch = /<MessageId>(.*?)<\/MessageId>/.exec(response.body);
     const md5Match = /<MD5OfBody>(.*?)<\/MD5OfBody>/.exec(response.body);
@@ -222,7 +220,7 @@ var AWSSQSEntity = class extends import_base.MonkEntity {
     };
   }
   receiveMessage(queueUrl, maxNumberOfMessages = 1, waitTimeSeconds = 0) {
-    let body = `Action=ReceiveMessage&QueueUrl=${encodeURIComponent(queueUrl)}&MaxNumberOfMessages=${maxNumberOfMessages}&WaitTimeSeconds=${waitTimeSeconds}&Version=2012-11-05`;
+    const body = `Action=ReceiveMessage&QueueUrl=${encodeURIComponent(queueUrl)}&MaxNumberOfMessages=${maxNumberOfMessages}&WaitTimeSeconds=${waitTimeSeconds}&Version=2012-11-05`;
     const response = import_aws.default.post(queueUrl, {
       service: "sqs",
       region: this.region,
@@ -232,13 +230,12 @@ var AWSSQSEntity = class extends import_base.MonkEntity {
       body
     });
     if (response.statusCode !== 200) {
-      const errorMessage = parseSQSError(response.body);
-      throw new Error(`Failed to receive messages: ${errorMessage}`);
+      throw new Error(`Failed to receive messages: ${response.body}`);
     }
     return { Messages: [] };
   }
   deleteMessage(queueUrl, receiptHandle) {
-    let body = `Action=DeleteMessage&QueueUrl=${encodeURIComponent(queueUrl)}&ReceiptHandle=${encodeURIComponent(receiptHandle)}&Version=2012-11-05`;
+    const body = `Action=DeleteMessage&QueueUrl=${encodeURIComponent(queueUrl)}&ReceiptHandle=${encodeURIComponent(receiptHandle)}&Version=2012-11-05`;
     const response = import_aws.default.post(queueUrl, {
       service: "sqs",
       region: this.region,
@@ -248,8 +245,7 @@ var AWSSQSEntity = class extends import_base.MonkEntity {
       body
     });
     if (response.statusCode !== 200) {
-      const errorMessage = parseSQSError(response.body);
-      throw new Error(`Failed to delete message: ${errorMessage}`);
+      throw new Error(`Failed to delete message: ${response.body}`);
     }
   }
   queueExists(queueName) {
