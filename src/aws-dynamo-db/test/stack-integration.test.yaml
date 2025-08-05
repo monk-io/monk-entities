@@ -162,9 +162,7 @@ tests:
     action: "do"
     target: "aws-dynamo-db-test/test-table/get-item"
     args:
-      key:
-        id:
-          S: "non-existent-item"
+      key: '{"id":{"S":"non-existent-item"}}'
     expect:
       exitCode: 0
 

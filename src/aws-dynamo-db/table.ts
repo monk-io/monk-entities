@@ -1,6 +1,5 @@
 import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState } from "./base.ts";
 import * as MonkecBase from "monkec/base";
-import cli from "cli";
 const action = MonkecBase.action;
 
 import {
@@ -159,16 +158,11 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         // Handle global secondary indexes
         const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'global_secondary_indexes');
         if (globalSecondaryIndexes.length > 0) {
-            cli.output(`🔧 Raw GSI before KeySchema fix: ${JSON.stringify(globalSecondaryIndexes, null, 2)}`);
             // Fix nested KeySchema arrays in each GSI
-            schema.GlobalSecondaryIndexes = globalSecondaryIndexes.map(gsi => {
-                const fixedGsi = {
-                    ...gsi,
-                    KeySchema: this.extractArrayFromIndexedFields(gsi, 'KeySchema')
-                };
-                cli.output(`🔧 Fixed GSI: ${JSON.stringify(fixedGsi, null, 2)}`);
-                return fixedGsi;
-            });
+            schema.GlobalSecondaryIndexes = globalSecondaryIndexes.map(gsi => ({
+                ...gsi,
+                KeySchema: this.extractArrayFromIndexedFields(gsi, 'KeySchema')
+            }));
         }
 
         // Handle local secondary indexes
@@ -205,18 +199,11 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     }
 
     override create(): void {
-        cli.output(`🎯 Starting DynamoDB table creation: ${this.definition.table_name}`);
-        cli.output(`🔍 Region: ${this.definition.region}`);
-        cli.output(`📝 Definition: ${JSON.stringify(this.definition, null, 2)}`);
-        
-        cli.output(`✅ Validating table definition...`);
         this.validateDefinition();
         
-        cli.output(`🔎 Checking if table already exists...`);
         // Check if table already exists
         const existingTable = super.getTableInfo(this.definition.table_name);
         if (existingTable) {
-            cli.output(`✅ Table ${this.definition.table_name} already exists`);
             this.state = {
                 table_name: existingTable.TableName,
                 table_arn: existingTable.TableArn,
@@ -226,17 +213,11 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             return;
         }
 
-        cli.output(`🏗️ Building table schema...`);
         // Create the table
         const tableSchema = this.buildTableSchema();
-        cli.output(`📋 Built schema: ${JSON.stringify(tableSchema, null, 2)}`);
-        
-        cli.output(`🚀 Creating new DynamoDB table...`);
         const response = this.makeDynamoDBRequest("CreateTable", tableSchema);
-        cli.output(`📥 CreateTable response: ${JSON.stringify(response, null, 2)}`);
         
         if (response.TableDescription) {
-            cli.output(`✅ Table creation initiated successfully`);
             this.state = {
                 table_name: response.TableDescription.TableName,
                 table_arn: response.TableDescription.TableArn,
@@ -271,21 +252,12 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     }
 
     override start(): void {
-        cli.output(`🚀 Starting DynamoDB table: ${this.definition.table_name}`);
-        
         if (!this.state.table_name) {
             throw new Error("Table not created yet");
         }
         
         // For DynamoDB tables, "starting" means waiting for ACTIVE status
-        cli.output(`⏳ Waiting for table to become ACTIVE...`);
-        try {
-            super.waitForTableStatus(this.state.table_name, "ACTIVE", 60, 5);
-            cli.output(`✅ Table ${this.definition.table_name} is now ACTIVE and ready`);
-        } catch (error) {
-            cli.output(`❌ Table failed to become ACTIVE: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            throw error;
-        }
+        super.waitForTableStatus(this.state.table_name, "ACTIVE", 60, 5);
     }
 
     override stop(): void {
@@ -414,8 +386,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             throw new Error("Item is required");
         }
 
-        cli.output(`🔧 DEBUG putItem args: ${JSON.stringify(args, null, 2)}`);
-
         // Parse JSON string to object
         let item;
         try {
@@ -423,8 +393,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         } catch (error) {
             throw new Error(`Invalid item JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-
-        cli.output(`🔧 DEBUG parsed item: ${JSON.stringify(item, null, 2)}`);
 
         const params = {
             TableName: this.state.table_name,
@@ -445,8 +413,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             throw new Error("Key is required");
         }
 
-        cli.output(`🔧 DEBUG getItem args: ${JSON.stringify(args, null, 2)}`);
-
         // Parse JSON string to object
         let key;
         try {
@@ -454,8 +420,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         } catch (error) {
             throw new Error(`Invalid key JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-
-        cli.output(`🔧 DEBUG parsed key: ${JSON.stringify(key, null, 2)}`);
 
         const params = {
             TableName: this.state.table_name,
@@ -481,8 +445,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             throw new Error("Key is required");
         }
 
-        cli.output(`🔧 DEBUG deleteItem args: ${JSON.stringify(args, null, 2)}`);
-
         // Parse JSON string to object
         let key;
         try {
@@ -490,8 +452,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         } catch (error) {
             throw new Error(`Invalid key JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-
-        cli.output(`🔧 DEBUG parsed key: ${JSON.stringify(key, null, 2)}`);
 
         const params = {
             TableName: this.state.table_name,
@@ -509,8 +469,7 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
 
         const limit = args?.limit;
         
-        cli.output(`🔧 DEBUG scanTable args: ${JSON.stringify(args, null, 2)}`);
-        cli.output(`🔧 DEBUG extracted limit: ${limit}`);
+
 
         const params: any = {
             TableName: this.state.table_name

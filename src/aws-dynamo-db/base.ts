@@ -1,6 +1,5 @@
 import { MonkEntity } from "monkec/base";
 import aws from "cloud/aws";
-import cli from "cli";
 
 export interface AWSDynamoDBDefinition {
     region: string;
@@ -44,26 +43,8 @@ export abstract class AWSDynamoDBEntity<
             timeout: 30
         };
 
-        cli.output(`🔧 DEBUG: DynamoDB API Request`);
-        cli.output(`   Action: ${action}`);
-        cli.output(`   URL: ${url}`);
-        cli.output(`   Region: ${this.region}`);
-        cli.output(`   Headers: ${JSON.stringify(options.headers, null, 2)}`);
-        cli.output(`   Body: ${options.body}`);
-        cli.output(`   Options: ${JSON.stringify(options, null, 2)}`);
-
         try {
-            cli.output(`🚀 Sending DynamoDB request using aws.post()...`);
-            cli.output(`🔐 AWS module type: ${typeof aws}`);
-            cli.output(`🔧 AWS post method type: ${typeof aws.post}`);
             const response = aws.post(url, options);
-            
-            cli.output(`📥 DynamoDB Response:`);
-            cli.output(`   Status Code: ${response.statusCode}`);
-            cli.output(`   Status: ${response.status}`);
-            cli.output(`   Headers: ${JSON.stringify(response.headers || {}, null, 2)}`);
-            cli.output(`   Body: ${response.body || 'No body'}`);
-            cli.output(`   Response Type: ${typeof response.body}`);
 
             if (response.statusCode >= 400) {
                 let errorMessage = `DynamoDB API error: ${response.statusCode} ${response.status}`;
@@ -146,21 +127,15 @@ export abstract class AWSDynamoDBEntity<
     }
 
     protected getTableInfo(tableName: string): any {
-        cli.output(`🔍 Getting table info for: ${tableName}`);
         try {
-            cli.output(`📞 Calling DescribeTable API...`);
             const response = this.makeDynamoDBRequest("DescribeTable", {
                 TableName: tableName
             });
-            cli.output(`📋 Table info response: ${JSON.stringify(response.Table, null, 2)}`);
             return response.Table;
         } catch (error) {
-            cli.output(`❌ Error getting table info: ${error instanceof Error ? error.message : 'Unknown error'}`);
             if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {
-                cli.output(`ℹ️ Table ${tableName} not found (ResourceNotFoundException)`);
                 return null;
             }
-            cli.output(`🚨 Rethrowing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error;
         }
     }

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  dynamodb-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: dynamodb-client:latest
+    container_name: dynamodb-client
+    restart: unless-stopped
+    
+    environment:
+      # DynamoDB Configuration
+      DYNAMODB_TABLE_NAME: ${DYNAMODB_TABLE_NAME:-users-table}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      
+      # Client Configuration
+      OPERATION_INTERVAL_MS: ${OPERATION_INTERVAL_MS:-3000}
+      MAX_OPERATIONS: ${MAX_OPERATIONS:-50}
+      
+      # AWS Credentials (if not using IAM roles)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      
+      # Application Settings
+      NODE_ENV: production
+    
+    volumes:
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 
