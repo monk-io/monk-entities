@@ -1,0 +1,81 @@
+namespace: aws-s3-example
+
+# Basic S3 bucket
+my-basic-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-basic-s3-bucket
+  versioning: false
+  public_read_access: false
+  public_write_access: false
+  tags:
+    Environment: production
+    Owner: my-team
+
+# S3 bucket with versioning and CORS
+my-website-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-west-2
+  bucket_name: my-website-bucket
+  versioning: true
+  public_read_access: true
+  public_write_access: false
+  cors_configuration:
+    cors_rules:
+      - allowed_methods: ["GET", "HEAD"]
+        allowed_origins: ["https://mydomain.com", "https://www.mydomain.com"]
+        allowed_headers: ["*"]
+        expose_headers: ["ETag"]
+        max_age_seconds: 3600
+  tags:
+    Environment: production
+    Purpose: website-hosting
+    Owner: frontend-team
+
+# S3 bucket with lifecycle rules
+my-data-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-data-archive-bucket
+  versioning: true
+  lifecycle_configuration:
+    rules:
+      - id: archive-old-data
+        status: Enabled
+        filter:
+          prefix: logs/
+        transitions:
+          - days: 30
+            storage_class: STANDARD_IA
+          - days: 90
+            storage_class: GLACIER
+        expiration:
+          days: 2555  # 7 years
+      - id: cleanup-uploads
+        status: Enabled
+        filter:
+          prefix: uploads/temp/
+        expiration:
+          days: 7
+  tags:
+    Environment: production
+    Purpose: data-archival
+    Retention: long-term
+
+# S3 bucket with encryption
+my-secure-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-secure-documents-bucket
+  versioning: true
+  public_read_access: false
+  public_write_access: false
+  server_side_encryption:
+    rules:
+      - apply_server_side_encryption_by_default:
+          sse_algorithm: AES256
+        bucket_key_enabled: true
+  tags:
+    Environment: production
+    Security: high
+    Compliance: required 
