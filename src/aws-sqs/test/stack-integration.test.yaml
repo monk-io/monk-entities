@@ -1,0 +1,170 @@
+name: "AWS SQS Queue Entity Integration Test"
+description: "Complete integration test for AWS SQS Queue entity including queue creation, custom actions, message operations, and cleanup"
+timeout: 300000
+
+setup:
+  - name: "Load AWS SQS entity manifest"
+    action: "load"
+    target: "dist/input/aws-sqs/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy stack"
+    action: "run"
+    target: "aws-sqs-test/stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for queue readiness"
+    action: "wait"
+    target: "aws-sqs-test/test-queue"
+    waitFor:
+      condition: "ready"
+      timeout: 15000
+
+  - name: "Wait for FIFO queue readiness"
+    action: "wait"
+    target: "aws-sqs-test/test-fifo-queue"
+    waitFor:
+      condition: "ready"
+      timeout: 150000
+
+  - name: "Verify SQS queue status"
+    action: "describe"
+    target: "aws-sqs-test/test-queue"
+    expect:
+      exitCode: 0
+  
+  - name: "Verify SQS FIFO queue status"
+    action: "describe"
+    target: "aws-sqs-test/test-fifo-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-queue-information-and-attributes action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/get-queue-information-and-attributes"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-queue-statistics-and-metrics action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/get-queue-statistics-and-metrics"
+    expect:
+      exitCode: 0
+
+  - name: "Test send-a-test-message-to-the-queue action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/send-a-test-message-to-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Test receive-messages-from-the-queue action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/receive-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-queue-tags action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/list-queue-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Test set-queue-tags action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/set-queue-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Test purge-all-messages-from-the-queue action"
+    action: "do"
+    target: "aws-sqs-test/test-queue/purge-all-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+  # Advanced testing with multiple messages
+  - name: "Send multiple test messages"
+    action: "do"
+    target: "aws-sqs-test/test-queue/send-a-test-message-to-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Send another test message"
+    action: "do"
+    target: "aws-sqs-test/test-queue/send-a-test-message-to-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Receive messages after sending multiple"
+    action: "do"
+    target: "aws-sqs-test/test-queue/receive-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Get queue statistics after message operations"
+    action: "do"
+    target: "aws-sqs-test/test-queue/get-queue-statistics-and-metrics"
+    expect:
+      exitCode: 0
+
+  - name: "Final purge of all messages"
+    action: "do"
+    target: "aws-sqs-test/test-queue/purge-all-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Test FIFO queue information"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/get-queue-information-and-attributes"
+    expect:
+      exitCode: 0
+
+  - name: "Test FIFO queue statistics"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/get-queue-statistics-and-metrics"
+    expect:
+      exitCode: 0
+
+  - name: "Send test message to FIFO queue"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/send-a-test-message-to-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Receive message from FIFO queue"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/receive-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+  - name: "Test FIFO queue tags"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/list-queue-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Purge FIFO queue"
+    action: "do"
+    target: "aws-sqs-test/test-fifo-queue/purge-all-messages-from-the-queue"
+    expect:
+      exitCode: 0
+
+# cleanup:
+#   - name: "Delete stack"
+#     action: "delete"
+#     target: "aws-sqs-test/stack"
+#     expect:
+#       exitCode: 0
