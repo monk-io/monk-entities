@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  sqs-worker:
+    build: .
+    environment:
+      # Required: Set your actual SQS queue URL
+      - SQS_QUEUE_URL=${SQS_QUEUE_URL:-https://sqs.us-east-1.amazonaws.com/123456789012/test-queue}
+      
+      # Optional: AWS configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # Optional: Worker configuration
+      - MAX_MESSAGES=${MAX_MESSAGES:-10}
+      - WAIT_TIME_SECONDS=${WAIT_TIME_SECONDS:-20}
+      - VISIBILITY_TIMEOUT_SECONDS=${VISIBILITY_TIMEOUT_SECONDS:-30}
+      - POLLING_INTERVAL_MS=${POLLING_INTERVAL_MS:-1000}
+    restart: unless-stopped
+    
+    # Optional: Use env file
+    env_file:
+      - .env  # Will be ignored if file doesn't exist
+    
+    # Optional: Mount logs directory
+    volumes:
+      - ./logs:/app/logs
+    
+    # Optional: Add labels for organization
+    labels:
+      - "com.monk.service=sqs-worker"
+      - "com.monk.component=message-processor" 

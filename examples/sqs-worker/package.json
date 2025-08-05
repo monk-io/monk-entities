@@ -1,0 +1,33 @@
+{
+  "name": "sqs-worker",
+  "version": "1.0.0",
+  "description": "Simple SQS worker for processing messages from AWS SQS queue",
+  "main": "dist/worker.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/worker.js",
+    "dev": "ts-node src/worker.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "aws",
+    "sqs",
+    "worker",
+    "monk",
+    "typescript"
+  ],
+  "author": "Monk SQS Worker",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+} 

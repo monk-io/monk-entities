@@ -1,0 +1,88 @@
+namespace: sqs-example
+
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-sqs-queue
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 60
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  tags:
+    Environment: test
+    Owner: exmaple
+
+sqs-worker:
+  defines: runnable
+  permissions:
+    # Grant access to AWS credentials if provided via secrets
+    permitted-secrets:
+      aws-access-key-id: true
+      aws-secret-access-key: true
+  connections:
+    queue:
+      runnable: sqs-example/test-queue
+      service: queue
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example/test-queue
+      timeout: 180
+  variables:
+    # Required: SQS Queue URL from connected queue
+    sqs_queue_url:
+      env: SQS_QUEUE_URL
+      value: <- connection-target("queue") entity-state get-member("queue_url")
+      type: string
+    
+    # AWS Region from connected queue
+    aws_region:
+      env: AWS_REGION
+      value: "us-east-1"
+      type: string
+    
+    # Optional: AWS credentials from secrets (if not using IAM roles)
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("aws-access-key-id")
+      type: string
+    
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("aws-secret-access-key")
+      type: string
+    
+    # Worker configuration (optional)
+    max_messages:
+      env: MAX_MESSAGES
+      value: "10"
+      type: string
+    
+    wait_time_seconds:
+      env: WAIT_TIME_SECONDS
+      value: "20"
+      type: string
+    
+    visibility_timeout_seconds:
+      env: VISIBILITY_TIMEOUT_SECONDS
+      value: "30"
+      type: string
+    
+    polling_interval_ms:
+      env: POLLING_INTERVAL_MS
+      value: "1000"
+      type: string
+
+  containers:
+    worker:
+      image: sqs-worker:latest
+
+# Complete example stack with queue and worker
+example-stack:
+  defines: process-group
+  runnable-list:
+    - sqs-example/test-queue
+    - sqs-example/sqs-worker 
