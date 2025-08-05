@@ -1,0 +1,5 @@
+namespace: aws-dynamo-db
+
+common:
+  defines: module
+  source: <<< common.js

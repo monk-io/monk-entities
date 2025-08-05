@@ -1,0 +1,178 @@
+name: "AWS DynamoDB Advanced Entity Integration Test"
+description: "Advanced integration test for AWS DynamoDB Table entity with complex table configurations including GSI, provisioned billing, and encryption"
+timeout: 450000
+
+setup:
+  - name: "Load AWS DynamoDB entity manifest"
+    action: "load"
+    target: "dist/input/aws-dynamo-db/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load advanced test stack template"
+    action: "load"
+    target: "stack-advanced-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy advanced test stack"
+    action: "run"
+    target: "aws-dynamo-db-advanced-test/stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for provisioned table readiness"
+    action: "wait"
+    target: "aws-dynamo-db-advanced-test/provisioned-table"
+    waitFor:
+      condition: "ready"
+      timeout: 90000
+
+  - name: "Wait for GSI table readiness"
+    action: "wait"
+    target: "aws-dynamo-db-advanced-test/gsi-table"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
+
+  - name: "Verify provisioned table status"
+    action: "describe"
+    target: "aws-dynamo-db-advanced-test/provisioned-table"
+    expect:
+      exitCode: 0
+
+  - name: "Verify GSI table status"
+    action: "describe"
+    target: "aws-dynamo-db-advanced-test/gsi-table"
+    expect:
+      exitCode: 0
+
+  - name: "Test provisioned table details"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/get-table-details"
+    expect:
+      exitCode: 0
+
+  - name: "Test GSI table details"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/get-table-details"
+    expect:
+      exitCode: 0
+
+  - name: "Test composite key operations on provisioned table"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/put-item"
+    args:
+      item: '{"user_id":{"S":"user123"},"timestamp":{"N":"1640995200"},"event_type":{"S":"login"},"ip_address":{"S":"192.168.1.1"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Retrieve composite key item from provisioned table"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/get-item"
+    args:
+      key: '{"user_id":{"S":"user123"},"timestamp":{"N":"1640995200"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test GSI table with multiple items for GSI testing"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/put-item"
+    args:
+      item: '{"event_id":{"S":"event001"},"timestamp":{"N":"1640995200"},"user_type":{"S":"premium"},"action":{"S":"purchase"},"amount":{"N":"99.99"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Add second GSI test item"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/put-item"
+    args:
+      item: '{"event_id":{"S":"event002"},"timestamp":{"N":"1640995300"},"user_type":{"S":"premium"},"action":{"S":"view"},"amount":{"N":"0"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Add third GSI test item with different user type"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/put-item"
+    args:
+      item: '{"event_id":{"S":"event003"},"timestamp":{"N":"1640995400"},"user_type":{"S":"basic"},"action":{"S":"login"},"amount":{"N":"0"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Scan GSI table to verify all items"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/scan-table"
+    expect:
+      exitCode: 0
+
+  - name: "Test provisioned table tags"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/list-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Test GSI table tags"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/list-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Test scan with limit on GSI table"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/scan-table"
+    args:
+      limit: 2
+    expect:
+      exitCode: 0
+
+  - name: "Clean up GSI table items"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/delete-item"
+    args:
+      key: '{"event_id":{"S":"event001"},"timestamp":{"N":"1640995200"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Clean up second GSI item"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/delete-item"
+    args:
+      key: '{"event_id":{"S":"event002"},"timestamp":{"N":"1640995300"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Clean up third GSI item"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/delete-item"
+    args:
+      key: '{"event_id":{"S":"event003"},"timestamp":{"N":"1640995400"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Clean up provisioned table item"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/delete-item"
+    args:
+      key: '{"user_id":{"S":"user123"},"timestamp":{"N":"1640995200"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Final scan to verify cleanup"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/gsi-table/scan-table"
+    expect:
+      exitCode: 0
+
+  - name: "Final provisioned table scan"
+    action: "do"
+    target: "aws-dynamo-db-advanced-test/provisioned-table/scan-table"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete advanced test stack"
+    action: "delete"
+    target: "aws-dynamo-db-advanced-test/stack"
+    expect:
+      exitCode: 0 
