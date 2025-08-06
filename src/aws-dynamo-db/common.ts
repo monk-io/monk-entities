@@ -245,6 +245,72 @@ export const DEFAULT_PROVISIONED_CONFIG = {
 };
 
 /**
+ * Validates that all attributes used in key schemas are defined in attribute definitions
+ */
+export function validateKeySchemaAttributes(
+    attributeDefinitions: AttributeDefinition[], 
+    keySchema: KeySchemaElement[], 
+    globalSecondaryIndexes?: GlobalSecondaryIndex[], 
+    localSecondaryIndexes?: LocalSecondaryIndex[]
+): { isValid: boolean; missingAttributes: string[]; extraAttributes: string[]; duplicateAttributes: string[] } {
+    console.log('[DEBUG] validateKeySchemaAttributes called with:');
+    console.log('  attributeDefinitions:', JSON.stringify(attributeDefinitions, null, 2));
+    console.log('  keySchema:', JSON.stringify(keySchema, null, 2));
+    console.log('  globalSecondaryIndexes:', JSON.stringify(globalSecondaryIndexes, null, 2));
+    console.log('  localSecondaryIndexes:', JSON.stringify(localSecondaryIndexes, null, 2));
+    
+    // Check for duplicate attribute definitions
+    const definedAttributeNames = attributeDefinitions.map(attr => attr.AttributeName);
+    const uniqueDefinedAttributes = new Set(definedAttributeNames);
+    const duplicateAttributes = definedAttributeNames.filter((name, index) => 
+        definedAttributeNames.indexOf(name) !== index
+    );
+    
+    const requiredAttributes = new Set<string>();
+    
+    // Collect attributes from main table key schema
+    keySchema.forEach(key => requiredAttributes.add(key.AttributeName));
+    console.log('  After main table KeySchema, required attributes:', Array.from(requiredAttributes));
+    
+    // Collect attributes from GSI key schemas
+    if (globalSecondaryIndexes) {
+        globalSecondaryIndexes.forEach(gsi => {
+            if (gsi.KeySchema && Array.isArray(gsi.KeySchema)) {
+                gsi.KeySchema.forEach(key => requiredAttributes.add(key.AttributeName));
+            }
+        });
+    }
+    console.log('  After GSI KeySchemas, required attributes:', Array.from(requiredAttributes));
+    
+    // Collect attributes from LSI key schemas
+    if (localSecondaryIndexes) {
+        localSecondaryIndexes.forEach(lsi => {
+            if (lsi.KeySchema && Array.isArray(lsi.KeySchema)) {
+                lsi.KeySchema.forEach(key => requiredAttributes.add(key.AttributeName));
+            }
+        });
+    }
+    console.log('  After LSI KeySchemas, required attributes:', Array.from(requiredAttributes));
+    
+    // Find missing and extra attributes
+    const missingAttributes = Array.from(requiredAttributes).filter(attr => !uniqueDefinedAttributes.has(attr));
+    const extraAttributes = Array.from(uniqueDefinedAttributes).filter(attr => !requiredAttributes.has(attr));
+    
+    console.log('  Missing attributes:', missingAttributes);
+    console.log('  Extra attributes (not used in any KeySchema):', extraAttributes);
+    console.log('  Duplicate attributes:', duplicateAttributes);
+    
+    const isValid = missingAttributes.length === 0 && duplicateAttributes.length === 0;
+    
+    return {
+        isValid,
+        missingAttributes,
+        extraAttributes,
+        duplicateAttributes
+    };
+}
+
+/**
  * Parses DynamoDB error messages to extract useful information
  */
 export function parseDynamoDBError(errorBody: string): { type: string; message: string } {

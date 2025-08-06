@@ -27,6 +27,7 @@ __export(common_exports, {
   parseDynamoDBError: () => parseDynamoDBError,
   validateAttributeName: () => validateAttributeName,
   validateBillingMode: () => validateBillingMode,
+  validateKeySchemaAttributes: () => validateKeySchemaAttributes,
   validateTableName: () => validateTableName
 });
 module.exports = __toCommonJS(common_exports);
@@ -89,6 +90,49 @@ var DEFAULT_PROVISIONED_CONFIG = {
   },
   DeletionProtectionEnabled: false
 };
+function validateKeySchemaAttributes(attributeDefinitions, keySchema, globalSecondaryIndexes, localSecondaryIndexes) {
+  console.log("[DEBUG] validateKeySchemaAttributes called with:");
+  console.log("  attributeDefinitions:", JSON.stringify(attributeDefinitions, null, 2));
+  console.log("  keySchema:", JSON.stringify(keySchema, null, 2));
+  console.log("  globalSecondaryIndexes:", JSON.stringify(globalSecondaryIndexes, null, 2));
+  console.log("  localSecondaryIndexes:", JSON.stringify(localSecondaryIndexes, null, 2));
+  const definedAttributeNames = attributeDefinitions.map((attr) => attr.AttributeName);
+  const uniqueDefinedAttributes = new Set(definedAttributeNames);
+  const duplicateAttributes = definedAttributeNames.filter(
+    (name, index) => definedAttributeNames.indexOf(name) !== index
+  );
+  const requiredAttributes = /* @__PURE__ */ new Set();
+  keySchema.forEach((key) => requiredAttributes.add(key.AttributeName));
+  console.log("  After main table KeySchema, required attributes:", Array.from(requiredAttributes));
+  if (globalSecondaryIndexes) {
+    globalSecondaryIndexes.forEach((gsi) => {
+      if (gsi.KeySchema && Array.isArray(gsi.KeySchema)) {
+        gsi.KeySchema.forEach((key) => requiredAttributes.add(key.AttributeName));
+      }
+    });
+  }
+  console.log("  After GSI KeySchemas, required attributes:", Array.from(requiredAttributes));
+  if (localSecondaryIndexes) {
+    localSecondaryIndexes.forEach((lsi) => {
+      if (lsi.KeySchema && Array.isArray(lsi.KeySchema)) {
+        lsi.KeySchema.forEach((key) => requiredAttributes.add(key.AttributeName));
+      }
+    });
+  }
+  console.log("  After LSI KeySchemas, required attributes:", Array.from(requiredAttributes));
+  const missingAttributes = Array.from(requiredAttributes).filter((attr) => !uniqueDefinedAttributes.has(attr));
+  const extraAttributes = Array.from(uniqueDefinedAttributes).filter((attr) => !requiredAttributes.has(attr));
+  console.log("  Missing attributes:", missingAttributes);
+  console.log("  Extra attributes (not used in any KeySchema):", extraAttributes);
+  console.log("  Duplicate attributes:", duplicateAttributes);
+  const isValid = missingAttributes.length === 0 && duplicateAttributes.length === 0;
+  return {
+    isValid,
+    missingAttributes,
+    extraAttributes,
+    duplicateAttributes
+  };
+}
 function parseDynamoDBError(errorBody) {
   try {
     const parsed = JSON.parse(errorBody);
@@ -112,5 +156,6 @@ function parseDynamoDBError(errorBody) {
   parseDynamoDBError,
   validateAttributeName,
   validateBillingMode,
+  validateKeySchemaAttributes,
   validateTableName
 });

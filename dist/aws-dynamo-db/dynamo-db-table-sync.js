@@ -56,6 +56,7 @@ const MonkecBase = require("monkec/base");
 const common = require("aws-dynamo-db/common");
 const validateTableName = common.validateTableName;
 const validateBillingMode = common.validateBillingMode;
+const validateKeySchemaAttributes = common.validateKeySchemaAttributes;
 const convertTagsToArray = common.convertTagsToArray;
 const convertTagsToObject = common.convertTagsToObject;
 var action2 = MonkecBase.action;
@@ -66,17 +67,52 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     __runInitializers(_init, 5, this);
   }
   extractArrayFromIndexedFields(obj, fieldName) {
+    if (obj[fieldName] && Array.isArray(obj[fieldName])) {
+      console.log(`[DEBUG] Found direct array for ${fieldName}:`, obj[fieldName]);
+      return obj[fieldName];
+    }
     const result = [];
     let index = 0;
     while (obj[`${fieldName}!${index}`] !== void 0) {
-      result.push(obj[`${fieldName}!${index}`]);
+      let item = obj[`${fieldName}!${index}`];
+      item = this.processNestedIndexedFields(item);
+      result.push(item);
       index++;
     }
-    return result;
+    console.log(`[DEBUG] Extracted from indexed notation for ${fieldName}:`, result);
+    return result.filter((item) => item != null);
+  }
+  processNestedIndexedFields(obj) {
+    if (!obj || typeof obj !== "object") {
+      return obj;
+    }
+    const processedObj = { ...obj };
+    const indexedFields = /* @__PURE__ */ new Set();
+    for (const key in processedObj) {
+      const match = key.match(/^(.+)!(\d+)$/);
+      if (match) {
+        const [, fieldName] = match;
+        indexedFields.add(fieldName);
+      }
+    }
+    for (const fieldName of indexedFields) {
+      const extractedArray = this.extractArrayFromIndexedFields(processedObj, fieldName);
+      let index = 0;
+      while (processedObj[`${fieldName}!${index}`] !== void 0) {
+        delete processedObj[`${fieldName}!${index}`];
+        index++;
+      }
+      if (extractedArray.length > 0) {
+        processedObj[fieldName] = extractedArray;
+      }
+    }
+    return processedObj;
   }
   validateDefinition() {
     const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, "attribute_definitions");
     const keySchema = this.extractArrayFromIndexedFields(this.definition, "key_schema");
+    const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "global_secondary_indexes");
+    const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "local_secondary_indexes");
     if (!validateTableName(this.definition.table_name)) {
       throw new Error(`Invalid table name: ${this.definition.table_name}. Must be 3-255 characters and contain only letters, numbers, underscores, periods, and hyphens.`);
     }
@@ -89,10 +125,28 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (!validateBillingMode(this.definition.billing_mode, this.definition.provisioned_throughput)) {
       throw new Error("Invalid billing mode configuration");
     }
+    const validation = validateKeySchemaAttributes(
+      attributeDefinitions,
+      keySchema,
+      globalSecondaryIndexes,
+      localSecondaryIndexes
+    );
+    if (!validation.isValid) {
+      const errors = [];
+      if (validation.missingAttributes.length > 0) {
+        errors.push(`Missing attribute definitions: ${validation.missingAttributes.join(", ")}`);
+      }
+      if (validation.duplicateAttributes.length > 0) {
+        errors.push(`Duplicate attribute definitions: ${validation.duplicateAttributes.join(", ")}`);
+      }
+      throw new Error(`DynamoDB attribute validation failed: ${errors.join("; ")}. All attributes in AttributeDefinitions must be used in key schemas, and no duplicates are allowed.`);
+    }
   }
   buildTableSchema() {
     const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, "attribute_definitions");
     const keySchema = this.extractArrayFromIndexedFields(this.definition, "key_schema");
+    console.log(`[DEBUG] Raw attribute_definitions:`, JSON.stringify(attributeDefinitions, null, 2));
+    console.log(`[DEBUG] Raw key_schema:`, JSON.stringify(keySchema, null, 2));
     const schema = {
       TableName: this.definition.table_name,
       AttributeDefinitions: attributeDefinitions,
@@ -103,12 +157,32 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       schema.ProvisionedThroughput = this.definition.provisioned_throughput;
     }
     const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "global_secondary_indexes");
+    console.log(`[DEBUG] Raw globalSecondaryIndexes:`, JSON.stringify(globalSecondaryIndexes, null, 2));
     if (globalSecondaryIndexes.length > 0) {
-      schema.GlobalSecondaryIndexes = globalSecondaryIndexes;
+      const validGSIs = globalSecondaryIndexes.filter((gsi) => {
+        if (!gsi || !gsi.IndexName || !gsi.KeySchema || !Array.isArray(gsi.KeySchema) || gsi.KeySchema.length === 0) {
+          console.log(`[WARNING] Skipping invalid GSI:`, gsi);
+          return false;
+        }
+        console.log(`[DEBUG] Valid GSI found:`, JSON.stringify(gsi, null, 2));
+        return true;
+      });
+      if (validGSIs.length > 0) {
+        schema.GlobalSecondaryIndexes = validGSIs;
+      }
     }
     const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "local_secondary_indexes");
     if (localSecondaryIndexes.length > 0) {
-      schema.LocalSecondaryIndexes = localSecondaryIndexes;
+      const validLSIs = localSecondaryIndexes.filter((lsi) => {
+        if (!lsi || !lsi.IndexName || !lsi.KeySchema || !Array.isArray(lsi.KeySchema) || lsi.KeySchema.length === 0) {
+          console.log(`[WARNING] Skipping invalid LSI:`, lsi);
+          return false;
+        }
+        return true;
+      });
+      if (validLSIs.length > 0) {
+        schema.LocalSecondaryIndexes = validLSIs;
+      }
     }
     if (this.definition.sse_specification) {
       schema.SSESpecification = this.definition.sse_specification;
@@ -125,6 +199,7 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (this.definition.tags) {
       schema.Tags = convertTagsToArray(this.definition.tags);
     }
+    console.log(`[DEBUG] Final DynamoDB CreateTable schema:`, JSON.stringify(schema, null, 2));
     return schema;
   }
   create() {
