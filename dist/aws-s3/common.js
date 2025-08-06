@@ -138,18 +138,19 @@ function buildLifecycleConfigXml(rules) {
             <Status>${rule.status}</Status>`;
     if (rule.filter) {
       ruleXml += "<Filter>";
-      if (rule.filter.prefix) {
-        ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
-      }
-      if (rule.filter.tags) {
+      if (rule.filter.prefix && rule.filter.tags) {
         ruleXml += "<And>";
-        if (rule.filter.prefix) {
-          ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
-        }
+        ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
         Object.entries(rule.filter.tags).forEach(([key, value]) => {
           ruleXml += `<Tag><Key>${escapeXml(key)}</Key><Value>${escapeXml(value)}</Value></Tag>`;
         });
         ruleXml += "</And>";
+      } else if (rule.filter.prefix) {
+        ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
+      } else if (rule.filter.tags) {
+        Object.entries(rule.filter.tags).forEach(([key, value]) => {
+          ruleXml += `<Tag><Key>${escapeXml(key)}</Key><Value>${escapeXml(value)}</Value></Tag>`;
+        });
       }
       ruleXml += "</Filter>";
     }

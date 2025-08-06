@@ -67,7 +67,7 @@ var AWSS3Entity = class extends import_base.MonkEntity {
     return this.definition.region;
   }
   getBucketUrl(bucketName, path) {
-    const basePath = path ? `/${path}` : "";
+    const basePath = path ? path.startsWith("?") ? path : `/${path}` : "";
     return `https://${bucketName}.s3.${this.region}.amazonaws.com${basePath}`;
   }
   bucketExists(bucketName) {

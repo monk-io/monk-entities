@@ -175,18 +175,22 @@ export function buildLifecycleConfigXml(rules: any[]): string {
         // Add filter if present
         if (rule.filter) {
             ruleXml += '<Filter>';
-            if (rule.filter.prefix) {
-                ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
-            }
-            if (rule.filter.tags) {
+            // If both prefix and tags are present, they must be inside an <And> element
+            if (rule.filter.prefix && rule.filter.tags) {
                 ruleXml += '<And>';
-                if (rule.filter.prefix) {
-                    ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
-                }
+                ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
                 Object.entries(rule.filter.tags).forEach(([key, value]) => {
                     ruleXml += `<Tag><Key>${escapeXml(key)}</Key><Value>${escapeXml(value as string)}</Value></Tag>`;
                 });
                 ruleXml += '</And>';
+            } else if (rule.filter.prefix) {
+                // Only prefix, no tags
+                ruleXml += `<Prefix>${escapeXml(rule.filter.prefix)}</Prefix>`;
+            } else if (rule.filter.tags) {
+                // Only tags, no prefix
+                Object.entries(rule.filter.tags).forEach(([key, value]) => {
+                    ruleXml += `<Tag><Key>${escapeXml(key)}</Key><Value>${escapeXml(value as string)}</Value></Tag>`;
+                });
             }
             ruleXml += '</Filter>';
         }

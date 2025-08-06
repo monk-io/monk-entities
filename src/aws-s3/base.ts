@@ -101,7 +101,8 @@ export abstract class AWSS3Entity<TDefinition extends AWSS3Definition, TState ex
     protected abstract getBucketName(): string;
 
     protected getBucketUrl(bucketName: string, path?: string): string {
-        const basePath = path ? `/${path}` : "";
+        // Query parameters should not have leading slash, object paths should
+        const basePath = path ? (path.startsWith('?') ? path : `/${path}`) : "";
         return `https://${bucketName}.s3.${this.region}.amazonaws.com${basePath}`;
     }
 
