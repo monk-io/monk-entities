@@ -68,7 +68,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
   }
   extractArrayFromIndexedFields(obj, fieldName) {
     if (obj[fieldName] && Array.isArray(obj[fieldName])) {
-      console.log(`[DEBUG] Found direct array for ${fieldName}:`, obj[fieldName]);
       return obj[fieldName];
     }
     const result = [];
@@ -79,7 +78,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       result.push(item);
       index++;
     }
-    console.log(`[DEBUG] Extracted from indexed notation for ${fieldName}:`, result);
     return result.filter((item) => item != null);
   }
   processNestedIndexedFields(obj) {
@@ -145,8 +143,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
   buildTableSchema() {
     const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, "attribute_definitions");
     const keySchema = this.extractArrayFromIndexedFields(this.definition, "key_schema");
-    console.log(`[DEBUG] Raw attribute_definitions:`, JSON.stringify(attributeDefinitions, null, 2));
-    console.log(`[DEBUG] Raw key_schema:`, JSON.stringify(keySchema, null, 2));
     const schema = {
       TableName: this.definition.table_name,
       AttributeDefinitions: attributeDefinitions,
@@ -157,15 +153,9 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       schema.ProvisionedThroughput = this.definition.provisioned_throughput;
     }
     const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "global_secondary_indexes");
-    console.log(`[DEBUG] Raw globalSecondaryIndexes:`, JSON.stringify(globalSecondaryIndexes, null, 2));
     if (globalSecondaryIndexes.length > 0) {
       const validGSIs = globalSecondaryIndexes.filter((gsi) => {
-        if (!gsi || !gsi.IndexName || !gsi.KeySchema || !Array.isArray(gsi.KeySchema) || gsi.KeySchema.length === 0) {
-          console.log(`[WARNING] Skipping invalid GSI:`, gsi);
-          return false;
-        }
-        console.log(`[DEBUG] Valid GSI found:`, JSON.stringify(gsi, null, 2));
-        return true;
+        return gsi && gsi.IndexName && gsi.KeySchema && Array.isArray(gsi.KeySchema) && gsi.KeySchema.length > 0;
       });
       if (validGSIs.length > 0) {
         schema.GlobalSecondaryIndexes = validGSIs;
@@ -174,11 +164,7 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "local_secondary_indexes");
     if (localSecondaryIndexes.length > 0) {
       const validLSIs = localSecondaryIndexes.filter((lsi) => {
-        if (!lsi || !lsi.IndexName || !lsi.KeySchema || !Array.isArray(lsi.KeySchema) || lsi.KeySchema.length === 0) {
-          console.log(`[WARNING] Skipping invalid LSI:`, lsi);
-          return false;
-        }
-        return true;
+        return lsi && lsi.IndexName && lsi.KeySchema && Array.isArray(lsi.KeySchema) && lsi.KeySchema.length > 0;
       });
       if (validLSIs.length > 0) {
         schema.LocalSecondaryIndexes = validLSIs;
@@ -199,7 +185,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (this.definition.tags) {
       schema.Tags = convertTagsToArray(this.definition.tags);
     }
-    console.log(`[DEBUG] Final DynamoDB CreateTable schema:`, JSON.stringify(schema, null, 2));
     return schema;
   }
   create() {
@@ -324,8 +309,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       throw new Error("Table not created yet");
     }
     const tableInfo = super.getTableInfo(this.state.table_name);
-    if (tableInfo) {
-    }
     return tableInfo;
   }
   putItem(args) {
