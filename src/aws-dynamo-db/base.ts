@@ -78,7 +78,7 @@ export abstract class AWSDynamoDBEntity<
         }
     }
 
-    protected async waitForTableStatus(tableName: string, targetStatus: string, maxAttempts: number = 30, delaySeconds: number = 5): Promise<void> {
+    protected waitForTableStatus(tableName: string, targetStatus: string, maxAttempts: number = 30, delaySeconds: number = 5): void {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 const response = this.makeDynamoDBRequest("DescribeTable", {
@@ -96,8 +96,12 @@ export abstract class AWSDynamoDBEntity<
                 }
 
                 if (attempt < maxAttempts) {
-                    // Note: In real implementation, we'd need a proper sleep function
-                    // For now, we'll just continue without delay in the monk runtime
+                    // Implement proper delay using busy wait like other entities
+                    const delayMs = delaySeconds * 1000;
+                    const start = Date.now();
+                    while (Date.now() - start < delayMs) {
+                        // Busy wait
+                    }
                 }
             } catch (error) {
                 if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {

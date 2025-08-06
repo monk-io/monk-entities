@@ -158,21 +158,13 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         // Handle global secondary indexes
         const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'global_secondary_indexes');
         if (globalSecondaryIndexes.length > 0) {
-            // Fix nested KeySchema arrays in each GSI
-            schema.GlobalSecondaryIndexes = globalSecondaryIndexes.map(gsi => ({
-                ...gsi,
-                KeySchema: this.extractArrayFromIndexedFields(gsi, 'KeySchema')
-            }));
+            schema.GlobalSecondaryIndexes = globalSecondaryIndexes;
         }
 
         // Handle local secondary indexes
         const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'local_secondary_indexes');
         if (localSecondaryIndexes.length > 0) {
-            // Fix nested KeySchema arrays in each LSI
-            schema.LocalSecondaryIndexes = localSecondaryIndexes.map(lsi => ({
-                ...lsi,
-                KeySchema: this.extractArrayFromIndexedFields(lsi, 'KeySchema')
-            }));
+            schema.LocalSecondaryIndexes = localSecondaryIndexes;
         }
 
         if (this.definition.sse_specification) {

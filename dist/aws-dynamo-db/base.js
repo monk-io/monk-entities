@@ -86,7 +86,7 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
       throw new Error(`DynamoDB API request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  async waitForTableStatus(tableName, targetStatus, maxAttempts = 30, delaySeconds = 5) {
+  waitForTableStatus(tableName, targetStatus, maxAttempts = 30, delaySeconds = 5) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const response = this.makeDynamoDBRequest("DescribeTable", {
@@ -100,6 +100,10 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
           throw new Error(`Table ${tableName} is being deleted`);
         }
         if (attempt < maxAttempts) {
+          const delayMs = delaySeconds * 1e3;
+          const start = Date.now();
+          while (Date.now() - start < delayMs) {
+          }
         }
       } catch (error) {
         if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {
