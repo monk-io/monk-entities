@@ -21,6 +21,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var common_exports = {};
 __export(common_exports, {
   buildCreateInstanceParams: () => buildCreateInstanceParams,
+  buildModifyInstanceParams: () => buildModifyInstanceParams,
   formatInstanceState: () => formatInstanceState,
   getDefaultPort: () => getDefaultPort,
   normalizeEngine: () => normalizeEngine,
@@ -173,6 +174,55 @@ function formatInstanceState(dbInstance, wasPreExisting = false) {
     last_modified: dbInstance.LastModifiedTime
   };
 }
+function buildModifyInstanceParams(definition) {
+  const params = {};
+  if (definition.allocated_storage !== void 0) {
+    params.AllocatedStorage = definition.allocated_storage;
+  }
+  if (definition.max_allocated_storage !== void 0) {
+    params.MaxAllocatedStorage = definition.max_allocated_storage;
+  }
+  if (definition.db_instance_class !== void 0) {
+    params.DBInstanceClass = definition.db_instance_class;
+  }
+  if (definition.engine_version !== void 0) {
+    params.EngineVersion = definition.engine_version;
+  }
+  if (definition.auto_minor_version_upgrade !== void 0) {
+    params.AutoMinorVersionUpgrade = definition.auto_minor_version_upgrade ? "true" : "false";
+  }
+  if (definition.backup_retention_period !== void 0) {
+    params.BackupRetentionPeriod = definition.backup_retention_period;
+  }
+  if (definition.backup_window !== void 0) {
+    params.PreferredBackupWindow = definition.backup_window;
+  }
+  if (definition.maintenance_window !== void 0) {
+    params.PreferredMaintenanceWindow = definition.maintenance_window;
+  }
+  if (definition.multi_az !== void 0) {
+    params.MultiAZ = definition.multi_az ? "true" : "false";
+  }
+  if (definition.performance_insights_enabled !== void 0) {
+    params.EnablePerformanceInsights = definition.performance_insights_enabled ? "true" : "false";
+  }
+  if (definition.monitoring_interval !== void 0) {
+    params.MonitoringInterval = definition.monitoring_interval;
+  }
+  if (definition.enabled_cloudwatch_logs_exports && Array.isArray(definition.enabled_cloudwatch_logs_exports)) {
+    params.CloudwatchLogsExportConfiguration = {
+      LogTypesToEnable: definition.enabled_cloudwatch_logs_exports
+    };
+  }
+  if (definition.deletion_protection !== void 0) {
+    params.DeletionProtection = definition.deletion_protection ? "true" : "false";
+  }
+  if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
+    params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
+  }
+  params.ApplyImmediately = "true";
+  return params;
+}
 function parseRDSError(xmlBody) {
   try {
     const errorMatch = /<Message>(.*?)<\/Message>/.exec(xmlBody);
@@ -189,6 +239,7 @@ function parseRDSError(xmlBody) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   buildCreateInstanceParams,
+  buildModifyInstanceParams,
   formatInstanceState,
   getDefaultPort,
   normalizeEngine,

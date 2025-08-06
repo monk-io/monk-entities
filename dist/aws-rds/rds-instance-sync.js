@@ -59,16 +59,35 @@ const common = require("aws-rds/common");
 const validateDBInstanceIdentifier = common.validateDBInstanceIdentifier;
 const validateStorageSize = common.validateStorageSize;
 const buildCreateInstanceParams = common.buildCreateInstanceParams;
+const buildModifyInstanceParams = common.buildModifyInstanceParams;
 const formatInstanceState = common.formatInstanceState;
 var action2 = MonkecBase.action;
-var _getConnectionInfo_dec, _createSnapshot_dec, _getInstanceInfo_dec, _a, _init;
-var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _createSnapshot_dec = [action2("create-snapshot")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
+var _getConnectionInfo_dec, _createSnapshot_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
+var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _createSnapshot_dec = [action2("create-snapshot")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
   }
   getDBInstanceIdentifier() {
     return this.definition.db_instance_identifier;
+  }
+  updatePasswordForExistingInstance(dbInstanceIdentifier) {
+    try {
+      console.log(`Updating password for existing DB instance: ${dbInstanceIdentifier}`);
+      const password = this.getOrCreatePassword();
+      const modifyParams = {
+        MasterUserPassword: password,
+        ApplyImmediately: "true"
+      };
+      const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+      if (response?.DBInstance) {
+        const updatedState = formatInstanceState(response.DBInstance, true);
+        Object.assign(this.state, updatedState);
+      }
+      console.log(`Password updated successfully for existing DB instance: ${dbInstanceIdentifier}`);
+    } catch (error) {
+      console.log(`Warning: Could not update password for existing instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
   /** Get or create password for the RDS instance */
   getOrCreatePassword() {
@@ -97,6 +116,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
     if (existingInstance) {
       const state = formatInstanceState(existingInstance.DBInstance, true);
       Object.assign(this.state, state);
+      this.updatePasswordForExistingInstance(dbInstanceIdentifier);
       return;
     }
     const password = this.getOrCreatePassword();
@@ -127,8 +147,23 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
   }
   update() {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    if (!this.state.db_instance_identifier) {
+      throw new Error(`Cannot update DB instance: instance not found in state`);
+    }
     try {
-      this.updateStateFromAWS();
+      const modifyParams = buildModifyInstanceParams(this.definition);
+      if (Object.keys(modifyParams).length > 1) {
+        console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
+        const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+        if (response?.DBInstance) {
+          const updatedState = formatInstanceState(response.DBInstance, this.state.existing);
+          Object.assign(this.state, updatedState);
+        }
+        console.log(`DB instance ${dbInstanceIdentifier} modification initiated successfully`);
+      } else {
+        console.log(`No modifications needed for DB instance ${dbInstanceIdentifier}`);
+        this.updateStateFromAWS();
+      }
     } catch (error) {
       throw new Error(`Failed to update DB instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
@@ -241,6 +276,38 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       throw new Error(errorMsg);
     }
   }
+  updatePassword(_args) {
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    try {
+      if (!this.state.db_instance_identifier) {
+        cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
+        throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+      }
+      cli.output("=== Updating Database Password ===");
+      cli.output(`Instance ID: ${dbInstanceIdentifier}`);
+      const secretRef = this.definition.password_secret_ref || `${dbInstanceIdentifier}-master-password`;
+      const password = this.getOrCreatePassword();
+      cli.output(`Secret Reference: ${secretRef}`);
+      cli.output("Updating master password...");
+      const modifyParams = {
+        MasterUserPassword: password,
+        ApplyImmediately: "true"
+      };
+      const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+      if (response?.DBInstance) {
+        const updatedState = formatInstanceState(response.DBInstance, this.state.existing);
+        Object.assign(this.state, updatedState);
+        cli.output(`Status: ${response.DBInstance.DBInstanceStatus || "Unknown"}`);
+        cli.output("Password update initiated successfully");
+        cli.output("Note: Password change may take a few minutes to complete");
+      }
+      cli.output("=== Password Update Completed ===");
+    } catch (error) {
+      const errorMsg = `Failed to update password: ${error instanceof Error ? error.message : "Unknown error"}`;
+      cli.output(errorMsg);
+      throw new Error(errorMsg);
+    }
+  }
   createSnapshot(args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     const snapshotId = args?.snapshot_id || `${dbInstanceIdentifier}-snapshot-${Date.now()}`;
@@ -311,6 +378,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInstanceInfo", _getInstanceInfo_dec, _RDSInstance);
+__decorateElement(_init, 1, "updatePassword", _updatePassword_dec, _RDSInstance);
 __decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _RDSInstance);
 __decoratorMetadata(_init, _RDSInstance);

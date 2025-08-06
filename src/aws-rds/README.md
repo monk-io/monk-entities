@@ -218,6 +218,25 @@ monk do my-app/my-database/get-connection-info
 - Connection string format
 - CLI command examples (mysql, psql)
 
+### update-password
+Update the master password for the database instance.
+
+```bash
+monk do my-app/my-database/update-password
+```
+
+**Use Cases:**
+- Reset password for existing RDS instances
+- Synchronize existing instances with Monk's secret management
+- Update passwords for security compliance
+
+**Process:**
+- Retrieves password from Monk's secret vault (or generates new one)
+- Updates RDS instance via AWS ModifyDBInstance API
+- Applied immediately to the database
+
+**Note:** This operation may cause a brief interruption for existing connections.
+
 ### create-snapshot
 Create a manual database snapshot.
 
@@ -231,7 +250,18 @@ monk do my-app/my-database/create-snapshot
 ## Lifecycle Management
 
 ### Creation
-The entity creates a new RDS instance with the specified configuration. Creation typically takes 10-15 minutes.
+The entity handles both new and existing RDS instances:
+
+**New Instances:**
+- Creates a new RDS instance with the specified configuration
+- Generates and securely stores master password in Monk's secret vault
+- Creation typically takes 10-15 minutes
+
+**Existing Instances:**
+- Detects pre-existing RDS instances automatically
+- Marks them as `existing: true` (protected from deletion)
+- **Automatically updates master password** to synchronize with Monk's secret management
+- Allows management without recreating the infrastructure
 
 ### Readiness Check
 The entity implements comprehensive readiness checks that verify the instance is in "available" status and ready to accept connections.
@@ -242,7 +272,36 @@ The entity implements comprehensive readiness checks that verify the instance is
 - Max Attempts: 40 (20 minutes total)
 
 ### Updates
-The entity supports updating instance configuration using the AWS ModifyDBInstance API.
+The entity supports updating instance configuration through Monk's built-in update mechanism.
+
+**Usage:**
+```bash
+monk update rds-client-demo/mysql-database
+```
+
+**Supported Updates:**
+- Instance class scaling (db_instance_class)
+- Storage scaling (allocated_storage, max_allocated_storage)  
+- Engine version upgrades (engine_version)
+- Backup settings (backup_retention_period, backup_window)
+- Maintenance settings (maintenance_window, auto_minor_version_upgrade)
+- Multi-AZ configuration (multi_az)
+- Performance Insights (performance_insights_enabled, monitoring_interval)
+- CloudWatch logs exports (enabled_cloudwatch_logs_exports)
+- Deletion protection (deletion_protection)
+- VPC security groups (vpc_security_group_ids)
+
+**Update Process:**
+1. Modify the entity definition in your YAML file
+2. Run `monk update <entity-name>` 
+3. Monk calls the entity's `update()` method
+4. Entity applies changes via AWS ModifyDBInstance API
+5. State is updated with the new configuration
+
+**Notes:**
+- Updates are applied immediately by default
+- Some updates may require a brief restart (e.g., instance class changes)
+- Engine version upgrades are one-way operations
 
 ### Deletion
 The entity properly deletes RDS instances with configurable final snapshot behavior.

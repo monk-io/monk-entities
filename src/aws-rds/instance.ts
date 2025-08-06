@@ -7,6 +7,7 @@ import {
     validateDBInstanceIdentifier,
     validateStorageSize,
     buildCreateInstanceParams,
+    buildModifyInstanceParams,
     formatInstanceState
 } from "./common.ts";
 
@@ -24,6 +25,35 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
 
     protected getDBInstanceIdentifier(): string {
         return this.definition.db_instance_identifier;
+    }
+
+    private updatePasswordForExistingInstance(dbInstanceIdentifier: string): void {
+        try {
+            console.log(`Updating password for existing DB instance: ${dbInstanceIdentifier}`);
+            
+            // Generate or get the password that should be used
+            const password = this.getOrCreatePassword();
+            
+            // Update the instance password via ModifyDBInstance
+            const modifyParams = {
+                MasterUserPassword: password,
+                ApplyImmediately: "true"
+            };
+            
+            const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+            
+            if (response?.DBInstance) {
+                // Update state with the response, preserving the existing flag
+                const updatedState = formatInstanceState(response.DBInstance, true);
+                Object.assign(this.state, updatedState);
+            }
+            
+            console.log(`Password updated successfully for existing DB instance: ${dbInstanceIdentifier}`);
+            
+        } catch (error) {
+            console.log(`Warning: Could not update password for existing instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Don't throw error here - we still want to manage the existing instance even if password update fails
+        }
     }
 
     /** Get or create password for the RDS instance */
@@ -63,6 +93,9 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             // Instance pre-existed, mark as existing (don't delete on cleanup)
             const state = formatInstanceState(existingInstance.DBInstance, true);
             Object.assign(this.state, state);
+            
+            // For existing instances, update the password to match our secret management
+            this.updatePasswordForExistingInstance(dbInstanceIdentifier);
             return;
         }
         
@@ -110,10 +143,32 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     override update(): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
+        if (!this.state.db_instance_identifier) {
+            throw new Error(`Cannot update DB instance: instance not found in state`);
+        }
+        
         try {
-            // For update operations, we would typically call ModifyDBInstance
-            // For now, we just update the state from AWS
-            this.updateStateFromAWS();
+            // Build modify parameters from current definition
+            const modifyParams = buildModifyInstanceParams(this.definition);
+            
+            // Only proceed with modification if there are parameters to update
+            if (Object.keys(modifyParams).length > 1) { // More than just ApplyImmediately
+                console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
+                
+                const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+                
+                // Update state from the response
+                if (response?.DBInstance) {
+                    const updatedState = formatInstanceState(response.DBInstance, this.state.existing);
+                    Object.assign(this.state, updatedState);
+                }
+                
+                console.log(`DB instance ${dbInstanceIdentifier} modification initiated successfully`);
+            } else {
+                console.log(`No modifications needed for DB instance ${dbInstanceIdentifier}`);
+                // Still update state from AWS to get current status
+                this.updateStateFromAWS();
+            }
         } catch (error) {
             throw new Error(`Failed to update DB instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -258,6 +313,54 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             cli.output("=== End DB Instance Information ===");
         } catch (error) {
             const errorMsg = `Failed to get instance info for ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            cli.output(errorMsg);
+            throw new Error(errorMsg);
+        }
+    }
+
+    @action("update-password")
+    updatePassword(_args?: MonkecBase.Args): void {
+        const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+        
+        try {
+            // Check entity state first
+            if (!this.state.db_instance_identifier) {
+                cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
+                throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+            }
+            
+            cli.output("=== Updating Database Password ===");
+            cli.output(`Instance ID: ${dbInstanceIdentifier}`);
+            
+            // Get the current password that will be used
+            const secretRef = this.definition.password_secret_ref || `${dbInstanceIdentifier}-master-password`;
+            const password = this.getOrCreatePassword();
+            
+            cli.output(`Secret Reference: ${secretRef}`);
+            cli.output("Updating master password...");
+            
+            // Update the password via ModifyDBInstance
+            const modifyParams = {
+                MasterUserPassword: password,
+                ApplyImmediately: "true"
+            };
+            
+            const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
+            
+            if (response?.DBInstance) {
+                // Update state with the response, preserving the existing flag
+                const updatedState = formatInstanceState(response.DBInstance, this.state.existing);
+                Object.assign(this.state, updatedState);
+                
+                cli.output(`Status: ${response.DBInstance.DBInstanceStatus || 'Unknown'}`);
+                cli.output("Password update initiated successfully");
+                cli.output("Note: Password change may take a few minutes to complete");
+            }
+            
+            cli.output("=== Password Update Completed ===");
+            
+        } catch (error) {
+            const errorMsg = `Failed to update password: ${error instanceof Error ? error.message : 'Unknown error'}`;
             cli.output(errorMsg);
             throw new Error(errorMsg);
         }

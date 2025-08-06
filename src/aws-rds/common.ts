@@ -199,6 +199,90 @@ export function formatInstanceState(dbInstance: any, wasPreExisting: boolean = f
 }
 
 /**
+ * Builds parameters for ModifyDBInstance API call
+ * @param definition - Entity definition containing updated values
+ */
+export function buildModifyInstanceParams(definition: any): Record<string, any> {
+    const params: Record<string, any> = {};
+    
+    // Storage modifications
+    if (definition.allocated_storage !== undefined) {
+        params.AllocatedStorage = definition.allocated_storage;
+    }
+    
+    if (definition.max_allocated_storage !== undefined) {
+        params.MaxAllocatedStorage = definition.max_allocated_storage;
+    }
+    
+    // Instance class modification
+    if (definition.db_instance_class !== undefined) {
+        params.DBInstanceClass = definition.db_instance_class;
+    }
+    
+    // Engine version upgrade
+    if (definition.engine_version !== undefined) {
+        params.EngineVersion = definition.engine_version;
+    }
+    
+    // Auto minor version upgrade
+    if (definition.auto_minor_version_upgrade !== undefined) {
+        params.AutoMinorVersionUpgrade = definition.auto_minor_version_upgrade ? "true" : "false";
+    }
+    
+    // Backup retention period
+    if (definition.backup_retention_period !== undefined) {
+        params.BackupRetentionPeriod = definition.backup_retention_period;
+    }
+    
+    // Backup window
+    if (definition.backup_window !== undefined) {
+        params.PreferredBackupWindow = definition.backup_window;
+    }
+    
+    // Maintenance window
+    if (definition.maintenance_window !== undefined) {
+        params.PreferredMaintenanceWindow = definition.maintenance_window;
+    }
+    
+    // Multi-AZ
+    if (definition.multi_az !== undefined) {
+        params.MultiAZ = definition.multi_az ? "true" : "false";
+    }
+    
+    // Performance Insights
+    if (definition.performance_insights_enabled !== undefined) {
+        params.EnablePerformanceInsights = definition.performance_insights_enabled ? "true" : "false";
+    }
+    
+    // Monitoring interval
+    if (definition.monitoring_interval !== undefined) {
+        params.MonitoringInterval = definition.monitoring_interval;
+    }
+    
+    // CloudWatch logs exports
+    if (definition.enabled_cloudwatch_logs_exports && Array.isArray(definition.enabled_cloudwatch_logs_exports)) {
+        params.CloudwatchLogsExportConfiguration = {
+            LogTypesToEnable: definition.enabled_cloudwatch_logs_exports
+        };
+    }
+    
+    // Deletion protection
+    if (definition.deletion_protection !== undefined) {
+        params.DeletionProtection = definition.deletion_protection ? "true" : "false";
+    }
+    
+    // VPC Security Groups
+    if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
+        params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
+    }
+    
+    // Apply immediately or during maintenance window
+    params.ApplyImmediately = "true"; // Default to apply immediately for updates
+    
+    return params;
+}
+
+/**
  * Parses RDS error messages from XML responses
  */
 export function parseRDSError(xmlBody: string): string {
