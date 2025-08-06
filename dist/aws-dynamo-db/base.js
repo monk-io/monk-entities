@@ -37,7 +37,6 @@ __export(base_exports, {
 module.exports = __toCommonJS(base_exports);
 var import_base = require("monkec/base");
 var import_aws = __toESM(require("cloud/aws"));
-var import_cli = __toESM(require("cli"));
 var AWSDynamoDBEntity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -58,12 +57,8 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
       body: typeof body === "string" ? body : JSON.stringify(body),
       timeout: 30
     };
-    import_cli.default.output(`[DEBUG] DynamoDB ${action} request to ${url}`);
-    import_cli.default.output(`[DEBUG] Request body: ${options.body}`);
     try {
       const response = import_aws.default.post(url, options);
-      import_cli.default.output(`[DEBUG] Response status: ${response.statusCode} ${response.status}`);
-      import_cli.default.output(`[DEBUG] Response body: ${response.body}`);
       if (response.statusCode >= 400) {
         let errorMessage = `DynamoDB API error: ${response.statusCode} ${response.status}`;
         try {
@@ -88,7 +83,6 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
       }
       return response;
     } catch (error) {
-      import_cli.default.output(`[DEBUG] Request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
       throw new Error(`DynamoDB API request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
@@ -99,7 +93,6 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
           TableName: tableName
         });
         const currentStatus = response.Table?.TableStatus;
-        import_cli.default.output(`[DEBUG] Table ${tableName} status: ${currentStatus} (attempt ${attempt}/${maxAttempts})`);
         if (currentStatus === targetStatus) {
           return;
         }
@@ -107,12 +100,10 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
           throw new Error(`Table ${tableName} is being deleted`);
         }
         if (attempt < maxAttempts) {
-          import_cli.default.output(`[DEBUG] Waiting ${delaySeconds} seconds before next check...`);
         }
       } catch (error) {
         if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {
           if (targetStatus === "DELETING" || targetStatus === "DELETED") {
-            import_cli.default.output(`[DEBUG] Table ${tableName} not found - deletion complete`);
             return;
           }
         }

@@ -1,5 +1,3 @@
 REPO aws-dynamo-db
-DESCRIPTION AWS DynamoDB Table Management Entity
-AUTHOR monk.io 
 LOAD dynamo-db-table.yaml base.yaml common.yaml
 RESOURCES common.js dynamo-db-table-sync.js base.js
