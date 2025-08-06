@@ -1,0 +1,247 @@
+name: "AWS S3 Bucket Entity Integration Test"
+description: "Complete integration test for AWS S3 Bucket entity including bucket creation, custom actions, object operations, and cleanup"
+timeout: 300000
+
+setup:
+  - name: "Load AWS S3 entity manifest"
+    action: "load"
+    target: "dist/input/aws-s3/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy stack"
+    action: "run"
+    target: "aws-s3-test/stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for basic bucket readiness"
+    action: "wait"
+    target: "aws-s3-test/test-basic-bucket"
+    waitFor:
+      condition: "ready"
+      timeout: 30000
+
+  - name: "Wait for versioned bucket readiness"
+    action: "wait"
+    target: "aws-s3-test/test-versioned-bucket"
+    waitFor:
+      condition: "ready"
+      timeout: 30000
+
+  - name: "Wait for advanced bucket readiness"
+    action: "wait"
+    target: "aws-s3-test/test-advanced-bucket"
+    waitFor:
+      condition: "ready"
+      timeout: 45000
+
+  - name: "Verify basic bucket status"
+    action: "describe"
+    target: "aws-s3-test/test-basic-bucket"
+    expect:
+      exitCode: 0
+  
+  - name: "Verify versioned bucket status"
+    action: "describe"
+    target: "aws-s3-test/test-versioned-bucket"
+    expect:
+      exitCode: 0
+
+  - name: "Verify advanced bucket status"
+    action: "describe"
+    target: "aws-s3-test/test-advanced-bucket"
+    expect:
+      exitCode: 0
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  # Test custom actions on basic bucket
+  - name: "Test get-bucket-info action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/get-bucket-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-objects action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-bucket-statistics action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  - name: "Test generate-presigned-url GET action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/generate-presigned-url"
+    args:
+      object_key: "test-file.txt"
+      method: "GET"
+      expires: "3600"
+    expect:
+      exitCode: 0
+
+  - name: "Test generate-presigned-url PUT action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/generate-presigned-url"
+    args:
+      object_key: "upload-test.txt"
+      method: "PUT"
+      expires: "1800"
+    expect:
+      exitCode: 0
+
+  - name: "Test empty-bucket action on basic bucket"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/empty-bucket"
+    expect:
+      exitCode: 0
+
+  # Test custom actions on versioned bucket
+  - name: "Test get-bucket-info action on versioned bucket"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/get-bucket-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-objects action on versioned bucket"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-bucket-statistics action on versioned bucket"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  - name: "Test generate-presigned-url with versioning"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/generate-presigned-url"
+    args:
+      object_key: "versioned-file.txt"
+      method: "POST"
+      expires: "7200"
+    expect:
+      exitCode: 0
+
+  - name: "Test empty-bucket action on versioned bucket"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/empty-bucket"
+    expect:
+      exitCode: 0
+
+  # Test custom actions on advanced bucket
+  - name: "Test get-bucket-info action on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/get-bucket-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-objects action on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-bucket-statistics action on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  - name: "Test generate-presigned-url DELETE action on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/generate-presigned-url"
+    args:
+      object_key: "lifecycle-test.txt"
+      method: "DELETE"
+      expires: "900"
+    expect:
+      exitCode: 0
+
+  - name: "Test empty-bucket action on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/empty-bucket"
+    expect:
+      exitCode: 0
+
+  # Advanced testing scenarios
+  - name: "Test multiple presigned URLs generation"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/generate-presigned-url"
+    args:
+      object_key: "batch-test-1.txt"
+      method: "PUT"
+      expires: "3600"
+    expect:
+      exitCode: 0
+
+  - name: "Test another presigned URL with different parameters"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/generate-presigned-url"
+    args:
+      object_key: "batch-test-2.txt"
+      method: "GET"
+      expires: "1200"
+    expect:
+      exitCode: 0
+
+  - name: "Final statistics check on all buckets"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  - name: "Final statistics check on versioned bucket"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  - name: "Final statistics check on advanced bucket"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/get-bucket-statistics"
+    expect:
+      exitCode: 0
+
+  # Final object listing to verify empty state
+  - name: "Verify basic bucket is empty"
+    action: "do"
+    target: "aws-s3-test/test-basic-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+  - name: "Verify versioned bucket is empty"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+  - name: "Verify advanced bucket is empty"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/list-objects"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete stack"
+    action: "delete"
+    target: "aws-s3-test/stack"
+    expect:
+      exitCode: 0 

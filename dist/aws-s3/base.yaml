@@ -1,0 +1,5 @@
+namespace: aws-s3
+
+base:
+  defines: module
+  source: <<< base.js

@@ -1,0 +1,170 @@
+namespace: aws-s3
+s3-bucket:
+  defines: entity
+  metadata:
+    name: S3Bucket
+  schema:
+    region:
+      type: string
+    bucket_name:
+      type: string
+    versioning:
+      type: boolean
+    public_read_access:
+      type: boolean
+    public_write_access:
+      type: boolean
+    cors_configuration:
+      type: object
+      properties:
+        cors_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              allowed_headers:
+                type: array
+                items:
+                  type: string
+              allowed_methods:
+                type: array
+                items:
+                  type: string
+              allowed_origins:
+                type: array
+                items:
+                  type: string
+              expose_headers:
+                type: array
+                items:
+                  type: string
+              max_age_seconds:
+                type: number
+            required:
+              - allowed_methods
+              - allowed_origins
+            additionalProperties: false
+      required:
+        - cors_rules
+      additionalProperties: false
+    lifecycle_configuration:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              status:
+                type: string
+                enum:
+                  - Enabled
+                  - Disabled
+              filter:
+                type: object
+                properties:
+                  prefix:
+                    type: string
+                  tags:
+                    type: object
+                    additionalProperties:
+                      type: string
+                additionalProperties: false
+              expiration:
+                type: object
+                properties:
+                  days:
+                    type: number
+                  date:
+                    type: string
+                additionalProperties: false
+              noncurrent_version_expiration:
+                type: object
+                properties:
+                  noncurrent_days:
+                    type: number
+                required:
+                  - noncurrent_days
+                additionalProperties: false
+              transitions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    days:
+                      type: number
+                    date:
+                      type: string
+                    storage_class:
+                      type: string
+                      enum:
+                        - STANDARD_IA
+                        - ONEZONE_IA
+                        - GLACIER
+                        - DEEP_ARCHIVE
+                  required:
+                    - storage_class
+                  additionalProperties: false
+            required:
+              - id
+              - status
+            additionalProperties: false
+      required:
+        - rules
+      additionalProperties: false
+    server_side_encryption:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              apply_server_side_encryption_by_default:
+                type: object
+                properties:
+                  sse_algorithm:
+                    type: string
+                    enum:
+                      - AES256
+                      - 'aws:kms'
+                  kms_master_key_id:
+                    type: string
+                required:
+                  - sse_algorithm
+                additionalProperties: false
+              bucket_key_enabled:
+                type: boolean
+            required:
+              - apply_server_side_encryption_by_default
+            additionalProperties: false
+      required:
+        - rules
+      additionalProperties: false
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - bucket_name
+  lifecycle:
+    sync: <<< s3-bucket-sync.js
+    get-bucket-info: ''
+    list-objects: ''
+    generate-presigned-url: ''
+    empty-bucket: ''
+    get-bucket-statistics: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-s3/base
+    - monkec/base
+    - cli
+    - cloud/aws
+    - aws-s3/common

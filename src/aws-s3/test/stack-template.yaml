@@ -1,0 +1,76 @@
+namespace: aws-s3-test
+
+# Basic S3 bucket with minimal configuration
+test-basic-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: test-s3-basic-bucket-monk-integration
+  versioning: false
+  public_read_access: false
+  public_write_access: false
+  tags:
+    Environment: test
+    Owner: integration-test
+    Purpose: basic-testing
+
+# Versioned bucket with CORS configuration
+test-versioned-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: test-s3-versioned-bucket-monk-integration
+  versioning: true
+  public_read_access: false
+  public_write_access: false
+  cors_configuration:
+    cors_rules:
+      - allowed_methods: ["GET", "PUT", "POST", "DELETE"]
+        allowed_origins: ["*"]
+        allowed_headers: ["*"]
+        expose_headers: ["ETag"]
+        max_age_seconds: 3600
+  tags:
+    Environment: test
+    Owner: integration-test
+    Purpose: versioning-cors-testing
+
+# Advanced bucket with lifecycle and encryption
+test-advanced-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: test-s3-advanced-bucket-monk-integration
+  versioning: true
+  public_read_access: false
+  public_write_access: false
+  lifecycle_configuration:
+    rules:
+      - id: "transition-to-ia"
+        status: "Enabled"
+        transitions:
+          - days: 30
+            storage_class: "STANDARD_IA"
+          - days: 90
+            storage_class: "GLACIER"
+        expiration:
+          days: 365
+      - id: "cleanup-incomplete-uploads"
+        status: "Enabled"
+        filter:
+          prefix: "uploads/"
+        noncurrent_version_expiration:
+          noncurrent_days: 30
+  server_side_encryption:
+    rules:
+      - apply_server_side_encryption_by_default:
+          sse_algorithm: "AES256"
+        bucket_key_enabled: true
+  tags:
+    Environment: test
+    Owner: integration-test
+    Purpose: advanced-features-testing
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws-s3-test/test-basic-bucket
+    - aws-s3-test/test-versioned-bucket
+    - aws-s3-test/test-advanced-bucket 
