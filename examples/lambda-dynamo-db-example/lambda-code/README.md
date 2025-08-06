@@ -47,11 +47,9 @@ API Gateway/Client → Lambda Function → DynamoDB Table
 
 3. **Test the Lambda function:**
    ```bash
-   # Get function info and test URL
-   monk do lambda-dynamo-example/lambda-dynamo-function get-function-info
    
    # Invoke the function directly
-   monk do lambda-dynamo-example/lambda-dynamo-function invoke-function
+   monk do lambda-dynamo-example/lambda-dynamo-function/invoke 
    ```
 
 ### Local Development
@@ -61,13 +59,7 @@ API Gateway/Client → Lambda Function → DynamoDB Table
    npm install
    ```
 
-2. **Set up environment variables:**
-   ```bash
-   cp env.example .env
-   # Edit .env with your AWS credentials and table name
-   ```
-
-3. **Test locally** (requires AWS credentials):
+2. **Test locally** (requires AWS credentials):
    ```bash
    node src/index.js
    ```
@@ -291,10 +283,10 @@ lambda-dynamo-db-example/
 monk logs lambda-dynamo-example/lambda-dynamo-function
 
 # Verify table status
-monk do lambda-dynamo-example/users-table get-table-info
+monk do lambda-dynamo-example/users-table/get-table-info
 
 # Test IAM permissions
-monk do lambda-dynamo-example/lambda-execution-role get-role-info
+monk do lambda-dynamo-example/lambda-execution-role/get-role-info
 ```
 
 ## 📚 Related Examples
