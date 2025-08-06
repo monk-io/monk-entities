@@ -15,6 +15,7 @@ import {
     Item,
     validateTableName,
     validateBillingMode,
+    validateKeySchemaAttributes,
     convertTagsToArray,
     convertTagsToObject
 } from "./common.ts";
@@ -106,21 +107,73 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     static readonly readiness = { period: 10, initialDelay: 5, attempts: 30 };
 
     private extractArrayFromIndexedFields(obj: any, fieldName: string): any[] {
+        // First check if the field is already a direct array
+        if (obj[fieldName] && Array.isArray(obj[fieldName])) {
+            return obj[fieldName];
+        }
+        
+        // Otherwise, extract from indexed notation (field!0, field!1, etc.)
         const result: any[] = [];
         let index = 0;
         
         while (obj[`${fieldName}!${index}`] !== undefined) {
-            result.push(obj[`${fieldName}!${index}`]);
+            let item = obj[`${fieldName}!${index}`];
+            
+            // For each extracted item, recursively process any nested indexed fields
+            item = this.processNestedIndexedFields(item);
+            
+            result.push(item);
             index++;
         }
         
-        return result;
+        // Filter out null/undefined values to prevent API errors
+        return result.filter(item => item != null);
+    }
+
+    private processNestedIndexedFields(obj: any): any {
+        if (!obj || typeof obj !== 'object') {
+            return obj;
+        }
+        
+        const processedObj = { ...obj };
+        
+        // Look for nested indexed fields and convert them to arrays
+        const indexedFields = new Set<string>();
+        
+        // Find all indexed field patterns in the object
+        for (const key in processedObj) {
+            const match = key.match(/^(.+)!(\d+)$/);
+            if (match) {
+                const [, fieldName] = match;
+                indexedFields.add(fieldName);
+            }
+        }
+        
+        // Process each indexed field found
+        for (const fieldName of indexedFields) {
+            const extractedArray = this.extractArrayFromIndexedFields(processedObj, fieldName);
+            
+            // Remove the indexed entries and add the array
+            let index = 0;
+            while (processedObj[`${fieldName}!${index}`] !== undefined) {
+                delete processedObj[`${fieldName}!${index}`];
+                index++;
+            }
+            
+            if (extractedArray.length > 0) {
+                processedObj[fieldName] = extractedArray;
+            }
+        }
+        
+        return processedObj;
     }
 
     private validateDefinition(): void {
         // Extract arrays from indexed format
         const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, 'attribute_definitions');
         const keySchema = this.extractArrayFromIndexedFields(this.definition, 'key_schema');
+        const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'global_secondary_indexes');
+        const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'local_secondary_indexes');
         
         if (!validateTableName(this.definition.table_name)) {
             throw new Error(`Invalid table name: ${this.definition.table_name}. Must be 3-255 characters and contain only letters, numbers, underscores, periods, and hyphens.`);
@@ -136,6 +189,25 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         
         if (!validateBillingMode(this.definition.billing_mode, this.definition.provisioned_throughput)) {
             throw new Error("Invalid billing mode configuration");
+        }
+        
+        // Validate that all key schema attributes are defined in attribute definitions
+        const validation = validateKeySchemaAttributes(
+            attributeDefinitions, 
+            keySchema, 
+            globalSecondaryIndexes, 
+            localSecondaryIndexes
+        );
+        
+        if (!validation.isValid) {
+            const errors = [];
+            if (validation.missingAttributes.length > 0) {
+                errors.push(`Missing attribute definitions: ${validation.missingAttributes.join(', ')}`);
+            }
+            if (validation.duplicateAttributes.length > 0) {
+                errors.push(`Duplicate attribute definitions: ${validation.duplicateAttributes.join(', ')}`);
+            }
+            throw new Error(`DynamoDB attribute validation failed: ${errors.join('; ')}. All attributes in AttributeDefinitions must be used in key schemas, and no duplicates are allowed.`);
         }
     }
 
@@ -157,22 +229,29 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
 
         // Handle global secondary indexes
         const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'global_secondary_indexes');
+        
         if (globalSecondaryIndexes.length > 0) {
-            // Fix nested KeySchema arrays in each GSI
-            schema.GlobalSecondaryIndexes = globalSecondaryIndexes.map(gsi => ({
-                ...gsi,
-                KeySchema: this.extractArrayFromIndexedFields(gsi, 'KeySchema')
-            }));
+            // Validate and filter GSI objects to ensure they have valid KeySchema
+            const validGSIs = globalSecondaryIndexes.filter(gsi => {
+                return gsi && gsi.IndexName && gsi.KeySchema && Array.isArray(gsi.KeySchema) && gsi.KeySchema.length > 0;
+            });
+            
+            if (validGSIs.length > 0) {
+                schema.GlobalSecondaryIndexes = validGSIs;
+            }
         }
 
         // Handle local secondary indexes
         const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'local_secondary_indexes');
         if (localSecondaryIndexes.length > 0) {
-            // Fix nested KeySchema arrays in each LSI
-            schema.LocalSecondaryIndexes = localSecondaryIndexes.map(lsi => ({
-                ...lsi,
-                KeySchema: this.extractArrayFromIndexedFields(lsi, 'KeySchema')
-            }));
+            // Validate and filter LSI objects to ensure they have valid KeySchema
+            const validLSIs = localSecondaryIndexes.filter(lsi => {
+                return lsi && lsi.IndexName && lsi.KeySchema && Array.isArray(lsi.KeySchema) && lsi.KeySchema.length > 0;
+            });
+            
+            if (validLSIs.length > 0) {
+                schema.LocalSecondaryIndexes = validLSIs;
+            }
         }
 
         if (this.definition.sse_specification) {
@@ -194,7 +273,7 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         if (this.definition.tags) {
             schema.Tags = convertTagsToArray(this.definition.tags);
         }
-
+        
         return schema;
     }
 
@@ -370,8 +449,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         }
 
         const tableInfo = super.getTableInfo(this.state.table_name);
-        if (tableInfo) {
-        }
         return tableInfo;
     }
 

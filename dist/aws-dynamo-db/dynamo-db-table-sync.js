@@ -53,10 +53,10 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 const base = require("aws-dynamo-db/base");
 const AWSDynamoDBEntity = base.AWSDynamoDBEntity;
 const MonkecBase = require("monkec/base");
-const cli = require("cli");
 const common = require("aws-dynamo-db/common");
 const validateTableName = common.validateTableName;
 const validateBillingMode = common.validateBillingMode;
+const validateKeySchemaAttributes = common.validateKeySchemaAttributes;
 const convertTagsToArray = common.convertTagsToArray;
 const convertTagsToObject = common.convertTagsToObject;
 var action2 = MonkecBase.action;
@@ -67,21 +67,52 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     __runInitializers(_init, 5, this);
   }
   extractArrayFromIndexedFields(obj, fieldName) {
+    if (obj[fieldName] && Array.isArray(obj[fieldName])) {
+      console.log(`[DEBUG] Found direct array for ${fieldName}:`, obj[fieldName]);
+      return obj[fieldName];
+    }
     const result = [];
     let index = 0;
     while (obj[`${fieldName}!${index}`] !== void 0) {
-      result.push(obj[`${fieldName}!${index}`]);
+      let item = obj[`${fieldName}!${index}`];
+      item = this.processNestedIndexedFields(item);
+      result.push(item);
       index++;
     }
-    return result;
+    console.log(`[DEBUG] Extracted from indexed notation for ${fieldName}:`, result);
+    return result.filter((item) => item != null);
+  }
+  processNestedIndexedFields(obj) {
+    if (!obj || typeof obj !== "object") {
+      return obj;
+    }
+    const processedObj = { ...obj };
+    const indexedFields = /* @__PURE__ */ new Set();
+    for (const key in processedObj) {
+      const match = key.match(/^(.+)!(\d+)$/);
+      if (match) {
+        const [, fieldName] = match;
+        indexedFields.add(fieldName);
+      }
+    }
+    for (const fieldName of indexedFields) {
+      const extractedArray = this.extractArrayFromIndexedFields(processedObj, fieldName);
+      let index = 0;
+      while (processedObj[`${fieldName}!${index}`] !== void 0) {
+        delete processedObj[`${fieldName}!${index}`];
+        index++;
+      }
+      if (extractedArray.length > 0) {
+        processedObj[fieldName] = extractedArray;
+      }
+    }
+    return processedObj;
   }
   validateDefinition() {
-    cli.output(`[DEBUG] Validating definition for table: ${this.definition.table_name}`);
-    cli.output(`[DEBUG] Full definition: ${JSON.stringify(this.definition)}`);
     const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, "attribute_definitions");
     const keySchema = this.extractArrayFromIndexedFields(this.definition, "key_schema");
-    cli.output(`[DEBUG] Extracted attribute definitions: ${JSON.stringify(attributeDefinitions)}`);
-    cli.output(`[DEBUG] Extracted key schema: ${JSON.stringify(keySchema)}`);
+    const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "global_secondary_indexes");
+    const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "local_secondary_indexes");
     if (!validateTableName(this.definition.table_name)) {
       throw new Error(`Invalid table name: ${this.definition.table_name}. Must be 3-255 characters and contain only letters, numbers, underscores, periods, and hyphens.`);
     }
@@ -94,10 +125,28 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (!validateBillingMode(this.definition.billing_mode, this.definition.provisioned_throughput)) {
       throw new Error("Invalid billing mode configuration");
     }
+    const validation = validateKeySchemaAttributes(
+      attributeDefinitions,
+      keySchema,
+      globalSecondaryIndexes,
+      localSecondaryIndexes
+    );
+    if (!validation.isValid) {
+      const errors = [];
+      if (validation.missingAttributes.length > 0) {
+        errors.push(`Missing attribute definitions: ${validation.missingAttributes.join(", ")}`);
+      }
+      if (validation.duplicateAttributes.length > 0) {
+        errors.push(`Duplicate attribute definitions: ${validation.duplicateAttributes.join(", ")}`);
+      }
+      throw new Error(`DynamoDB attribute validation failed: ${errors.join("; ")}. All attributes in AttributeDefinitions must be used in key schemas, and no duplicates are allowed.`);
+    }
   }
   buildTableSchema() {
     const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, "attribute_definitions");
     const keySchema = this.extractArrayFromIndexedFields(this.definition, "key_schema");
+    console.log(`[DEBUG] Raw attribute_definitions:`, JSON.stringify(attributeDefinitions, null, 2));
+    console.log(`[DEBUG] Raw key_schema:`, JSON.stringify(keySchema, null, 2));
     const schema = {
       TableName: this.definition.table_name,
       AttributeDefinitions: attributeDefinitions,
@@ -108,12 +157,32 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       schema.ProvisionedThroughput = this.definition.provisioned_throughput;
     }
     const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "global_secondary_indexes");
+    console.log(`[DEBUG] Raw globalSecondaryIndexes:`, JSON.stringify(globalSecondaryIndexes, null, 2));
     if (globalSecondaryIndexes.length > 0) {
-      schema.GlobalSecondaryIndexes = globalSecondaryIndexes;
+      const validGSIs = globalSecondaryIndexes.filter((gsi) => {
+        if (!gsi || !gsi.IndexName || !gsi.KeySchema || !Array.isArray(gsi.KeySchema) || gsi.KeySchema.length === 0) {
+          console.log(`[WARNING] Skipping invalid GSI:`, gsi);
+          return false;
+        }
+        console.log(`[DEBUG] Valid GSI found:`, JSON.stringify(gsi, null, 2));
+        return true;
+      });
+      if (validGSIs.length > 0) {
+        schema.GlobalSecondaryIndexes = validGSIs;
+      }
     }
     const localSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, "local_secondary_indexes");
     if (localSecondaryIndexes.length > 0) {
-      schema.LocalSecondaryIndexes = localSecondaryIndexes;
+      const validLSIs = localSecondaryIndexes.filter((lsi) => {
+        if (!lsi || !lsi.IndexName || !lsi.KeySchema || !Array.isArray(lsi.KeySchema) || lsi.KeySchema.length === 0) {
+          console.log(`[WARNING] Skipping invalid LSI:`, lsi);
+          return false;
+        }
+        return true;
+      });
+      if (validLSIs.length > 0) {
+        schema.LocalSecondaryIndexes = validLSIs;
+      }
     }
     if (this.definition.sse_specification) {
       schema.SSESpecification = this.definition.sse_specification;
@@ -130,14 +199,13 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (this.definition.tags) {
       schema.Tags = convertTagsToArray(this.definition.tags);
     }
+    console.log(`[DEBUG] Final DynamoDB CreateTable schema:`, JSON.stringify(schema, null, 2));
     return schema;
   }
   create() {
     this.validateDefinition();
-    cli.output(`Creating DynamoDB table: ${this.definition.table_name}`);
     const existingTable = super.getTableInfo(this.definition.table_name);
     if (existingTable) {
-      cli.output(`Table ${this.definition.table_name} already exists`);
       this.state = {
         table_name: existingTable.TableName,
         table_arn: existingTable.TableArn,
@@ -155,7 +223,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
         table_status: response.TableDescription.TableStatus,
         existing: false
       };
-      cli.output(`Table ${this.definition.table_name} creation initiated`);
     } else {
       throw new Error("Unexpected response from CreateTable API");
     }
@@ -170,27 +237,21 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
         return false;
       }
       const isReady = tableInfo.TableStatus === "ACTIVE";
-      cli.output(`Table ${this.state.table_name} status: ${tableInfo.TableStatus} (ready: ${isReady})`);
       this.state.table_status = tableInfo.TableStatus;
       return isReady;
     } catch (error) {
-      cli.output(`Error checking table readiness: ${error instanceof Error ? error.message : "Unknown error"}`);
       return false;
     }
   }
   start() {
-    cli.output(`Starting DynamoDB table: ${this.definition.table_name}`);
-    if (!this.checkReadiness()) {
-      throw new Error(`Table ${this.definition.table_name} is not ready`);
+    if (!this.state.table_name) {
+      throw new Error("Table not created yet");
     }
-    cli.output(`Table ${this.definition.table_name} is active and ready for operations`);
+    super.waitForTableStatus(this.state.table_name, "ACTIVE", 60, 5);
   }
   stop() {
-    cli.output(`Stopping DynamoDB table: ${this.definition.table_name}`);
-    cli.output(`Table ${this.definition.table_name} stop operation completed`);
   }
   update() {
-    cli.output(`Updating DynamoDB table: ${this.definition.table_name}`);
     if (!this.state.table_name) {
       throw new Error("Table not created yet");
     }
@@ -229,10 +290,8 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       const response = this.makeDynamoDBRequest("UpdateTable", updateParams);
       if (response.TableDescription) {
         this.state.table_status = response.TableDescription.TableStatus;
-        cli.output(`Table ${this.definition.table_name} update initiated`);
       }
     } else {
-      cli.output(`No changes detected for table ${this.definition.table_name}`);
     }
     if (this.definition.point_in_time_recovery_enabled !== void 0) {
       this.updatePointInTimeRecovery();
@@ -242,24 +301,19 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     }
   }
   delete() {
-    cli.output(`Deleting DynamoDB table: ${this.definition.table_name}`);
     if (!this.state.table_name) {
-      cli.output("Table not created, nothing to delete");
       return;
     }
     if (this.state.existing) {
-      cli.output(`Table ${this.state.table_name} existed before entity creation, skipping deletion`);
       return;
     }
     try {
       this.makeDynamoDBRequest("DeleteTable", {
         TableName: this.state.table_name
       });
-      cli.output(`Table ${this.state.table_name} deletion initiated`);
       this.state.table_status = "DELETING";
     } catch (error) {
       if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {
-        cli.output(`Table ${this.state.table_name} not found - already deleted`);
         return;
       }
       throw error;
@@ -271,24 +325,42 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     }
     const tableInfo = super.getTableInfo(this.state.table_name);
     if (tableInfo) {
-      cli.output(`Table info retrieved for ${this.state.table_name}`);
     }
     return tableInfo;
   }
-  putItem(item) {
+  putItem(args) {
     if (!this.state.table_name) {
       throw new Error("Table not created yet");
+    }
+    const itemJson = args?.item;
+    if (!itemJson) {
+      throw new Error("Item is required");
+    }
+    let item;
+    try {
+      item = typeof itemJson === "string" ? JSON.parse(itemJson) : itemJson;
+    } catch (error) {
+      throw new Error(`Invalid item JSON: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
     const params = {
       TableName: this.state.table_name,
       Item: item
     };
     this.makeDynamoDBRequest("PutItem", params);
-    cli.output(`Item put into table ${this.state.table_name}`);
   }
-  getItem(key) {
+  getItem(args) {
     if (!this.state.table_name) {
       throw new Error("Table not created yet");
+    }
+    const keyJson = args?.key;
+    if (!keyJson) {
+      throw new Error("Key is required");
+    }
+    let key;
+    try {
+      key = typeof keyJson === "string" ? JSON.parse(keyJson) : keyJson;
+    } catch (error) {
+      throw new Error(`Invalid key JSON: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
     const params = {
       TableName: this.state.table_name,
@@ -296,35 +368,42 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     };
     const response = this.makeDynamoDBRequest("GetItem", params);
     if (response.Item) {
-      cli.output(`Item retrieved from table ${this.state.table_name}`);
       return response.Item;
     }
-    cli.output(`Item not found in table ${this.state.table_name}`);
     return null;
   }
-  deleteItem(key) {
+  deleteItem(args) {
     if (!this.state.table_name) {
       throw new Error("Table not created yet");
+    }
+    const keyJson = args?.key;
+    if (!keyJson) {
+      throw new Error("Key is required");
+    }
+    let key;
+    try {
+      key = typeof keyJson === "string" ? JSON.parse(keyJson) : keyJson;
+    } catch (error) {
+      throw new Error(`Invalid key JSON: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
     const params = {
       TableName: this.state.table_name,
       Key: key
     };
     this.makeDynamoDBRequest("DeleteItem", params);
-    cli.output(`Item deleted from table ${this.state.table_name}`);
   }
-  scanTable(limit) {
+  scanTable(args) {
     if (!this.state.table_name) {
       throw new Error("Table not created yet");
     }
+    const limit = args?.limit;
     const params = {
       TableName: this.state.table_name
     };
     if (limit) {
-      params.Limit = limit;
+      params.Limit = parseInt(limit, 10);
     }
     const response = this.makeDynamoDBRequest("Scan", params);
-    cli.output(`Scanned table ${this.state.table_name}, found ${response.Count || 0} items`);
     return {
       Items: response.Items || [],
       Count: response.Count || 0,
@@ -340,7 +419,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       ResourceArn: this.state.table_arn
     });
     const tags = convertTagsToObject(response.Tags);
-    cli.output(`Retrieved ${Object.keys(tags || {}).length} tags for table ${this.state.table_name}`);
     return tags || {};
   }
   updatePointInTimeRecovery() {
@@ -354,7 +432,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       }
     };
     this.makeDynamoDBRequest("UpdateContinuousBackups", params);
-    cli.output(`Point-in-time recovery ${this.definition.point_in_time_recovery_enabled ? "enabled" : "disabled"} for table ${this.state.table_name}`);
   }
   updateTags() {
     if (!this.state.table_arn || !this.definition.tags) {
@@ -368,7 +445,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
         ResourceArn: this.state.table_arn,
         TagKeys: tagsToRemove
       });
-      cli.output(`Removed ${tagsToRemove.length} tags from table ${this.state.table_name}`);
     }
     const tagsToSet = convertTagsToArray(newTags);
     if (tagsToSet && tagsToSet.length > 0) {
@@ -376,7 +452,6 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
         ResourceArn: this.state.table_arn,
         Tags: tagsToSet
       });
-      cli.output(`Updated ${tagsToSet.length} tags for table ${this.state.table_name}`);
     }
   }
 };

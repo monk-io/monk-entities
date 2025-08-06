@@ -223,5 +223,4 @@ dynamo-db-table:
   requires:
     - aws-dynamo-db/base
     - monkec/base
-    - cli
     - aws-dynamo-db/common
