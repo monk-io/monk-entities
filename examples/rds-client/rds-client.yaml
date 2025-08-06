@@ -1,0 +1,243 @@
+namespace: rds-client-demo
+
+# RDS Client Application Demo
+# This demonstrates how to use an RDS instance created by the aws-rds entity
+
+rds-demo-app:
+  defines: process-group
+  runnable-list:
+    - mysql-database
+    - mysql-client
+    - postgres-database  
+    - postgres-client
+
+# MySQL RDS Instance
+mysql-database:
+  defines: aws-rds/rds-instance
+  permitted-secrets:
+    demo-mysql-db-master-password: true
+  variables:
+    db-instance-identifier: demo-mysql-db
+    region: us-east-1
+  
+  # AWS Configuration
+  region: us-east-1
+    
+  # Database configuration
+  db_instance_identifier: <- `${db-instance-identifier}`
+  db_name: mydatabase
+  allocated_storage: 20
+  max_allocated_storage: 100
+  db_instance_class: db.t3.micro
+  engine: mysql
+  engine_version: "8.0"
+  master_username: admin
+  password_secret_ref: <- `${db-instance-identifier}-master-password`
+  
+  # Network and security
+  # vpc_security_group_ids:
+  #   - sg-0123456789abcdef0  # Replace with your security group
+  db_subnet_group_name: default  # Use default VPC's public subnets
+  publicly_accessible: true  # Enable public access for demo
+  
+  # Note: You may need to create a security group that allows inbound traffic on port 3306
+  # Example security group rule: Source 0.0.0.0/0, Protocol TCP, Port 3306
+  
+  # Backup and maintenance
+  backup_retention_period: 7
+  backup_window: "03:00-04:00"
+  maintenance_window: "sun:04:00-sun:05:00"
+  auto_minor_version_upgrade: true
+  
+  # Performance and monitoring
+  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false  # Not supported on db.t3.micro
+  enabled_cloudwatch_logs_exports:
+    - error
+    - general
+    - slow-query
+  
+  # Deletion protection
+  skip_final_snapshot: true
+  deletion_protection: false
+  
+  tags:
+    Environment: demo
+    Application: rds-client
+    Engine: mysql
+
+# MySQL Client Application
+mysql-client:
+  defines: runnable
+  permitted-secrets:
+    demo-mysql-db-master-password: true
+  connections:
+    db:
+      runnable: rds-client-demo/mysql-database
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - rds-client-demo/mysql-database
+      timeout: 600
+  variables:
+    mysql_endpoint:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("endpoint_address")
+      type: string
+    mysql_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("endpoint_port")
+      type: string
+    mysql_database:
+      env: DB_NAME
+      value: <- connection-target("db") entity get-member("db_name")
+      type: string
+    mysql_user:
+      env: DB_USER
+      value: <- connection-target("db") entity get-member("master_username")
+      type: string
+    mysql_password_secret:
+      value: <- connection-target("db") entity get-member("password_secret_ref")
+      type: string
+    mysql_password:
+      env: DB_PASSWORD
+      value: <- secret($mysql_password_secret)
+      type: string
+  
+  containers:
+    client:
+      image: node:18-alpine
+      workdir: /app
+      bash: |
+        set -e
+        echo "🔧 Installing dependencies..."
+        npm install
+        
+        echo "🔨 Building TypeScript..."
+        npm run build
+        
+        echo "🚀 Starting MySQL RDS Client..."
+        exec npm start
+      paths:
+        - .:/app
+      environment:
+        - DB_ENGINE=mysql
+        - DB_CONNECTION_LIMIT=5
+        - DB_TIMEOUT=10000
+        - OPERATION_INTERVAL_MS=10000
+        - SAMPLE_TABLE_NAME=demo_users
+        - SAMPLE_RECORDS_COUNT=5
+
+# PostgreSQL RDS Instance  
+postgres-database:
+  defines: aws-rds/rds-instance
+  permitted-secrets:
+    demo-postgres-db-master-password: true
+  variables:
+    db-instance-identifier: demo-postgres-db
+    region: us-east-1
+  
+  # AWS Configuration
+  region: us-east-1
+    
+  # Database configuration
+  db_instance_identifier: <- `${db-instance-identifier}`
+  db_name: mydatabase
+  allocated_storage: 20
+  max_allocated_storage: 100
+  db_instance_class: db.t3.micro
+  engine: postgres
+  engine_version: "15"
+  master_username: postgres
+  password_secret_ref: <- `${db-instance-identifier}-master-password`
+  
+  # Network and security
+  vpc_security_group_ids:
+    - sg-0123456789abcdef0  # Replace with your security group
+  db_subnet_group_name: default
+  publicly_accessible: true
+  
+  # Backup and maintenance
+  backup_retention_period: 7
+  backup_window: "03:00-04:00"
+  maintenance_window: "sun:04:00-sun:05:00"
+  auto_minor_version_upgrade: true
+  
+  # Performance and monitoring
+  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false  # Not supported on db.t3.micro
+  enabled_cloudwatch_logs_exports:
+    - postgresql
+  
+  # Deletion protection
+  skip_final_snapshot: true
+  deletion_protection: false
+  
+  tags:
+    Environment: demo
+    Application: rds-client
+    Engine: postgresql
+
+# PostgreSQL Client Application
+postgres-client:
+  defines: runnable
+  permitted-secrets:
+    demo-postgres-db-master-password: true
+  connections:
+    db:
+      runnable: rds-client-demo/postgres-database
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - rds-client-demo/postgres-database
+      timeout: 600
+  variables:
+    postgres_endpoint:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("endpoint_address")
+      type: string
+    postgres_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("endpoint_port")
+      type: string
+    postgres_database:
+      env: DB_NAME
+      value: <- connection-target("db") entity get-member("db_name")
+      type: string
+    postgres_user:
+      env: DB_USER
+      value: <- connection-target("db") entity get-member("master_username")
+      type: string
+    postgres_password_secret:
+      value: <- connection-target("db") entity get-member("password_secret_ref")
+      type: string
+    postgres_password:
+      env: DB_PASSWORD
+      value: <- secret($postgres_password_secret)
+      type: string
+  
+  containers:
+    client:
+      image: node:18-alpine
+      workdir: /app
+      bash: |
+        set -e
+        echo "🔧 Installing dependencies..."
+        npm install
+        
+        echo "🔨 Building TypeScript..."
+        npm run build
+        
+        echo "🚀 Starting PostgreSQL RDS Client..."
+        exec npm start
+      paths:
+        - .:/app
+      environment:
+        - DB_ENGINE=postgresql
+        - DB_CONNECTION_LIMIT=5
+        - DB_TIMEOUT=10000
+        - OPERATION_INTERVAL_MS=10000
+        - SAMPLE_TABLE_NAME=demo_users
+        - SAMPLE_RECORDS_COUNT=5 

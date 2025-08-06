@@ -1,0 +1,54 @@
+namespace: my-app
+
+# Basic MySQL RDS instance
+my-mysql-db:
+  defines: aws-rds/rds-instance
+  region: us-east-1
+  db_instance_identifier: my-mysql-instance
+  db_instance_class: db.t3.micro
+  engine: mysql
+  engine_version: "8.0"
+  master_username: admin
+  password_secret_ref: my-mysql-db-password
+  allocated_storage: 20
+  port: 3306
+  storage_type: gp2
+  auto_minor_version_upgrade: true
+  backup_retention_period: 7
+  publicly_accessible: false
+  multi_az: false
+  deletion_protection: false
+  skip_final_snapshot: true
+  tags:
+    Environment: development
+    Application: my-app
+    ManagedBy: monk
+
+# PostgreSQL RDS instance with more configuration
+my-postgres-db:
+  defines: aws-rds/rds-instance
+  region: us-west-2
+  db_instance_identifier: my-postgres-instance
+  db_instance_class: db.t3.small
+  engine: postgres
+  engine_version: "15.4"
+  master_username: postgres
+  password_secret_ref: my-postgres-db-password
+  allocated_storage: 50
+  port: 5432
+  storage_type: gp3
+  auto_minor_version_upgrade: true
+  backup_retention_period: 14
+  preferred_backup_window: "07:00-08:00"
+  preferred_maintenance_window: "sun:08:00-sun:09:00"
+  publicly_accessible: false
+  multi_az: true
+  storage_encrypted: true
+  deletion_protection: true
+  skip_final_snapshot: false
+  final_db_snapshot_identifier: my-postgres-final-snapshot
+  tags:
+    Environment: production
+    Application: my-app
+    ManagedBy: monk
+    BackupRequired: "true" 

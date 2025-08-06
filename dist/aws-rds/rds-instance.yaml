@@ -1,0 +1,82 @@
+namespace: aws-rds
+rds-instance:
+  defines: entity
+  metadata:
+    name: RDSInstance
+  schema:
+    region:
+      type: string
+    db_instance_identifier:
+      type: string
+    db_instance_class:
+      type: string
+    engine:
+      type: string
+    master_username:
+      type: string
+    allocated_storage:
+      type: number
+    engine_version:
+      type: string
+    port:
+      type: number
+    password_secret_ref:
+      type: string
+    vpc_security_group_ids:
+      type: array
+      items:
+        type: string
+    db_subnet_group_name:
+      type: string
+    backup_retention_period:
+      type: number
+    preferred_backup_window:
+      type: string
+    preferred_maintenance_window:
+      type: string
+    auto_minor_version_upgrade:
+      type: boolean
+    multi_az:
+      type: boolean
+    publicly_accessible:
+      type: boolean
+    storage_type:
+      type: string
+    storage_encrypted:
+      type: boolean
+    kms_key_id:
+      type: string
+    deletion_protection:
+      type: boolean
+    skip_final_snapshot:
+      type: boolean
+    final_db_snapshot_identifier:
+      type: string
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - db_instance_identifier
+      - db_instance_class
+      - engine
+      - master_username
+      - allocated_storage
+  lifecycle:
+    sync: <<< rds-instance-sync.js
+    get-instance-info: ''
+    update-password: ''
+    create-snapshot: ''
+    get-connection-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 10
+      attempts: 100
+  requires:
+    - aws-rds/base
+    - monkec/base
+    - cli
+    - secret
+    - aws-rds/common
