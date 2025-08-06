@@ -109,7 +109,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     private extractArrayFromIndexedFields(obj: any, fieldName: string): any[] {
         // First check if the field is already a direct array
         if (obj[fieldName] && Array.isArray(obj[fieldName])) {
-            console.log(`[DEBUG] Found direct array for ${fieldName}:`, obj[fieldName]);
             return obj[fieldName];
         }
         
@@ -126,8 +125,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             result.push(item);
             index++;
         }
-        
-        console.log(`[DEBUG] Extracted from indexed notation for ${fieldName}:`, result);
         
         // Filter out null/undefined values to prevent API errors
         return result.filter(item => item != null);
@@ -219,10 +216,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         const attributeDefinitions = this.extractArrayFromIndexedFields(this.definition, 'attribute_definitions');
         const keySchema = this.extractArrayFromIndexedFields(this.definition, 'key_schema');
         
-        // Debug: Log extracted arrays
-        console.log(`[DEBUG] Raw attribute_definitions:`, JSON.stringify(attributeDefinitions, null, 2));
-        console.log(`[DEBUG] Raw key_schema:`, JSON.stringify(keySchema, null, 2));
-        
         const schema: TableSchema = {
             TableName: this.definition.table_name,
             AttributeDefinitions: attributeDefinitions,
@@ -236,17 +229,11 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
 
         // Handle global secondary indexes
         const globalSecondaryIndexes = this.extractArrayFromIndexedFields(this.definition, 'global_secondary_indexes');
-        console.log(`[DEBUG] Raw globalSecondaryIndexes:`, JSON.stringify(globalSecondaryIndexes, null, 2));
         
         if (globalSecondaryIndexes.length > 0) {
             // Validate and filter GSI objects to ensure they have valid KeySchema
             const validGSIs = globalSecondaryIndexes.filter(gsi => {
-                if (!gsi || !gsi.IndexName || !gsi.KeySchema || !Array.isArray(gsi.KeySchema) || gsi.KeySchema.length === 0) {
-                    console.log(`[WARNING] Skipping invalid GSI:`, gsi);
-                    return false;
-                }
-                console.log(`[DEBUG] Valid GSI found:`, JSON.stringify(gsi, null, 2));
-                return true;
+                return gsi && gsi.IndexName && gsi.KeySchema && Array.isArray(gsi.KeySchema) && gsi.KeySchema.length > 0;
             });
             
             if (validGSIs.length > 0) {
@@ -259,11 +246,7 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         if (localSecondaryIndexes.length > 0) {
             // Validate and filter LSI objects to ensure they have valid KeySchema
             const validLSIs = localSecondaryIndexes.filter(lsi => {
-                if (!lsi || !lsi.IndexName || !lsi.KeySchema || !Array.isArray(lsi.KeySchema) || lsi.KeySchema.length === 0) {
-                    console.log(`[WARNING] Skipping invalid LSI:`, lsi);
-                    return false;
-                }
-                return true;
+                return lsi && lsi.IndexName && lsi.KeySchema && Array.isArray(lsi.KeySchema) && lsi.KeySchema.length > 0;
             });
             
             if (validLSIs.length > 0) {
@@ -290,9 +273,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         if (this.definition.tags) {
             schema.Tags = convertTagsToArray(this.definition.tags);
         }
-
-        // Debug: Log the final schema being sent to DynamoDB
-        console.log(`[DEBUG] Final DynamoDB CreateTable schema:`, JSON.stringify(schema, null, 2));
         
         return schema;
     }
@@ -469,8 +449,6 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         }
 
         const tableInfo = super.getTableInfo(this.state.table_name);
-        if (tableInfo) {
-        }
         return tableInfo;
     }
 
