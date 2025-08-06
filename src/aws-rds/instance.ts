@@ -247,7 +247,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         
         try {
             // First check if we have state information
-            if (!this.state.existing || !this.state.db_instance_identifier) {
+            if (!this.state.db_instance_identifier) {
                 cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
                 throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
             }
@@ -280,7 +280,11 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             }
             
             cli.output(`Multi-AZ: ${(dbInstance as any)?.MultiAZ ? 'Yes' : 'No'}`);
-            cli.output(`Publicly Accessible: ${dbInstance.PubliclyAccessible ? 'Yes' : 'No'}`);
+            // Note: PubliclyAccessible may not be returned by specific instance queries
+            const publiclyAccessible = dbInstance.PubliclyAccessible;
+            const accessibilityDisplay = publiclyAccessible === undefined ? 'Unknown (check AWS Console)' : 
+                                        (publiclyAccessible === true || (publiclyAccessible as any) === 'true' ? 'Yes' : 'No');
+            cli.output(`Publicly Accessible: ${accessibilityDisplay}`);
             cli.output(`Backup Retention: ${dbInstance.BackupRetentionPeriod || 0} days`);
             cli.output(`Preferred Backup Window: ${dbInstance.PreferredBackupWindow || 'N/A'}`);
             cli.output(`Preferred Maintenance Window: ${dbInstance.PreferredMaintenanceWindow || 'N/A'}`);
@@ -373,7 +377,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         
         try {
             // First check if we have state information
-            if (!this.state.existing || !this.state.db_instance_identifier) {
+            if (!this.state.db_instance_identifier) {
                 cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
                 throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
             }
@@ -401,7 +405,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         
         try {
             // First check if we have state information
-            if (!this.state.existing || !this.state.db_instance_identifier) {
+            if (!this.state.db_instance_identifier) {
                 cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
                 throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
             }

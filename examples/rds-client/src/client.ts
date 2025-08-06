@@ -50,6 +50,32 @@ class MySQLClient extends DatabaseClient {
     console.log(`   Database: ${this.config.database}`);
     console.log(`   User: ${this.config.user}`);
 
+    // First, connect without specifying database to create it if needed
+    const tempPool = mysql.createPool({
+      host: this.config.host,
+      port: this.config.port,
+      user: this.config.user,
+      password: this.config.password,
+      connectionLimit: 1
+    });
+
+    try {
+      console.log('🔧 Ensuring database exists...');
+      const connection = await tempPool.getConnection();
+      
+      // Create database if it doesn't exist
+      await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${this.config.database}\``);
+      console.log(`✅ Database '${this.config.database}' is ready`);
+      
+      connection.release();
+      await tempPool.end();
+    } catch (error) {
+      await tempPool.end();
+      console.error('❌ Failed to ensure database exists:', error);
+      throw error;
+    }
+
+    // Now connect to the specific database
     this.pool = mysql.createPool({
       host: this.config.host,
       port: this.config.port,
@@ -59,7 +85,7 @@ class MySQLClient extends DatabaseClient {
       connectionLimit: this.config.connectionLimit
     });
 
-    // Test connection
+    // Test connection to the specific database
     try {
       const connection = await this.pool.getConnection();
       console.log('✅ MySQL connection established successfully');

@@ -14,6 +14,8 @@ rds-demo-app:
 # MySQL RDS Instance
 mysql-database:
   defines: aws-rds/rds-instance
+  permitted-secrets:
+    demo-mysql-db-master-password: true
   variables:
     db-instance-identifier: demo-mysql-db
     region: us-east-1
@@ -35,8 +37,11 @@ mysql-database:
   # Network and security
   # vpc_security_group_ids:
   #   - sg-0123456789abcdef0  # Replace with your security group
-  # db_subnet_group_name: default
-  # publicly_accessible: true
+  db_subnet_group_name: default  # Use default VPC's public subnets
+  publicly_accessible: true  # Enable public access for demo
+  
+  # Note: You may need to create a security group that allows inbound traffic on port 3306
+  # Example security group rule: Source 0.0.0.0/0, Protocol TCP, Port 3306
   
   # Backup and maintenance
   backup_retention_period: 7
@@ -45,8 +50,8 @@ mysql-database:
   auto_minor_version_upgrade: true
   
   # Performance and monitoring
-  monitoring_interval: 60
-  performance_insights_enabled: true
+  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false  # Not supported on db.t3.micro
   enabled_cloudwatch_logs_exports:
     - error
     - general
@@ -97,7 +102,7 @@ mysql-client:
       type: string
     mysql_password:
       env: DB_PASSWORD
-      value: <- connection-target("db") entity get-member("password_secret_ref")
+      value: <- secret($mysql_password_secret)
       type: string
   
   containers:
@@ -127,6 +132,8 @@ mysql-client:
 # PostgreSQL RDS Instance  
 postgres-database:
   defines: aws-rds/rds-instance
+  permitted-secrets:
+    demo-postgres-db-master-password: true
   variables:
     db-instance-identifier: demo-postgres-db
     region: us-east-1
@@ -158,8 +165,8 @@ postgres-database:
   auto_minor_version_upgrade: true
   
   # Performance and monitoring
-  monitoring_interval: 60
-  performance_insights_enabled: true
+  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false  # Not supported on db.t3.micro
   enabled_cloudwatch_logs_exports:
     - postgresql
   
@@ -226,7 +233,7 @@ postgres-client:
         echo "🚀 Starting PostgreSQL RDS Client..."
         exec npm start
       paths:
-        - /home/ivan/Work/monk-entities/examples/rds-client:/app
+        - .:/app
       environment:
         - DB_ENGINE=postgresql
         - DB_CONNECTION_LIMIT=5

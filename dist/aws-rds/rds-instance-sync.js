@@ -219,7 +219,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
   getInstanceInfo(_args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
-      if (!this.state.existing || !this.state.db_instance_identifier) {
+      if (!this.state.db_instance_identifier) {
         cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
         throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
       }
@@ -246,7 +246,9 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
         cli.output(`Endpoint: Not available`);
       }
       cli.output(`Multi-AZ: ${dbInstance?.MultiAZ ? "Yes" : "No"}`);
-      cli.output(`Publicly Accessible: ${dbInstance.PubliclyAccessible ? "Yes" : "No"}`);
+      const publiclyAccessible = dbInstance.PubliclyAccessible;
+      const accessibilityDisplay = publiclyAccessible === void 0 ? "Unknown (check AWS Console)" : publiclyAccessible === true || publiclyAccessible === "true" ? "Yes" : "No";
+      cli.output(`Publicly Accessible: ${accessibilityDisplay}`);
       cli.output(`Backup Retention: ${dbInstance.BackupRetentionPeriod || 0} days`);
       cli.output(`Preferred Backup Window: ${dbInstance.PreferredBackupWindow || "N/A"}`);
       cli.output(`Preferred Maintenance Window: ${dbInstance.PreferredMaintenanceWindow || "N/A"}`);
@@ -312,7 +314,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     const snapshotId = args?.snapshot_id || `${dbInstanceIdentifier}-snapshot-${Date.now()}`;
     try {
-      if (!this.state.existing || !this.state.db_instance_identifier) {
+      if (!this.state.db_instance_identifier) {
         cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
         throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
       }
@@ -330,7 +332,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
   getConnectionInfo(_args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
-      if (!this.state.existing || !this.state.db_instance_identifier) {
+      if (!this.state.db_instance_identifier) {
         cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
         throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
       }

@@ -359,10 +359,22 @@ examples/rds-client/
 
 ### Common Issues
 
-1. **Connection Timeout**
-   - Check network connectivity to RDS instance
-   - Verify security group allows connections
-   - Increase `DB_TIMEOUT` value
+1. **Connection Timeout (ETIMEDOUT)**
+   - **Most Common Cause**: RDS not publicly accessible or security group blocks traffic
+   - **Check RDS Configuration**:
+     ```bash
+     monk do rds-demo-app/mysql-database/get-instance-info
+     # Look for "Publicly Accessible: Yes"
+     ```
+   - **Required AWS Security Group Rules**:
+     - Type: MySQL/Aurora (port 3306) or PostgreSQL (port 5432)
+     - Protocol: TCP
+     - Source: 0.0.0.0/0 (for demo) or your IP range
+   - **Solutions**:
+     - Recreate RDS with `publicly_accessible: true`
+     - Create/assign security group allowing inbound database connections
+     - Deploy client within same VPC as RDS (alternative)
+   - **Increase timeout**: Set higher `DB_TIMEOUT` value
 
 2. **Authentication Failed**
    - Verify username and password

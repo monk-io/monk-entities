@@ -41,6 +41,76 @@ export interface AWSRDSState {
 }
 
 export interface RDSResponse {
+    DBInstances?: Array<{
+        DBInstanceIdentifier?: string;
+        DBInstanceClass?: string;
+        Engine?: string;
+        DBInstanceStatus?: string;
+        MasterUsername?: string;
+        Endpoint?: {
+            Address?: string;
+            Port?: number;
+        };
+        AllocatedStorage?: number;
+        InstanceCreateTime?: string;
+        PreferredBackupWindow?: string;
+        BackupRetentionPeriod?: number;
+        VpcSecurityGroups?: Array<{
+            VpcSecurityGroupId?: string;
+            Status?: string;
+        }>;
+        DBParameterGroups?: Array<{
+            DBParameterGroupName?: string;
+            ParameterApplyStatus?: string;
+        }>;
+        AvailabilityZone?: string;
+        DBSubnetGroup?: {
+            DBSubnetGroupName?: string;
+            DBSubnetGroupDescription?: string;
+            VpcId?: string;
+        };
+        PreferredMaintenanceWindow?: string;
+        PendingModifiedValues?: any;
+        LatestRestorableTime?: string;
+        AutoMinorVersionUpgrade?: boolean;
+        ReadReplicaDBInstanceIdentifiers?: string[];
+        LicenseModel?: string;
+        OptionGroupMemberships?: Array<{
+            OptionGroupName?: string;
+            Status?: string;
+        }>;
+        PubliclyAccessible?: boolean;
+        StorageType?: string;
+        DbInstancePort?: number;
+        StorageEncrypted?: boolean;
+        KmsKeyId?: string;
+        DbiResourceId?: string;
+        CACertificateIdentifier?: string;
+        DomainMemberships?: any[];
+        CopyTagsToSnapshot?: boolean;
+        MonitoringInterval?: number;
+        EnhancedMonitoringResourceArn?: string;
+        MonitoringRoleArn?: string;
+        PromotionTier?: number;
+        DBInstanceArn?: string;
+        Timezone?: string;
+        IAMDatabaseAuthenticationEnabled?: boolean;
+        PerformanceInsightsEnabled?: boolean;
+        PerformanceInsightsKMSKeyId?: string;
+        PerformanceInsightsRetentionPeriod?: number;
+        EnabledCloudwatchLogsExports?: string[];
+        ProcessorFeatures?: any[];
+        DeletionProtection?: boolean;
+        AssociatedRoles?: any[];
+        ListenerEndpoint?: {
+            Address?: string;
+            Port?: number;
+            HostedZoneId?: string;
+        };
+        MaxAllocatedStorage?: number;
+        EngineVersion?: string;
+        MultiAZ?: boolean;
+    }>;
     DBInstance?: {
         DBInstanceIdentifier?: string;
         DBInstanceClass?: string;
