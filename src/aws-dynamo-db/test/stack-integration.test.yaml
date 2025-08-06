@@ -1,0 +1,186 @@
+name: "AWS DynamoDB Table Entity Integration Test"
+description: "Complete integration test for AWS DynamoDB Table entity including table creation, custom actions, item operations, and cleanup"
+timeout: 300000
+
+setup:
+  - name: "Load AWS DynamoDB entity manifest"
+    action: "load"
+    target: "dist/input/aws-dynamo-db/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy test table"
+    action: "run"
+    target: "aws-dynamo-db-test/test-table"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for table readiness"
+    action: "wait"
+    target: "aws-dynamo-db-test/test-table"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Verify DynamoDB table status"
+    action: "describe"
+    target: "aws-dynamo-db-test/test-table"
+    expect:
+      exitCode: 0
+
+  - name: "Verify table is running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-table-details action"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-table-details"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-tags action"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/list-tags"
+    expect:
+      exitCode: 0
+
+  - name: "Test put-item action with first test item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/put-item"
+    args:
+      item: '{"id":{"S":"test-item-1"},"name":{"S":"Test Item One"},"value":{"N":"100"},"test_bool":{"BOOL":true}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test put-item action with second test item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/put-item"
+    args:
+      item: '{"id":{"S":"test-item-2"},"name":{"S":"Test Item Two"},"value":{"N":"200"},"test_bool":{"BOOL":false}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test get-item action for first item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-item"
+    args:
+      key: '{"id":{"S":"test-item-1"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test get-item action for second item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-item"
+    args:
+      key: '{"id":{"S":"test-item-2"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test scan-table action to retrieve all items"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/scan-table"
+    expect:
+      exitCode: 0
+
+  - name: "Test scan-table action with limit"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/scan-table"
+    args:
+      limit: 1
+    expect:
+      exitCode: 0
+
+  - name: "Add third test item for additional testing"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/put-item"
+    args:
+      item: '{"id":{"S":"test-item-3"},"name":{"S":"Test Item Three"},"value":{"N":"300"},"category":{"S":"test-category"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Scan table again to verify three items"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/scan-table"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-item action for third item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-item"
+    args:
+      key: '{"id":{"S":"test-item-3"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test delete-item action for first item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/delete-item"
+    args:
+      key: '{"id":{"S":"test-item-1"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Verify first item is deleted by attempting to get it"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-item"
+    args:
+      key: '{"id":{"S":"test-item-1"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test delete-item action for second item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/delete-item"
+    args:
+      key: '{"id":{"S":"test-item-2"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Test delete-item action for third item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/delete-item"
+    args:
+      key: '{"id":{"S":"test-item-3"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Scan table after all deletions to verify cleanup"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/scan-table"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-item action for non-existent item"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-item"
+    args:
+      key: '{"id":{"S":"non-existent-item"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Final table details check"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/get-table-details"
+    expect:
+      exitCode: 0
+
+  - name: "Final tags list check"
+    action: "do"
+    target: "aws-dynamo-db-test/test-table/list-tags"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete test table"
+    action: "delete"
+    target: "aws-dynamo-db-test/test-table"
+    expect:
+      exitCode: 0 

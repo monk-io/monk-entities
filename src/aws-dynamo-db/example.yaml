@@ -1,0 +1,81 @@
+namespace: aws-dynamo-db-example
+
+# Simple DynamoDB table with pay-per-request billing
+simple-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: simple-example-table
+  attribute_definitions:
+    - AttributeName: id
+      AttributeType: S
+  key_schema:
+    - AttributeName: id
+      KeyType: HASH
+  billing_mode: PAY_PER_REQUEST
+  tags:
+    Environment: example
+    Purpose: demonstration
+    ManagedBy: monk
+
+# DynamoDB table with composite key and provisioned billing
+user-posts-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: user-posts-example
+  attribute_definitions:
+    - AttributeName: user_id
+      AttributeType: S
+    - AttributeName: post_timestamp
+      AttributeType: N
+  key_schema:
+    - AttributeName: user_id
+      KeyType: HASH
+    - AttributeName: post_timestamp
+      KeyType: RANGE
+  billing_mode: PROVISIONED
+  provisioned_throughput:
+    ReadCapacityUnits: 5
+    WriteCapacityUnits: 5
+  sse_specification:
+    Enabled: true
+    SSEType: AES256
+  point_in_time_recovery_enabled: true
+  tags:
+    Environment: example
+    Purpose: user-content
+    ManagedBy: monk
+
+# Advanced table with Global Secondary Index
+analytics-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: analytics-example
+  attribute_definitions:
+    - AttributeName: event_id
+      AttributeType: S
+    - AttributeName: timestamp
+      AttributeType: N
+    - AttributeName: user_type
+      AttributeType: S
+  key_schema:
+    - AttributeName: event_id
+      KeyType: HASH
+    - AttributeName: timestamp
+      KeyType: RANGE
+  billing_mode: PAY_PER_REQUEST
+  global_secondary_indexes:
+    - IndexName: UserTypeIndex
+      KeySchema:
+        - AttributeName: user_type
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      Projection:
+        ProjectionType: ALL
+  stream_specification:
+    StreamEnabled: true
+    StreamViewType: NEW_AND_OLD_IMAGES
+  tags:
+    Environment: example
+    Purpose: analytics
+    ManagedBy: monk 

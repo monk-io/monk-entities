@@ -1,0 +1,227 @@
+namespace: aws-dynamo-db
+dynamo-db-table:
+  defines: entity
+  metadata:
+    name: DynamoDBTable
+  schema:
+    region:
+      type: string
+    table_name:
+      type: string
+      minLength: 3
+      maxLength: 255
+      pattern: '^[a-zA-Z0-9_.-]+$'
+    attribute_definitions:
+      type: array
+      items:
+        type: object
+        properties:
+          AttributeName:
+            type: string
+          AttributeType:
+            type: string
+            enum:
+              - S
+              - 'N'
+              - B
+        required:
+          - AttributeName
+          - AttributeType
+        additionalProperties: false
+    key_schema:
+      type: array
+      items:
+        type: object
+        properties:
+          AttributeName:
+            type: string
+          KeyType:
+            type: string
+            enum:
+              - HASH
+              - RANGE
+        required:
+          - AttributeName
+          - KeyType
+        additionalProperties: false
+    billing_mode:
+      type: string
+      enum:
+        - PROVISIONED
+        - PAY_PER_REQUEST
+      default: PAY_PER_REQUEST
+    provisioned_throughput:
+      type: object
+      properties:
+        ReadCapacityUnits:
+          type: number
+        WriteCapacityUnits:
+          type: number
+      required:
+        - ReadCapacityUnits
+        - WriteCapacityUnits
+      additionalProperties: false
+    global_secondary_indexes:
+      type: array
+      items:
+        type: object
+        properties:
+          IndexName:
+            type: string
+          KeySchema:
+            type: array
+            items:
+              type: object
+              properties:
+                AttributeName:
+                  type: string
+                KeyType:
+                  type: string
+                  enum:
+                    - HASH
+                    - RANGE
+              required:
+                - AttributeName
+                - KeyType
+              additionalProperties: false
+          Projection:
+            type: object
+            properties:
+              ProjectionType:
+                type: string
+                enum:
+                  - ALL
+                  - KEYS_ONLY
+                  - INCLUDE
+              NonKeyAttributes:
+                type: array
+                items:
+                  type: string
+            required:
+              - ProjectionType
+            additionalProperties: false
+          ProvisionedThroughput:
+            type: object
+            properties:
+              ReadCapacityUnits:
+                type: number
+              WriteCapacityUnits:
+                type: number
+            required:
+              - ReadCapacityUnits
+              - WriteCapacityUnits
+            additionalProperties: false
+        required:
+          - IndexName
+          - KeySchema
+          - Projection
+        additionalProperties: false
+    local_secondary_indexes:
+      type: array
+      items:
+        type: object
+        properties:
+          IndexName:
+            type: string
+          KeySchema:
+            type: array
+            items:
+              type: object
+              properties:
+                AttributeName:
+                  type: string
+                KeyType:
+                  type: string
+                  enum:
+                    - HASH
+                    - RANGE
+              required:
+                - AttributeName
+                - KeyType
+              additionalProperties: false
+          Projection:
+            type: object
+            properties:
+              ProjectionType:
+                type: string
+                enum:
+                  - ALL
+                  - KEYS_ONLY
+                  - INCLUDE
+              NonKeyAttributes:
+                type: array
+                items:
+                  type: string
+            required:
+              - ProjectionType
+            additionalProperties: false
+        required:
+          - IndexName
+          - KeySchema
+          - Projection
+        additionalProperties: false
+    sse_specification:
+      type: object
+      properties:
+        Enabled:
+          type: boolean
+        SSEType:
+          type: string
+          enum:
+            - AES256
+            - KMS
+        KMSMasterKeyId:
+          type: string
+      additionalProperties: false
+    stream_specification:
+      type: object
+      properties:
+        StreamEnabled:
+          type: boolean
+        StreamViewType:
+          type: string
+          enum:
+            - KEYS_ONLY
+            - NEW_IMAGE
+            - OLD_IMAGE
+            - NEW_AND_OLD_IMAGES
+      required:
+        - StreamEnabled
+      additionalProperties: false
+    table_class:
+      type: string
+      enum:
+        - STANDARD
+        - STANDARD_INFREQUENT_ACCESS
+      default: STANDARD
+    deletion_protection_enabled:
+      type: boolean
+      default: false
+    point_in_time_recovery_enabled:
+      type: boolean
+      default: false
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - table_name
+  lifecycle:
+    sync: <<< dynamo-db-table-sync.js
+    get-table-details: ''
+    put-item: ''
+    get-item: ''
+    delete-item: ''
+    scan-table: ''
+    list-tags: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+  requires:
+    - aws-dynamo-db/base
+    - monkec/base
+    - cli
+    - aws-dynamo-db/common

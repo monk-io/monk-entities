@@ -1,0 +1,35 @@
+{
+  "name": "dynamo-db-client",
+  "version": "1.0.0",
+  "description": "Simple DynamoDB client for demonstrating CRUD operations with AWS DynamoDB",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "aws",
+    "dynamodb",
+    "client",
+    "monk",
+    "typescript",
+    "crud"
+  ],
+  "author": "Monk DynamoDB Client",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+} 
