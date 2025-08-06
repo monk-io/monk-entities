@@ -1,0 +1,5 @@
+namespace: aws-rds
+
+common:
+  defines: module
+  source: <<< common.js

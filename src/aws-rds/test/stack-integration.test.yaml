@@ -1,0 +1,144 @@
+name: "AWS RDS Entity Integration Test"
+description: "Complete integration test for AWS RDS entity including DB instance creation, custom actions, and cleanup"
+timeout: 1800000  # 30 minutes for RDS operations
+
+setup:
+  - name: "Load AWS RDS entity manifest"
+    action: "load"
+    target: "dist/input/aws-rds/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Test MySQL instance lifecycle
+  - name: "Create MySQL RDS instance"
+    action: "run"
+    target: "aws-rds-test/test-mysql-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for MySQL instance readiness"
+    action: "wait"
+    target: "aws-rds-test/test-mysql-instance"
+    waitFor:
+      condition: "ready"
+      timeout: 900000  # 15 minutes for RDS instance to become available
+
+  - name: "Verify MySQL instance status"
+    action: "describe"
+    target: "aws-rds-test/test-mysql-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-instance-info action for MySQL"
+    action: "do"
+    target: "aws-rds-test/test-mysql-instance/get-instance-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "DB Instance Information"
+        - "mysql"
+        - "available"
+
+  - name: "Test get-connection-info action for MySQL"
+    action: "do"
+    target: "aws-rds-test/test-mysql-instance/get-connection-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connection Information"
+        - "Host:"
+        - "Port: 3306"
+
+  - name: "Test create-snapshot action for MySQL"
+    action: "do"
+    target: "aws-rds-test/test-mysql-instance/create-snapshot"
+    expect:
+      exitCode: 0
+      contains:
+        - "Snapshot creation initiated"
+
+  # Test PostgreSQL instance lifecycle  
+  - name: "Create PostgreSQL RDS instance"
+    action: "run"
+    target: "aws-rds-test/test-postgres-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for PostgreSQL instance readiness"
+    action: "wait"
+    target: "aws-rds-test/test-postgres-instance"
+    waitFor:
+      condition: "ready"
+      timeout: 900000  # 15 minutes for RDS instance to become available
+
+  - name: "Verify PostgreSQL instance status"
+    action: "describe"
+    target: "aws-rds-test/test-postgres-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-instance-info action for PostgreSQL"
+    action: "do"
+    target: "aws-rds-test/test-postgres-instance/get-instance-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "DB Instance Information"
+        - "postgres"
+        - "available"
+
+  - name: "Test get-connection-info action for PostgreSQL"
+    action: "do"
+    target: "aws-rds-test/test-postgres-instance/get-connection-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connection Information"
+        - "Host:"
+        - "Port: 5432"
+
+  - name: "Test create-snapshot action for PostgreSQL"
+    action: "do"
+    target: "aws-rds-test/test-postgres-instance/create-snapshot"
+    expect:
+      exitCode: 0
+      contains:
+        - "Snapshot creation initiated"
+
+  # Test entity operations
+  - name: "Verify all instances are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  - name: "Test MySQL instance update"
+    action: "update"
+    target: "aws-rds-test/test-mysql-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Test PostgreSQL instance update"
+    action: "update"
+    target: "aws-rds-test/test-postgres-instance"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete PostgreSQL instance"
+    action: "delete"
+    target: "aws-rds-test/test-postgres-instance"
+    expect:
+      exitCode: 0
+
+  - name: "Delete MySQL instance"
+    action: "delete"
+    target: "aws-rds-test/test-mysql-instance"
+    expect:
+      exitCode: 0 

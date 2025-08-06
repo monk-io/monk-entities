@@ -1,0 +1,5 @@
+namespace: aws-rds
+
+base:
+  defines: module
+  source: <<< base.js
