@@ -120,7 +120,7 @@ mysql-client:
         echo "🚀 Starting MySQL RDS Client..."
         exec npm start
       paths:
-        - /home/ivan/Work/monk-entities/examples/rds-client:/app
+        - .:/app
       environment:
         - DB_ENGINE=mysql
         - DB_CONNECTION_LIMIT=5
