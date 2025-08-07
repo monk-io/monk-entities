@@ -1,0 +1,3 @@
+REPO lambda-dynamo-db-example
+LOAD lambda-dynamo-db-example.yaml
+BLOBS lambda-dynamo-db-example:lambda-code/

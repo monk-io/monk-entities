@@ -1,0 +1,33 @@
+{
+  "name": "lambda-dynamo-db-example",
+  "version": "1.0.0",
+  "description": "AWS Lambda function demonstrating CRUD operations with DynamoDB using AWS SDK v3",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node test/test-lambda.js",
+    "test-local": "node test/test-local.js",
+    "invoke": "node test/invoke-lambda.js",
+    "zip": "zip -r lambda-function.zip src/ package.json node_modules/"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "dynamodb",
+    "crud",
+    "monk",
+    "serverless",
+    "nodejs"
+  ],
+  "author": "Monk Lambda + DynamoDB Example",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0"
+  }
+} 
