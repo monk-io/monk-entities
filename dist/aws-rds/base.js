@@ -217,16 +217,7 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       }
       throw new Error(errorMessage);
     }
-    if (action === "DescribeSecurityGroups" && params["GroupId.1"]) {
-      import_cli.default.output(`[DEBUG] Raw XML response for security group ${params["GroupId.1"]}: ${response.body}`);
-    }
     const parsedResponse = this.parseEC2Response(response.body);
-    if (action === "DescribeSecurityGroups" && params["GroupId.1"]) {
-      import_cli.default.output(`[DEBUG] Parsed response for SG ${params["GroupId.1"]}: ${JSON.stringify(parsedResponse, null, 2)}`);
-      if (parsedResponse.SecurityGroups && parsedResponse.SecurityGroups.length > 0) {
-        import_cli.default.output(`[DEBUG] First SG in parsed response: ${JSON.stringify(parsedResponse.SecurityGroups[0], null, 2)}`);
-      }
-    }
     return parsedResponse;
   }
   parseEC2Response(xmlBody) {
@@ -254,7 +245,6 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     const securityGroupInfoMatch = /<securityGroupInfo>(.*?)<\/securityGroupInfo>/s.exec(xmlBody);
     if (securityGroupInfoMatch) {
       const securityGroupInfoXml = securityGroupInfoMatch[1];
-      import_cli.default.output(`[DEBUG] securityGroupInfoXml: ${securityGroupInfoXml.substring(0, 500)}...`);
       const sgMatches = [];
       let currentIndex = 0;
       let itemStart = securityGroupInfoXml.indexOf("<item>", currentIndex);
@@ -285,7 +275,6 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
           break;
         }
       }
-      import_cli.default.output(`[DEBUG] sgMatches count: ${sgMatches.length}`);
       if (sgMatches.length > 0) {
         result.SecurityGroups = [];
         sgMatches.forEach((sgItemXml) => {
@@ -301,12 +290,9 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
               GroupName: sgNameMatch[1],
               VpcId: vpcIdMatch2 ? vpcIdMatch2[1] : void 0
             };
-            import_cli.default.output(`[DEBUG] Looking for ipPermissions in full sgItemXml: ${sgItemXml.substring(0, 200)}...`);
             const ipPermissionsMatch = /<ipPermissions>(.*?)<\/ipPermissions>/s.exec(sgItemXml);
-            import_cli.default.output(`[DEBUG] ipPermissionsMatch found: ${ipPermissionsMatch ? "YES" : "NO"}`);
             if (ipPermissionsMatch) {
               const ipPermissionsXml = ipPermissionsMatch[1];
-              import_cli.default.output(`[DEBUG] ipPermissionsXml: ${ipPermissionsXml.substring(0, 300)}`);
               const permissionItems = [];
               let currentIndex2 = 0;
               let itemStart2 = ipPermissionsXml.indexOf("<item>", currentIndex2);
@@ -337,7 +323,6 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
                   break;
                 }
               }
-              import_cli.default.output(`[DEBUG] permissionItems count: ${permissionItems.length}`);
               if (permissionItems.length > 0) {
                 securityGroup.IpPermissions = [];
                 permissionItems.forEach((permXml) => {
@@ -364,24 +349,18 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
                         });
                       }
                     }
-                    import_cli.default.output(`[DEBUG] Looking for groups in permXml: ${permXml.substring(0, 200)}...`);
                     const groupsMatch = /<groups>(.*?)<\/groups>/s.exec(permXml);
-                    import_cli.default.output(`[DEBUG] groupsMatch found: ${groupsMatch ? "YES" : "NO"}`);
                     if (groupsMatch) {
                       const groupsXml = groupsMatch[1];
-                      import_cli.default.output(`[DEBUG] groupsXml: ${groupsXml.substring(0, 200)}`);
                       const groupItems = groupsXml.match(/<item>.*?<\/item>/gs);
-                      import_cli.default.output(`[DEBUG] groupItems count: ${groupItems ? groupItems.length : 0}`);
                       if (groupItems) {
                         permission.UserIdGroupPairs = [];
                         groupItems.forEach((grpXml) => {
                           const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
-                          import_cli.default.output(`[DEBUG] grpXml: ${grpXml}, grpIdMatch: ${grpIdMatch ? grpIdMatch[1] : "NONE"}`);
                           if (grpIdMatch) {
                             permission.UserIdGroupPairs.push({ GroupId: grpIdMatch[1] });
                           }
                         });
-                        import_cli.default.output(`[DEBUG] Final UserIdGroupPairs: ${JSON.stringify(permission.UserIdGroupPairs)}`);
                       }
                     }
                     securityGroup.IpPermissions.push(permission);
@@ -403,10 +382,8 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
         "Filter.1.Value.1": "true"
       });
       if (response.VpcId && response.IsDefault) {
-        console.log(`Found default VPC: ${response.VpcId}`);
         return response.VpcId;
       }
-      console.log("No default VPC found");
       return null;
     } catch (error) {
       console.log(`Warning: Could not retrieve default VPC: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -414,9 +391,7 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     }
   }
   resolveSecurityGroupNames(groupNames, vpcId) {
-    import_cli.default.output(`[DEBUG] resolveSecurityGroupNames called with: groupNames=${JSON.stringify(groupNames)}, vpcId=${vpcId}`);
     if (groupNames.length === 0) {
-      import_cli.default.output(`[DEBUG] No group names to resolve, returning empty array`);
       return [];
     }
     try {
@@ -428,27 +403,21 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       if (vpcId) {
         params["Filter.2.Name"] = "vpc-id";
         params["Filter.2.Value.1"] = vpcId;
-        import_cli.default.output(`[DEBUG] Adding VPC filter: ${vpcId}`);
       } else {
         const defaultVpcId = this.getDefaultVpc();
         if (defaultVpcId) {
           params["Filter.2.Name"] = "vpc-id";
           params["Filter.2.Value.1"] = defaultVpcId;
-          import_cli.default.output(`[DEBUG] Adding default VPC filter: ${defaultVpcId}`);
         } else {
-          import_cli.default.output(`[DEBUG] No VPC filter - searching all VPCs`);
         }
       }
-      import_cli.default.output(`[DEBUG] DescribeSecurityGroups parameters: ${JSON.stringify(params, null, 2)}`);
       const response = this.makeEC2Request("DescribeSecurityGroups", params);
-      import_cli.default.output(`[DEBUG] DescribeSecurityGroups response: ${JSON.stringify(response, null, 2)}`);
       const sgIds = [];
       const sgMatches = response.SecurityGroups || [];
       if (Array.isArray(sgMatches)) {
         sgMatches.forEach((sg) => {
           if (sg.GroupId) {
             sgIds.push(sg.GroupId);
-            import_cli.default.output(`[DEBUG] Found security group: ${sg.GroupName} -> ${sg.GroupId}`);
           }
         });
       } else {
@@ -458,50 +427,33 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
             const idMatch = /<groupId>(.*?)<\/groupId>/.exec(match);
             if (idMatch) {
               sgIds.push(idMatch[1]);
-              import_cli.default.output(`[DEBUG] Found security group ID from XML: ${idMatch[1]}`);
             }
           });
         } else {
-          import_cli.default.output(`[DEBUG] No security groups found matching the criteria`);
         }
       }
       if (sgIds.length === 0 && (vpcId || this.getDefaultVpc())) {
-        import_cli.default.output(`[DEBUG] No security groups found with VPC filter, trying without VPC filter...`);
         try {
-          import_cli.default.output(`[DEBUG] Listing ALL security groups for reference...`);
           const allSgsResponse = this.makeEC2Request("DescribeSecurityGroups", {});
           if (allSgsResponse.SecurityGroups && Array.isArray(allSgsResponse.SecurityGroups)) {
-            import_cli.default.output(`[DEBUG] Found ${allSgsResponse.SecurityGroups.length} total security groups:`);
-            allSgsResponse.SecurityGroups.forEach((sg) => {
-              import_cli.default.output(`[DEBUG]   - ${sg.GroupName} (${sg.GroupId}) in VPC: ${sg.VpcId}`);
-            });
           } else {
-            import_cli.default.output(`[DEBUG] No security groups found in account or parsing issue`);
           }
-        } catch (listError) {
-          import_cli.default.output(`[DEBUG] Failed to list all security groups: ${listError instanceof Error ? listError.message : "Unknown error"}`);
+        } catch (_listError) {
         }
         const noVpcParams = {};
         noVpcParams["Filter.1.Name"] = "group-name";
         groupNames.forEach((name, index) => {
           noVpcParams[`Filter.1.Value.${index + 1}`] = name;
         });
-        import_cli.default.output(`[DEBUG] DescribeSecurityGroups parameters (no VPC): ${JSON.stringify(noVpcParams, null, 2)}`);
         const noVpcResponse = this.makeEC2Request("DescribeSecurityGroups", noVpcParams);
-        import_cli.default.output(`[DEBUG] DescribeSecurityGroups response (no VPC): ${JSON.stringify(noVpcResponse, null, 2)}`);
         const noVpcMatches = noVpcResponse.SecurityGroups || [];
         if (Array.isArray(noVpcMatches)) {
           noVpcMatches.forEach((sg) => {
             if (sg.GroupId) {
               sgIds.push(sg.GroupId);
-              import_cli.default.output(`[DEBUG] Found security group (no VPC filter): ${sg.GroupName} -> ${sg.GroupId} (VPC: ${sg.VpcId})`);
             }
           });
         }
-      }
-      if (sgIds.length !== groupNames.length) {
-        const foundNames = sgIds.length;
-        import_cli.default.output(`[DEBUG] Warning: Found ${foundNames} security groups out of ${groupNames.length} requested: ${JSON.stringify(groupNames)}`);
       }
       return sgIds;
     } catch (error) {
@@ -546,16 +498,13 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
         params["Filter.2.Name"] = "vpc-id";
         params["Filter.2.Value.1"] = targetVpcId;
       }
-      console.log(`Searching for security group '${groupName}' in VPC '${targetVpcId || "any"}'`);
       const response = this.makeEC2Request("DescribeSecurityGroups", params);
       if (response.SecurityGroups && response.SecurityGroups.length > 0) {
         const securityGroups = Array.isArray(response.SecurityGroups) ? response.SecurityGroups : [response.SecurityGroups];
         if (securityGroups.length > 0) {
-          console.log(`Found existing security group: ${securityGroups[0].GroupId}`);
           return securityGroups[0].GroupId;
         }
       }
-      console.log(`No security group found with name '${groupName}' in VPC '${targetVpcId || "any"}'`);
       return null;
     } catch (error) {
       console.log(`Error finding security group by name: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -563,7 +512,6 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     }
   }
   authorizeSecurityGroupIngress(groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
-    import_cli.default.output(`[DEBUG] authorizeSecurityGroupIngress called with: groupId=${groupId}, protocol=${protocol}, fromPort=${fromPort}, toPort=${toPort}, cidrBlocks=${JSON.stringify(cidrBlocks)}, sourceSecurityGroupIds=${JSON.stringify(sourceSecurityGroupIds)}`);
     const params = {
       GroupId: groupId
     };
@@ -584,20 +532,16 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       params[`${permissionBase}.Groups.1.GroupId`] = sgId;
       permissionIndex++;
     });
-    import_cli.default.output(`[DEBUG] AuthorizeSecurityGroupIngress parameters: ${JSON.stringify(params, null, 2)}`);
     try {
       this.makeEC2Request("AuthorizeSecurityGroupIngress", params);
-      import_cli.default.output(`[DEBUG] AuthorizeSecurityGroupIngress completed successfully`);
     } catch (error) {
       if (error instanceof Error && !error.message.includes("InvalidPermission.Duplicate")) {
         import_cli.default.output(`[ERROR] AuthorizeSecurityGroupIngress failed: ${error.message}`);
         throw error;
       }
-      import_cli.default.output(`[DEBUG] Some security group rules already exist, continuing...`);
     }
   }
   revokeSecurityGroupIngress(groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
-    import_cli.default.output(`[DEBUG] revokeSecurityGroupIngress called with: groupId=${groupId}, protocol=${protocol}, fromPort=${fromPort}, toPort=${toPort}, cidrBlocks=${JSON.stringify(cidrBlocks)}, sourceSecurityGroupIds=${JSON.stringify(sourceSecurityGroupIds)}`);
     const params = {
       GroupId: groupId
     };
@@ -618,71 +562,52 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       params[`${permissionBase}.Groups.1.GroupId`] = sgId;
       permissionIndex++;
     });
-    import_cli.default.output(`[DEBUG] RevokeSecurityGroupIngress parameters: ${JSON.stringify(params, null, 2)}`);
     try {
       this.makeEC2Request("RevokeSecurityGroupIngress", params);
-      import_cli.default.output(`[DEBUG] RevokeSecurityGroupIngress completed successfully`);
     } catch (error) {
       if (error instanceof Error && !error.message.includes("InvalidPermission.NotFound")) {
         import_cli.default.output(`[ERROR] RevokeSecurityGroupIngress failed: ${error.message}`);
         throw error;
       }
-      import_cli.default.output(`[DEBUG] Some security group rules already removed, continuing...`);
     }
   }
   updateSecurityGroupRules() {
     if (!this.state.created_security_group_id || this.state.created_security_group_existing) {
-      import_cli.default.output("[DEBUG] Skipping security group rules update - not an auto-created security group");
       return;
     }
     const groupId = this.state.created_security_group_id;
     const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
     const allowedCidrs = this.definition.allowed_cidr_blocks || [];
     const allowedSgNames = this.definition.allowed_security_group_names || [];
-    import_cli.default.output(`[DEBUG] Current definition: allowedCidrs=${JSON.stringify(allowedCidrs)}, allowedSgNames=${JSON.stringify(allowedSgNames)}, port=${port}`);
-    import_cli.default.output(`[DEBUG] Updating security group rules for ${groupId} using API-only approach`);
     try {
       const currentAwsRules = this.getCurrentSecurityGroupRules(groupId, port);
-      import_cli.default.output(`[DEBUG] Attempting to resolve security group names: ${JSON.stringify(allowedSgNames)}`);
       const allowedSgIds = allowedSgNames.length > 0 ? this.resolveSecurityGroupNames([...allowedSgNames], this.definition.vpc_id) : [];
-      import_cli.default.output(`[DEBUG] Resolved security group IDs: ${JSON.stringify(allowedSgIds)}`);
       const cidrsToAdd = allowedCidrs.filter((cidr) => !currentAwsRules.cidrs.includes(cidr));
       const cidrsToRemove = currentAwsRules.cidrs.filter((cidr) => !allowedCidrs.includes(cidr));
       const sgIdsToAdd = allowedSgIds.filter((sgId) => !currentAwsRules.sgIds.includes(sgId));
       const sgIdsToRemove = currentAwsRules.sgIds.filter((sgId) => !allowedSgIds.includes(sgId));
-      import_cli.default.output(`[DEBUG] Rules to add - CIDRs: ${JSON.stringify(cidrsToAdd)}, SG IDs: ${JSON.stringify(sgIdsToAdd)}`);
-      import_cli.default.output(`[DEBUG] Rules to remove - CIDRs: ${JSON.stringify(cidrsToRemove)}, SG IDs: ${JSON.stringify(sgIdsToRemove)}`);
       if (cidrsToAdd.length === 0 && cidrsToRemove.length === 0 && sgIdsToAdd.length === 0 && sgIdsToRemove.length === 0) {
-        import_cli.default.output(`[DEBUG] No security group rule changes needed for ${groupId}`);
         return;
       }
       if (cidrsToRemove.length > 0 || sgIdsToRemove.length > 0) {
-        import_cli.default.output(`[DEBUG] Removing security group rules: CIDRs=${cidrsToRemove}, SGs=${sgIdsToRemove}`);
         this.revokeSecurityGroupIngress(groupId, "tcp", port, port, cidrsToRemove, sgIdsToRemove);
       }
       if (cidrsToAdd.length > 0 || sgIdsToAdd.length > 0) {
-        import_cli.default.output(`[DEBUG] Adding security group rules: CIDRs=${JSON.stringify(cidrsToAdd)}, SGs=${JSON.stringify(sgIdsToAdd)}`);
-        import_cli.default.output(`[DEBUG] Port: ${port}, Protocol: tcp`);
         this.authorizeSecurityGroupIngress(groupId, "tcp", port, port, cidrsToAdd, sgIdsToAdd);
-        import_cli.default.output(`[DEBUG] Successfully added security group rules`);
       }
-      import_cli.default.output(`[DEBUG] Security group rules updated successfully for ${groupId}`);
     } catch (error) {
       throw new Error(`Failed to update security group rules: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   getCurrentSecurityGroupRules(groupId, port) {
     try {
-      import_cli.default.output(`[DEBUG] Querying current AWS security group rules for ${groupId}`);
       const response = this.makeEC2Request("DescribeSecurityGroups", {
         "GroupId.1": groupId
       });
-      import_cli.default.output(`[DEBUG] getCurrentSecurityGroupRules - AWS response: ${JSON.stringify(response, null, 2)}`);
       const actualCidrs = [];
       const actualSgIds = [];
       if (response.SecurityGroups && response.SecurityGroups.length > 0) {
         const securityGroup = response.SecurityGroups[0];
-        import_cli.default.output(`[DEBUG] Security group for rule parsing: ${JSON.stringify(securityGroup, null, 2)}`);
         if (securityGroup.IpPermissions) {
           const permissions = Array.isArray(securityGroup.IpPermissions) ? securityGroup.IpPermissions : [securityGroup.IpPermissions];
           permissions.forEach((permission) => {
@@ -707,10 +632,8 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
           });
         }
       }
-      import_cli.default.output(`[DEBUG] Current AWS rules - CIDRs: ${actualCidrs}, SG IDs: ${actualSgIds}`);
       return { cidrs: actualCidrs, sgIds: actualSgIds };
     } catch (error) {
-      import_cli.default.output(`[DEBUG] Warning: Could not query current security group rules: ${error instanceof Error ? error.message : "Unknown error"}`);
       return { cidrs: [], sgIds: [] };
     }
   }
@@ -748,17 +671,14 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       let groupId = this.findSecurityGroupByName(groupName, vpcId);
       let isExisting = false;
       if (groupId) {
-        import_cli.default.output(`[DEBUG] Found existing security group ${groupId} with name '${groupName}' for RDS instance ${dbInstanceIdentifier}`);
         isExisting = true;
       } else {
         groupId = this.createSecurityGroup(groupName, description, vpcId);
-        import_cli.default.output(`[DEBUG] Created new security group ${groupId} for RDS instance ${dbInstanceIdentifier}`);
       }
       const allowedSgIds = allowedSgNames.length > 0 ? this.resolveSecurityGroupNames([...allowedSgNames], vpcId) : [];
       if (!isExisting) {
         this.authorizeSecurityGroupIngress(groupId, "tcp", port, port, [...allowedCidrs], allowedSgIds);
       } else {
-        import_cli.default.output(`[DEBUG] Using existing security group ${groupId}, skipping rule creation`);
       }
       this.state.created_security_group_id = groupId;
       this.state.created_security_group_existing = isExisting;

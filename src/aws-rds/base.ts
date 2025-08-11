@@ -455,20 +455,7 @@ export abstract class AWSRDSEntity<
             throw new Error(errorMessage);
         }
 
-        // Debug XML for DescribeSecurityGroups to see if IpPermissions are there
-        if (action === 'DescribeSecurityGroups' && params['GroupId.1']) {
-            cli.output(`[DEBUG] Raw XML response for security group ${params['GroupId.1']}: ${response.body}`);
-        }
-        
         const parsedResponse = this.parseEC2Response(response.body);
-        
-        // Extra debug for security group parsing
-        if (action === 'DescribeSecurityGroups' && params['GroupId.1']) {
-            cli.output(`[DEBUG] Parsed response for SG ${params['GroupId.1']}: ${JSON.stringify(parsedResponse, null, 2)}`);
-            if (parsedResponse.SecurityGroups && parsedResponse.SecurityGroups.length > 0) {
-                cli.output(`[DEBUG] First SG in parsed response: ${JSON.stringify(parsedResponse.SecurityGroups[0], null, 2)}`);
-            }
-        }
         
         return parsedResponse;
     }
@@ -510,8 +497,7 @@ export abstract class AWSRDSEntity<
         const securityGroupInfoMatch = /<securityGroupInfo>(.*?)<\/securityGroupInfo>/s.exec(xmlBody);
         if (securityGroupInfoMatch) {
             const securityGroupInfoXml = securityGroupInfoMatch[1];
-            cli.output(`[DEBUG] securityGroupInfoXml: ${securityGroupInfoXml.substring(0, 500)}...`);
-            
+
             // Match only direct child <item> elements of securityGroupInfo
             // We need to be more careful to avoid matching nested <item> tags
             const sgMatches = [];
@@ -552,9 +538,7 @@ export abstract class AWSRDSEntity<
                     break; // Malformed XML
                 }
             }
-            
-            cli.output(`[DEBUG] sgMatches count: ${sgMatches.length}`);
-            
+
             if (sgMatches.length > 0) {
                 result.SecurityGroups = [];
                 sgMatches.forEach(sgItemXml => {
@@ -574,12 +558,10 @@ export abstract class AWSRDSEntity<
                         };
                     
                         // Parse ingress rules (IpPermissions)
-                        cli.output(`[DEBUG] Looking for ipPermissions in full sgItemXml: ${sgItemXml.substring(0, 200)}...`);
                         const ipPermissionsMatch = /<ipPermissions>(.*?)<\/ipPermissions>/s.exec(sgItemXml);
-                        cli.output(`[DEBUG] ipPermissionsMatch found: ${ipPermissionsMatch ? 'YES' : 'NO'}`);
                         if (ipPermissionsMatch) {
                             const ipPermissionsXml = ipPermissionsMatch[1];
-                            cli.output(`[DEBUG] ipPermissionsXml: ${ipPermissionsXml.substring(0, 300)}`);
+
                             // Use depth-counting approach for permission items too (same nested <item> issue)
                             const permissionItems = [];
                             let currentIndex = 0;
@@ -619,9 +601,7 @@ export abstract class AWSRDSEntity<
                                     break; // Malformed XML
                                 }
                             }
-                            
-                            cli.output(`[DEBUG] permissionItems count: ${permissionItems.length}`);
-                            
+
                             if (permissionItems.length > 0) {
                                 securityGroup.IpPermissions = [];
                                 permissionItems.forEach(permXml => {
@@ -653,24 +633,19 @@ export abstract class AWSRDSEntity<
                                         }
                                         
                                         // Parse user ID group pairs
-                                        cli.output(`[DEBUG] Looking for groups in permXml: ${permXml.substring(0, 200)}...`);
                                         const groupsMatch = /<groups>(.*?)<\/groups>/s.exec(permXml);
-                                        cli.output(`[DEBUG] groupsMatch found: ${groupsMatch ? 'YES' : 'NO'}`);
                                         if (groupsMatch) {
                                             const groupsXml = groupsMatch[1];
-                                            cli.output(`[DEBUG] groupsXml: ${groupsXml.substring(0, 200)}`);
                                             const groupItems = groupsXml.match(/<item>.*?<\/item>/gs);
-                                            cli.output(`[DEBUG] groupItems count: ${groupItems ? groupItems.length : 0}`);
                                             if (groupItems) {
                                                 permission.UserIdGroupPairs = [];
                                                 groupItems.forEach(grpXml => {
-                                                    const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
-                                                    cli.output(`[DEBUG] grpXml: ${grpXml}, grpIdMatch: ${grpIdMatch ? grpIdMatch[1] : 'NONE'}`);
+                                                                                                            const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
                                                     if (grpIdMatch) {
                                                         permission.UserIdGroupPairs.push({ GroupId: grpIdMatch[1] });
                                                     }
                                                 });
-                                                cli.output(`[DEBUG] Final UserIdGroupPairs: ${JSON.stringify(permission.UserIdGroupPairs)}`);
+
                                             }
                                         }
                                         
@@ -698,11 +673,10 @@ export abstract class AWSRDSEntity<
             
             // Check if the response has VpcId and IsDefault flag
             if (response.VpcId && response.IsDefault) {
-                console.log(`Found default VPC: ${response.VpcId}`);
+
                 return response.VpcId;
             }
-            
-            console.log('No default VPC found');
+
             return null;
         } catch (error) {
             console.log(`Warning: Could not retrieve default VPC: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -711,10 +685,7 @@ export abstract class AWSRDSEntity<
     }
 
     protected resolveSecurityGroupNames(groupNames: string[], vpcId?: string): string[] {
-        cli.output(`[DEBUG] resolveSecurityGroupNames called with: groupNames=${JSON.stringify(groupNames)}, vpcId=${vpcId}`);
-        
         if (groupNames.length === 0) {
-            cli.output(`[DEBUG] No group names to resolve, returning empty array`);
             return [];
         }
         
@@ -731,23 +702,16 @@ export abstract class AWSRDSEntity<
             if (vpcId) {
                 params['Filter.2.Name'] = 'vpc-id';
                 params['Filter.2.Value.1'] = vpcId;
-                cli.output(`[DEBUG] Adding VPC filter: ${vpcId}`);
             } else {
                 // Try to get the default VPC if no VPC ID is specified
                 const defaultVpcId = this.getDefaultVpc();
                 if (defaultVpcId) {
                     params['Filter.2.Name'] = 'vpc-id';
                     params['Filter.2.Value.1'] = defaultVpcId;
-                    cli.output(`[DEBUG] Adding default VPC filter: ${defaultVpcId}`);
                 } else {
-                    cli.output(`[DEBUG] No VPC filter - searching all VPCs`);
                 }
             }
-            
-            cli.output(`[DEBUG] DescribeSecurityGroups parameters: ${JSON.stringify(params, null, 2)}`);
             const response = this.makeEC2Request('DescribeSecurityGroups', params);
-            cli.output(`[DEBUG] DescribeSecurityGroups response: ${JSON.stringify(response, null, 2)}`);
-            
             // Parse security groups from response
             const sgIds: string[] = [];
             const sgMatches = response.SecurityGroups || [];
@@ -756,7 +720,6 @@ export abstract class AWSRDSEntity<
                 sgMatches.forEach((sg: any) => {
                     if (sg.GroupId) {
                         sgIds.push(sg.GroupId);
-                        cli.output(`[DEBUG] Found security group: ${sg.GroupName} -> ${sg.GroupId}`);
                     }
                 });
             } else {
@@ -767,32 +730,23 @@ export abstract class AWSRDSEntity<
                         const idMatch = /<groupId>(.*?)<\/groupId>/.exec(match);
                         if (idMatch) {
                             sgIds.push(idMatch[1]);
-                            cli.output(`[DEBUG] Found security group ID from XML: ${idMatch[1]}`);
                         }
                     });
                 } else {
-                    cli.output(`[DEBUG] No security groups found matching the criteria`);
                 }
             }
             
             // If we didn't find any security groups and we were using a VPC filter, try without VPC filter
             if (sgIds.length === 0 && (vpcId || this.getDefaultVpc())) {
-                cli.output(`[DEBUG] No security groups found with VPC filter, trying without VPC filter...`);
-                
                 // Also list all security groups for debugging
                 try {
-                    cli.output(`[DEBUG] Listing ALL security groups for reference...`);
                     const allSgsResponse = this.makeEC2Request('DescribeSecurityGroups', {});
                     if (allSgsResponse.SecurityGroups && Array.isArray(allSgsResponse.SecurityGroups)) {
-                        cli.output(`[DEBUG] Found ${allSgsResponse.SecurityGroups.length} total security groups:`);
-                        allSgsResponse.SecurityGroups.forEach((sg: any) => {
-                            cli.output(`[DEBUG]   - ${sg.GroupName} (${sg.GroupId}) in VPC: ${sg.VpcId}`);
-                        });
+                        // Removed debug logging
                     } else {
-                        cli.output(`[DEBUG] No security groups found in account or parsing issue`);
                     }
-                } catch (listError) {
-                    cli.output(`[DEBUG] Failed to list all security groups: ${listError instanceof Error ? listError.message : 'Unknown error'}`);
+                } catch (_listError) {
+                    // Ignore error - this was for debugging
                 }
                 
                 // Create new parameters without VPC filter
@@ -801,28 +755,19 @@ export abstract class AWSRDSEntity<
                 groupNames.forEach((name, index) => {
                     noVpcParams[`Filter.1.Value.${index + 1}`] = name;
                 });
-                
-                cli.output(`[DEBUG] DescribeSecurityGroups parameters (no VPC): ${JSON.stringify(noVpcParams, null, 2)}`);
                 const noVpcResponse = this.makeEC2Request('DescribeSecurityGroups', noVpcParams);
-                cli.output(`[DEBUG] DescribeSecurityGroups response (no VPC): ${JSON.stringify(noVpcResponse, null, 2)}`);
-                
                 // Parse the no-VPC response
                 const noVpcMatches = noVpcResponse.SecurityGroups || [];
                 if (Array.isArray(noVpcMatches)) {
                     noVpcMatches.forEach((sg: any) => {
                         if (sg.GroupId) {
                             sgIds.push(sg.GroupId);
-                            cli.output(`[DEBUG] Found security group (no VPC filter): ${sg.GroupName} -> ${sg.GroupId} (VPC: ${sg.VpcId})`);
                         }
                     });
                 }
             }
             
-            // Verify we found all requested security groups
-            if (sgIds.length !== groupNames.length) {
-                const foundNames = sgIds.length;
-                cli.output(`[DEBUG] Warning: Found ${foundNames} security groups out of ${groupNames.length} requested: ${JSON.stringify(groupNames)}`);
-            }
+            // Return the found security group IDs
             
             return sgIds;
         } catch (error) {
@@ -879,9 +824,7 @@ export abstract class AWSRDSEntity<
                 params['Filter.2.Name'] = 'vpc-id';
                 params['Filter.2.Value.1'] = targetVpcId;
             }
-            
-            console.log(`Searching for security group '${groupName}' in VPC '${targetVpcId || 'any'}'`);
-            
+
             const response = this.makeEC2Request('DescribeSecurityGroups', params);
             
             // Check if we have any security groups in the response
@@ -891,12 +834,10 @@ export abstract class AWSRDSEntity<
                     response.SecurityGroups : [response.SecurityGroups];
                 
                 if (securityGroups.length > 0) {
-                    console.log(`Found existing security group: ${securityGroups[0].GroupId}`);
                     return securityGroups[0].GroupId;
                 }
             }
             
-            console.log(`No security group found with name '${groupName}' in VPC '${targetVpcId || 'any'}'`);
             return null; // No security group found with this name
         } catch (error) {
             // If there's an error describing security groups, return null
@@ -906,8 +847,6 @@ export abstract class AWSRDSEntity<
     }
 
     protected authorizeSecurityGroupIngress(groupId: string, protocol: string, fromPort: number, toPort: number, cidrBlocks: string[], sourceSecurityGroupIds: string[] = []): void {
-        cli.output(`[DEBUG] authorizeSecurityGroupIngress called with: groupId=${groupId}, protocol=${protocol}, fromPort=${fromPort}, toPort=${toPort}, cidrBlocks=${JSON.stringify(cidrBlocks)}, sourceSecurityGroupIds=${JSON.stringify(sourceSecurityGroupIds)}`);
-        
         const params: Record<string, any> = {
             GroupId: groupId
         };
@@ -933,25 +872,18 @@ export abstract class AWSRDSEntity<
             params[`${permissionBase}.Groups.1.GroupId`] = sgId;
             permissionIndex++;
         });
-        
-        cli.output(`[DEBUG] AuthorizeSecurityGroupIngress parameters: ${JSON.stringify(params, null, 2)}`);
-        
         try {
             this.makeEC2Request('AuthorizeSecurityGroupIngress', params);
-            cli.output(`[DEBUG] AuthorizeSecurityGroupIngress completed successfully`);
         } catch (error) {
             // Ignore errors for rules that already exist (duplicate rules)
             if (error instanceof Error && !error.message.includes('InvalidPermission.Duplicate')) {
                 cli.output(`[ERROR] AuthorizeSecurityGroupIngress failed: ${error.message}`);
                 throw error;
             }
-            cli.output(`[DEBUG] Some security group rules already exist, continuing...`);
         }
     }
 
     protected revokeSecurityGroupIngress(groupId: string, protocol: string, fromPort: number, toPort: number, cidrBlocks: string[], sourceSecurityGroupIds: string[] = []): void {
-        cli.output(`[DEBUG] revokeSecurityGroupIngress called with: groupId=${groupId}, protocol=${protocol}, fromPort=${fromPort}, toPort=${toPort}, cidrBlocks=${JSON.stringify(cidrBlocks)}, sourceSecurityGroupIds=${JSON.stringify(sourceSecurityGroupIds)}`);
-        
         const params: Record<string, any> = {
             GroupId: groupId
         };
@@ -977,26 +909,21 @@ export abstract class AWSRDSEntity<
             params[`${permissionBase}.Groups.1.GroupId`] = sgId;
             permissionIndex++;
         });
-        
-        cli.output(`[DEBUG] RevokeSecurityGroupIngress parameters: ${JSON.stringify(params, null, 2)}`);
-        
         try {
             this.makeEC2Request('RevokeSecurityGroupIngress', params);
-            cli.output(`[DEBUG] RevokeSecurityGroupIngress completed successfully`);
         } catch (error) {
             // Ignore errors for rules that don't exist (already removed)
             if (error instanceof Error && !error.message.includes('InvalidPermission.NotFound')) {
                 cli.output(`[ERROR] RevokeSecurityGroupIngress failed: ${error.message}`);
                 throw error;
             }
-            cli.output(`[DEBUG] Some security group rules already removed, continuing...`);
         }
     }
 
     protected updateSecurityGroupRules(): void {
         // Only update rules for auto-created security groups
         if (!this.state.created_security_group_id || this.state.created_security_group_existing) {
-            cli.output('[DEBUG] Skipping security group rules update - not an auto-created security group');
+
             return;
         }
 
@@ -1004,52 +931,33 @@ export abstract class AWSRDSEntity<
         const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
         const allowedCidrs = this.definition.allowed_cidr_blocks || [];
         const allowedSgNames = this.definition.allowed_security_group_names || [];
-        
-        cli.output(`[DEBUG] Current definition: allowedCidrs=${JSON.stringify(allowedCidrs)}, allowedSgNames=${JSON.stringify(allowedSgNames)}, port=${port}`);
-        cli.output(`[DEBUG] Updating security group rules for ${groupId} using API-only approach`);
-
         try {
             // API-ONLY APPROACH: Query current AWS rules directly
             const currentAwsRules = this.getCurrentSecurityGroupRules(groupId, port);
             
             // Resolve template security group names to IDs
-            cli.output(`[DEBUG] Attempting to resolve security group names: ${JSON.stringify(allowedSgNames)}`);
             const allowedSgIds = allowedSgNames.length > 0 ?
                 this.resolveSecurityGroupNames([...allowedSgNames], this.definition.vpc_id) : [];
-            cli.output(`[DEBUG] Resolved security group IDs: ${JSON.stringify(allowedSgIds)}`);
-
             // Compare template vs AWS reality
             const cidrsToAdd = allowedCidrs.filter(cidr => !currentAwsRules.cidrs.includes(cidr));
             const cidrsToRemove = currentAwsRules.cidrs.filter(cidr => !allowedCidrs.includes(cidr));
             const sgIdsToAdd = allowedSgIds.filter(sgId => !currentAwsRules.sgIds.includes(sgId));
             const sgIdsToRemove = currentAwsRules.sgIds.filter(sgId => !allowedSgIds.includes(sgId));
-
-            cli.output(`[DEBUG] Rules to add - CIDRs: ${JSON.stringify(cidrsToAdd)}, SG IDs: ${JSON.stringify(sgIdsToAdd)}`);
-            cli.output(`[DEBUG] Rules to remove - CIDRs: ${JSON.stringify(cidrsToRemove)}, SG IDs: ${JSON.stringify(sgIdsToRemove)}`);
-
             // Check if there are actually changes to make
             if (cidrsToAdd.length === 0 && cidrsToRemove.length === 0 &&
                 sgIdsToAdd.length === 0 && sgIdsToRemove.length === 0) {
-                cli.output(`[DEBUG] No security group rule changes needed for ${groupId}`);
                 return;
             }
 
             // Remove old rules first
             if (cidrsToRemove.length > 0 || sgIdsToRemove.length > 0) {
-                cli.output(`[DEBUG] Removing security group rules: CIDRs=${cidrsToRemove}, SGs=${sgIdsToRemove}`);
                 this.revokeSecurityGroupIngress(groupId, 'tcp', port, port, cidrsToRemove, sgIdsToRemove);
             }
 
             // Add new rules
             if (cidrsToAdd.length > 0 || sgIdsToAdd.length > 0) {
-                cli.output(`[DEBUG] Adding security group rules: CIDRs=${JSON.stringify(cidrsToAdd)}, SGs=${JSON.stringify(sgIdsToAdd)}`);
-                cli.output(`[DEBUG] Port: ${port}, Protocol: tcp`);
                 this.authorizeSecurityGroupIngress(groupId, 'tcp', port, port, cidrsToAdd, sgIdsToAdd);
-                cli.output(`[DEBUG] Successfully added security group rules`);
             }
-
-            cli.output(`[DEBUG] Security group rules updated successfully for ${groupId}`);
-
         } catch (error) {
             throw new Error(`Failed to update security group rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -1057,23 +965,16 @@ export abstract class AWSRDSEntity<
 
     protected getCurrentSecurityGroupRules(groupId: string, port: number): { cidrs: string[]; sgIds: string[] } {
         try {
-            cli.output(`[DEBUG] Querying current AWS security group rules for ${groupId}`);
-            
             // Get actual rules from AWS
             const response = this.makeEC2Request('DescribeSecurityGroups', {
                 'GroupId.1': groupId
             });
-            
-            cli.output(`[DEBUG] getCurrentSecurityGroupRules - AWS response: ${JSON.stringify(response, null, 2)}`);
-
             const actualCidrs: string[] = [];
             const actualSgIds: string[] = [];
 
             // Parse ingress rules from the response
             if (response.SecurityGroups && response.SecurityGroups.length > 0) {
                 const securityGroup = response.SecurityGroups[0];
-                cli.output(`[DEBUG] Security group for rule parsing: ${JSON.stringify(securityGroup, null, 2)}`);
-                
                 // Look for rules on our specific port
                 if (securityGroup.IpPermissions) {
                     const permissions = Array.isArray(securityGroup.IpPermissions) ?
@@ -1109,13 +1010,9 @@ export abstract class AWSRDSEntity<
                     });
                 }
             }
-
-            cli.output(`[DEBUG] Current AWS rules - CIDRs: ${actualCidrs}, SG IDs: ${actualSgIds}`);
-            
             return { cidrs: actualCidrs, sgIds: actualSgIds };
             
         } catch (error) {
-            cli.output(`[DEBUG] Warning: Could not query current security group rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
             // Return empty arrays as fallback
             return { cidrs: [], sgIds: [] };
         }
@@ -1173,12 +1070,10 @@ export abstract class AWSRDSEntity<
             
                             if (groupId) {
                     // Security group already exists, use it
-                    cli.output(`[DEBUG] Found existing security group ${groupId} with name '${groupName}' for RDS instance ${dbInstanceIdentifier}`);
                     isExisting = true;
                 } else {
                     // Create a new security group
                     groupId = this.createSecurityGroup(groupName, description, vpcId);
-                    cli.output(`[DEBUG] Created new security group ${groupId} for RDS instance ${dbInstanceIdentifier}`);
                 }
             
             // Resolve security group names to IDs
@@ -1190,7 +1085,6 @@ export abstract class AWSRDSEntity<
                 if (!isExisting) {
                     this.authorizeSecurityGroupIngress(groupId, 'tcp', port, port, [...allowedCidrs], allowedSgIds);
                 } else {
-                    cli.output(`[DEBUG] Using existing security group ${groupId}, skipping rule creation`);
                 }
             
             // Store in state that we are using this security group
