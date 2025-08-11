@@ -88,7 +88,7 @@ function getDefaultPort(engine) {
   };
   return portMap[engine] || 3306;
 }
-function buildCreateInstanceParams(definition, password) {
+function buildCreateInstanceParams(definition, password, securityGroupIds) {
   const params = {
     DBInstanceIdentifier: definition.db_instance_identifier,
     DBInstanceClass: definition.db_instance_class,
@@ -105,7 +105,9 @@ function buildCreateInstanceParams(definition, password) {
   } else {
     params.Port = getDefaultPort(normalizeEngine(definition.engine));
   }
-  if (definition.vpc_security_group_ids?.length) {
+  if (securityGroupIds?.length) {
+    params.VpcSecurityGroupIds = securityGroupIds;
+  } else if (definition.vpc_security_group_ids?.length) {
     params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
   }
   if (definition.db_subnet_group_name) {
@@ -174,7 +176,7 @@ function formatInstanceState(dbInstance, wasPreExisting = false) {
     last_modified: dbInstance.LastModifiedTime
   };
 }
-function buildModifyInstanceParams(definition) {
+function buildModifyInstanceParams(definition, securityGroupIds) {
   const params = {};
   if (definition.allocated_storage !== void 0) {
     params.AllocatedStorage = definition.allocated_storage;
@@ -217,7 +219,9 @@ function buildModifyInstanceParams(definition) {
   if (definition.deletion_protection !== void 0) {
     params.DeletionProtection = definition.deletion_protection ? "true" : "false";
   }
-  if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
+  if (securityGroupIds && securityGroupIds.length > 0) {
+    params.VpcSecurityGroupIds = securityGroupIds;
+  } else if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
     params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
   }
   params.ApplyImmediately = "true";
@@ -232,7 +236,7 @@ function parseRDSError(xmlBody) {
     } else if (errorMatch) {
       return errorMatch[1];
     }
-  } catch (error) {
+  } catch (_error) {
   }
   return xmlBody;
 }

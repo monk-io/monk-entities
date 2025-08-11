@@ -67,7 +67,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 throw new Error("Password not found");
             }
             return storedPassword;
-        } catch (e) {
+        } catch (_e) {
             // Generate a secure random password (16 characters)
             const password = secret.randString(16);
             secret.set(secretRef, password);
@@ -102,8 +102,11 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         // Get or generate password
         const password = this.getOrCreatePassword();
         
+        // Get or create security groups
+        const securityGroupIds = this.getOrCreateSecurityGroup();
+        
         // Build create parameters
-        const params = buildCreateInstanceParams(this.definition, password);
+        const params = buildCreateInstanceParams(this.definition, password, securityGroupIds);
         
         try {
             const response = this.createDBInstance(params);
@@ -148,11 +151,24 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
         
         try {
+            // First, update security group rules if needed (this handles auto-created security groups)
+            this.updateSecurityGroupRules();
+            
+            // Get current security group IDs (handles auto-creation and updates)
+            const securityGroupIds = this.getOrCreateSecurityGroup();
+            
             // Build modify parameters from current definition
-            const modifyParams = buildModifyInstanceParams(this.definition);
+            const modifyParams = buildModifyInstanceParams(this.definition, securityGroupIds);
             
             // Only proceed with modification if there are parameters to update
             if (Object.keys(modifyParams).length > 1) { // More than just ApplyImmediately
+                // Wait for instance to be available before modifying (security group changes may have triggered modification)
+                console.log(`Waiting for DB instance ${dbInstanceIdentifier} to be available before applying modifications...`);
+                const isAvailable = this.waitForDBInstanceState(dbInstanceIdentifier, 'available', 40); // 20 minutes max
+                if (!isAvailable) {
+                    throw new Error(`DB instance ${dbInstanceIdentifier} did not become available within timeout`);
+                }
+                
                 console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
                 
                 const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
@@ -197,6 +213,9 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             this.state.db_instance_identifier = undefined;
             this.state.db_instance_status = undefined;
         }
+        
+        // Clean up any security group we created
+        this.cleanupCreatedSecurityGroup();
     }
 
     override checkReadiness(): boolean {
@@ -453,7 +472,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             } else {
                 this.state.existing = false;
             }
-        } catch (error) {
+        } catch (_error) {
             // Silently handle state update failures
         }
     }

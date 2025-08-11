@@ -98,7 +98,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
         throw new Error("Password not found");
       }
       return storedPassword;
-    } catch (e) {
+    } catch (_e) {
       const password = secret.randString(16);
       secret.set(secretRef, password);
       return password;
@@ -120,7 +120,8 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       return;
     }
     const password = this.getOrCreatePassword();
-    const params = buildCreateInstanceParams(this.definition, password);
+    const securityGroupIds = this.getOrCreateSecurityGroup();
+    const params = buildCreateInstanceParams(this.definition, password, securityGroupIds);
     try {
       const response = this.createDBInstance(params);
       if (response.DBInstance) {
@@ -151,8 +152,15 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       throw new Error(`Cannot update DB instance: instance not found in state`);
     }
     try {
-      const modifyParams = buildModifyInstanceParams(this.definition);
+      this.updateSecurityGroupRules();
+      const securityGroupIds = this.getOrCreateSecurityGroup();
+      const modifyParams = buildModifyInstanceParams(this.definition, securityGroupIds);
       if (Object.keys(modifyParams).length > 1) {
+        console.log(`Waiting for DB instance ${dbInstanceIdentifier} to be available before applying modifications...`);
+        const isAvailable = this.waitForDBInstanceState(dbInstanceIdentifier, "available", 40);
+        if (!isAvailable) {
+          throw new Error(`DB instance ${dbInstanceIdentifier} did not become available within timeout`);
+        }
         console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
         const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
         if (response?.DBInstance) {
@@ -184,6 +192,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       this.state.db_instance_identifier = void 0;
       this.state.db_instance_status = void 0;
     }
+    this.cleanupCreatedSecurityGroup();
   }
   checkReadiness() {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
@@ -374,7 +383,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       } else {
         this.state.existing = false;
       }
-    } catch (error) {
+    } catch (_error) {
     }
   }
 };

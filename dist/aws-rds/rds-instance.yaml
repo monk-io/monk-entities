@@ -56,6 +56,22 @@ rds-instance:
       type: object
       additionalProperties:
         type: string
+    auto_create_security_group:
+      type: boolean
+    security_group_name:
+      type: string
+    security_group_description:
+      type: string
+    vpc_id:
+      type: string
+    allowed_cidr_blocks:
+      type: array
+      items:
+        type: string
+    allowed_security_group_names:
+      type: array
+      items:
+        type: string
     required:
       - region
       - db_instance_identifier
