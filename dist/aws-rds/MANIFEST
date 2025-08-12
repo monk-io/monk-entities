@@ -1,3 +1,3 @@
 REPO aws-rds
-LOAD rds-instance.yaml base.yaml common.yaml
+LOAD rds-instance.yaml common.yaml base.yaml
 RESOURCES common.js base.js rds-instance-sync.js
