@@ -89,24 +89,23 @@ api-handler:
 container-function:
   defines: aws-lambda/function
   region: eu-west-1
-  blob_name: container-function-code
+  image_uri: 123456789012.dkr.ecr.eu-west-1.amazonaws.com/my-lambda-app:latest
   function_name: container-function
-  runtime: nodejs20.x
   role: arn:aws:iam::123456789012:role/container-function-role
-  handler: index.handler
-  description: "Container-based Lambda function"
+  summary: "Container-based Lambda function"
   package_type: Image
   timeout: 60
-  memory_size: 256
+  memory_size: 512
   image_config:
     entry_point:
       - "/lambda-entrypoint.sh"
     command:
-      - "index.handler"
+      - "src/index.handler"
     working_directory: "/var/task"
   environment:
     variables:
       NODE_ENV: production
+      APP_VERSION: "1.0.0"
   tags:
     Environment: production
     DeploymentType: container

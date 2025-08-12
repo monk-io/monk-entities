@@ -8,6 +8,8 @@ lambda-function:
       type: string
     blob_name:
       type: string
+    image_uri:
+      type: string
     function_name:
       type: string
     runtime:
@@ -115,11 +117,8 @@ lambda-function:
       type: boolean
     required:
       - region
-      - blob_name
       - function_name
-      - runtime
       - role
-      - handler
   lifecycle:
     sync: <<< lambda-function-sync.js
     invoke: ''

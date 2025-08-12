@@ -47,6 +47,9 @@ var AWSLambdaEntity = class extends import_base.MonkEntity {
     this.region = this.definition.region;
   }
   getLambdaZipFromBlob() {
+    if (!this.definition.blob_name) {
+      throw new Error("blob_name is required for ZIP package deployments");
+    }
     try {
       const blobMeta = import_blobs.default.get(this.definition.blob_name);
       if (!blobMeta) {
@@ -88,22 +91,113 @@ var AWSLambdaEntity = class extends import_base.MonkEntity {
       }
       if (response.statusCode >= 400) {
         let errorMessage = `AWS Lambda API error: ${response.statusCode} ${response.status}`;
+        let errorDetails = {};
         try {
-          const errorBody = JSON.parse(response.body);
-          if (errorBody.message) {
-            errorMessage += ` - ${errorBody.message}`;
+          errorDetails = JSON.parse(response.body);
+          if (errorDetails.message) {
+            errorMessage += ` - ${errorDetails.message}`;
           }
-          if (errorBody.errorMessage) {
-            errorMessage += ` - ${errorBody.errorMessage}`;
+          if (errorDetails.errorMessage) {
+            errorMessage += ` - ${errorDetails.errorMessage}`;
           }
-          if (errorBody.Type) {
-            errorMessage += ` - Type: ${errorBody.Type}`;
+          if (errorDetails.Type) {
+            errorMessage += ` - Type: ${errorDetails.Type}`;
           }
-          if (errorBody.__type) {
-            errorMessage += ` - ErrorType: ${errorBody.__type}`;
+          if (errorDetails.__type) {
+            errorMessage += ` - ErrorType: ${errorDetails.__type}`;
           }
-        } catch (parseError) {
-          errorMessage += ` - Raw: ${response.body}`;
+        } catch (_parseError) {
+          errorMessage += ` - Raw response: ${response.body}`;
+        }
+        if (response.statusCode === 403) {
+          errorMessage += `
+
+\u{1F50D} 403 FORBIDDEN ERROR ANALYSIS:`;
+          errorMessage += `
+   \u2022 Request URL: ${url}`;
+          errorMessage += `
+   \u2022 HTTP Method: ${method}`;
+          errorMessage += `
+   \u2022 Region: ${this.region}`;
+          if (body && (body.Code?.ImageUri || body.PackageType === "Image")) {
+            errorMessage += `
+   \u2022 Deployment Type: Container Image`;
+            if (body.Code?.ImageUri) {
+              errorMessage += `
+   \u2022 Image URI: ${body.Code.ImageUri}`;
+            }
+            errorMessage += `
+
+\u{1F4A1} CONTAINER IMAGE 403 TROUBLESHOOTING:`;
+            errorMessage += `
+   1. Missing ECR permissions - you need:`;
+            errorMessage += `
+      \u2022 ecr:GetAuthorizationToken`;
+            errorMessage += `
+      \u2022 ecr:BatchCheckLayerAvailability`;
+            errorMessage += `
+      \u2022 ecr:GetDownloadUrlForLayer`;
+            errorMessage += `
+      \u2022 ecr:BatchGetImage`;
+            errorMessage += `
+   2. Check if ECR repository exists:`;
+            if (body.Code?.ImageUri) {
+              const imageUri = body.Code.ImageUri;
+              const repoMatch = imageUri.match(/\/([^:]+)/);
+              if (repoMatch) {
+                errorMessage += `
+      aws ecr describe-repositories --repository-names ${repoMatch[1]} --region ${this.region}`;
+              }
+            }
+            errorMessage += `
+   3. Verify image exists in ECR repository`;
+            errorMessage += `
+   4. Ensure Lambda execution role has ECR permissions`;
+          } else {
+            errorMessage += `
+   \u2022 Deployment Type: ZIP Package`;
+            errorMessage += `
+
+\u{1F4A1} ZIP PACKAGE 403 TROUBLESHOOTING:`;
+            errorMessage += `
+   1. Missing Lambda permissions - you need:`;
+            errorMessage += `
+      \u2022 lambda:CreateFunction`;
+            errorMessage += `
+      \u2022 lambda:GetFunction`;
+            errorMessage += `
+      \u2022 lambda:UpdateFunctionCode`;
+            errorMessage += `
+   2. Check IAM role ARN is valid and accessible`;
+            errorMessage += `
+   3. Verify role has lambda.amazonaws.com trust policy`;
+          }
+          if (errorDetails.message && errorDetails.message.includes("not authorized")) {
+            errorMessage += `
+
+\u{1F6A8} SPECIFIC AUTHORIZATION ERROR:`;
+            errorMessage += `
+   This is a credential/permission issue, not a configuration error.`;
+            errorMessage += `
+   Run: aws sts get-caller-identity`;
+            errorMessage += `
+   Then verify your credentials have the required permissions.`;
+          }
+        }
+        errorMessage += `
+
+\u{1F4CB} FULL ERROR DETAILS:`;
+        errorMessage += `
+   Status Code: ${response.statusCode}`;
+        errorMessage += `
+   Status Text: ${response.status || "N/A"}`;
+        errorMessage += `
+   Response Headers: ${JSON.stringify(response.headers || {}, null, 2)}`;
+        errorMessage += `
+   Response Body: ${response.body || "Empty"}`;
+        if (body) {
+          errorMessage += `
+   Request Body: ${JSON.stringify(body, null, 2)}`;
         }
         throw new Error(errorMessage);
       }

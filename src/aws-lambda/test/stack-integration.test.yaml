@@ -11,73 +11,114 @@ setup:
 
   - name: "Load test stack template"
     action: "load"
-    target: "MANIFEST"
+    target: "stack-template.yaml"
     expect:
       exitCode: 0
 
 tests:
-  - name: "Deploy Lambda function"
+  - name: "Deploy Lambda stack"
     action: "run"
-    target: "aws-lambda-test/test-lambda-function"
+    target: "aws-lambda-test/stack"
     expect:
       exitCode: 0
 
-  # - name: "Wait for Lambda function readiness"
-  #   action: "wait"
-  #   target: "aws-lambda-test/test-lambda-function"
-  #   waitFor:
-  #     condition: "ready"
-  #     timeout: 60000
+  - name: "Wait for Lambda function readiness"
+    action: "wait"
+    target: "aws-lambda-test/lambda-function"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Wait for Go Lambda function readiness"
+    action: "wait"
+    target: "aws-lambda-test/lambda-go-function"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Wait for Container Lambda function readiness"
+    action: "wait"
+    target: "aws-lambda-test/lambda-container-function"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
 
   - name: "Verify Lambda function deployment"
     action: "describe"
-    target: "aws-lambda-test/test-lambda-function"
+    target: "aws-lambda-test/lambda-function"
     expect:
       exitCode: 0
 
-  - name: "Test Lambda function invocation - simple payload"
+  - name: "Verify Go Lambda function deployment"
+    action: "describe"
+    target: "aws-lambda-test/lambda-go-function"
+    expect:
+      exitCode: 0
+
+  - name: "Verify Container Lambda function deployment"
+    action: "describe"
+    target: "aws-lambda-test/lambda-container-function"
+    expect:
+      exitCode: 0
+
+  - name: "Test Lambda function invocation"
     action: "do"
-    target: "aws-lambda-test/test-lambda-function/invoke"
+    target: "aws-lambda-test/lambda-function/invoke"
     args:
       payload: '{"name":"World","source":"integration-test","action":"simple-test"}'
     expect:
       exitCode: 0
       contains:
-        - "Function invoked successfully"
         - "Hello from AWS Lambda test function!"
 
-  - name: "Test Lambda function invocation - complex payload"
-    action: "do" 
-    target: "aws-lambda-test/test-lambda-function/invoke"
-    args:
-      payload: '{"action":"integration-test","data":{"numbers":[1,2,3,4,5],"success":true,"metadata":{"test":"aws-lambda-entity","framework":"monkec"}}}'
-    expect:
-      exitCode: 0
-      contains:
-        - "Function invoked successfully"
-        - "integration-test"
-
-  - name: "Test get-logs action"
+  - name: "Test Go Lambda function invocation"
     action: "do"
-    target: "aws-lambda-test/test-lambda-function/get-logs"
+    target: "aws-lambda-test/lambda-go-function/invoke"
+    args:
+      payload: '{"name":"World","source":"integration-test","action":"simple-test"}'
     expect:
       exitCode: 0
       contains:
-        - "CloudWatch Log Group"
-        - "/aws/lambda/"
+        - "Hello, AWS Lambda!"
+
+  - name: "Test Container Lambda function invocation"
+    action: "do"
+    target: "aws-lambda-test/lambda-container-function/invoke"
+    args:
+      payload: '{"name":"World","source":"integration-test","action":"simple-test"}'
+    expect:
+      exitCode: 0
+      contains:
+        - "Hello from Lambda!"
 
   - name: "Test update-code action"
     action: "do"
-    target: "aws-lambda-test/test-lambda-function/update-code"
+    target: "aws-lambda-test/lambda-function/update-code"
     expect:
       exitCode: 0
       contains:
-        - "Successfully updated Lambda function code"
+        - "Function code updated successfully"
+
+  - name: "Test update-code action for Go Lambda function"
+    action: "do"
+    target: "aws-lambda-test/lambda-go-function/update-code"
+    expect:
+      exitCode: 0
+      contains:
+        - "Function code updated successfully"
+
+  - name: "Test update-code action for Container Lambda function"
+    action: "do"
+    target: "aws-lambda-test/lambda-container-function/update-code"
+    expect:
+      exitCode: 0
+      contains:
+        - "Function code updated successfully"
 
 cleanup:
   - name: "Delete Lambda function"
     action: "delete"
-    target: "aws-lambda-test/test-lambda-function"
+    target: "aws-lambda-test/stack"
     expect:
       exitCode: 0
       

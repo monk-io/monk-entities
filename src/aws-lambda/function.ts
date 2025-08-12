@@ -63,9 +63,9 @@ interface CreateFunctionRequest extends LambdaFunctionConfig {
 
 export interface LambdaFunctionDefinition extends AWSLambdaDefinition {
     function_name: string;
-    runtime: string;
+    runtime?: string;  // Optional for container images (defined in image)
     role: string;
-    handler: string;
+    handler?: string;  // Optional for container images (defined in image)
     summary?: string;
     timeout?: number;
     memory_size?: number;
@@ -129,21 +129,69 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         return this.definition.function_name;
     }
 
+    private validateContainerImageConfiguration(): void {
+        const packageType = this.definition.package_type || "Zip";
+        
+        if (packageType === "Image") {
+            if (!this.definition.image_uri) {
+                throw new Error("image_uri is required when package_type is 'Image'");
+            }
+            
+            // Validate ECR URI format
+            const ecrUriPattern = /^[0-9]{12}\.dkr\.ecr\.[a-z0-9\-]+\.amazonaws\.com\/[a-zA-Z0-9\-_\/]+:[a-zA-Z0-9\-_\.]+$/;
+            if (!ecrUriPattern.test(this.definition.image_uri)) {
+                throw new Error(
+                    `Invalid ECR image URI format: ${this.definition.image_uri}\n` +
+                    `Expected format: 123456789012.dkr.ecr.region.amazonaws.com/repository:tag\n` +
+                    `Note: AWS Lambda only supports ECR images, not Docker Hub or other registries`
+                );
+            }
+            
+            // Extract region from URI and validate it matches function region
+            const uriRegionMatch = this.definition.image_uri.match(/\.dkr\.ecr\.([a-z0-9\-]+)\.amazonaws\.com\//);
+            if (uriRegionMatch && uriRegionMatch[1] !== this.definition.region) {
+                throw new Error(
+                    `ECR image region (${uriRegionMatch[1]}) does not match Lambda function region (${this.definition.region})\n` +
+                    `The ECR repository must be in the same region as the Lambda function`
+                );
+            }
+        }
+    }
+
     private buildCreateFunctionRequest(): CreateFunctionRequest {
-        // Get ZIP content from blob
-        const zipContent = this.getLambdaZipFromBlob();
+        const packageType = this.definition.package_type || "Zip";
+        
+        // Validate deployment type configuration
+        if (packageType === "Image") {
+            this.validateContainerImageConfiguration();
+        } else {
+            if (!this.definition.runtime) {
+                throw new Error("runtime is required when package_type is 'Zip'");
+            }
+            if (!this.definition.handler) {
+                throw new Error("handler is required when package_type is 'Zip'");
+            }
+        }
 
         const request: CreateFunctionRequest = {
             FunctionName: this.definition.function_name,
-            Runtime: this.definition.runtime,
             Role: this.definition.role,
-            Handler: this.definition.handler,
-            Code: {
-                ZipFile: zipContent,
-            },
-            PackageType: this.definition.package_type || "Zip",
+            PackageType: packageType,
             Publish: this.definition.publish || false,
+            Code: {},
         };
+
+        // Configure code source based on package type
+        if (packageType === "Image") {
+            request.Code.ImageUri = this.definition.image_uri;
+            // Runtime and Handler are not used for container images
+        } else {
+            // ZIP package deployment
+            const zipContent = this.getLambdaZipFromBlob();
+            request.Code.ZipFile = zipContent;
+            request.Runtime = this.definition.runtime;
+            request.Handler = this.definition.handler;
+        }
 
         // Add optional configuration
         if (this.definition.summary) {
@@ -236,9 +284,21 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     private buildUpdateConfigurationRequest(): Partial<LambdaFunctionConfig> {
+        const packageType = this.definition.package_type || "Zip";
+        
         const config: Partial<LambdaFunctionConfig> = {
             FunctionName: this.definition.function_name,
         };
+
+        // Add runtime and handler only for ZIP packages
+        if (packageType === "Zip") {
+            if (this.definition.runtime !== undefined) {
+                config.Runtime = this.definition.runtime;
+            }
+            if (this.definition.handler !== undefined) {
+                config.Handler = this.definition.handler;
+            }
+        }
 
         // Add optional configuration
         if (this.definition.summary !== undefined) {
@@ -373,11 +433,24 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         }
 
         try {
-            // Update function code from blob
-            const zipContent = this.getLambdaZipFromBlob();
-            const updateCodeRequest = {
-                ZipFile: zipContent,
-            };
+            // Update function code based on package type
+            const packageType = this.definition.package_type || "Zip";
+            let updateCodeRequest: { ZipFile?: string; ImageUri?: string };
+            
+            if (packageType === "Image") {
+                if (!this.definition.image_uri) {
+                    throw new Error("image_uri is required for container image updates");
+                }
+                updateCodeRequest = {
+                    ImageUri: this.definition.image_uri,
+                };
+            } else {
+                // ZIP package update
+                const zipContent = this.getLambdaZipFromBlob();
+                updateCodeRequest = {
+                    ZipFile: zipContent,
+                };
+            }
             
             this.makeAWSRequest(
                 "PUT", 
@@ -517,10 +590,26 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         }
 
         try {
-            const zipContent = this.getLambdaZipFromBlob();
-            const updateCodeRequest = {
-                ZipFile: zipContent,
-            };
+            // Update function code based on package type
+            const packageType = this.definition.package_type || "Zip";
+            let updateCodeRequest: { ZipFile?: string; ImageUri?: string };
+            
+            if (packageType === "Image") {
+                if (!this.definition.image_uri) {
+                    throw new Error("image_uri is required for container image updates");
+                }
+                updateCodeRequest = {
+                    ImageUri: this.definition.image_uri,
+                };
+                cli.output(`Updating Lambda function code with container image: ${this.definition.image_uri}`);
+            } else {
+                // ZIP package update
+                const zipContent = this.getLambdaZipFromBlob();
+                updateCodeRequest = {
+                    ZipFile: zipContent,
+                };
+                cli.output(`Updating Lambda function code from blob: ${this.definition.blob_name}`);
+            }
             
             const response = this.makeAWSRequest(
                 "PUT", 
@@ -529,6 +618,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             );
             
             this.updateStateFromResponse(response);
+            cli.output("Function code updated successfully");
         } catch (error) {
             throw new Error(`Failed to update function code: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }

@@ -4,7 +4,8 @@ import blobs from "blobs";
 
 export interface AWSLambdaDefinition {
     region: string;
-    blob_name: string;
+    blob_name?: string;  // Optional for container images
+    image_uri?: string;  // Container image URI for package_type: Image
 }
 
 export interface AWSLambdaState {
@@ -115,6 +116,10 @@ export abstract class AWSLambdaEntity<
     protected abstract getFunctionName(): string;
 
     protected getLambdaZipFromBlob(): string {
+        if (!this.definition.blob_name) {
+            throw new Error("blob_name is required for ZIP package deployments");
+        }
+
         try {
             // Get blob metadata to verify it exists
             const blobMeta = blobs.get(this.definition.blob_name);
@@ -168,24 +173,84 @@ export abstract class AWSLambdaEntity<
             
             if (response.statusCode >= 400) {
                 let errorMessage = `AWS Lambda API error: ${response.statusCode} ${response.status}`;
+                let errorDetails: any = {};
                 
                 try {
-                    const errorBody = JSON.parse(response.body);
-                    if (errorBody.message) {
-                        errorMessage += ` - ${errorBody.message}`;
+                    errorDetails = JSON.parse(response.body);
+                    if (errorDetails.message) {
+                        errorMessage += ` - ${errorDetails.message}`;
                     }
-                    if (errorBody.errorMessage) {
-                        errorMessage += ` - ${errorBody.errorMessage}`;
+                    if (errorDetails.errorMessage) {
+                        errorMessage += ` - ${errorDetails.errorMessage}`;
                     }
-                    if (errorBody.Type) {
-                        errorMessage += ` - Type: ${errorBody.Type}`;
+                    if (errorDetails.Type) {
+                        errorMessage += ` - Type: ${errorDetails.Type}`;
                     }
-                    if (errorBody.__type) {
-                        errorMessage += ` - ErrorType: ${errorBody.__type}`;
+                    if (errorDetails.__type) {
+                        errorMessage += ` - ErrorType: ${errorDetails.__type}`;
                     }
-                } catch (parseError) {
-                    errorMessage += ` - Raw: ${response.body}`;
+                } catch (_parseError) {
+                    errorMessage += ` - Raw response: ${response.body}`;
                 }
+
+                // Enhanced error details for specific status codes
+                if (response.statusCode === 403) {
+                    errorMessage += `\n\n🔍 403 FORBIDDEN ERROR ANALYSIS:`;
+                    errorMessage += `\n   • Request URL: ${url}`;
+                    errorMessage += `\n   • HTTP Method: ${method}`;
+                    errorMessage += `\n   • Region: ${this.region}`;
+                    
+                    // Check if this is a container image deployment
+                    if (body && (body.Code?.ImageUri || body.PackageType === "Image")) {
+                        errorMessage += `\n   • Deployment Type: Container Image`;
+                        if (body.Code?.ImageUri) {
+                            errorMessage += `\n   • Image URI: ${body.Code.ImageUri}`;
+                        }
+                        errorMessage += `\n\n💡 CONTAINER IMAGE 403 TROUBLESHOOTING:`;
+                        errorMessage += `\n   1. Missing ECR permissions - you need:`;
+                        errorMessage += `\n      • ecr:GetAuthorizationToken`;
+                        errorMessage += `\n      • ecr:BatchCheckLayerAvailability`;
+                        errorMessage += `\n      • ecr:GetDownloadUrlForLayer`;
+                        errorMessage += `\n      • ecr:BatchGetImage`;
+                        errorMessage += `\n   2. Check if ECR repository exists:`;
+                        if (body.Code?.ImageUri) {
+                            const imageUri = body.Code.ImageUri;
+                            const repoMatch = imageUri.match(/\/([^:]+)/);
+                            if (repoMatch) {
+                                errorMessage += `\n      aws ecr describe-repositories --repository-names ${repoMatch[1]} --region ${this.region}`;
+                            }
+                        }
+                        errorMessage += `\n   3. Verify image exists in ECR repository`;
+                        errorMessage += `\n   4. Ensure Lambda execution role has ECR permissions`;
+                    } else {
+                        errorMessage += `\n   • Deployment Type: ZIP Package`;
+                        errorMessage += `\n\n💡 ZIP PACKAGE 403 TROUBLESHOOTING:`;
+                        errorMessage += `\n   1. Missing Lambda permissions - you need:`;
+                        errorMessage += `\n      • lambda:CreateFunction`;
+                        errorMessage += `\n      • lambda:GetFunction`;
+                        errorMessage += `\n      • lambda:UpdateFunctionCode`;
+                        errorMessage += `\n   2. Check IAM role ARN is valid and accessible`;
+                        errorMessage += `\n   3. Verify role has lambda.amazonaws.com trust policy`;
+                    }
+                    
+                    if (errorDetails.message && errorDetails.message.includes("not authorized")) {
+                        errorMessage += `\n\n🚨 SPECIFIC AUTHORIZATION ERROR:`;
+                        errorMessage += `\n   This is a credential/permission issue, not a configuration error.`;
+                        errorMessage += `\n   Run: aws sts get-caller-identity`;
+                        errorMessage += `\n   Then verify your credentials have the required permissions.`;
+                    }
+                }
+
+                // Add full response details for debugging
+                errorMessage += `\n\n📋 FULL ERROR DETAILS:`;
+                errorMessage += `\n   Status Code: ${response.statusCode}`;
+                errorMessage += `\n   Status Text: ${response.status || 'N/A'}`;
+                errorMessage += `\n   Response Headers: ${JSON.stringify(response.headers || {}, null, 2)}`;
+                errorMessage += `\n   Response Body: ${response.body || 'Empty'}`;
+                if (body) {
+                    errorMessage += `\n   Request Body: ${JSON.stringify(body, null, 2)}`;
+                }
+                
                 throw new Error(errorMessage);
             }
 
