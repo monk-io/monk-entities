@@ -290,6 +290,7 @@ monk update rds-client-demo/mysql-database
 - CloudWatch logs exports (enabled_cloudwatch_logs_exports)
 - Deletion protection (deletion_protection)
 - VPC security groups (vpc_security_group_ids)
+- **Security group access rules** (allowed_cidr_blocks, allowed_security_group_names)
 
 **Update Process:**
 1. Modify the entity definition in your YAML file
@@ -298,9 +299,32 @@ monk update rds-client-demo/mysql-database
 4. Entity applies changes via AWS ModifyDBInstance API
 5. State is updated with the new configuration
 
+**Security Group Rules Updates:**
+For auto-created security groups, the entity supports dynamic updates to access rules:
+- **Add/remove CIDR blocks**: Update `allowed_cidr_blocks` list
+- **Add/remove security group references**: Update `allowed_security_group_names` list
+- Rules are updated incrementally (only changed rules are added/removed)
+- Existing security groups (not auto-created) are left unchanged during updates
+
+**Example Update Workflow:**
+```yaml
+# Initial configuration
+allowed_cidr_blocks:
+  - "10.0.0.0/16"
+allowed_security_group_names:
+  - "app-servers-sg"
+
+# After update - adds new CIDR, removes security group reference
+allowed_cidr_blocks:
+  - "10.0.0.0/16"
+  - "172.16.0.0/12"  # NEW: Added this CIDR block
+# removed: allowed_security_group_names (removed app-servers-sg access)
+```
+
 **Notes:**
 - Updates are applied immediately by default
 - Some updates may require a brief restart (e.g., instance class changes)
+- Security group rule changes take effect immediately without downtime
 - Engine version upgrades are one-way operations
 
 ### Deletion
@@ -316,6 +340,43 @@ vpc_security_group_ids:
   - sg-12345678  # Database access
   - sg-87654321  # Application access
 ```
+
+#### Automatic Security Group Creation
+If `vpc_security_group_ids` is not specified, the entity can automatically create a security group for you:
+
+```yaml
+# Auto-create security group with default settings
+auto_create_security_group: true  # Default: true if vpc_security_group_ids not specified
+
+# Customize auto-created security group
+security_group_name: my-db-security-group
+security_group_description: "Custom description for auto-created security group"
+vpc_id: vpc-0123456789abcdef0  # Optional: specify VPC (uses default VPC if not provided)
+
+# Security access control (at least one must be specified)
+allowed_cidr_blocks:           # Optional: allow access from specific IP ranges
+  - "10.0.0.0/16"             # VPC CIDR
+  - "192.168.1.0/24"          # Office network
+
+allowed_security_group_names:  # Optional: allow access from specific security groups
+  - "app-servers-sg"          # Application servers
+  - "web-servers-sg"          # Web servers
+```
+
+**Security Group Auto-Creation Features:**
+- Automatically creates a security group if none specified
+- **Smart reuse**: If a security group with the same name already exists, it will be reused instead of creating a duplicate
+- Creates security group in specified VPC or default VPC if none provided
+- Configures ingress rules for the database port (only for newly created security groups)
+- Supports both CIDR blocks and security group references for access control
+- **Secure by default**: Requires explicit access configuration (no default 0.0.0.0/0)
+- **Intelligent cleanup**: Only deletes security groups that were actually created (not existing ones that were reused)
+- Preserves existing security groups (won't delete pre-existing ones)
+
+**Access Control Options:**
+- `allowed_cidr_blocks`: Grant access to specific IP address ranges
+- `allowed_security_group_names`: Grant access to instances in specific security groups
+- **At least one access method must be specified** for security
 
 ### Database Subnet Groups
 Deploy in specific subnets using database subnet groups:
@@ -419,10 +480,27 @@ The entity requires the following AWS IAM permissions:
         "rds:AddTagsToResource"
       ],
       "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSecurityGroup",
+        "ec2:DescribeSecurityGroups",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:DeleteSecurityGroup"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${aws:RequestedRegion}"
+        }
+      }
     }
   ]
 }
 ```
+
+**Note:** EC2 security group permissions are only required if using the automatic security group creation feature. If you provide explicit `vpc_security_group_ids`, these permissions are not needed.
 
 ## Error Handling
 

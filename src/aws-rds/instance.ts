@@ -29,7 +29,6 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
 
     private updatePasswordForExistingInstance(dbInstanceIdentifier: string): void {
         try {
-            console.log(`Updating password for existing DB instance: ${dbInstanceIdentifier}`);
             
             // Generate or get the password that should be used
             const password = this.getOrCreatePassword();
@@ -47,9 +46,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 const updatedState = formatInstanceState(response.DBInstance, true);
                 Object.assign(this.state, updatedState);
             }
-            
-            console.log(`Password updated successfully for existing DB instance: ${dbInstanceIdentifier}`);
-            
+
         } catch (error) {
             console.log(`Warning: Could not update password for existing instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             // Don't throw error here - we still want to manage the existing instance even if password update fails
@@ -67,7 +64,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 throw new Error("Password not found");
             }
             return storedPassword;
-        } catch (e) {
+        } catch (_e) {
             // Generate a secure random password (16 characters)
             const password = secret.randString(16);
             secret.set(secretRef, password);
@@ -102,8 +99,11 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         // Get or generate password
         const password = this.getOrCreatePassword();
         
+        // Get or create security groups
+        const securityGroupIds = this.getOrCreateSecurityGroup();
+        
         // Build create parameters
-        const params = buildCreateInstanceParams(this.definition, password);
+        const params = buildCreateInstanceParams(this.definition, password, securityGroupIds);
         
         try {
             const response = this.createDBInstance(params);
@@ -148,13 +148,23 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
         
         try {
+            // First, update security group rules if needed (this handles auto-created security groups)
+            this.updateSecurityGroupRules();
+            
+            // Get current security group IDs (handles auto-creation and updates)
+            const securityGroupIds = this.getOrCreateSecurityGroup();
+            
             // Build modify parameters from current definition
-            const modifyParams = buildModifyInstanceParams(this.definition);
+            const modifyParams = buildModifyInstanceParams(this.definition, securityGroupIds);
             
             // Only proceed with modification if there are parameters to update
             if (Object.keys(modifyParams).length > 1) { // More than just ApplyImmediately
-                console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
-                
+                // Wait for instance to be available before modifying (security group changes may have triggered modification)
+                const isAvailable = this.waitForDBInstanceState(dbInstanceIdentifier, 'available', 40); // 20 minutes max
+                if (!isAvailable) {
+                    throw new Error(`DB instance ${dbInstanceIdentifier} did not become available within timeout`);
+                }
+
                 const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
                 
                 // Update state from the response
@@ -163,9 +173,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                     Object.assign(this.state, updatedState);
                 }
                 
-                console.log(`DB instance ${dbInstanceIdentifier} modification initiated successfully`);
             } else {
-                console.log(`No modifications needed for DB instance ${dbInstanceIdentifier}`);
                 // Still update state from AWS to get current status
                 this.updateStateFromAWS();
             }
@@ -197,37 +205,34 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             this.state.db_instance_identifier = undefined;
             this.state.db_instance_status = undefined;
         }
+        
+        // Clean up any security group we created
+        this.cleanupCreatedSecurityGroup();
     }
 
     override checkReadiness(): boolean {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         try {
-            console.log(`Checking readiness for DB instance: ${dbInstanceIdentifier}`);
             
             // FIRST: Check if our state already shows the instance is available
             if (this.state && this.state.db_instance_identifier && this.state.db_instance_status === 'available') {
-                console.log(`DB instance ${dbInstanceIdentifier} is already available`);
                 return true;
             }
             
             const response = this.checkDBInstanceExists(dbInstanceIdentifier);
             if (!response) {
-                console.log(`DB instance ${dbInstanceIdentifier} does not exist yet`);
                 return false;
             }
             
             if (!response.DBInstance) {
-                console.log(`DB instance ${dbInstanceIdentifier} response missing DBInstance object`);
                 return false;
             }
             
             const status = response.DBInstance.DBInstanceStatus;
-            console.log(`DB instance ${dbInstanceIdentifier} status: ${status}`);
             
             // Check for various possible status formats
             if (status === 'available' || status === 'Available') {
-                console.log(`DB instance ${dbInstanceIdentifier} is ready`);
                 // Update state with latest information, preserve existing flag
                 const state = formatInstanceState(response.DBInstance, this.state.existing);
                 Object.assign(this.state, state);
@@ -395,10 +400,6 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
     }
 
-
-
-
-
     @action("get-connection-info")
     getConnectionInfo(_args?: MonkecBase.Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
@@ -453,7 +454,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             } else {
                 this.state.existing = false;
             }
-        } catch (error) {
+        } catch (_error) {
             // Silently handle state update failures
         }
     }
