@@ -85,7 +85,7 @@ export function getDefaultPort(engine: string): number {
 /**
  * Converts RDS instance configuration to API parameters
  */
-export function buildCreateInstanceParams(definition: any, password: string): Record<string, any> {
+export function buildCreateInstanceParams(definition: any, password: string, securityGroupIds?: string[]): Record<string, any> {
     const params: Record<string, any> = {
         DBInstanceIdentifier: definition.db_instance_identifier,
         DBInstanceClass: definition.db_instance_class,
@@ -108,7 +108,10 @@ export function buildCreateInstanceParams(definition: any, password: string): Re
     
     // MasterUserPassword is now set as required above
     
-    if (definition.vpc_security_group_ids?.length) {
+    // Use provided security group IDs (from auto-creation) or definition
+    if (securityGroupIds?.length) {
+        params.VpcSecurityGroupIds = securityGroupIds;
+    } else if (definition.vpc_security_group_ids?.length) {
         params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
     }
     
@@ -201,8 +204,9 @@ export function formatInstanceState(dbInstance: any, wasPreExisting: boolean = f
 /**
  * Builds parameters for ModifyDBInstance API call
  * @param definition - Entity definition containing updated values
+ * @param securityGroupIds - Optional security group IDs to use (from getOrCreateSecurityGroup)
  */
-export function buildModifyInstanceParams(definition: any): Record<string, any> {
+export function buildModifyInstanceParams(definition: any, securityGroupIds?: string[]): Record<string, any> {
     const params: Record<string, any> = {};
     
     // Storage modifications
@@ -272,7 +276,10 @@ export function buildModifyInstanceParams(definition: any): Record<string, any> 
     }
     
     // VPC Security Groups
-    if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
+    // Use provided security group IDs (from getOrCreateSecurityGroup) or fall back to definition
+    if (securityGroupIds && securityGroupIds.length > 0) {
+        params.VpcSecurityGroupIds = securityGroupIds;
+    } else if (definition.vpc_security_group_ids && Array.isArray(definition.vpc_security_group_ids)) {
         params.VpcSecurityGroupIds = definition.vpc_security_group_ids;
     }
     
@@ -295,7 +302,7 @@ export function parseRDSError(xmlBody: string): string {
         } else if (errorMatch) {
             return errorMatch[1];
         }
-    } catch (error) {
+    } catch (_error) {
         // If parsing fails, return the raw body
     }
     

@@ -73,7 +73,6 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
   }
   updatePasswordForExistingInstance(dbInstanceIdentifier) {
     try {
-      console.log(`Updating password for existing DB instance: ${dbInstanceIdentifier}`);
       const password = this.getOrCreatePassword();
       const modifyParams = {
         MasterUserPassword: password,
@@ -84,7 +83,6 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
         const updatedState = formatInstanceState(response.DBInstance, true);
         Object.assign(this.state, updatedState);
       }
-      console.log(`Password updated successfully for existing DB instance: ${dbInstanceIdentifier}`);
     } catch (error) {
       console.log(`Warning: Could not update password for existing instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
@@ -98,7 +96,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
         throw new Error("Password not found");
       }
       return storedPassword;
-    } catch (e) {
+    } catch (_e) {
       const password = secret.randString(16);
       secret.set(secretRef, password);
       return password;
@@ -120,7 +118,8 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       return;
     }
     const password = this.getOrCreatePassword();
-    const params = buildCreateInstanceParams(this.definition, password);
+    const securityGroupIds = this.getOrCreateSecurityGroup();
+    const params = buildCreateInstanceParams(this.definition, password, securityGroupIds);
     try {
       const response = this.createDBInstance(params);
       if (response.DBInstance) {
@@ -151,17 +150,20 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       throw new Error(`Cannot update DB instance: instance not found in state`);
     }
     try {
-      const modifyParams = buildModifyInstanceParams(this.definition);
+      this.updateSecurityGroupRules();
+      const securityGroupIds = this.getOrCreateSecurityGroup();
+      const modifyParams = buildModifyInstanceParams(this.definition, securityGroupIds);
       if (Object.keys(modifyParams).length > 1) {
-        console.log(`Updating DB instance ${dbInstanceIdentifier} with parameters:`, Object.keys(modifyParams));
+        const isAvailable = this.waitForDBInstanceState(dbInstanceIdentifier, "available", 40);
+        if (!isAvailable) {
+          throw new Error(`DB instance ${dbInstanceIdentifier} did not become available within timeout`);
+        }
         const response = this.modifyDBInstance(dbInstanceIdentifier, modifyParams);
         if (response?.DBInstance) {
           const updatedState = formatInstanceState(response.DBInstance, this.state.existing);
           Object.assign(this.state, updatedState);
         }
-        console.log(`DB instance ${dbInstanceIdentifier} modification initiated successfully`);
       } else {
-        console.log(`No modifications needed for DB instance ${dbInstanceIdentifier}`);
         this.updateStateFromAWS();
       }
     } catch (error) {
@@ -184,28 +186,23 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       this.state.db_instance_identifier = void 0;
       this.state.db_instance_status = void 0;
     }
+    this.cleanupCreatedSecurityGroup();
   }
   checkReadiness() {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
-      console.log(`Checking readiness for DB instance: ${dbInstanceIdentifier}`);
       if (this.state && this.state.db_instance_identifier && this.state.db_instance_status === "available") {
-        console.log(`DB instance ${dbInstanceIdentifier} is already available`);
         return true;
       }
       const response = this.checkDBInstanceExists(dbInstanceIdentifier);
       if (!response) {
-        console.log(`DB instance ${dbInstanceIdentifier} does not exist yet`);
         return false;
       }
       if (!response.DBInstance) {
-        console.log(`DB instance ${dbInstanceIdentifier} response missing DBInstance object`);
         return false;
       }
       const status = response.DBInstance.DBInstanceStatus;
-      console.log(`DB instance ${dbInstanceIdentifier} status: ${status}`);
       if (status === "available" || status === "Available") {
-        console.log(`DB instance ${dbInstanceIdentifier} is ready`);
         const state = formatInstanceState(response.DBInstance, this.state.existing);
         Object.assign(this.state, state);
         return true;
@@ -374,7 +371,7 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       } else {
         this.state.existing = false;
       }
-    } catch (error) {
+    } catch (_error) {
     }
   }
 };

@@ -37,11 +37,22 @@ mysql-database:
   # Network and security
   # vpc_security_group_ids:
   #   - sg-0123456789abcdef0  # Replace with your security group
-  db_subnet_group_name: default  # Use default VPC's public subnets
-  publicly_accessible: true  # Enable public access for demo
+  # db_subnet_group_name: default  # Use default VPC's public subnets
+  # publicly_accessible: true  # Enable public access for demo
   
   # Note: You may need to create a security group that allows inbound traffic on port 3306
   # Example security group rule: Source 0.0.0.0/0, Protocol TCP, Port 3306
+
+  # Auto-create security group in default VPC (no vpc_id specified)
+  auto_create_security_group: true
+  security_group_name: mysql-database-sg
+  security_group_description: "MySQL Database Security Group"
+  # Allow access from specific security groups by name
+  allowed_security_group_names:
+    - "test-rds" # AWS node security group (node name)
+    - "test-rds2" 
+  # allowed_cidr_blocks:
+  #   - "0.0.0.0/0"
   
   # Backup and maintenance
   backup_retention_period: 7

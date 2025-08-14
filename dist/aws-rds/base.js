@@ -37,6 +37,7 @@ __export(base_exports, {
 module.exports = __toCommonJS(base_exports);
 var import_base = require("monkec/base");
 var import_aws = __toESM(require("cloud/aws"));
+var import_cli = __toESM(require("cli"));
 var AWSRDSEntity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -72,7 +73,7 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
         if (codeMatch) {
           errorMessage += ` (${codeMatch[1]})`;
         }
-      } catch (parseError) {
+      } catch (_parseError) {
         errorMessage += ` - Raw: ${response.body}`;
       }
       throw new Error(errorMessage);
@@ -182,6 +183,535 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
       }
     }
     return false;
+  }
+  // Security Group Management Methods
+  makeEC2Request(action, params = {}) {
+    const url = `https://ec2.${this.region}.amazonaws.com/`;
+    const formParams = {
+      "Action": action,
+      "Version": "2016-11-15"
+    };
+    this.addParamsToFormData(formParams, params);
+    const formBody = Object.entries(formParams).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+    const response = import_aws.default.post(url, {
+      service: "ec2",
+      region: this.region,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: formBody
+    });
+    if (response.statusCode >= 400) {
+      let errorMessage = `AWS EC2 API error: ${response.statusCode} ${response.status}`;
+      try {
+        const errorMatch = /<message>(.*?)<\/message>/i.exec(response.body);
+        if (errorMatch) {
+          errorMessage += ` - ${errorMatch[1]}`;
+        }
+        const codeMatch = /<code>(.*?)<\/code>/i.exec(response.body);
+        if (codeMatch) {
+          errorMessage += ` (${codeMatch[1]})`;
+        }
+      } catch (_parseError) {
+        errorMessage += ` - Raw: ${response.body}`;
+      }
+      throw new Error(errorMessage);
+    }
+    const parsedResponse = this.parseEC2Response(response.body);
+    return parsedResponse;
+  }
+  parseEC2Response(xmlBody) {
+    const result = {};
+    const groupIdMatch = /<groupId>(.*?)<\/groupId>/.exec(xmlBody);
+    if (groupIdMatch) {
+      result.GroupId = groupIdMatch[1];
+    }
+    const groupNameMatch = /<groupName>(.*?)<\/groupName>/.exec(xmlBody);
+    if (groupNameMatch) {
+      result.GroupName = groupNameMatch[1];
+    }
+    const descriptionMatch = /<groupDescription>(.*?)<\/groupDescription>/.exec(xmlBody);
+    if (descriptionMatch) {
+      result.Description = descriptionMatch[1];
+    }
+    const vpcIdMatch = /<vpcId>(.*?)<\/vpcId>/.exec(xmlBody);
+    if (vpcIdMatch) {
+      result.VpcId = vpcIdMatch[1];
+    }
+    const isDefaultMatch = /<isDefault>true<\/isDefault>/.exec(xmlBody);
+    if (isDefaultMatch && vpcIdMatch) {
+      result.IsDefault = true;
+    }
+    const securityGroupInfoMatch = /<securityGroupInfo>(.*?)<\/securityGroupInfo>/s.exec(xmlBody);
+    if (securityGroupInfoMatch) {
+      const securityGroupInfoXml = securityGroupInfoMatch[1];
+      const sgMatches = [];
+      let currentIndex = 0;
+      let itemStart = securityGroupInfoXml.indexOf("<item>", currentIndex);
+      while (itemStart !== -1) {
+        let depth = 1;
+        let searchPos = itemStart + 6;
+        let itemEnd = -1;
+        while (depth > 0 && searchPos < securityGroupInfoXml.length) {
+          const nextOpen = securityGroupInfoXml.indexOf("<item>", searchPos);
+          const nextClose = securityGroupInfoXml.indexOf("</item>", searchPos);
+          if (nextClose === -1) break;
+          if (nextOpen !== -1 && nextOpen < nextClose) {
+            depth++;
+            searchPos = nextOpen + 6;
+          } else {
+            depth--;
+            if (depth === 0) {
+              itemEnd = nextClose + 7;
+            }
+            searchPos = nextClose + 7;
+          }
+        }
+        if (itemEnd !== -1) {
+          sgMatches.push(securityGroupInfoXml.substring(itemStart, itemEnd));
+          currentIndex = itemEnd;
+          itemStart = securityGroupInfoXml.indexOf("<item>", currentIndex);
+        } else {
+          break;
+        }
+      }
+      if (sgMatches.length > 0) {
+        result.SecurityGroups = [];
+        sgMatches.forEach((sgItemXml) => {
+          const sgContentMatch = /<item>(.*?)<\/item>/s.exec(sgItemXml);
+          if (!sgContentMatch) return;
+          const sgXml = sgContentMatch[1];
+          const sgIdMatch = /<groupId>(.*?)<\/groupId>/.exec(sgXml);
+          const sgNameMatch = /<groupName>(.*?)<\/groupName>/.exec(sgXml);
+          if (sgIdMatch && sgNameMatch) {
+            const vpcIdMatch2 = /<vpcId>(.*?)<\/vpcId>/.exec(sgXml);
+            const securityGroup = {
+              GroupId: sgIdMatch[1],
+              GroupName: sgNameMatch[1],
+              VpcId: vpcIdMatch2 ? vpcIdMatch2[1] : void 0
+            };
+            const ipPermissionsMatch = /<ipPermissions>(.*?)<\/ipPermissions>/s.exec(sgItemXml);
+            if (ipPermissionsMatch) {
+              const ipPermissionsXml = ipPermissionsMatch[1];
+              const permissionItems = [];
+              let currentIndex2 = 0;
+              let itemStart2 = ipPermissionsXml.indexOf("<item>", currentIndex2);
+              while (itemStart2 !== -1) {
+                let depth = 1;
+                let searchPos = itemStart2 + 6;
+                let itemEnd = -1;
+                while (depth > 0 && searchPos < ipPermissionsXml.length) {
+                  const nextOpen = ipPermissionsXml.indexOf("<item>", searchPos);
+                  const nextClose = ipPermissionsXml.indexOf("</item>", searchPos);
+                  if (nextClose === -1) break;
+                  if (nextOpen !== -1 && nextOpen < nextClose) {
+                    depth++;
+                    searchPos = nextOpen + 6;
+                  } else {
+                    depth--;
+                    if (depth === 0) {
+                      itemEnd = nextClose + 7;
+                    }
+                    searchPos = nextClose + 7;
+                  }
+                }
+                if (itemEnd !== -1) {
+                  permissionItems.push(ipPermissionsXml.substring(itemStart2, itemEnd));
+                  currentIndex2 = itemEnd;
+                  itemStart2 = ipPermissionsXml.indexOf("<item>", currentIndex2);
+                } else {
+                  break;
+                }
+              }
+              if (permissionItems.length > 0) {
+                securityGroup.IpPermissions = [];
+                permissionItems.forEach((permXml) => {
+                  const protocolMatch = /<ipProtocol>(.*?)<\/ipProtocol>/.exec(permXml);
+                  const fromPortMatch = /<fromPort>(.*?)<\/fromPort>/.exec(permXml);
+                  const toPortMatch = /<toPort>(.*?)<\/toPort>/.exec(permXml);
+                  if (protocolMatch) {
+                    const permission = {
+                      IpProtocol: protocolMatch[1],
+                      FromPort: fromPortMatch ? fromPortMatch[1] : null,
+                      ToPort: toPortMatch ? toPortMatch[1] : null
+                    };
+                    const ipRangesMatch = /<ipRanges>(.*?)<\/ipRanges>/s.exec(permXml);
+                    if (ipRangesMatch) {
+                      const ipRangesXml = ipRangesMatch[1];
+                      const ipRangeItems = ipRangesXml.match(/<item>.*?<\/item>/gs);
+                      if (ipRangeItems) {
+                        permission.IpRanges = [];
+                        ipRangeItems.forEach((ipXml) => {
+                          const cidrMatch = /<cidrIp>(.*?)<\/cidrIp>/.exec(ipXml);
+                          if (cidrMatch) {
+                            permission.IpRanges.push({ CidrIp: cidrMatch[1] });
+                          }
+                        });
+                      }
+                    }
+                    const groupsMatch = /<groups>(.*?)<\/groups>/s.exec(permXml);
+                    if (groupsMatch) {
+                      const groupsXml = groupsMatch[1];
+                      const groupItems = groupsXml.match(/<item>.*?<\/item>/gs);
+                      if (groupItems) {
+                        permission.UserIdGroupPairs = [];
+                        groupItems.forEach((grpXml) => {
+                          const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
+                          if (grpIdMatch) {
+                            permission.UserIdGroupPairs.push({ GroupId: grpIdMatch[1] });
+                          }
+                        });
+                      }
+                    }
+                    securityGroup.IpPermissions.push(permission);
+                  }
+                });
+              }
+            }
+            result.SecurityGroups.push(securityGroup);
+          }
+        });
+      }
+    }
+    return result;
+  }
+  getDefaultVpc() {
+    try {
+      const response = this.makeEC2Request("DescribeVpcs", {
+        "Filter.1.Name": "isDefault",
+        "Filter.1.Value.1": "true"
+      });
+      if (response.VpcId && response.IsDefault) {
+        return response.VpcId;
+      }
+      return null;
+    } catch (error) {
+      console.log(`Warning: Could not retrieve default VPC: ${error instanceof Error ? error.message : "Unknown error"}`);
+      return null;
+    }
+  }
+  resolveSecurityGroupNames(groupNames, vpcId) {
+    if (groupNames.length === 0) {
+      return [];
+    }
+    try {
+      const params = {};
+      params["Filter.1.Name"] = "group-name";
+      groupNames.forEach((name, index) => {
+        params[`Filter.1.Value.${index + 1}`] = name;
+      });
+      if (vpcId) {
+        params["Filter.2.Name"] = "vpc-id";
+        params["Filter.2.Value.1"] = vpcId;
+      } else {
+        const defaultVpcId = this.getDefaultVpc();
+        if (defaultVpcId) {
+          params["Filter.2.Name"] = "vpc-id";
+          params["Filter.2.Value.1"] = defaultVpcId;
+        } else {
+        }
+      }
+      const response = this.makeEC2Request("DescribeSecurityGroups", params);
+      const sgIds = [];
+      const sgMatches = response.SecurityGroups || [];
+      if (Array.isArray(sgMatches)) {
+        sgMatches.forEach((sg) => {
+          if (sg.GroupId) {
+            sgIds.push(sg.GroupId);
+          }
+        });
+      } else {
+        const xmlMatches = response.match ? response.match(/<groupId>(.*?)<\/groupId>/g) : [];
+        if (xmlMatches) {
+          xmlMatches.forEach((match) => {
+            const idMatch = /<groupId>(.*?)<\/groupId>/.exec(match);
+            if (idMatch) {
+              sgIds.push(idMatch[1]);
+            }
+          });
+        } else {
+        }
+      }
+      if (sgIds.length === 0 && (vpcId || this.getDefaultVpc())) {
+        try {
+          const allSgsResponse = this.makeEC2Request("DescribeSecurityGroups", {});
+          if (allSgsResponse.SecurityGroups && Array.isArray(allSgsResponse.SecurityGroups)) {
+          } else {
+          }
+        } catch (_listError) {
+        }
+        const noVpcParams = {};
+        noVpcParams["Filter.1.Name"] = "group-name";
+        groupNames.forEach((name, index) => {
+          noVpcParams[`Filter.1.Value.${index + 1}`] = name;
+        });
+        const noVpcResponse = this.makeEC2Request("DescribeSecurityGroups", noVpcParams);
+        const noVpcMatches = noVpcResponse.SecurityGroups || [];
+        if (Array.isArray(noVpcMatches)) {
+          noVpcMatches.forEach((sg) => {
+            if (sg.GroupId) {
+              sgIds.push(sg.GroupId);
+            }
+          });
+        }
+      }
+      return sgIds;
+    } catch (error) {
+      throw new Error(`Failed to resolve security group names: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  createSecurityGroup(groupName, description, vpcId) {
+    const params = {
+      GroupName: groupName,
+      GroupDescription: description
+    };
+    if (vpcId) {
+      params.VpcId = vpcId;
+    }
+    const response = this.makeEC2Request("CreateSecurityGroup", params);
+    if (!response.GroupId) {
+      throw new Error("Failed to create security group: No GroupId in response");
+    }
+    return response.GroupId;
+  }
+  checkSecurityGroupExists(groupId) {
+    try {
+      this.makeEC2Request("DescribeSecurityGroups", {
+        "GroupId.1": groupId
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("InvalidGroupId.NotFound")) {
+        return false;
+      }
+      throw error;
+    }
+  }
+  findSecurityGroupByName(groupName, vpcId) {
+    try {
+      const params = {
+        "Filter.1.Name": "group-name",
+        "Filter.1.Value.1": groupName
+      };
+      const targetVpcId = vpcId || this.getDefaultVpc();
+      if (targetVpcId) {
+        params["Filter.2.Name"] = "vpc-id";
+        params["Filter.2.Value.1"] = targetVpcId;
+      }
+      const response = this.makeEC2Request("DescribeSecurityGroups", params);
+      if (response.SecurityGroups && response.SecurityGroups.length > 0) {
+        const securityGroups = Array.isArray(response.SecurityGroups) ? response.SecurityGroups : [response.SecurityGroups];
+        if (securityGroups.length > 0) {
+          return securityGroups[0].GroupId;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.log(`Error finding security group by name: ${error instanceof Error ? error.message : "Unknown error"}`);
+      return null;
+    }
+  }
+  authorizeSecurityGroupIngress(groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
+    const params = {
+      GroupId: groupId
+    };
+    let permissionIndex = 1;
+    cidrBlocks.forEach((cidr) => {
+      const permissionBase = `IpPermissions.${permissionIndex}`;
+      params[`${permissionBase}.IpProtocol`] = protocol;
+      params[`${permissionBase}.FromPort`] = fromPort.toString();
+      params[`${permissionBase}.ToPort`] = toPort.toString();
+      params[`${permissionBase}.IpRanges.1.CidrIp`] = cidr;
+      permissionIndex++;
+    });
+    sourceSecurityGroupIds.forEach((sgId) => {
+      const permissionBase = `IpPermissions.${permissionIndex}`;
+      params[`${permissionBase}.IpProtocol`] = protocol;
+      params[`${permissionBase}.FromPort`] = fromPort.toString();
+      params[`${permissionBase}.ToPort`] = toPort.toString();
+      params[`${permissionBase}.Groups.1.GroupId`] = sgId;
+      permissionIndex++;
+    });
+    try {
+      this.makeEC2Request("AuthorizeSecurityGroupIngress", params);
+    } catch (error) {
+      if (error instanceof Error && !error.message.includes("InvalidPermission.Duplicate")) {
+        import_cli.default.output(`[ERROR] AuthorizeSecurityGroupIngress failed: ${error.message}`);
+        throw error;
+      }
+    }
+  }
+  revokeSecurityGroupIngress(groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
+    const params = {
+      GroupId: groupId
+    };
+    let permissionIndex = 1;
+    cidrBlocks.forEach((cidr) => {
+      const permissionBase = `IpPermissions.${permissionIndex}`;
+      params[`${permissionBase}.IpProtocol`] = protocol;
+      params[`${permissionBase}.FromPort`] = fromPort.toString();
+      params[`${permissionBase}.ToPort`] = toPort.toString();
+      params[`${permissionBase}.IpRanges.1.CidrIp`] = cidr;
+      permissionIndex++;
+    });
+    sourceSecurityGroupIds.forEach((sgId) => {
+      const permissionBase = `IpPermissions.${permissionIndex}`;
+      params[`${permissionBase}.IpProtocol`] = protocol;
+      params[`${permissionBase}.FromPort`] = fromPort.toString();
+      params[`${permissionBase}.ToPort`] = toPort.toString();
+      params[`${permissionBase}.Groups.1.GroupId`] = sgId;
+      permissionIndex++;
+    });
+    try {
+      this.makeEC2Request("RevokeSecurityGroupIngress", params);
+    } catch (error) {
+      if (error instanceof Error && !error.message.includes("InvalidPermission.NotFound")) {
+        import_cli.default.output(`[ERROR] RevokeSecurityGroupIngress failed: ${error.message}`);
+        throw error;
+      }
+    }
+  }
+  updateSecurityGroupRules() {
+    if (!this.state.created_security_group_id || this.state.created_security_group_existing) {
+      return;
+    }
+    const groupId = this.state.created_security_group_id;
+    const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
+    const allowedCidrs = this.definition.allowed_cidr_blocks || [];
+    const allowedSgNames = this.definition.allowed_security_group_names || [];
+    try {
+      const currentAwsRules = this.getCurrentSecurityGroupRules(groupId, port);
+      const allowedSgIds = allowedSgNames.length > 0 ? this.resolveSecurityGroupNames([...allowedSgNames], this.definition.vpc_id) : [];
+      const cidrsToAdd = allowedCidrs.filter((cidr) => !currentAwsRules.cidrs.includes(cidr));
+      const cidrsToRemove = currentAwsRules.cidrs.filter((cidr) => !allowedCidrs.includes(cidr));
+      const sgIdsToAdd = allowedSgIds.filter((sgId) => !currentAwsRules.sgIds.includes(sgId));
+      const sgIdsToRemove = currentAwsRules.sgIds.filter((sgId) => !allowedSgIds.includes(sgId));
+      if (cidrsToAdd.length === 0 && cidrsToRemove.length === 0 && sgIdsToAdd.length === 0 && sgIdsToRemove.length === 0) {
+        return;
+      }
+      if (cidrsToRemove.length > 0 || sgIdsToRemove.length > 0) {
+        this.revokeSecurityGroupIngress(groupId, "tcp", port, port, cidrsToRemove, sgIdsToRemove);
+      }
+      if (cidrsToAdd.length > 0 || sgIdsToAdd.length > 0) {
+        this.authorizeSecurityGroupIngress(groupId, "tcp", port, port, cidrsToAdd, sgIdsToAdd);
+      }
+    } catch (error) {
+      throw new Error(`Failed to update security group rules: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getCurrentSecurityGroupRules(groupId, port) {
+    try {
+      const response = this.makeEC2Request("DescribeSecurityGroups", {
+        "GroupId.1": groupId
+      });
+      const actualCidrs = [];
+      const actualSgIds = [];
+      if (response.SecurityGroups && response.SecurityGroups.length > 0) {
+        const securityGroup = response.SecurityGroups[0];
+        if (securityGroup.IpPermissions) {
+          const permissions = Array.isArray(securityGroup.IpPermissions) ? securityGroup.IpPermissions : [securityGroup.IpPermissions];
+          permissions.forEach((permission) => {
+            if (permission.IpProtocol === "tcp" && parseInt(permission.FromPort) === port && parseInt(permission.ToPort) === port) {
+              if (permission.IpRanges) {
+                const ipRanges = Array.isArray(permission.IpRanges) ? permission.IpRanges : [permission.IpRanges];
+                ipRanges.forEach((range) => {
+                  if (range.CidrIp) {
+                    actualCidrs.push(range.CidrIp);
+                  }
+                });
+              }
+              if (permission.UserIdGroupPairs) {
+                const groups = Array.isArray(permission.UserIdGroupPairs) ? permission.UserIdGroupPairs : [permission.UserIdGroupPairs];
+                groups.forEach((group) => {
+                  if (group.GroupId) {
+                    actualSgIds.push(group.GroupId);
+                  }
+                });
+              }
+            }
+          });
+        }
+      }
+      return { cidrs: actualCidrs, sgIds: actualSgIds };
+    } catch (error) {
+      return { cidrs: [], sgIds: [] };
+    }
+  }
+  deleteSecurityGroup(groupId) {
+    this.makeEC2Request("DeleteSecurityGroup", {
+      GroupId: groupId
+    });
+  }
+  getOrCreateSecurityGroup() {
+    if (this.definition.vpc_security_group_ids?.length) {
+      return [...this.definition.vpc_security_group_ids];
+    }
+    if (this.definition.auto_create_security_group === false) {
+      return [];
+    }
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    const groupName = this.definition.security_group_name || `${dbInstanceIdentifier}-sg`;
+    const description = this.definition.security_group_description || `Security group for RDS instance ${dbInstanceIdentifier}`;
+    const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
+    const allowedCidrs = this.definition.allowed_cidr_blocks || [];
+    const allowedSgNames = this.definition.allowed_security_group_names || [];
+    if (allowedCidrs.length === 0 && allowedSgNames.length === 0) {
+      throw new Error("Security group auto-creation requires either allowed_cidr_blocks or allowed_security_group_names to be specified for security");
+    }
+    if (this.state.created_security_group_id) {
+      if (this.checkSecurityGroupExists(this.state.created_security_group_id)) {
+        return [this.state.created_security_group_id];
+      } else {
+        this.state.created_security_group_id = void 0;
+        this.state.created_security_group_existing = false;
+      }
+    }
+    try {
+      const vpcId = this.definition.vpc_id;
+      let groupId = this.findSecurityGroupByName(groupName, vpcId);
+      let isExisting = false;
+      if (groupId) {
+        isExisting = true;
+      } else {
+        groupId = this.createSecurityGroup(groupName, description, vpcId);
+      }
+      const allowedSgIds = allowedSgNames.length > 0 ? this.resolveSecurityGroupNames([...allowedSgNames], vpcId) : [];
+      if (!isExisting) {
+        this.authorizeSecurityGroupIngress(groupId, "tcp", port, port, [...allowedCidrs], allowedSgIds);
+      } else {
+      }
+      this.state.created_security_group_id = groupId;
+      this.state.created_security_group_existing = isExisting;
+      return [groupId];
+    } catch (error) {
+      throw new Error(`Failed to create or find security group: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDefaultPortForEngine(engine) {
+    const portMap = {
+      "mysql": 3306,
+      "postgres": 5432,
+      "mariadb": 3306,
+      "oracle-ee": 1521,
+      "oracle-se2": 1521,
+      "sqlserver-ex": 1433,
+      "sqlserver-web": 1433,
+      "sqlserver-se": 1433,
+      "sqlserver-ee": 1433
+    };
+    return portMap[engine.toLowerCase()] || 3306;
+  }
+  cleanupCreatedSecurityGroup() {
+    if (this.state.created_security_group_id && !this.state.created_security_group_existing) {
+      try {
+        console.log(`Deleting created security group: ${this.state.created_security_group_id}`);
+        this.deleteSecurityGroup(this.state.created_security_group_id);
+        this.state.created_security_group_id = void 0;
+        this.state.created_security_group_existing = false;
+      } catch (error) {
+        console.log(`Warning: Could not delete security group ${this.state.created_security_group_id}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    }
   }
 };
 // Annotate the CommonJS export names for ESM import in node:
