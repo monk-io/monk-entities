@@ -1,0 +1,48 @@
+{
+  "name": "aws-integrated-demo-client",
+  "version": "1.0.0",
+  "description": "Demo client for AWS Lambda + DynamoDB + RDS integration",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.450.0",
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/pg": "^8.10.7",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "eslint": "^8.52.0",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Monk Framework",
+  "license": "MIT",
+  "keywords": [
+    "aws",
+    "lambda",
+    "dynamodb",
+    "rds",
+    "postgresql",
+    "integration",
+    "demo",
+    "client"
+  ]
+}

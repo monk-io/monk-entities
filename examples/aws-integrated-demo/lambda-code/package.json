@@ -1,0 +1,39 @@
+{
+  "name": "aws-integrated-demo-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function demonstrating AWS Lambda + DynamoDB + RDS integration",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "@aws-sdk/client-secrets-manager": "^3.450.0",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.52.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Monk Framework",
+  "license": "MIT",
+  "keywords": [
+    "aws",
+    "lambda",
+    "dynamodb",
+    "rds",
+    "postgresql",
+    "serverless",
+    "integration",
+    "demo"
+  ]
+}
