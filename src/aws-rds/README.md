@@ -356,9 +356,11 @@ security_group_description: "Custom description for auto-created security group"
 vpc_id: vpc-0123456789abcdef0  # Optional: specify VPC (uses default VPC if not provided)
 
 # Security access control (at least one must be specified)
+# IP addresses are automatically converted to CIDR notation (e.g., "192.168.1.1" -> "192.168.1.1/32")
 allowed_cidr_blocks:           # Optional: allow access from specific IP ranges
-  - "10.0.0.0/16"             # VPC CIDR
-  - "192.168.1.0/24"          # Office network
+  - "10.0.0.0/16"             # VPC CIDR (already in CIDR format)
+  - "192.168.1.0/24"          # Office network (already in CIDR format)
+  - "203.0.113.5"             # Single IP (automatically converted to 203.0.113.5/32)
 
 allowed_security_group_names:  # Optional: allow access from specific security groups
   - "app-servers-sg"          # Application servers
@@ -512,6 +514,16 @@ The entity provides comprehensive error handling:
 - **Validation Errors**: Input validation with helpful error messages
 - **Timeout Handling**: Proper timeout management for long-running operations
 - **State Management**: Robust state tracking and recovery
+
+### Common Issues
+
+**CIDR Block Format Error**
+```
+Error: AWS EC2 API error: CIDR block x.x.x.x is malformed (InvalidParameterValue)
+```
+- **Cause**: Single IP addresses need to be in CIDR notation for AWS security groups
+- **Solution**: The entity automatically converts single IPs (e.g., `192.168.1.1`) to CIDR format (`192.168.1.1/32`)
+- **Manual Fix**: Add `/32` to single IP addresses in your configuration
 
 ## Best Practices
 

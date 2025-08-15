@@ -1,6 +1,31 @@
 import { makeEC2Request } from "./common.ts";
 import cli from "cli";
 
+/**
+ * Converts a single IP address to CIDR notation if needed
+ * Examples: "192.168.1.1" -> "192.168.1.1/32", "10.0.0.0/16" -> "10.0.0.0/16"
+ */
+function normalizeToCidr(ipOrCidr: string): string {
+    if (ipOrCidr.includes('/')) {
+        return ipOrCidr; // Already CIDR notation
+    }
+    
+    // Check if it's a valid IP address
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (ipPattern.test(ipOrCidr)) {
+        return `${ipOrCidr}/32`; // Convert single IP to /32 CIDR
+    }
+    
+    return ipOrCidr; // Return as-is if not recognizable
+}
+
+/**
+ * Normalizes an array of IP addresses and CIDR blocks to proper CIDR notation
+ */
+function normalizeCidrArray(ipAddresses: string[]): string[] {
+    return ipAddresses.map(ip => normalizeToCidr(ip.trim()));
+}
+
 export function getDefaultVpc(region: string): string | null {
     try {
         const response = makeEC2Request(region, 'DescribeVpcs', {
@@ -184,6 +209,8 @@ export function findSecurityGroupByName(region: string, groupName: string, vpcId
 }
 
 export function authorizeSecurityGroupIngress(region: string, groupId: string, protocol: string, fromPort: number, toPort: number, cidrBlocks: string[], sourceSecurityGroupIds: string[] = []): void {
+    // Normalize CIDR blocks to ensure proper format
+    const normalizedCidrs = normalizeCidrArray(cidrBlocks);
     const params: Record<string, any> = {
         GroupId: groupId
     };
@@ -191,7 +218,7 @@ export function authorizeSecurityGroupIngress(region: string, groupId: string, p
     let permissionIndex = 1;
     
     // Add IP permissions for each CIDR block
-    cidrBlocks.forEach((cidr) => {
+    normalizedCidrs.forEach((cidr) => {
         const permissionBase = `IpPermissions.${permissionIndex}`;
         params[`${permissionBase}.IpProtocol`] = protocol;
         params[`${permissionBase}.FromPort`] = fromPort.toString();
@@ -221,6 +248,8 @@ export function authorizeSecurityGroupIngress(region: string, groupId: string, p
 }
 
 export function revokeSecurityGroupIngress(region: string, groupId: string, protocol: string, fromPort: number, toPort: number, cidrBlocks: string[], sourceSecurityGroupIds: string[] = []): void {
+    // Normalize CIDR blocks to ensure proper format
+    const normalizedCidrs = normalizeCidrArray(cidrBlocks);
     const params: Record<string, any> = {
         GroupId: groupId
     };
@@ -228,7 +257,7 @@ export function revokeSecurityGroupIngress(region: string, groupId: string, prot
     let permissionIndex = 1;
     
     // Add IP permissions for each CIDR block to revoke
-    cidrBlocks.forEach((cidr) => {
+    normalizedCidrs.forEach((cidr) => {
         const permissionBase = `IpPermissions.${permissionIndex}`;
         params[`${permissionBase}.IpProtocol`] = protocol;
         params[`${permissionBase}.FromPort`] = fromPort.toString();
@@ -259,6 +288,9 @@ export function revokeSecurityGroupIngress(region: string, groupId: string, prot
 
 export function updateSecurityGroupRules(region: string, groupId: string, port: number, allowedCidrs: string[], allowedSgNames: string[], vpcId?: string): void {
     try {
+        // Normalize IP addresses to proper CIDR format (e.g., "192.168.1.1" -> "192.168.1.1/32")
+        const normalizedCidrs = normalizeCidrArray(allowedCidrs);
+        
         // API-ONLY APPROACH: Query current AWS rules directly
         const currentAwsRules = getCurrentSecurityGroupRules(region, groupId, port);
         
@@ -266,8 +298,8 @@ export function updateSecurityGroupRules(region: string, groupId: string, port: 
         const allowedSgIds = allowedSgNames.length > 0 ?
             resolveSecurityGroupNames(region, [...allowedSgNames], vpcId) : [];
         // Compare template vs AWS reality
-        const cidrsToAdd = allowedCidrs.filter(cidr => !currentAwsRules.cidrs.includes(cidr));
-        const cidrsToRemove = currentAwsRules.cidrs.filter(cidr => !allowedCidrs.includes(cidr));
+        const cidrsToAdd = normalizedCidrs.filter(cidr => !currentAwsRules.cidrs.includes(cidr));
+        const cidrsToRemove = currentAwsRules.cidrs.filter(cidr => !normalizedCidrs.includes(cidr));
         const sgIdsToAdd = allowedSgIds.filter(sgId => !currentAwsRules.sgIds.includes(sgId));
         const sgIdsToRemove = currentAwsRules.sgIds.filter(sgId => !allowedSgIds.includes(sgId));
         // Check if there are actually changes to make

@@ -19,6 +19,7 @@ var _RDSAccessList = class _RDSAccessList extends MonkEntity {
     if (!checkSecurityGroupExists(this.definition.region, this.definition.security_group_id)) {
       throw new Error(`Security group ${this.definition.security_group_id} not found`);
     }
+    cli.output(`DEFINITION ${JSON.stringify(this.definition)}`);
     this.updateSecurityGroupRules();
   }
   start() {

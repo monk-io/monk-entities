@@ -26,6 +26,8 @@ export class RDSAccessList extends MonkEntity<AWSRDSAccessListDefinition, AWSRDS
         if (!checkSecurityGroupExists(this.definition.region, this.definition.security_group_id)) {
             throw new Error(`Security group ${this.definition.security_group_id} not found`);
         }
+
+        cli.output(`DEFINITION ${JSON.stringify(this.definition)}`);
         
         // Update security group rules to match definition
         this.updateSecurityGroupRules();

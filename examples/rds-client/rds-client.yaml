@@ -162,7 +162,7 @@ postgres-database:
   password_secret_ref: <- `${db-instance-identifier}-master-password`
   
   # Network and security
-  publicly_accessible: false
+  publicly_accessible: true
   auto_create_security_group: true
   security_group_name: postgres-database-sg
   security_group_description: "PostgreSQL Database Security Group"
@@ -243,7 +243,7 @@ postgres-access-list:
   region: <- connection-target("db") entity get-member("region")
   security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
   port: <- connection-target("db") entity-state get-member("endpoint_port")
-  allowed_security_group_names: <- runnable-peers("rds-client-demo/postgres-client")
+  allowed_cidr_blocks: <- runnable-peers-public-ips("rds-client-demo/postgres-client")
   connections:
     db:
       runnable: rds-client-demo/postgres-database

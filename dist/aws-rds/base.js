@@ -254,6 +254,19 @@ function parseEC2Response(xmlBody) {
 
 // input/aws-rds/securityGroup.ts
 var import_cli = __toESM(require("cli"));
+function normalizeToCidr(ipOrCidr) {
+  if (ipOrCidr.includes("/")) {
+    return ipOrCidr;
+  }
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipPattern.test(ipOrCidr)) {
+    return `${ipOrCidr}/32`;
+  }
+  return ipOrCidr;
+}
+function normalizeCidrArray(ipAddresses) {
+  return ipAddresses.map((ip) => normalizeToCidr(ip.trim()));
+}
 function getDefaultVpc(region) {
   try {
     const response = makeEC2Request(region, "DescribeVpcs", {
@@ -391,11 +404,12 @@ function findSecurityGroupByName(region, groupName, vpcId) {
   }
 }
 function authorizeSecurityGroupIngress(region, groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
+  const normalizedCidrs = normalizeCidrArray(cidrBlocks);
   const params = {
     GroupId: groupId
   };
   let permissionIndex = 1;
-  cidrBlocks.forEach((cidr) => {
+  normalizedCidrs.forEach((cidr) => {
     const permissionBase = `IpPermissions.${permissionIndex}`;
     params[`${permissionBase}.IpProtocol`] = protocol;
     params[`${permissionBase}.FromPort`] = fromPort.toString();
@@ -421,11 +435,12 @@ function authorizeSecurityGroupIngress(region, groupId, protocol, fromPort, toPo
   }
 }
 function revokeSecurityGroupIngress(region, groupId, protocol, fromPort, toPort, cidrBlocks, sourceSecurityGroupIds = []) {
+  const normalizedCidrs = normalizeCidrArray(cidrBlocks);
   const params = {
     GroupId: groupId
   };
   let permissionIndex = 1;
-  cidrBlocks.forEach((cidr) => {
+  normalizedCidrs.forEach((cidr) => {
     const permissionBase = `IpPermissions.${permissionIndex}`;
     params[`${permissionBase}.IpProtocol`] = protocol;
     params[`${permissionBase}.FromPort`] = fromPort.toString();
@@ -452,10 +467,11 @@ function revokeSecurityGroupIngress(region, groupId, protocol, fromPort, toPort,
 }
 function updateSecurityGroupRules(region, groupId, port, allowedCidrs, allowedSgNames, vpcId) {
   try {
+    const normalizedCidrs = normalizeCidrArray(allowedCidrs);
     const currentAwsRules = getCurrentSecurityGroupRules(region, groupId, port);
     const allowedSgIds = allowedSgNames.length > 0 ? resolveSecurityGroupNames(region, [...allowedSgNames], vpcId) : [];
-    const cidrsToAdd = allowedCidrs.filter((cidr) => !currentAwsRules.cidrs.includes(cidr));
-    const cidrsToRemove = currentAwsRules.cidrs.filter((cidr) => !allowedCidrs.includes(cidr));
+    const cidrsToAdd = normalizedCidrs.filter((cidr) => !currentAwsRules.cidrs.includes(cidr));
+    const cidrsToRemove = currentAwsRules.cidrs.filter((cidr) => !normalizedCidrs.includes(cidr));
     const sgIdsToAdd = allowedSgIds.filter((sgId) => !currentAwsRules.sgIds.includes(sgId));
     const sgIdsToRemove = currentAwsRules.sgIds.filter((sgId) => !allowedSgIds.includes(sgId));
     if (cidrsToAdd.length === 0 && cidrsToRemove.length === 0 && sgIdsToAdd.length === 0 && sgIdsToRemove.length === 0) {
