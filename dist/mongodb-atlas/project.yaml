@@ -20,6 +20,15 @@ project:
       - secret_ref
       - name
       - organization
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    organization_id:
+      type: string
+    name:
+      type: string
   lifecycle:
     sync: <<< project-sync.js
   requires:

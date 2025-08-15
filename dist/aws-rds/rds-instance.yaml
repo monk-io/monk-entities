@@ -79,6 +79,31 @@ rds-instance:
       - engine
       - master_username
       - allocated_storage
+  state-schema:
+    existing:
+      type: boolean
+    db_instance_identifier:
+      type: string
+    db_instance_arn:
+      type: string
+    db_instance_status:
+      type: string
+    endpoint_address:
+      type: string
+    endpoint_port:
+      type: number
+    allocated_storage:
+      type: number
+    creation_time:
+      type: string
+    last_modified:
+      type: string
+    created_security_group_id:
+      type: string
+    created_security_group_existing:
+      type: boolean
+    required:
+      - existing
   lifecycle:
     sync: <<< rds-instance-sync.js
     get-instance-info: ''

@@ -207,6 +207,15 @@ dynamo-db-table:
     required:
       - region
       - table_name
+  state-schema:
+    existing:
+      type: boolean
+    table_name:
+      type: string
+    table_arn:
+      type: string
+    table_status:
+      type: string
   lifecycle:
     sync: <<< dynamo-db-table-sync.js
     get-table-details: ''

@@ -150,6 +150,17 @@ s3-bucket:
     required:
       - region
       - bucket_name
+  state-schema:
+    existing:
+      type: boolean
+    bucket_name:
+      type: string
+    region:
+      type: string
+    location:
+      type: string
+    required:
+      - existing
   lifecycle:
     sync: <<< s3-bucket-sync.js
     get-bucket-info: ''
