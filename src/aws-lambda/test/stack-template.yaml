@@ -108,10 +108,44 @@ lambda-go-function:
         - aws-lambda-test/lambda-execution-role
       timeout: 60
 
+lambda-container-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  image_uri: 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-test:latest
+  function_name: lambda-container-function
+  package_type: Image
+  role: <- connection-target("execution-role") entity-state get-member("role_arn")
+  summary: "Test Lambda container function"
+  timeout: 30
+  memory_size: 256
+  environment:
+    variables:
+      TEST_ENV: "true"
+      NODE_ENV: "test"
+  # image_config:
+  #   command:
+  #     - "index.handler"
+  #   working_directory: "/var/task"
+  # architectures:
+  #   - x86_64
+  tags:
+    Owner: integration-test
+    DeploymentType: container
+  connections:
+    execution-role:
+      runnable: aws-lambda-test/lambda-execution-role
+      service: execution-role
+  depends:
+    wait-for:
+      runnables:
+        - aws-lambda-test/lambda-execution-role
+      timeout: 60
+
 stack:
   defines: process-group
   runnable-list:
-    - aws-lambda-test/lambda-go-function
-    - aws-lambda-test/lambda-function
-    - aws-lambda-test/lambda-execution-role
     - aws-lambda-test/lambda-execution-policy
+    - aws-lambda-test/lambda-execution-role
+    - aws-lambda-test/lambda-function
+    - aws-lambda-test/lambda-go-function
+    - aws-lambda-test/lambda-container-function

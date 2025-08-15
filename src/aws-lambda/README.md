@@ -84,34 +84,50 @@ namespace: my-app
 container-lambda:
   defines: aws-lambda/function
   region: eu-west-1
-  blob_name: container-lambda-code
+  image_uri: 123456789012.dkr.ecr.eu-west-1.amazonaws.com/my-lambda:latest
   function_name: container-lambda-function
-  runtime: nodejs20.x
   role: arn:aws:iam::123456789012:role/lambda-execution-role
-  handler: index.handler
   package_type: Image
+  summary: "Lambda function deployed as container image"
+  timeout: 60
+  memory_size: 512
   image_config:
     entry_point:
-      - "/app/index.js"
+      - "/lambda-entrypoint.sh"
     command:
-      - "handler"
-    working_directory: "/app"
+      - "src/index.handler"
+    working_directory: "/var/task"
+  environment:
+    variables:
+      NODE_ENV: production
+      LOG_LEVEL: info
+  architectures:
+    - x86_64
 ```
 
 ## Configuration
 
 ### Required Fields
 
+#### For ZIP Package Deployments (default)
 - `region`: AWS region for the Lambda function
-- `blob_name`: Name of the blob containing the Lambda code
+- `blob_name`: Name of the blob containing the Lambda code (ZIP archive)
 - `function_name`: Name of the Lambda function
 - `runtime`: Lambda runtime (see supported runtimes below)
 - `role`: IAM role ARN for Lambda execution
 - `handler`: Function handler (e.g., `index.handler`)
 
+#### For Container Image Deployments
+- `region`: AWS region for the Lambda function
+- `image_uri`: Container image URI (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest`)
+- `function_name`: Name of the Lambda function
+- `role`: IAM role ARN for Lambda execution
+- `package_type`: Must be set to `Image`
+
 ### Optional Fields
 
-- `description`: Function description
+#### Common to Both Deployment Types
+- `summary`: Function description
 - `timeout`: Function timeout in seconds (1-900, default: 3)
 - `memory_size`: Memory allocation in MB (128-10240, default: 128)
 - `environment`: Environment variables configuration
@@ -121,14 +137,20 @@ container-lambda:
 - `tags`: Function tags
 - `layers`: Lambda layers ARNs
 - `file_system_configs`: EFS file system configurations
-- `image_config`: Container image configuration
 - `code_signing_config_arn`: Code signing configuration
 - `architectures`: Function architectures (x86_64, arm64)
 - `ephemeral_storage`: Ephemeral storage configuration
 - `snap_start`: SnapStart configuration
 - `logging_config`: CloudWatch Logs configuration
-- `package_type`: Package type (Zip or Image, default: Zip)
 - `publish`: Whether to publish a version (default: false)
+
+#### Container Image Specific
+- `image_config`: Container image configuration (entry_point, command, working_directory)
+
+#### ZIP Package Specific
+- `blob_name`: Name of the blob containing the Lambda code (required for ZIP)
+- `runtime`: Lambda runtime (required for ZIP)
+- `handler`: Function handler (required for ZIP)
 
 ## Supported Runtimes
 
