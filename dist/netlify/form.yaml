@@ -17,6 +17,44 @@ form:
     required:
       - site_id
       - name
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Unique identifier for the form
+    site_id:
+      type: string
+      description: The site this form belongs to
+    name:
+      type: string
+      description: Name of the form
+    paths:
+      type: array
+      items:
+        type: string
+      description: Paths where the form is located
+    submission_count:
+      type: number
+      description: Number of submissions to this form
+    fields:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          type:
+            type: string
+        required:
+          - name
+          - type
+        additionalProperties: false
+      description: Fields defined in the form
+    created_at:
+      type: string
+      format: date-time
+      description: When the form was created
   lifecycle:
     sync: <<< form-sync.js
     get-form: ''

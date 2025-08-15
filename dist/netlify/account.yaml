@@ -8,6 +8,13 @@ account:
       type: string
       minLength: 1
       maxLength: 24
+  state-schema:
+    existing:
+      type: boolean
+    accounts:
+      type: array
+      items:
+        type: string
   lifecycle:
     sync: <<< account-sync.js
   checks:

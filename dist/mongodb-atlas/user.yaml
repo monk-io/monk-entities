@@ -27,6 +27,28 @@ user:
       - name
       - project_id
       - password_secret_ref
+  state-schema:
+    existing:
+      type: boolean
+    name:
+      type: string
+    project_id:
+      type: string
+    database_name:
+      type: string
+    roles:
+      type: array
+      items:
+        type: object
+        properties:
+          databaseName:
+            type: string
+          roleName:
+            type: string
+        required:
+          - databaseName
+          - roleName
+        additionalProperties: false
   lifecycle:
     sync: <<< user-sync.js
   requires:

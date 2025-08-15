@@ -26,6 +26,30 @@ database:
       - name
       - projectId
       - branchId
+  state-schema:
+    id:
+      type: number
+      description: Unique identifier for the database
+    name:
+      type: string
+      description: Current name of the database
+    branchId:
+      type: string
+      description: ID of the branch containing this database
+    ownerName:
+      type: string
+      description: Name of the role that owns the database
+    createdAt:
+      type: string
+      format: date-time
+      description: When the database was created
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the database was last updated
+    operationId:
+      type: string
+      description: ID of the current operation
   lifecycle:
     sync: <<< database-sync.js
     update-database: ''

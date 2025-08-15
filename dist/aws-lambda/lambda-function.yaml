@@ -119,6 +119,39 @@ lambda-function:
       - region
       - function_name
       - role
+  state-schema:
+    existing:
+      type: boolean
+    function_name:
+      type: string
+    function_arn:
+      type: string
+    code_sha256:
+      type: string
+    last_modified:
+      type: string
+    state:
+      type: string
+    state_reason:
+      type: string
+    runtime:
+      type: string
+    role:
+      type: string
+    handler:
+      type: string
+    timeout:
+      type: number
+    memory_size:
+      type: number
+    code_size:
+      type: number
+    version:
+      type: string
+    last_update_status:
+      type: string
+    revision_id:
+      type: string
   lifecycle:
     sync: <<< lambda-function-sync.js
     invoke: ''

@@ -64,6 +64,17 @@ sqs-queue:
     required:
       - region
       - queue_name
+  state-schema:
+    existing:
+      type: boolean
+    queue_name:
+      type: string
+    queue_url:
+      type: string
+    queue_arn:
+      type: string
+    required:
+      - existing
   lifecycle:
     sync: <<< sqs-queue-sync.js
     send-message: ''

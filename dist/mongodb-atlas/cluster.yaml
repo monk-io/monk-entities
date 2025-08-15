@@ -48,6 +48,17 @@ cluster:
       - provider
       - region
       - instance_size
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    name:
+      type: string
+    connection_standard:
+      type: string
+    connection_srv:
+      type: string
   lifecycle:
     sync: <<< cluster-sync.js
   checks:

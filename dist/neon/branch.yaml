@@ -23,6 +23,66 @@ branch:
     required:
       - secret_ref
       - projectId
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Unique identifier for the branch
+    name:
+      type: string
+      description: Current name of the branch
+    parentId:
+      type: string
+      description: ID of the parent branch
+    parentLsn:
+      type: string
+      description: Log Sequence Number the branch was created from
+    currentState:
+      type: string
+      description: 'Branch state (init, ready, etc)'
+    createdAt:
+      type: string
+      format: date-time
+      description: When the branch was created
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the branch was last updated
+    logicalSize:
+      type: number
+      description: Logical size of the branch data
+    physicalSize:
+      type: number
+      description: Physical size of the branch data
+    operationIds:
+      type: array
+      items:
+        type: string
+      description: Array of operation IDs that need to complete
+    pendingState:
+      type: string
+      description: Pending state of the branch
+    endpoints:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          type:
+            type: string
+          state:
+            type: string
+          host:
+            type: string
+        required:
+          - id
+          - type
+          - state
+          - host
+        additionalProperties: false
+      description: Information about the branch endpoints
   lifecycle:
     sync: <<< branch-sync.js
     get-branch-details: ''

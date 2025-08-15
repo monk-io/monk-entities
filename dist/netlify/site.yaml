@@ -26,6 +26,35 @@ site:
       description: Whether to force SSL for the site
     required:
       - name
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Unique identifier for the site
+    name:
+      type: string
+      description: Current name of the site
+    url:
+      type: string
+      description: The public URL of the site
+    admin_url:
+      type: string
+      description: The admin URL for managing the site
+    custom_domain:
+      type: string
+      description: Custom domain configured for the site
+    state:
+      type: string
+      description: Current state of the site
+    created_at:
+      type: string
+      format: date-time
+      description: When the site was created
+    updated_at:
+      type: string
+      format: date-time
+      description: When the site was last updated
   lifecycle:
     sync: <<< site-sync.js
     get-site: ''

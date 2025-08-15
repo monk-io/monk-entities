@@ -26,6 +26,32 @@ project:
       description: List of allowed IP addresses for the project
     required:
       - secret_ref
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Unique identifier for the project
+    name:
+      type: string
+      description: Current name of the project
+    region:
+      type: string
+      description: AWS region where the project is hosted
+    createdAt:
+      type: string
+      format: date-time
+      description: When the project was created
+    lastUpdated:
+      type: string
+      format: date-time
+      description: When the project was last updated
+    status:
+      type: string
+      description: Current status of the project
+    operationId:
+      type: string
+      description: ID of the operation that created the project
   lifecycle:
     sync: <<< project-sync.js
     get-project-details: ''

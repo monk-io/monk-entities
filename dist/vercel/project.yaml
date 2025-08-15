@@ -59,6 +59,73 @@ project:
       description: Environment variables for the project
     required:
       - name
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Unique identifier for the project
+    name:
+      type: string
+      description: Current name of the project
+    url:
+      type: string
+      description: The public URL of the project
+    domains:
+      type: array
+      items:
+        type: string
+      description: Domains associated with the project
+    status:
+      type: string
+      description: Current status of the project
+    created_at:
+      type: string
+      format: date-time
+      description: When the project was created
+    updated_at:
+      type: string
+      format: date-time
+      description: When the project was last updated
+    account_id:
+      type: string
+      description: Account ID that owns the project
+    latest_deployment:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        created_at:
+          type: string
+        state:
+          type: string
+      required:
+        - id
+        - url
+        - created_at
+        - state
+      additionalProperties: false
+      description: Latest deployment information
+    framework:
+      type: string
+      description: Current framework preset for the project
+    build_command:
+      type: string
+      description: Current build command for the project
+    output_directory:
+      type: string
+      description: Current output directory for the project
+    install_command:
+      type: string
+      description: Current install command for the project
+    dev_command:
+      type: string
+      description: Current development command for the project
+    root_directory:
+      type: string
+      description: Current root directory for the project
   lifecycle:
     sync: <<< project-sync.js
     get-project: ''

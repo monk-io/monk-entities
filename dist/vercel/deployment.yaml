@@ -32,6 +32,23 @@ deployment:
     required:
       - project_id
       - source_path
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    url:
+      type: string
+    status:
+      type: string
+    created_at:
+      type: string
+    ready_at:
+      type: string
+    build_status:
+      type: string
+    error:
+      type: string
   lifecycle:
     sync: <<< deployment-sync.js
     get-deployment-details: ''

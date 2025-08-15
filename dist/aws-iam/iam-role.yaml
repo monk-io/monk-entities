@@ -26,6 +26,15 @@ iam-role:
     required:
       - region
       - role_name
+  state-schema:
+    existing:
+      type: boolean
+    role_arn:
+      type: string
+    role_id:
+      type: string
+    create_date:
+      type: string
   lifecycle:
     sync: <<< iam-role-sync.js
   checks:

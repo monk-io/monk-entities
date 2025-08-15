@@ -20,6 +20,21 @@ iam-policy:
     required:
       - region
       - policy_name
+  state-schema:
+    existing:
+      type: boolean
+    policy_arn:
+      type: string
+    policy_id:
+      type: string
+    default_version_id:
+      type: string
+    attachment_count:
+      type: number
+    create_date:
+      type: string
+    update_date:
+      type: string
   lifecycle:
     sync: <<< iam-policy-sync.js
   requires:
