@@ -1,3 +1,5 @@
+import aws from "cloud/aws";
+
 /**
  * Validates a DB instance identifier according to AWS RDS naming rules
  */
@@ -308,3 +310,281 @@ export function parseRDSError(xmlBody: string): string {
     
     return xmlBody;
 } 
+
+export function addParamsToFormData(formParams: Record<string, string>, params: Record<string, any>, prefix = ''): void {
+    for (const [key, value] of Object.entries(params)) {
+        const paramKey = prefix ? `${prefix}.${key}` : key;
+        
+        if (value === null || value === undefined) {
+            continue;
+        }
+        
+        if (Array.isArray(value)) {
+            value.forEach((item, index) => {
+                if (typeof item === 'object') {
+                    addParamsToFormData(formParams, item, `${paramKey}.member.${index + 1}`);
+                } else {
+                    formParams[`${paramKey}.member.${index + 1}`] = String(item);
+                }
+            });
+        } else if (typeof value === 'object') {
+            addParamsToFormData(formParams, value, paramKey);
+        } else {
+            formParams[paramKey] = String(value);
+        }
+    }
+}
+
+export function makeEC2Request(region: string, action: string, params: Record<string, any> = {}): any {
+    const url = `https://ec2.${region}.amazonaws.com/`;
+    
+    // Build URL-encoded form data for EC2 API
+    const formParams: Record<string, string> = {
+        'Action': action,
+        'Version': '2016-11-15'
+    };
+    
+    // Add parameters to form data
+    addParamsToFormData(formParams, params);
+    
+    // Convert to URL-encoded string
+    const formBody = Object.entries(formParams)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&');
+    
+    const response = aws.post(url, {
+        service: 'ec2',
+        region: region,
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formBody
+    });
+
+    if (response.statusCode >= 400) {
+        let errorMessage = `AWS EC2 API error: ${response.statusCode} ${response.status}`;
+        
+        try {
+            // Parse XML error response
+            const errorMatch = /<message>(.*?)<\/message>/i.exec(response.body);
+            if (errorMatch) {
+                errorMessage += ` - ${errorMatch[1]}`;
+            }
+            const codeMatch = /<code>(.*?)<\/code>/i.exec(response.body);
+            if (codeMatch) {
+                errorMessage += ` (${codeMatch[1]})`;
+            }
+        } catch (_parseError) {
+            errorMessage += ` - Raw: ${response.body}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const parsedResponse = parseEC2Response(response.body);
+    
+    return parsedResponse;
+}
+
+function parseEC2Response(xmlBody: string): any {
+    // Simple XML parsing for security group operations
+    const result: any = {};
+    
+    // Parse security group ID from CreateSecurityGroup response
+    const groupIdMatch = /<groupId>(.*?)<\/groupId>/.exec(xmlBody);
+    if (groupIdMatch) {
+        result.GroupId = groupIdMatch[1];
+    }
+    
+    // Parse security group info from DescribeSecurityGroups response
+    const groupNameMatch = /<groupName>(.*?)<\/groupName>/.exec(xmlBody);
+    if (groupNameMatch) {
+        result.GroupName = groupNameMatch[1];
+    }
+    
+    const descriptionMatch = /<groupDescription>(.*?)<\/groupDescription>/.exec(xmlBody);
+    if (descriptionMatch) {
+        result.Description = descriptionMatch[1];
+    }
+    
+    const vpcIdMatch = /<vpcId>(.*?)<\/vpcId>/.exec(xmlBody);
+    if (vpcIdMatch) {
+        result.VpcId = vpcIdMatch[1];
+    }
+    
+    // Parse default VPC from DescribeVpcs response
+    const isDefaultMatch = /<isDefault>true<\/isDefault>/.exec(xmlBody);
+    if (isDefaultMatch && vpcIdMatch) {
+        result.IsDefault = true;
+    }
+    
+    // Parse security groups with ingress rules
+    // More specific regex to match only top-level security group items within securityGroupInfo
+    const securityGroupInfoMatch = /<securityGroupInfo>(.*?)<\/securityGroupInfo>/s.exec(xmlBody);
+    if (securityGroupInfoMatch) {
+        const securityGroupInfoXml = securityGroupInfoMatch[1];
+
+        // Match only direct child <item> elements of securityGroupInfo
+        // We need to be more careful to avoid matching nested <item> tags
+        const sgMatches = [];
+        let currentIndex = 0;
+        let itemStart = securityGroupInfoXml.indexOf('<item>', currentIndex);
+        
+        while (itemStart !== -1) {
+            // Find the matching closing tag by counting open/close tags
+            let depth = 1;
+            let searchPos = itemStart + 6; // Start after '<item>'
+            let itemEnd = -1;
+            
+            while (depth > 0 && searchPos < securityGroupInfoXml.length) {
+                const nextOpen = securityGroupInfoXml.indexOf('<item>', searchPos);
+                const nextClose = securityGroupInfoXml.indexOf('</item>', searchPos);
+                
+                if (nextClose === -1) break; // No more closing tags
+                
+                if (nextOpen !== -1 && nextOpen < nextClose) {
+                    // Found an opening tag before the next closing tag
+                    depth++;
+                    searchPos = nextOpen + 6;
+                } else {
+                    // Found a closing tag
+                    depth--;
+                    if (depth === 0) {
+                        itemEnd = nextClose + 7; // Include </item>
+                    }
+                    searchPos = nextClose + 7;
+                }
+            }
+            
+            if (itemEnd !== -1) {
+                sgMatches.push(securityGroupInfoXml.substring(itemStart, itemEnd));
+                currentIndex = itemEnd;
+                itemStart = securityGroupInfoXml.indexOf('<item>', currentIndex);
+            } else {
+                break; // Malformed XML
+            }
+        }
+
+        if (sgMatches.length > 0) {
+            result.SecurityGroups = [];
+            sgMatches.forEach(sgItemXml => {
+                // Extract the content inside the security group item
+                const sgContentMatch = /<item>(.*?)<\/item>/s.exec(sgItemXml);
+                if (!sgContentMatch) return;
+                const sgXml = sgContentMatch[1];
+                
+                const sgIdMatch = /<groupId>(.*?)<\/groupId>/.exec(sgXml);
+                const sgNameMatch = /<groupName>(.*?)<\/groupName>/.exec(sgXml);
+                if (sgIdMatch && sgNameMatch) {
+                    const vpcIdMatch = /<vpcId>(.*?)<\/vpcId>/.exec(sgXml);
+                    const securityGroup: any = {
+                        GroupId: sgIdMatch[1],
+                        GroupName: sgNameMatch[1],
+                        VpcId: vpcIdMatch ? vpcIdMatch[1] : undefined
+                    };
+                
+                    // Parse ingress rules (IpPermissions)
+                    const ipPermissionsMatch = /<ipPermissions>(.*?)<\/ipPermissions>/s.exec(sgItemXml);
+                    if (ipPermissionsMatch) {
+                        const ipPermissionsXml = ipPermissionsMatch[1];
+
+                        // Use depth-counting approach for permission items too (same nested <item> issue)
+                        const permissionItems = [];
+                        let currentIndex = 0;
+                        let itemStart = ipPermissionsXml.indexOf('<item>', currentIndex);
+                        
+                        while (itemStart !== -1) {
+                            // Find the matching closing tag by counting open/close tags
+                            let depth = 1;
+                            let searchPos = itemStart + 6; // Start after '<item>'
+                            let itemEnd = -1;
+                            
+                            while (depth > 0 && searchPos < ipPermissionsXml.length) {
+                                const nextOpen = ipPermissionsXml.indexOf('<item>', searchPos);
+                                const nextClose = ipPermissionsXml.indexOf('</item>', searchPos);
+                                
+                                if (nextClose === -1) break; // No more closing tags
+                                
+                                if (nextOpen !== -1 && nextOpen < nextClose) {
+                                    // Found an opening tag before the next closing tag
+                                    depth++;
+                                    searchPos = nextOpen + 6;
+                                } else {
+                                    // Found a closing tag
+                                    depth--;
+                                    if (depth === 0) {
+                                        itemEnd = nextClose + 7; // Include </item>
+                                    }
+                                    searchPos = nextClose + 7;
+                                }
+                            }
+                            
+                            if (itemEnd !== -1) {
+                                permissionItems.push(ipPermissionsXml.substring(itemStart, itemEnd));
+                                currentIndex = itemEnd;
+                                itemStart = ipPermissionsXml.indexOf('<item>', currentIndex);
+                            } else {
+                                break; // Malformed XML
+                            }
+                        }
+
+                        if (permissionItems.length > 0) {
+                            securityGroup.IpPermissions = [];
+                            permissionItems.forEach(permXml => {
+                                const protocolMatch = /<ipProtocol>(.*?)<\/ipProtocol>/.exec(permXml);
+                                const fromPortMatch = /<fromPort>(.*?)<\/fromPort>/.exec(permXml);
+                                const toPortMatch = /<toPort>(.*?)<\/toPort>/.exec(permXml);
+                                
+                                if (protocolMatch) {
+                                    const permission: any = {
+                                        IpProtocol: protocolMatch[1],
+                                        FromPort: fromPortMatch ? fromPortMatch[1] : null,
+                                        ToPort: toPortMatch ? toPortMatch[1] : null
+                                    };
+                                    
+                                    // Parse IP ranges
+                                    const ipRangesMatch = /<ipRanges>(.*?)<\/ipRanges>/s.exec(permXml);
+                                    if (ipRangesMatch) {
+                                        const ipRangesXml = ipRangesMatch[1];
+                                        const ipRangeItems = ipRangesXml.match(/<item>.*?<\/item>/gs);
+                                        if (ipRangeItems) {
+                                            permission.IpRanges = [];
+                                            ipRangeItems.forEach(ipXml => {
+                                                const cidrMatch = /<cidrIp>(.*?)<\/cidrIp>/.exec(ipXml);
+                                                if (cidrMatch) {
+                                                    permission.IpRanges.push({ CidrIp: cidrMatch[1] });
+                                                }
+                                            });
+                                        }
+                                    }
+                                    
+                                    // Parse user ID group pairs
+                                    const groupsMatch = /<groups>(.*?)<\/groups>/s.exec(permXml);
+                                    if (groupsMatch) {
+                                        const groupsXml = groupsMatch[1];
+                                        const groupItems = groupsXml.match(/<item>.*?<\/item>/gs);
+                                        if (groupItems) {
+                                            permission.UserIdGroupPairs = [];
+                                            groupItems.forEach(grpXml => {
+                                                                                                        const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
+                                                if (grpIdMatch) {
+                                                    permission.UserIdGroupPairs.push({ GroupId: grpIdMatch[1] });
+                                                }
+                                            });
+
+                                        }
+                                    }
+                                    
+                                    securityGroup.IpPermissions.push(permission);
+                                }
+                            });
+                        }
+                    }
+                    
+                    result.SecurityGroups.push(securityGroup);
+                }
+            });
+        }
+    }
+    
+    return result;
+}

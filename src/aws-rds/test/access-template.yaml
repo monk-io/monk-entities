@@ -1,0 +1,32 @@
+# AWS RDS Access Entity Test Template
+# This template creates test entities for the RDS Access integration tests
+
+aws-rds-access-test:
+  defines: process-group
+  runnable-list:
+    - test-mysql-access
+    - test-postgres-access
+
+# Test access management for MySQL port
+test-mysql-access:
+  defines: aws-rds/access
+  region: us-east-1
+  security_group_id: ${TEST_SECURITY_GROUP_ID}
+  port: 3306
+  allowed_cidr_blocks:
+    - "10.0.0.0/16"
+    - "192.168.1.0/24"
+  allowed_security_group_names:
+    - ${TEST_ALLOWED_SG_NAME}
+
+# Test access management for PostgreSQL port
+test-postgres-access:
+  defines: aws-rds/access
+  region: us-east-1
+  security_group_id: ${TEST_SECURITY_GROUP_ID_2}
+  port: 5432
+  vpc_id: ${TEST_VPC_ID}
+  allowed_cidr_blocks:
+    - "10.1.0.0/16"
+  allowed_security_group_names:
+    - ${TEST_ALLOWED_SG_NAME}

@@ -35,24 +35,18 @@ mysql-database:
   password_secret_ref: <- `${db-instance-identifier}-master-password`
   
   # Network and security
-  # vpc_security_group_ids:
-  #   - sg-0123456789abcdef0  # Replace with your security group
-  # db_subnet_group_name: default  # Use default VPC's public subnets
-  # publicly_accessible: true  # Enable public access for demo
-  
-  # Note: You may need to create a security group that allows inbound traffic on port 3306
-  # Example security group rule: Source 0.0.0.0/0, Protocol TCP, Port 3306
+  publicly_accessible: false  # Enable public access for demo
 
   # Auto-create security group in default VPC (no vpc_id specified)
   auto_create_security_group: true
   security_group_name: mysql-database-sg
   security_group_description: "MySQL Database Security Group"
-  # Allow access from specific security groups by name
-  allowed_security_group_names:
-    - "test-rds" # AWS node security group (node name)
-    - "test-rds2" 
-  # allowed_cidr_blocks:
-  #   - "0.0.0.0/0"
+  # # Allow access from specific security groups by name
+  # allowed_security_group_names:
+  #   - "test-rds" # AWS node security group (node name)
+  #   - "test-rds2" 
+  # # allowed_cidr_blocks:
+  # #   - "0.0.0.0/0"
   
   # Backup and maintenance
   backup_retention_period: 7
@@ -118,20 +112,7 @@ mysql-client:
   
   containers:
     client:
-      image: node:18-alpine
-      workdir: /app
-      bash: |
-        set -e
-        echo "🔧 Installing dependencies..."
-        npm install
-        
-        echo "🔨 Building TypeScript..."
-        npm run build
-        
-        echo "🚀 Starting MySQL RDS Client..."
-        exec npm start
-      paths:
-        - .:/app
+      image: docker.io/imanachyn/rds-client:v1
       environment:
         - DB_ENGINE=mysql
         - DB_CONNECTION_LIMIT=5
@@ -139,6 +120,23 @@ mysql-client:
         - OPERATION_INTERVAL_MS=10000
         - SAMPLE_TABLE_NAME=demo_users
         - SAMPLE_RECORDS_COUNT=5
+
+mysql-access-list:
+  defines: aws-rds/rds-access-list
+  region: <- connection-target("db") entity get-member("region")
+  security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+  port: <- connection-target("db") entity-state get-member("endpoint_port")
+  allowed_security_group_names: <- runnable-peers("rds-client-demo/mysql-client")
+  connections:
+    db:
+      runnable: rds-client-demo/mysql-database
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - rds-client-demo/mysql-database
+        - rds-client-demo/mysql-client
+      timeout: 600
 
 # PostgreSQL RDS Instance  
 postgres-database:
@@ -164,10 +162,10 @@ postgres-database:
   password_secret_ref: <- `${db-instance-identifier}-master-password`
   
   # Network and security
-  vpc_security_group_ids:
-    - sg-0123456789abcdef0  # Replace with your security group
-  db_subnet_group_name: default
-  publicly_accessible: true
+  publicly_accessible: false
+  auto_create_security_group: true
+  security_group_name: postgres-database-sg
+  security_group_description: "PostgreSQL Database Security Group"
   
   # Backup and maintenance
   backup_retention_period: 7

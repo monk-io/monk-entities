@@ -1,0 +1,5 @@
+namespace: aws-rds
+
+security-group:
+  defines: module
+  source: <<< security-group.js
