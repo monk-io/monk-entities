@@ -6,11 +6,13 @@ dynamo-db-table:
   schema:
     region:
       type: string
+      description: AWS region for the DynamoDB table
     table_name:
       type: string
       minLength: 3
       maxLength: 255
       pattern: '^[a-zA-Z0-9_.-]+$'
+      description: The name of the DynamoDB table
     attribute_definitions:
       type: array
       items:
@@ -28,6 +30,7 @@ dynamo-db-table:
           - AttributeName
           - AttributeType
         additionalProperties: false
+      description: Attribute definitions for the table
     key_schema:
       type: array
       items:
@@ -44,11 +47,13 @@ dynamo-db-table:
           - AttributeName
           - KeyType
         additionalProperties: false
+      description: Key schema for the table (hash and range keys)
     billing_mode:
       type: string
       enum:
         - PROVISIONED
         - PAY_PER_REQUEST
+      description: Billing mode for the table
       default: PAY_PER_REQUEST
     provisioned_throughput:
       type: object
@@ -61,6 +66,9 @@ dynamo-db-table:
         - ReadCapacityUnits
         - WriteCapacityUnits
       additionalProperties: false
+      description: >-
+        Provisioned throughput settings (required if billing_mode is
+        PROVISIONED)
     global_secondary_indexes:
       type: array
       items:
@@ -116,6 +124,7 @@ dynamo-db-table:
           - KeySchema
           - Projection
         additionalProperties: false
+      description: Global secondary indexes
     local_secondary_indexes:
       type: array
       items:
@@ -160,6 +169,7 @@ dynamo-db-table:
           - KeySchema
           - Projection
         additionalProperties: false
+      description: Local secondary indexes
     sse_specification:
       type: object
       properties:
@@ -173,6 +183,7 @@ dynamo-db-table:
         KMSMasterKeyId:
           type: string
       additionalProperties: false
+      description: Server-side encryption specification
     stream_specification:
       type: object
       properties:
@@ -188,34 +199,44 @@ dynamo-db-table:
       required:
         - StreamEnabled
       additionalProperties: false
+      description: DynamoDB stream configuration
     table_class:
       type: string
       enum:
         - STANDARD
         - STANDARD_INFREQUENT_ACCESS
+      description: Table class
       default: STANDARD
     deletion_protection_enabled:
       type: boolean
+      description: Deletion protection enabled
       default: false
     point_in_time_recovery_enabled:
       type: boolean
+      description: Point-in-time recovery enabled
       default: false
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags
+      description: Resource tags
     required:
       - region
       - table_name
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the table pre-existed before this entity managed it
     table_name:
       type: string
+      description: Table name
     table_arn:
       type: string
+      description: Table ARN
     table_status:
       type: string
+      description: 'Current table status (e.g., ACTIVE)'
   lifecycle:
     sync: <<< dynamo-db-table-sync.js
     get-table-details: ''

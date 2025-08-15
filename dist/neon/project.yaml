@@ -8,6 +8,7 @@ project:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for Neon API authentication
     name:
       type: string
       description: Custom name for the Neon project
@@ -29,6 +30,7 @@ project:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource already existed before this entity managed it
     id:
       type: string
       description: Unique identifier for the project

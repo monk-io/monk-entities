@@ -8,6 +8,7 @@ branch:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for Neon API authentication
     project-id:
       type: string
       description: 'The Neon project ID (format: project-name-123456)'
@@ -26,6 +27,7 @@ branch:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource already existed before this entity managed it
     id:
       type: string
       description: Unique identifier for the branch

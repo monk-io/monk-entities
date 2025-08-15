@@ -12,56 +12,98 @@ import {
 } from "./common.ts";
 
 export interface S3BucketDefinition extends AWSS3Definition {
+    /** @description S3 bucket name */
     bucket_name: string;
+    /** @description Enable or disable bucket versioning
+     *  @default false
+     */
     versioning?: boolean;
+    /** @description Whether to allow public reads (controls public access block)
+     *  @default false
+     */
     public_read_access?: boolean;
+    /** @description Whether to allow public writes (controls public ACLs)
+     *  @default false
+     */
     public_write_access?: boolean;
+    /** @description CORS configuration for the bucket */
     cors_configuration?: {
+        /** @description List of CORS rules applied to the bucket */
         cors_rules: Array<{
+            /** @description Allowed headers for CORS requests */
             allowed_headers?: string[];
+            /** @description Allowed HTTP methods */
             allowed_methods: string[];
+            /** @description Allowed origins */
             allowed_origins: string[];
+            /** @description Response headers to expose */
             expose_headers?: string[];
+            /** @description Max age for preflight results */
             max_age_seconds?: number;
         }>;
     };
+    /** @description Lifecycle rules for automatic transitions/expiration */
     lifecycle_configuration?: {
+        /** @description Lifecycle rules */
         rules: Array<{
+            /** @description Rule identifier */
             id: string;
+            /** @description Rule status */
             status: "Enabled" | "Disabled";
+            /** @description Object filter for the rule */
             filter?: {
+                /** @description Key prefix filter */
                 prefix?: string;
+                /** @description Tag filter */
                 tags?: Record<string, string>;
             };
+            /** @description Expiration settings */
             expiration?: {
+                /** @description Expire after this many days */
                 days?: number;
+                /** @description Expire on specific date (YYYY-MM-DD) */
                 date?: string;
             };
+            /** @description Noncurrent version expiration settings */
             noncurrent_version_expiration?: {
+                /** @description Days until noncurrent versions expire */
                 noncurrent_days: number;
             };
+            /** @description Storage class transition rules */
             transitions?: Array<{
+                /** @description Transition after this many days */
                 days?: number;
+                /** @description Transition on specific date */
                 date?: string;
+                /** @description Target storage class */
                 storage_class: "STANDARD_IA" | "ONEZONE_IA" | "GLACIER" | "DEEP_ARCHIVE";
             }>;
         }>;
     };
+    /** @description Default server-side encryption configuration */
     server_side_encryption?: {
+        /** @description Encryption rules */
         rules: Array<{
+            /** @description Default encryption settings */
             apply_server_side_encryption_by_default: {
+                /** @description Algorithm to use */
                 sse_algorithm: "AES256" | "aws:kms";
+                /** @description KMS key ID/ARN for aws:kms */
                 kms_master_key_id?: string;
             };
+            /** @description Enable S3 Bucket Keys for KMS */
             bucket_key_enabled?: boolean;
         }>;
     };
+    /** @description Resource tags for the bucket */
     tags?: Record<string, string>;
 }
 
 export interface S3BucketState extends AWSS3State {
-    // Inherits: existing, bucket_name, region, location
-    // All other data (configuration, attributes, etc.) obtained via API calls
+    /**
+     * Inherits: existing, bucket_name, region, location
+     * All other data (configuration, attributes, etc.) obtained via API calls
+     */
 }
 
 interface S3ObjectInfo {

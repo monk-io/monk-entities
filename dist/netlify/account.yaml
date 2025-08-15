@@ -8,6 +8,9 @@ account:
       type: string
       minLength: 1
       maxLength: 24
+      description: |-
+        Secret Reference for Netlify API authentication
+        Defaults to "default-netlify-pat" if not provided
   state-schema:
     existing:
       type: boolean

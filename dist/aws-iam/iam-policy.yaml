@@ -6,35 +6,49 @@ iam-policy:
   schema:
     region:
       type: string
+      description: AWS region for IAM operations (signing region)
     policy_name:
       type: string
-    policy_document: {}
+      description: IAM policy name
+    policy_document:
+      description: Policy document (JSON object or string)
     path:
       type: string
+      description: Optional path for the policy (defaults to "/")
     policy_description:
       type: string
+      description: Human-readable description for the policy
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags for the policy
+      description: Resource tags for the policy
     required:
       - region
       - policy_name
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
     policy_arn:
       type: string
+      description: Policy ARN
     policy_id:
       type: string
+      description: Policy ID
     default_version_id:
       type: string
+      description: Default version identifier
     attachment_count:
       type: number
+      description: Number of attachments to principals
     create_date:
       type: string
+      description: Creation timestamp
     update_date:
       type: string
+      description: Last update timestamp
   lifecycle:
     sync: <<< iam-policy-sync.js
   requires:

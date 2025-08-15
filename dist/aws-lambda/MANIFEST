@@ -1,3 +1,3 @@
 REPO aws-lambda
-LOAD lambda-function.yaml common.yaml base.yaml
-RESOURCES common.js base.js lambda-function-sync.js
+LOAD base.yaml common.yaml lambda-function.yaml
+RESOURCES base.js common.js lambda-function-sync.js

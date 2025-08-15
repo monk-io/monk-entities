@@ -8,6 +8,9 @@ site:
       type: string
       minLength: 1
       maxLength: 24
+      description: |-
+        Secret Reference for Netlify API authentication
+        Defaults to "default-netlify-pat" if not provided
     name:
       type: string
       minLength: 1
@@ -29,6 +32,7 @@ site:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource already existed before this entity managed it
     id:
       type: string
       description: Unique identifier for the site

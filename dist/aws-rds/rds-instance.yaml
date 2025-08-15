@@ -6,72 +6,103 @@ rds-instance:
   schema:
     region:
       type: string
+      description: AWS region for the RDS instance
     db_instance_identifier:
       type: string
+      description: 'DB instance identifier (1-63 chars, starts with letter)'
     db_instance_class:
       type: string
+      description: 'Instance class (e.g., db.t3.micro)'
     engine:
       type: string
+      description: 'Database engine (e.g., mysql, postgres)'
     master_username:
       type: string
+      description: Master username for the database
     allocated_storage:
       type: number
+      description: Allocated storage in GB
     engine_version:
       type: string
+      description: Specific engine version
     port:
       type: number
+      description: Database port
     password_secret_ref:
       type: string
+      description: Secret reference to store/retrieve the master password
     vpc_security_group_ids:
       type: array
       items:
         type: string
+      description: VPC security group IDs to associate
     db_subnet_group_name:
       type: string
+      description: DB subnet group name
     backup_retention_period:
       type: number
+      description: Backup retention period (days)
     preferred_backup_window:
       type: string
+      description: 'Preferred backup window (UTC, hh24:mi-hh24:mi)'
     preferred_maintenance_window:
       type: string
+      description: 'Preferred maintenance window (UTC, ddd:hh24:mi-ddd:hh24:mi)'
     auto_minor_version_upgrade:
       type: boolean
+      description: Enable automatic minor version upgrades
     multi_az:
       type: boolean
+      description: Multi-AZ deployment
     publicly_accessible:
       type: boolean
+      description: Public accessibility
     storage_type:
       type: string
+      description: 'Storage type (e.g., gp2, gp3, io1)'
     storage_encrypted:
       type: boolean
+      description: Enable storage encryption
     kms_key_id:
       type: string
+      description: KMS key ID for encryption
     deletion_protection:
       type: boolean
+      description: Enable deletion protection
     skip_final_snapshot:
       type: boolean
+      description: Skip final snapshot on delete
     final_db_snapshot_identifier:
       type: string
+      description: Final snapshot identifier when not skipping
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags for the instance
+      description: Resource tags for the instance
     auto_create_security_group:
       type: boolean
+      description: Auto-create a security group and manage ingress rules
     security_group_name:
       type: string
+      description: Name for the auto-created security group
     security_group_description:
       type: string
+      description: Description for the auto-created security group
     vpc_id:
       type: string
+      description: VPC ID to use when creating or resolving security groups
     allowed_cidr_blocks:
       type: array
       items:
         type: string
+      description: Allowed CIDR blocks for ingress on the DB port
     allowed_security_group_names:
       type: array
       items:
         type: string
+      description: Allowed security group names for ingress on the DB port
     required:
       - region
       - db_instance_identifier
@@ -82,26 +113,37 @@ rds-instance:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the instance pre-existed before this entity managed it
     db_instance_identifier:
       type: string
+      description: DB instance identifier
     db_instance_arn:
       type: string
+      description: DB instance ARN
     db_instance_status:
       type: string
+      description: 'Current DB instance status (e.g., available)'
     endpoint_address:
       type: string
+      description: Endpoint address
     endpoint_port:
       type: number
+      description: Endpoint port
     allocated_storage:
       type: number
+      description: Allocated storage in GB
     creation_time:
       type: string
+      description: Instance creation timestamp
     last_modified:
       type: string
+      description: Last modified timestamp
     created_security_group_id:
       type: string
+      description: ID of the auto-created security group (if any)
     created_security_group_existing:
       type: boolean
+      description: Whether the used security group pre-existed
     required:
       - existing
   lifecycle:
