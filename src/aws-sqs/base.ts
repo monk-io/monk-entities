@@ -6,34 +6,74 @@ import {
 } from "./common.ts";
 
 export interface AWSSQSDefinition {
+    /** @description AWS region for the queue */
     region: string;
+    /** @description Queue name (append .fifo for FIFO queues) */
     queue_name: string;
+    /** @description Default delay (seconds) for messages
+     *  @default 0
+     */
     delay_seconds?: number;
+    /** @description Maximum message size in bytes
+     *  @default 262144
+     */
     maximum_message_size?: number;
+    /** @description How long to retain messages (seconds)
+     *  @default 345600
+     */
     message_retention_period?: number;
+    /** @description Long polling wait time (seconds)
+     *  @default 0
+     */
     receive_message_wait_time_seconds?: number;
+    /** @description Visibility timeout (seconds)
+     *  @default 30
+     */
     visibility_timeout?: number;
+    /** @description Whether this is a FIFO queue
+     *  @default false
+     */
     fifo_queue?: boolean;
+    /** @description Enable content-based deduplication (FIFO only)
+     *  @default false
+     */
     content_based_deduplication?: boolean;
+    /** @description KMS key ID/ARN for server-side encryption */
     kms_master_key_id?: string;
+    /** @description KMS data key reuse period (seconds) */
     kms_data_key_reuse_period_seconds?: number;
+    /** @description Dead-letter queue settings */
     redrive_policy?: {
+        /** @description Target DLQ ARN */
         dead_letter_target_arn: string;
+        /** @description Max receives before moving to DLQ */
         max_receive_count: number;
     };
+    /** @description Redrive allow policy configuration */
     redrive_allow_policy?: {
+        /** @description Redrive permission mode */
         redrive_permission: string;
+        /** @description Allowed source queue ARNs */
         source_queue_arns?: string[];
     };
+    /** @description Enable SQS-managed server-side encryption
+     *  @default false
+     */
     sqs_managed_sse_enabled?: boolean;
+    /** @description JSON policy document string */
     policy?: string;
+    /** @description Resource tags for the queue */
     tags?: Record<string, string>;
 }
 
 export interface AWSSQSState {
+    /** @description Indicates if the queue pre-existed before this entity managed it */
     existing: boolean;
+    /** @description Queue name */
     queue_name?: string;
+    /** @description Queue URL */
     queue_url?: string;
+    /** @description Queue ARN */
     queue_arn?: string;
 }
 

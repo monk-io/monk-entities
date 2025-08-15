@@ -8,36 +8,36 @@ import cli from "cli";
  */
 export interface ClusterDefinition extends MongoDBAtlasEntityDefinition {
     /**
-     * Cluster name
+     * @description Cluster name
      * @minLength 1
      * @maxLength 100
      */
     name: string;
 
     /**
-     * Project ID where the cluster will be created
+     * @description Project ID where the cluster will be created
      * @minLength 1
      * @maxLength 24
      */
     project_id: string;
 
     /**
-     * Cloud provider
+     * @description Cloud provider
      */
     provider: "AWS" | "GCP" | "AZURE";
 
     /**
-     * Cloud provider region
+     * @description Cloud provider region
      */
     region: string;
 
     /**
-     * Instance size/tier
+     * @description Instance size/tier
      */
     instance_size: "M0" | "M2" | "M5" | "M10" | "M20" | "M30" | "M40" | "M50" | "M60" | "M80";
 
     /**
-     * Array of IP addresses allowed to access the cluster
+     * @description Array of IP addresses allowed to access the cluster
      */
     allow_ips?: string[];
 }
@@ -49,22 +49,22 @@ export interface ClusterDefinition extends MongoDBAtlasEntityDefinition {
  */
 export interface ClusterState extends MongoDBAtlasEntityState {
     /**
-     * Cluster ID
+     * @description Cluster ID
      */
     id?: string;
 
     /**
-     * Cluster Name
+     * @description Cluster Name
      */
     name?: string;
 
     /**
-     * Standard connection string
+     * @description Standard connection string
      */
     connection_standard?: string;
 
     /**
-     * SRV connection string
+     * @description SRV connection string
      */
     connection_srv?: string;
 }

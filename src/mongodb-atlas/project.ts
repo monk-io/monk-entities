@@ -9,14 +9,14 @@ import cli from "cli";
  */
 export interface ProjectDefinition extends MongoDBAtlasEntityDefinition {
     /**
-     * Project name
+     * @description Project name
      * @minLength 1
      * @maxLength 100
      */
     name: string;
 
     /**
-     * Organization Name
+     * @description Organization Name
      * @minLength 1
      * @maxLength 100
      */
@@ -30,17 +30,17 @@ export interface ProjectDefinition extends MongoDBAtlasEntityDefinition {
  */
 export interface ProjectState extends MongoDBAtlasEntityState {
     /**
-     * Project ID
+     * @description Project ID
      */
     id?: string;
 
     /**
-     * Project Organization ID
+     * @description Project Organization ID
      */
     organization_id?: string;
 
     /**
-     * Project Name
+     * @description Project Name
      */
     name?: string;
 }

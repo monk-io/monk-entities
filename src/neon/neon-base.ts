@@ -8,7 +8,7 @@ import cli from "cli";
  */
 export interface NeonEntityDefinition {
     /**
-     * Secret Reference for Neon API authentication
+     * @description Secret Reference for Neon API authentication
      * @minLength 1
      * @maxLength 24
      */
@@ -20,7 +20,7 @@ export interface NeonEntityDefinition {
  */
 export interface NeonEntityState {
     /**
-     * Indicates if the resource already existed before this entity managed it
+     * @description Indicates if the resource already existed before this entity managed it
      */
     existing?: boolean;
 }

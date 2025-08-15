@@ -8,7 +8,7 @@ import cli from "cli";
  */
 export interface MongoDBAtlasEntityDefinition {
     /**
-     * Secret Reference for MongoDB Atlas API authentication
+     * @description Secret Reference for MongoDB Atlas API authentication
      * @minLength 1
      * @maxLength 24
      */
@@ -20,7 +20,7 @@ export interface MongoDBAtlasEntityDefinition {
  */
 export interface MongoDBAtlasEntityState {
     /**
-     * Indicates if the resource already existed before this entity managed it
+     * @description Indicates if the resource already existed before this entity managed it
      */
     existing?: boolean;
 }

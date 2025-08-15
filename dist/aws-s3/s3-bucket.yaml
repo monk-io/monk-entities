@@ -6,14 +6,22 @@ s3-bucket:
   schema:
     region:
       type: string
+      description: AWS region for the bucket
     bucket_name:
       type: string
+      description: S3 bucket name
     versioning:
       type: boolean
+      description: Enable or disable bucket versioning
+      default: false
     public_read_access:
       type: boolean
+      description: Whether to allow public reads (controls public access block)
+      default: false
     public_write_access:
       type: boolean
+      description: Whether to allow public writes (controls public ACLs)
+      default: false
     cors_configuration:
       type: object
       properties:
@@ -26,27 +34,34 @@ s3-bucket:
                 type: array
                 items:
                   type: string
+                description: Allowed headers for CORS requests
               allowed_methods:
                 type: array
                 items:
                   type: string
+                description: Allowed HTTP methods
               allowed_origins:
                 type: array
                 items:
                   type: string
+                description: Allowed origins
               expose_headers:
                 type: array
                 items:
                   type: string
+                description: Response headers to expose
               max_age_seconds:
                 type: number
+                description: Max age for preflight results
             required:
               - allowed_methods
               - allowed_origins
             additionalProperties: false
+          description: List of CORS rules applied to the bucket
       required:
         - cors_rules
       additionalProperties: false
+      description: CORS configuration for the bucket
     lifecycle_configuration:
       type: object
       properties:
@@ -57,37 +72,48 @@ s3-bucket:
             properties:
               id:
                 type: string
+                description: Rule identifier
               status:
                 type: string
                 enum:
                   - Enabled
                   - Disabled
+                description: Rule status
               filter:
                 type: object
                 properties:
                   prefix:
                     type: string
+                    description: Key prefix filter
                   tags:
                     type: object
                     additionalProperties:
                       type: string
+                      description: Tag filter
+                    description: Tag filter
                 additionalProperties: false
+                description: Object filter for the rule
               expiration:
                 type: object
                 properties:
                   days:
                     type: number
+                    description: Expire after this many days
                   date:
                     type: string
+                    description: Expire on specific date (YYYY-MM-DD)
                 additionalProperties: false
+                description: Expiration settings
               noncurrent_version_expiration:
                 type: object
                 properties:
                   noncurrent_days:
                     type: number
+                    description: Days until noncurrent versions expire
                 required:
                   - noncurrent_days
                 additionalProperties: false
+                description: Noncurrent version expiration settings
               transitions:
                 type: array
                 items:
@@ -95,8 +121,10 @@ s3-bucket:
                   properties:
                     days:
                       type: number
+                      description: Transition after this many days
                     date:
                       type: string
+                      description: Transition on specific date
                     storage_class:
                       type: string
                       enum:
@@ -104,16 +132,20 @@ s3-bucket:
                         - ONEZONE_IA
                         - GLACIER
                         - DEEP_ARCHIVE
+                      description: Target storage class
                   required:
                     - storage_class
                   additionalProperties: false
+                description: Storage class transition rules
             required:
               - id
               - status
             additionalProperties: false
+          description: Lifecycle rules
       required:
         - rules
       additionalProperties: false
+      description: Lifecycle rules for automatic transitions/expiration
     server_side_encryption:
       type: object
       properties:
@@ -130,35 +162,47 @@ s3-bucket:
                     enum:
                       - AES256
                       - 'aws:kms'
+                    description: Algorithm to use
                   kms_master_key_id:
                     type: string
+                    description: 'KMS key ID/ARN for aws:kms'
                 required:
                   - sse_algorithm
                 additionalProperties: false
+                description: Default encryption settings
               bucket_key_enabled:
                 type: boolean
+                description: Enable S3 Bucket Keys for KMS
             required:
               - apply_server_side_encryption_by_default
             additionalProperties: false
+          description: Encryption rules
       required:
         - rules
       additionalProperties: false
+      description: Default server-side encryption configuration
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags for the bucket
+      description: Resource tags for the bucket
     required:
       - region
       - bucket_name
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the bucket pre-existed before this entity managed it
     bucket_name:
       type: string
+      description: Bucket name
     region:
       type: string
+      description: Bucket region
     location:
       type: string
+      description: Bucket location constraint reported by AWS
     required:
       - existing
   lifecycle:

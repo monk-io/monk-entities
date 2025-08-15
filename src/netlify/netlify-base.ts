@@ -8,7 +8,7 @@ import secret from "secret";
  */
 export interface NetlifyEntityDefinition {
     /**
-     * Secret Reference for Netlify API authentication
+     * @description Secret Reference for Netlify API authentication
      * Defaults to "default-netlify-pat" if not provided
      * @minLength 1
      * @maxLength 24
@@ -21,7 +21,7 @@ export interface NetlifyEntityDefinition {
  */
 export interface NetlifyEntityState {
     /**
-     * Indicates if the resource already existed before this entity managed it
+     * @description Indicates if the resource already existed before this entity managed it
      */
     existing?: boolean;
 }

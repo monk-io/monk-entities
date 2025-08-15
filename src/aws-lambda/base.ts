@@ -3,18 +3,36 @@ import aws from "cloud/aws";
 import blobs from "blobs";
 
 export interface AWSLambdaDefinition {
+    /**
+     * @description AWS region where the Lambda function will be managed
+     * @example "us-east-1"
+     */
     region: string;
+    /**
+     * @description Name of the blob that contains the ZIP archive for code deployments (used when `package_type` is Zip)
+     */
     blob_name?: string;  // Optional for container images
+    /**
+     * @description ECR image URI for container image deployments (used when `package_type` is Image)
+     * @example "123456789012.dkr.ecr.us-east-1.amazonaws.com/repo:tag"
+     */
     image_uri?: string;  // Container image URI for package_type: Image
 }
 
 export interface AWSLambdaState {
+    /** @description Indicates if the function pre-existed before this entity managed it */
     existing?: boolean;
+    /** @description Lambda function name */
     function_name?: string;
+    /** @description ARN of the Lambda function */
     function_arn?: string;
+    /** @description SHA-256 hash of the currently deployed code */
     code_sha256?: string;
+    /** @description Timestamp of the last modification (ISO 8601) */
     last_modified?: string;
+    /** @description Current function lifecycle state (e.g., Active) */
     state?: string;
+    /** @description Reason for the current state, if any */
     state_reason?: string;
 }
 

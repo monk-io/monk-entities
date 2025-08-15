@@ -8,16 +8,15 @@ import secret from "secret";
  */
 export interface VercelEntityDefinition {
     /**
-     * Secret Reference for Vercel API authentication
-     * Defaults to "default-vercel-token" if not provided
-     * @minLength 1
-     * @maxLength 24
-     */
+      * @description Secret Reference for Vercel API authentication
+      * Defaults to "default-vercel-token" if not provided
+      * @minLength 1
+      * @maxLength 24
+      */
     secret_ref?: string;
 
     /**
-     * Team ID for team-specific operations (optional)
-     * @description Team ID for team-specific resources
+     * @description Team ID for team-specific operations (optional)
      */
     team_id?: string;
 }
@@ -27,7 +26,7 @@ export interface VercelEntityDefinition {
  */
 export interface VercelEntityState {
     /**
-     * Indicates if the resource already existed before this entity managed it
+     * @description Indicates if the resource already existed before this entity managed it
      */
     existing?: boolean;
 }

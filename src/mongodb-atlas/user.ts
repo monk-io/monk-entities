@@ -9,29 +9,29 @@ import cli from "cli";
  */
 export interface UserDefinition extends MongoDBAtlasEntityDefinition {
     /**
-     * Database username
+     * @description Database username
      * @minLength 1
      * @maxLength 100
      */
     name: string;
 
     /**
-     * Project ID where the user will be created
+     * @description Project ID where the user will be created
      * @minLength 1
      * @maxLength 24
      */
     project_id: string;
 
     /**
-     * Secret Reference for user password
+     * @description Secret Reference for user password
      * @minLength 1
      * @maxLength 24
      */
     password_secret_ref: string;
 
     /**
-     * Database role for the user
-     * Defaults to "readWriteAnyDatabase" if not specified
+     * @description Database role for the user
+     * @default readWriteAnyDatabase
      */
     role?: string;
 }
@@ -43,22 +43,22 @@ export interface UserDefinition extends MongoDBAtlasEntityDefinition {
  */
 export interface UserState extends MongoDBAtlasEntityState {
     /**
-     * Username
+     * @description Username
      */
     name?: string;
 
     /**
-     * Project ID
+     * @description Project ID
      */
     project_id?: string;
 
     /**
-     * Database name (always "admin" for Atlas)
+     * @description Database name (always "admin" for Atlas)
      */
     database_name?: string;
 
     /**
-     * User roles
+     * @description User roles
      */
     roles?: Array<{
         databaseName: string;

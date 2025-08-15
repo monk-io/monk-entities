@@ -8,9 +8,12 @@ project:
       type: string
       minLength: 1
       maxLength: 24
+      description: |-
+        Secret Reference for Vercel API authentication
+        Defaults to "default-vercel-token" if not provided
     team_id:
       type: string
-      description: Team ID for team-specific resources
+      description: Team ID for team-specific operations (optional)
     name:
       type: string
       minLength: 1
@@ -62,6 +65,7 @@ project:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource already existed before this entity managed it
     id:
       type: string
       description: Unique identifier for the project

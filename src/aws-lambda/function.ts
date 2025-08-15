@@ -62,61 +62,118 @@ interface CreateFunctionRequest extends LambdaFunctionConfig {
 }
 
 export interface LambdaFunctionDefinition extends AWSLambdaDefinition {
+    /** @description Lambda function name */
     function_name: string;
+    /**
+     * @description Lambda runtime (e.g., nodejs20.x). Optional for container images
+     */
     runtime?: string;  // Optional for container images (defined in image)
+    /** @description IAM role ARN assumed by the Lambda function */
     role: string;
+    /**
+     * @description Handler entrypoint (e.g., index.handler). Optional for container images
+     */
     handler?: string;  // Optional for container images (defined in image)
+    /** @description Human-readable description for the function */
     summary?: string;
+    /** @description Function timeout in seconds
+     *  @default 3
+     */
     timeout?: number;
+    /** @description Memory size in MB
+     *  @default 128
+     */
     memory_size?: number;
+    /** @description Environment variables */
     environment?: {
+        /** @description Key/value environment variables */
         variables?: Record<string, string>;
     };
+    /** @description Dead-letter queue configuration */
     dead_letter_config?: {
+        /** @description Target ARN for dead-letter messages */
         target_arn?: string;
     };
+    /** @description KMS key ARN for encrypting environment variables */
     kms_key_arn?: string;
+    /** @description AWS X-Ray tracing configuration */
     tracing_config?: {
+        /** @description Tracing mode (e.g., Active, PassThrough) */
         mode?: string;
     };
+    /** @description Resource tags to apply to the function */
     tags?: Record<string, string>;
+    /** @description Layer ARNs to attach */
     layers?: string[];
+    /** @description EFS file system configurations */
     file_system_configs?: Array<{
+        /** @description EFS Access Point ARN */
         arn: string;
+        /** @description Local mount path inside the Lambda environment */
         local_mount_path: string;
     }>;
+    /** @description Container image runtime configuration overrides */
     image_config?: {
+        /** @description Container entry point */
         entry_point?: string[];
+        /** @description Container command */
         command?: string[];
+        /** @description Working directory inside the container */
         working_directory?: string;
     };
+    /** @description Code signing configuration ARN */
     code_signing_config_arn?: string;
+    /** @description Instruction set architectures (e.g., x86_64, arm64) */
     architectures?: string[];
+    /** @description Ephemeral /tmp storage configuration */
     ephemeral_storage?: {
+        /** @description Size in MB for /tmp storage */
         size?: number;
     };
+    /** @description SnapStart configuration */
     snap_start?: {
+        /** @description Apply SnapStart on PublishedVersions or None */
         apply_on?: string;
     };
+    /** @description Logging configuration */
     logging_config?: {
+        /** @description Log format (e.g., JSON) */
         log_format?: string;
+        /** @description Application log level */
         application_log_level?: string;
+        /** @description System log level */
         system_log_level?: string;
+        /** @description CloudWatch Logs group name */
         log_group?: string;
     };
+    /** @description Deployment package type (Zip or Image)
+     *  @default Zip
+     */
     package_type?: string;
+    /** @description Whether to publish a new version on create/update
+     *  @default false
+     */
     publish?: boolean;
 }
 
 export interface LambdaFunctionState extends AWSLambdaState {
+    /** @description Effective runtime */
     runtime?: string;
+    /** @description Role ARN bound to the function */
     role?: string;
+    /** @description Handler entrypoint */
     handler?: string;
+    /** @description Effective timeout in seconds */
     timeout?: number;
+    /** @description Effective memory size in MB */
     memory_size?: number;
+    /** @description Deployed code size in bytes */
     code_size?: number;
+    /** @description Published function version */
     version?: string;
+    /** @description Status of the last update operation */
     last_update_status?: string;
+    /** @description Revision identifier */
     revision_id?: string;
 }
 

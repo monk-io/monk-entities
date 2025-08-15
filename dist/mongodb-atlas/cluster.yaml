@@ -8,22 +8,27 @@ cluster:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
     name:
       type: string
       minLength: 1
       maxLength: 100
+      description: Cluster name
     project_id:
       type: string
       minLength: 1
       maxLength: 24
+      description: Project ID where the cluster will be created
     provider:
       type: string
       enum:
         - AWS
         - GCP
         - AZURE
+      description: Cloud provider
     region:
       type: string
+      description: Cloud provider region
     instance_size:
       type: string
       enum:
@@ -37,10 +42,12 @@ cluster:
         - M50
         - M60
         - M80
+      description: Instance size/tier
     allow_ips:
       type: array
       items:
         type: string
+      description: Array of IP addresses allowed to access the cluster
     required:
       - secret_ref
       - name
@@ -51,14 +58,19 @@ cluster:
   state-schema:
     existing:
       type: boolean
+      description: Indicates if the resource already existed before this entity managed it
     id:
       type: string
+      description: Cluster ID
     name:
       type: string
+      description: Cluster Name
     connection_standard:
       type: string
+      description: Standard connection string
     connection_srv:
       type: string
+      description: SRV connection string
   lifecycle:
     sync: <<< cluster-sync.js
   checks:
