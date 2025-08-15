@@ -116,6 +116,7 @@ my-postgres-db:
 
 - `engine_version` - Specific engine version (defaults to latest)
 - `port` - Database port (defaults based on engine)
+- `db_name` - Name of the database to create (PostgreSQL/MySQL only)
 - `master_user_password` - Master password (can be managed externally)
 - `vpc_security_group_ids` - List of VPC security group IDs
 - `db_subnet_group_name` - Database subnet group name
@@ -146,6 +147,7 @@ The entity supports all major RDS database engines:
 - Engine: `postgres` or `postgresql`
 - Versions: 11, 12, 13, 14, 15
 - Default Port: 5432
+- **Database Creation**: Use `db_name` parameter to create initial database. If not specified, only the default `postgres` database exists.
 
 ### MariaDB
 - Engine: `mariadb`

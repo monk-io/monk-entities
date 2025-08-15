@@ -381,12 +381,27 @@ examples/rds-client/
    - Check RDS instance user permissions
    - Ensure database exists
 
-3. **Table Creation Errors**
+3. **PostgreSQL SSL Connection Error** (`no encryption`)
+   - **Cause**: AWS RDS PostgreSQL requires SSL connections by default
+   - **Error**: `no pg_hba.conf entry for host "x.x.x.x", user "postgres", database "mydatabase", no encryption`
+   - **Solution**: The client automatically configures SSL with `rejectUnauthorized: false` for RDS compatibility
+   - **Production**: For production, consider using proper SSL certificates and set `rejectUnauthorized: true`
+
+4. **PostgreSQL Database Not Found** (`database "mydatabase" does not exist`)
+   - **Cause**: RDS instance was created without `db_name` parameter, so only default `postgres` database exists
+   - **Error**: `database "mydatabase" does not exist`
+   - **Automatic Solution**: The client automatically creates the missing database by:
+     1. Connecting to the default `postgres` database
+     2. Creating the target database (`mydatabase`)
+     3. Reconnecting to the newly created database
+   - **Manual Solution**: Add `db_name: mydatabase` to your RDS instance configuration and recreate the instance
+
+5. **Table Creation Errors**
    - Verify user has CREATE permissions
    - Check database engine compatibility
    - Review SQL syntax for engine differences
 
-4. **Docker Issues**
+6. **Docker Issues**
    - Ensure proper environment variables
    - Check network connectivity from container
    - Verify image build completed successfully

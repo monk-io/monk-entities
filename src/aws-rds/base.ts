@@ -13,6 +13,7 @@ export interface AWSRDSDefinition {
     allocated_storage: number;
     engine_version?: string;
     port?: number;
+    db_name?: string;
     password_secret_ref?: string;
     vpc_security_group_ids?: string[];
     db_subnet_group_name?: string;
@@ -379,6 +380,58 @@ export abstract class AWSRDSEntity<
             } catch (error) {
                 if (attempt === maxAttempts - 1) {
                     throw error;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    protected waitForDBInstanceDeletion(dbInstanceIdentifier: string, maxAttempts: number = 40): boolean {
+        console.log(`Waiting for DB instance ${dbInstanceIdentifier} to be fully deleted...`);
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+                
+                // If instance doesn't exist, deletion is complete
+                if (!response) {
+                    console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
+                    return true;
+                }
+                
+                const status = response.DBInstance?.DBInstanceStatus;
+                console.log(`DB instance ${dbInstanceIdentifier} status: ${status} (attempt ${attempt + 1}/${maxAttempts})`);
+                
+                // If still deleting, continue waiting
+                if (status === 'deleting') {
+                    // Wait 30 seconds before next attempt
+                    const start = Date.now();
+                    while (Date.now() - start < 30000) {
+                        // Simple busy wait
+                    }
+                    continue;
+                }
+                
+                // If in any other state, something went wrong
+                throw new Error(`DB instance ${dbInstanceIdentifier} is in unexpected state: ${status}`);
+                
+            } catch (error) {
+                // If we get a "DBInstanceNotFound" error, that means deletion is complete
+                if (error instanceof Error && error.message.includes('DBInstanceNotFound')) {
+                    console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
+                    return true;
+                }
+                
+                // For other errors, only throw on final attempt
+                if (attempt === maxAttempts - 1) {
+                    throw new Error(`Failed to confirm DB instance deletion: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                }
+                
+                // Wait before retrying
+                const start = Date.now();
+                while (Date.now() - start < 30000) {
+                    // Simple busy wait
                 }
             }
         }

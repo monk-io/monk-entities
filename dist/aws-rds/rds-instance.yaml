@@ -20,6 +20,8 @@ rds-instance:
       type: string
     port:
       type: number
+    db_name:
+      type: string
     password_secret_ref:
       type: string
     vpc_security_group_ids:

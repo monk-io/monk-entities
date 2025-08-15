@@ -118,6 +118,9 @@ function buildCreateInstanceParams(definition, password, securityGroupIds) {
   } else {
     params.Port = getDefaultPort(normalizeEngine(definition.engine));
   }
+  if (definition.db_name) {
+    params.DBName = definition.db_name;
+  }
   if (securityGroupIds?.length) {
     params.VpcSecurityGroupIds = securityGroupIds;
   } else if (definition.vpc_security_group_ids?.length) {

@@ -108,6 +108,11 @@ export function buildCreateInstanceParams(definition: any, password: string, sec
         params.Port = getDefaultPort(normalizeEngine(definition.engine));
     }
     
+    // Add database name if specified
+    if (definition.db_name) {
+        params.DBName = definition.db_name;
+    }
+    
     // MasterUserPassword is now set as required above
     
     // Use provided security group IDs (from auto-creation) or definition

@@ -642,6 +642,39 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     }
     return false;
   }
+  waitForDBInstanceDeletion(dbInstanceIdentifier, maxAttempts = 40) {
+    console.log(`Waiting for DB instance ${dbInstanceIdentifier} to be fully deleted...`);
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+        if (!response) {
+          console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
+          return true;
+        }
+        const status = response.DBInstance?.DBInstanceStatus;
+        console.log(`DB instance ${dbInstanceIdentifier} status: ${status} (attempt ${attempt + 1}/${maxAttempts})`);
+        if (status === "deleting") {
+          const start = Date.now();
+          while (Date.now() - start < 3e4) {
+          }
+          continue;
+        }
+        throw new Error(`DB instance ${dbInstanceIdentifier} is in unexpected state: ${status}`);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("DBInstanceNotFound")) {
+          console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
+          return true;
+        }
+        if (attempt === maxAttempts - 1) {
+          throw new Error(`Failed to confirm DB instance deletion: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+        const start = Date.now();
+        while (Date.now() - start < 3e4) {
+        }
+      }
+    }
+    return false;
+  }
   // Security Group Management Methods
   updateSecurityGroupRules() {
     if (!this.state.created_security_group_id || this.state.created_security_group_existing) {

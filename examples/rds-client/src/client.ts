@@ -222,26 +222,95 @@ class PostgreSQLClient extends DatabaseClient {
     console.log(`   Host: ${this.config.host}:${this.config.port}`);
     console.log(`   Database: ${this.config.database}`);
     console.log(`   User: ${this.config.user}`);
+    console.log('   SSL: Required (AWS RDS default)');
+    
+    // For PostgreSQL, if the target database doesn't exist, we'll try to create it
+    // by first connecting to the default 'postgres' database
+    let targetDatabase = this.config.database;
+    let shouldCreateDatabase = false;
 
-    this.pool = new PostgreSQLPool({
-      host: this.config.host,
-      port: this.config.port,
-      user: this.config.user,
-      password: this.config.password,
-      database: this.config.database,
-      max: this.config.connectionLimit,
-      connectionTimeoutMillis: this.config.timeout,
-      idleTimeoutMillis: 30000
-    });
-
-    // Test connection
+    // First, try to connect to the target database
     try {
+      this.pool = new PostgreSQLPool({
+        host: this.config.host,
+        port: this.config.port,
+        user: this.config.user,
+        password: this.config.password,
+        database: targetDatabase,
+        max: this.config.connectionLimit,
+        connectionTimeoutMillis: this.config.timeout,
+        idleTimeoutMillis: 30000,
+        // AWS RDS requires SSL connections
+        ssl: {
+          rejectUnauthorized: false // For RDS, we accept the certificate
+        }
+      });
+
+      // Test connection to target database
       const client = await this.pool.connect();
-      console.log('✅ PostgreSQL connection established successfully');
+      console.log(`✅ PostgreSQL connection established successfully to database: ${targetDatabase}`);
       client.release();
-    } catch (error) {
-      console.error('❌ Failed to connect to PostgreSQL:', error);
-      throw error;
+      
+    } catch (error: any) {
+      // If database doesn't exist (error code 3D000), try to create it
+      if (error.code === '3D000' && targetDatabase !== 'postgres') {
+        console.log(`⚠️  Database '${targetDatabase}' doesn't exist. Attempting to create it...`);
+        shouldCreateDatabase = true;
+        
+        // Connect to default postgres database to create the target database
+        this.pool = new PostgreSQLPool({
+          host: this.config.host,
+          port: this.config.port,
+          user: this.config.user,
+          password: this.config.password,
+          database: 'postgres', // Connect to default database
+          max: this.config.connectionLimit,
+          connectionTimeoutMillis: this.config.timeout,
+          idleTimeoutMillis: 30000,
+          ssl: {
+            rejectUnauthorized: false
+          }
+        });
+
+        try {
+          const client = await this.pool.connect();
+          console.log('✅ Connected to default postgres database');
+          
+          // Create the target database
+          await client.query(`CREATE DATABASE "${targetDatabase}"`);
+          console.log(`✅ Database '${targetDatabase}' created successfully`);
+          client.release();
+          
+          // Close connection to postgres database
+          await this.pool.end();
+          
+          // Now connect to the newly created database
+          this.pool = new PostgreSQLPool({
+            host: this.config.host,
+            port: this.config.port,
+            user: this.config.user,
+            password: this.config.password,
+            database: targetDatabase,
+            max: this.config.connectionLimit,
+            connectionTimeoutMillis: this.config.timeout,
+            idleTimeoutMillis: 30000,
+            ssl: {
+              rejectUnauthorized: false
+            }
+          });
+          
+          const newClient = await this.pool.connect();
+          console.log(`✅ Connected to newly created database: ${targetDatabase}`);
+          newClient.release();
+          
+        } catch (createError) {
+          console.error('❌ Failed to create database:', createError);
+          throw createError;
+        }
+      } else {
+        console.error('❌ Failed to connect to PostgreSQL:', error);
+        throw error;
+      }
     }
   }
 

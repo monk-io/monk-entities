@@ -192,11 +192,23 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 const skipFinalSnapshot = this.definition.skip_final_snapshot ?? true;
                 const finalSnapshotId = this.definition.final_db_snapshot_identifier;
                 
+                // Initiate DB instance deletion
                 this.deleteDBInstance(dbInstanceIdentifier, skipFinalSnapshot, finalSnapshotId);
                 
-                // Reset state
+                // Wait for the DB instance to be fully deleted before cleaning up security group
+                // This prevents "DependencyViolation" errors when deleting the security group
+                console.log(`Waiting for DB instance ${dbInstanceIdentifier} deletion to complete before security group cleanup...`);
+                const deletionComplete = this.waitForDBInstanceDeletion(dbInstanceIdentifier, 40); // 40 attempts = ~20 minutes
+                
+                if (!deletionComplete) {
+                    console.log(`Warning: DB instance ${dbInstanceIdentifier} deletion did not complete within timeout. Security group cleanup may fail.`);
+                }
+                
+                // Reset state after successful deletion
                 this.state.existing = false;
-                this.state.db_instance_status = 'deleting';
+                this.state.db_instance_status = undefined;
+                this.state.db_instance_identifier = undefined;
+                
             } catch (error) {
                 throw new Error(`Failed to delete DB instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
@@ -206,7 +218,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             this.state.db_instance_status = undefined;
         }
         
-        // Clean up any security group we created
+        // Clean up any security group we created (now safe to do after DB instance is fully deleted)
         this.cleanupCreatedSecurityGroup();
     }
 

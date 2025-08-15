@@ -229,20 +229,7 @@ postgres-client:
   
   containers:
     client:
-      image: node:18-alpine
-      workdir: /app
-      bash: |
-        set -e
-        echo "🔧 Installing dependencies..."
-        npm install
-        
-        echo "🔨 Building TypeScript..."
-        npm run build
-        
-        echo "🚀 Starting PostgreSQL RDS Client..."
-        exec npm start
-      paths:
-        - .:/app
+      image: docker.io/imanachyn/rds-client:v1
       environment:
         - DB_ENGINE=postgresql
         - DB_CONNECTION_LIMIT=5
@@ -250,3 +237,20 @@ postgres-client:
         - OPERATION_INTERVAL_MS=10000
         - SAMPLE_TABLE_NAME=demo_users
         - SAMPLE_RECORDS_COUNT=5 
+
+postgres-access-list:
+  defines: aws-rds/rds-access-list
+  region: <- connection-target("db") entity get-member("region")
+  security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+  port: <- connection-target("db") entity-state get-member("endpoint_port")
+  allowed_security_group_names: <- runnable-peers("rds-client-demo/postgres-client")
+  connections:
+    db:
+      runnable: rds-client-demo/postgres-database
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - rds-client-demo/postgres-database
+        - rds-client-demo/postgres-client
+      timeout: 600
