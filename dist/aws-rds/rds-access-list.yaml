@@ -24,6 +24,11 @@ rds-access-list:
       - region
       - security_group_id
       - port
+  state-schema:
+    existing:
+      type: boolean
+    required:
+      - existing
   lifecycle:
     sync: <<< rds-access-list-sync.js
   requires:
