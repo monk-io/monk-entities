@@ -1,0 +1,2 @@
+REPO aws-cognito
+LOAD user-pool.yaml

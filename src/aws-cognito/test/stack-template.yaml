@@ -1,0 +1,114 @@
+namespace: cognito-test
+
+# Basic User Pool for testing
+test-user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: monk-test-user-pool
+  mfa_configuration: OFF
+  
+  # Simple configuration for testing
+  password_policy:
+    MinimumLength: 8
+    RequireUppercase: true
+    RequireLowercase: true
+    RequireNumbers: true
+    RequireSymbols: false
+    TemporaryPasswordValidityDays: 7
+
+  # Allow both admin and self-service registration
+  admin_create_user_config:
+    AllowAdminCreateUserOnly: false
+    UnusedAccountValidityDays: 7
+    InviteMessageAction: EMAIL
+
+  # Auto-verification
+  auto_verified_attributes:
+    - email
+  username_attributes:
+    - email
+
+  # Account recovery
+  account_recovery_setting:
+    RecoveryMechanisms:
+      - Priority: 1
+        Name: verified_email
+
+  # Tags
+  tags:
+    Environment: test
+    Purpose: integration-testing
+    CreatedBy: monk-entities
+
+# Advanced User Pool for comprehensive testing
+test-advanced-user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: monk-test-advanced-user-pool
+  mfa_configuration: ON
+  
+  # Custom attributes for testing
+  schema:
+    - Name: department
+      AttributeDataType: String
+      Required: false
+      Mutable: true
+      StringAttributeConstraints:
+        MinLength: "1"
+        MaxLength: "50"
+    - Name: employee_id
+      AttributeDataType: Number
+      Required: false
+      Mutable: false
+      NumberAttributeConstraints:
+        MinValue: "1"
+        MaxValue: "999999"
+
+  # Strong password policy
+  password_policy:
+    MinimumLength: 10
+    RequireUppercase: true
+    RequireLowercase: true
+    RequireNumbers: true
+    RequireSymbols: true
+    TemporaryPasswordValidityDays: 3
+
+  # Admin-only creation
+  admin_create_user_config:
+    AllowAdminCreateUserOnly: true
+    UnusedAccountValidityDays: 14
+    InviteMessageAction: EMAIL
+
+  # Device security
+  device_configuration:
+    ChallengeRequiredOnNewDevice: true
+    DeviceOnlyRememberedOnUserPrompt: false
+
+  # Multiple verification and sign-in methods
+  auto_verified_attributes:
+    - email
+  username_attributes:
+    - email
+  alias_attributes:
+    - preferred_username
+
+  # Account recovery
+  account_recovery_setting:
+    RecoveryMechanisms:
+      - Priority: 1
+        Name: verified_email
+
+  # Username configuration
+  username_configuration:
+    CaseSensitive: false
+
+  # Advanced security
+  user_pool_add_ons:
+    AdvancedSecurityMode: AUDIT
+
+  # Tags
+  tags:
+    Environment: test
+    Purpose: advanced-testing
+    SecurityLevel: high
+    CreatedBy: monk-entities

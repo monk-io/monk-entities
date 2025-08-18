@@ -1,0 +1,156 @@
+namespace: my-app
+
+# Basic User Pool for simple authentication
+basic-user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: my-app-users
+  mfa_configuration: OPTIONAL
+  auto_verified_attributes:
+    - email
+  username_attributes:
+    - email
+  tags:
+    Environment: production
+    Application: my-app
+
+# Advanced User Pool with comprehensive configuration
+advanced-user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: my-app-advanced-users
+  mfa_configuration: ON
+  
+  # Custom user attributes
+  schema:
+    - Name: department
+      AttributeDataType: String
+      Required: false
+      Mutable: true
+      StringAttributeConstraints:
+        MinLength: "1"
+        MaxLength: "50"
+    - Name: employee_id
+      AttributeDataType: Number
+      Required: true
+      Mutable: false
+      NumberAttributeConstraints:
+        MinValue: "1"
+        MaxValue: "999999"
+    - Name: hire_date
+      AttributeDataType: DateTime
+      Required: false
+      Mutable: true
+
+  # Strong password policy
+  password_policy:
+    MinimumLength: 12
+    RequireUppercase: true
+    RequireLowercase: true
+    RequireNumbers: true
+    RequireSymbols: true
+    TemporaryPasswordValidityDays: 3
+
+  # Admin-only user creation
+  admin_create_user_config:
+    AllowAdminCreateUserOnly: true
+    UnusedAccountValidityDays: 30
+    InviteMessageAction: EMAIL
+    TemporaryPasswordValidityDays: 7
+
+  # Device security
+  device_configuration:
+    ChallengeRequiredOnNewDevice: true
+    DeviceOnlyRememberedOnUserPrompt: true
+
+  # Email configuration using SES
+  email_configuration:
+    EmailSendingAccount: DEVELOPER
+    SourceArn: arn:aws:ses:us-east-1:123456789012:identity/noreply@myapp.com
+    ReplyToEmailAddress: support@myapp.com
+    From: MyApp <noreply@myapp.com>
+
+  # Auto-verification and sign-in options
+  auto_verified_attributes:
+    - email
+    - phone_number
+  username_attributes:
+    - email
+    - phone_number
+  alias_attributes:
+    - preferred_username
+
+  # Custom verification messages
+  verification_message_template:
+    EmailSubject: "Verify your MyApp account"
+    EmailMessage: "Please verify your account by clicking this link: {##Verify Email##}"
+    DefaultEmailOption: "CONFIRM_WITH_LINK"
+
+  # Account recovery options
+  account_recovery_setting:
+    RecoveryMechanisms:
+      - Priority: 1
+        Name: verified_email
+      - Priority: 2
+        Name: verified_phone_number
+
+  # Username case sensitivity
+  username_configuration:
+    CaseSensitive: false
+
+  # Advanced security features
+  user_pool_add_ons:
+    AdvancedSecurityMode: ENFORCED
+
+  # Attribute update verification
+  user_attribute_update_settings:
+    AttributesRequireVerificationBeforeUpdate:
+      - email
+      - phone_number
+
+  # Tags
+  tags:
+    Environment: production
+    Application: my-app
+    SecurityLevel: high
+    Team: backend
+
+# Development User Pool with relaxed settings
+dev-user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: my-app-dev-users
+  mfa_configuration: OFF
+  
+  # Simple password policy for development
+  password_policy:
+    MinimumLength: 8
+    RequireUppercase: false
+    RequireLowercase: true
+    RequireNumbers: true
+    RequireSymbols: false
+    TemporaryPasswordValidityDays: 7
+
+  # Allow self-registration
+  admin_create_user_config:
+    AllowAdminCreateUserOnly: false
+    UnusedAccountValidityDays: 7
+    InviteMessageAction: EMAIL
+
+  # Auto-verification
+  auto_verified_attributes:
+    - email
+  username_attributes:
+    - email
+
+  # Simple account recovery
+  account_recovery_setting:
+    RecoveryMechanisms:
+      - Priority: 1
+        Name: verified_email
+
+  # Tags
+  tags:
+    Environment: development
+    Application: my-app
+    SecurityLevel: low

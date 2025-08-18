@@ -1,0 +1,3 @@
+REPO aws-cognito
+LOAD cognito-base.yaml base.yaml user-pool.yaml common.yaml
+RESOURCES common.js cognito-base.js user-pool-sync.js base.js
