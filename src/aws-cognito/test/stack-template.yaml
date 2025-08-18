@@ -1,5 +1,17 @@
 namespace: cognito-test
 
+# Basic Identity Pool for testing
+test-identity-pool:
+  defines: aws-cognito/identity-pool
+  region: us-east-1
+  identity_pool_name: monk-test-identity-pool
+  allow_unauthenticated_identities: true
+  allow_classic_flow: false
+  identity_pool_tags:
+    Environment: test
+    Purpose: integration-testing
+    CreatedBy: monk-entities
+
 # Basic User Pool for testing
 test-user-pool:
   defines: aws-cognito/user-pool

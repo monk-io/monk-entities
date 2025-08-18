@@ -1,5 +1,46 @@
 namespace: my-app
 
+# Basic Identity Pool for AWS credentials access
+basic-identity-pool:
+  defines: aws-cognito/identity-pool
+  region: us-east-1
+  identity_pool_name: my-app-identity-pool
+  allow_unauthenticated_identities: false
+  identity_pool_tags:
+    Environment: production
+    Application: my-app
+
+# Advanced Identity Pool with multiple login providers
+advanced-identity-pool:
+  defines: aws-cognito/identity-pool
+  region: us-east-1
+  identity_pool_name: my-app-advanced-identity-pool
+  allow_unauthenticated_identities: true
+  allow_classic_flow: false
+  
+  # Cognito User Pool authentication
+  cognito_identity_providers:
+    - ProviderName: cognito-idp.us-east-1.amazonaws.com/us-east-1_example
+      ClientId: your-user-pool-client-id
+      ServerSideTokenCheck: true
+  
+  # Social login providers
+  supported_login_providers:
+    accounts.google.com: your-google-client-id
+    www.amazon.com: your-amazon-client-id
+    graph.facebook.com: your-facebook-app-id
+  
+  # SAML and OpenID Connect providers
+  saml_providers:
+    - arn:aws:iam::123456789012:saml-provider/ExampleProvider
+  openid_connect_provider_arns:
+    - arn:aws:iam::123456789012:oidc-provider/example.com
+  
+  identity_pool_tags:
+    Environment: production
+    Application: my-app
+    AuthType: federated
+
 # Basic User Pool for simple authentication
 basic-user-pool:
   defines: aws-cognito/user-pool

@@ -1,2 +1,3 @@
 REPO aws-cognito
 LOAD user-pool.yaml
+LOAD identity-pool.yaml
