@@ -1,0 +1,93 @@
+# AWS RDS Access Management Examples
+# This file demonstrates how to use the RDS Access entity to manage
+# security group access rules for RDS instances
+
+---
+# Basic example: Managing access to an RDS instance security group
+basic-rds-access:
+  defines: aws-rds/access
+  region: us-east-1
+  security_group_id: sg-12345678
+  port: 3306
+  allowed_cidr_blocks:
+    - "10.0.0.0/16"
+    - "192.168.1.0/24"
+  allowed_security_group_names:
+    - "web-servers-sg"
+    - "app-servers-sg"
+
+---
+# PostgreSQL example: Managing access for a PostgreSQL RDS instance
+postgres-rds-access:
+  defines: aws-rds/access
+  region: us-west-2
+  security_group_id: sg-87654321
+  port: 5432
+  vpc_id: vpc-abcdef12
+  allowed_cidr_blocks:
+    - "10.1.0.0/16"
+  allowed_security_group_names:
+    - "application-tier-sg"
+
+---
+# Restrictive access: Only specific security groups
+restrictive-rds-access:
+  defines: aws-rds/access
+  region: eu-west-1
+  security_group_id: sg-abcdef12
+  port: 3306
+  allowed_security_group_names:
+    - "backend-services-sg"
+    - "admin-access-sg"
+  # No allowed_cidr_blocks = no direct IP access
+
+---
+# Development environment: Open access for development
+dev-rds-access:
+  defines: aws-rds/access
+  region: us-east-1
+  security_group_id: sg-dev123456
+  port: 3306
+  allowed_cidr_blocks:
+    - "0.0.0.0/0"  # WARNING: Only for development!
+  # Note: This is not recommended for production
+
+---
+# Complete example with RDS instance and access management
+# This shows how to use both entities together
+complete-example:
+  defines: process-group
+  runnable-list:
+    - mysql-database
+    - database-access
+
+mysql-database:
+  defines: aws-rds/instance
+  region: us-east-1
+  db_instance_identifier: my-mysql-db
+  db_instance_class: db.t3.micro
+  engine: mysql
+  engine_version: "8.0"
+  master_username: admin
+  allocated_storage: 20
+  password_secret_ref: mysql-db-password
+  auto_create_security_group: true
+  security_group_name: my-mysql-sg
+  allowed_cidr_blocks:
+    - "10.0.0.0/16"
+  allowed_security_group_names:
+    - "web-tier-sg"
+
+database-access:
+  defines: aws-rds/access
+  region: us-east-1
+  # This would reference the security group created by the RDS instance
+  # In practice, you'd get this from the RDS instance state or use a known security group ID
+  security_group_id: sg-mysql-instance
+  port: 3306
+  allowed_cidr_blocks:
+    - "10.0.0.0/16"
+    - "192.168.0.0/16"  # Additional access beyond the RDS instance
+  allowed_security_group_names:
+    - "web-tier-sg"
+    - "admin-sg"        # Additional security group access

@@ -5,7 +5,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -27,16 +26,22 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// input/aws-rds/base.ts
-var base_exports = {};
-__export(base_exports, {
-  AWSRDSEntity: () => AWSRDSEntity
+// input/aws-rds/securityGroup.ts
+var security_group_exports = {};
+__export(security_group_exports, {
+  authorizeSecurityGroupIngress: () => authorizeSecurityGroupIngress,
+  checkSecurityGroupExists: () => checkSecurityGroupExists,
+  createSecurityGroup: () => createSecurityGroup,
+  deleteSecurityGroup: () => deleteSecurityGroup,
+  findSecurityGroupByName: () => findSecurityGroupByName,
+  getCurrentSecurityGroupRules: () => getCurrentSecurityGroupRules,
+  getDefaultVpc: () => getDefaultVpc,
+  resolveSecurityGroupNames: () => resolveSecurityGroupNames,
+  revokeSecurityGroupIngress: () => revokeSecurityGroupIngress,
+  updateSecurityGroupRules: () => updateSecurityGroupRules
 });
-module.exports = __toCommonJS(base_exports);
-var import_base = require("monkec/base");
-var import_aws2 = __toESM(require("cloud/aws"));
+module.exports = __toCommonJS(security_group_exports);
 
 // input/aws-rds/common.ts
 var import_aws = __toESM(require("cloud/aws"));
@@ -530,248 +535,16 @@ function deleteSecurityGroup(region, groupId) {
     GroupId: groupId
   });
 }
-
-// input/aws-rds/base.ts
-var import_cli2 = __toESM(require("cli"));
-var AWSRDSEntity = class extends import_base.MonkEntity {
-  constructor() {
-    super(...arguments);
-    __publicField(this, "region");
-  }
-  before() {
-    this.region = this.definition.region;
-  }
-  makeRDSRequest(action, params = {}) {
-    const url = `https://rds.${this.region}.amazonaws.com/`;
-    const formParams = {
-      "Action": action,
-      "Version": "2014-10-31"
-    };
-    addParamsToFormData(formParams, params);
-    const formBody = Object.entries(formParams).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
-    const response = import_aws2.default.post(url, {
-      service: "rds",
-      region: this.region,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: formBody
-    });
-    if (response.statusCode >= 400) {
-      let errorMessage = `AWS RDS API error: ${response.statusCode} ${response.status}`;
-      try {
-        const errorMatch = /<Message>(.*?)<\/Message>/.exec(response.body);
-        if (errorMatch) {
-          errorMessage += ` - ${errorMatch[1]}`;
-        }
-        const codeMatch = /<Code>(.*?)<\/Code>/.exec(response.body);
-        if (codeMatch) {
-          errorMessage += ` (${codeMatch[1]})`;
-        }
-      } catch (_parseError) {
-        errorMessage += ` - Raw: ${response.body}`;
-      }
-      throw new Error(errorMessage);
-    }
-    return this.parseRDSResponse(response.body);
-  }
-  parseRDSResponse(xmlBody) {
-    const dbInstance = {};
-    const identifierMatch = /<DBInstanceIdentifier>(.*?)<\/DBInstanceIdentifier>/.exec(xmlBody);
-    if (identifierMatch) dbInstance.DBInstanceIdentifier = identifierMatch[1];
-    const classMatch = /<DBInstanceClass>(.*?)<\/DBInstanceClass>/.exec(xmlBody);
-    if (classMatch) dbInstance.DBInstanceClass = classMatch[1];
-    const engineMatch = /<Engine>(.*?)<\/Engine>/.exec(xmlBody);
-    if (engineMatch) dbInstance.Engine = engineMatch[1];
-    const statusMatch = /<DBInstanceStatus>(.*?)<\/DBInstanceStatus>/.exec(xmlBody);
-    if (statusMatch) {
-      dbInstance.DBInstanceStatus = statusMatch[1];
-    }
-    const usernameMatch = /<MasterUsername>(.*?)<\/MasterUsername>/.exec(xmlBody);
-    if (usernameMatch) dbInstance.MasterUsername = usernameMatch[1];
-    const storageMatch = /<AllocatedStorage>(.*?)<\/AllocatedStorage>/.exec(xmlBody);
-    if (storageMatch) dbInstance.AllocatedStorage = parseInt(storageMatch[1]);
-    const engineVersionMatch = /<EngineVersion>(.*?)<\/EngineVersion>/.exec(xmlBody);
-    if (engineVersionMatch) dbInstance.EngineVersion = engineVersionMatch[1];
-    const createTimeMatch = /<InstanceCreateTime>(.*?)<\/InstanceCreateTime>/.exec(xmlBody);
-    if (createTimeMatch) dbInstance.InstanceCreateTime = createTimeMatch[1];
-    const arnMatch = /<DBInstanceArn>(.*?)<\/DBInstanceArn>/.exec(xmlBody);
-    if (arnMatch) dbInstance.DBInstanceArn = arnMatch[1];
-    const endpointAddressMatch = /<Address>(.*?)<\/Address>/.exec(xmlBody);
-    const endpointPortMatch = /<Port>(.*?)<\/Port>/.exec(xmlBody);
-    if (endpointAddressMatch || endpointPortMatch) {
-      dbInstance.Endpoint = {};
-      if (endpointAddressMatch) dbInstance.Endpoint.Address = endpointAddressMatch[1];
-      if (endpointPortMatch) dbInstance.Endpoint.Port = parseInt(endpointPortMatch[1]);
-    }
-    return { DBInstance: dbInstance };
-  }
-  checkDBInstanceExists(dbInstanceIdentifier) {
-    try {
-      return this.makeRDSRequest("DescribeDBInstances", {
-        DBInstanceIdentifier: dbInstanceIdentifier
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("DBInstanceNotFound")) {
-        return null;
-      }
-      throw error;
-    }
-  }
-  createDBInstance(params) {
-    return this.makeRDSRequest("CreateDBInstance", params);
-  }
-  modifyDBInstance(dbInstanceIdentifier, params) {
-    return this.makeRDSRequest("ModifyDBInstance", {
-      DBInstanceIdentifier: dbInstanceIdentifier,
-      ...params
-    });
-  }
-  deleteDBInstance(dbInstanceIdentifier, skipFinalSnapshot = true, finalSnapshotId) {
-    const params = {
-      DBInstanceIdentifier: dbInstanceIdentifier,
-      SkipFinalSnapshot: skipFinalSnapshot
-    };
-    if (!skipFinalSnapshot && finalSnapshotId) {
-      params.FinalDBSnapshotIdentifier = finalSnapshotId;
-    }
-    this.makeRDSRequest("DeleteDBInstance", params);
-  }
-  waitForDBInstanceState(dbInstanceIdentifier, targetState, maxAttempts = 60) {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = this.checkDBInstanceExists(dbInstanceIdentifier);
-        if (response?.DBInstance?.DBInstanceStatus === targetState) {
-          return true;
-        }
-        if (response?.DBInstance?.DBInstanceStatus === "failed") {
-          throw new Error(`DB instance ${dbInstanceIdentifier} is in failed state`);
-        }
-        const start = Date.now();
-        while (Date.now() - start < 3e4) {
-        }
-      } catch (error) {
-        if (attempt === maxAttempts - 1) {
-          throw error;
-        }
-      }
-    }
-    return false;
-  }
-  waitForDBInstanceDeletion(dbInstanceIdentifier, maxAttempts = 40) {
-    console.log(`Waiting for DB instance ${dbInstanceIdentifier} to be fully deleted...`);
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = this.checkDBInstanceExists(dbInstanceIdentifier);
-        if (!response) {
-          console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
-          return true;
-        }
-        const status = response.DBInstance?.DBInstanceStatus;
-        console.log(`DB instance ${dbInstanceIdentifier} status: ${status} (attempt ${attempt + 1}/${maxAttempts})`);
-        if (status === "deleting") {
-          const start = Date.now();
-          while (Date.now() - start < 3e4) {
-          }
-          continue;
-        }
-        throw new Error(`DB instance ${dbInstanceIdentifier} is in unexpected state: ${status}`);
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("DBInstanceNotFound")) {
-          console.log(`DB instance ${dbInstanceIdentifier} has been successfully deleted`);
-          return true;
-        }
-        if (attempt === maxAttempts - 1) {
-          throw new Error(`Failed to confirm DB instance deletion: ${error instanceof Error ? error.message : "Unknown error"}`);
-        }
-        const start = Date.now();
-        while (Date.now() - start < 3e4) {
-        }
-      }
-    }
-    return false;
-  }
-  // Security Group Management Methods
-  updateSecurityGroupRules() {
-    if (!this.state.created_security_group_id || this.state.created_security_group_existing) {
-      return;
-    }
-    const groupId = this.state.created_security_group_id;
-    const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
-    const allowedCidrs = this.definition.allowed_cidr_blocks || [];
-    const allowedSgNames = this.definition.allowed_security_group_names || [];
-    const vpcId = this.definition.vpc_id;
-    updateSecurityGroupRules(this.region, groupId, port, [...allowedCidrs], [...allowedSgNames], vpcId);
-  }
-  getOrCreateSecurityGroup() {
-    if (this.definition.vpc_security_group_ids?.length) {
-      return [...this.definition.vpc_security_group_ids];
-    }
-    if (this.definition.auto_create_security_group === false) {
-      return [];
-    }
-    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
-    const groupName = this.definition.security_group_name || `${dbInstanceIdentifier}-sg`;
-    const description = this.definition.security_group_description || `Security group for RDS instance ${dbInstanceIdentifier}`;
-    const port = this.definition.port || this.getDefaultPortForEngine(this.definition.engine);
-    const allowedCidrs = this.definition.allowed_cidr_blocks || [];
-    const allowedSgNames = this.definition.allowed_security_group_names || [];
-    if (this.state.created_security_group_id) {
-      if (checkSecurityGroupExists(this.region, this.state.created_security_group_id)) {
-        return [this.state.created_security_group_id];
-      } else {
-        this.state.created_security_group_id = void 0;
-        this.state.created_security_group_existing = false;
-      }
-    }
-    try {
-      const vpcId = this.definition.vpc_id;
-      let groupId = findSecurityGroupByName(this.region, groupName, vpcId);
-      let isExisting = false;
-      if (groupId) {
-        isExisting = true;
-      } else {
-        groupId = createSecurityGroup(this.region, groupName, description, vpcId);
-      }
-      const allowedSgIds = allowedSgNames.length > 0 ? resolveSecurityGroupNames(this.region, [...allowedSgNames], vpcId) : [];
-      if (!isExisting && (allowedCidrs.length > 0 || allowedSgIds.length > 0)) {
-        authorizeSecurityGroupIngress(this.region, groupId, "tcp", port, port, [...allowedCidrs], allowedSgIds);
-      }
-      this.state.created_security_group_id = groupId;
-      this.state.created_security_group_existing = isExisting;
-      return [groupId];
-    } catch (error) {
-      throw new Error(`Failed to create or find security group: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  }
-  cleanupCreatedSecurityGroup() {
-    if (this.state.created_security_group_id && !this.state.created_security_group_existing) {
-      try {
-        import_cli2.default.output(`Deleting created security group: ${this.state.created_security_group_id}`);
-        deleteSecurityGroup(this.region, this.state.created_security_group_id);
-        this.state.created_security_group_id = void 0;
-        this.state.created_security_group_existing = false;
-      } catch (error) {
-        import_cli2.default.output(`Warning: Could not delete security group ${this.state.created_security_group_id}: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
-    }
-  }
-  getDefaultPortForEngine(engine) {
-    const portMap = {
-      "mysql": 3306,
-      "postgres": 5432,
-      "mariadb": 3306,
-      "oracle-ee": 1521,
-      "oracle-se2": 1521,
-      "sqlserver-ex": 1433,
-      "sqlserver-web": 1433,
-      "sqlserver-se": 1433,
-      "sqlserver-ee": 1433
-    };
-    return portMap[engine.toLowerCase()] || 3306;
-  }
-};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  AWSRDSEntity
+  authorizeSecurityGroupIngress,
+  checkSecurityGroupExists,
+  createSecurityGroup,
+  deleteSecurityGroup,
+  findSecurityGroupByName,
+  getCurrentSecurityGroupRules,
+  getDefaultVpc,
+  resolveSecurityGroupNames,
+  revokeSecurityGroupIngress,
+  updateSecurityGroupRules
 });

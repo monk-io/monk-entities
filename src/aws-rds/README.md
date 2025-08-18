@@ -116,6 +116,7 @@ my-postgres-db:
 
 - `engine_version` - Specific engine version (defaults to latest)
 - `port` - Database port (defaults based on engine)
+- `db_name` - Name of the database to create (PostgreSQL/MySQL only)
 - `master_user_password` - Master password (can be managed externally)
 - `vpc_security_group_ids` - List of VPC security group IDs
 - `db_subnet_group_name` - Database subnet group name
@@ -146,6 +147,7 @@ The entity supports all major RDS database engines:
 - Engine: `postgres` or `postgresql`
 - Versions: 11, 12, 13, 14, 15
 - Default Port: 5432
+- **Database Creation**: Use `db_name` parameter to create initial database. If not specified, only the default `postgres` database exists.
 
 ### MariaDB
 - Engine: `mariadb`
@@ -354,9 +356,11 @@ security_group_description: "Custom description for auto-created security group"
 vpc_id: vpc-0123456789abcdef0  # Optional: specify VPC (uses default VPC if not provided)
 
 # Security access control (at least one must be specified)
+# IP addresses are automatically converted to CIDR notation (e.g., "192.168.1.1" -> "192.168.1.1/32")
 allowed_cidr_blocks:           # Optional: allow access from specific IP ranges
-  - "10.0.0.0/16"             # VPC CIDR
-  - "192.168.1.0/24"          # Office network
+  - "10.0.0.0/16"             # VPC CIDR (already in CIDR format)
+  - "192.168.1.0/24"          # Office network (already in CIDR format)
+  - "203.0.113.5"             # Single IP (automatically converted to 203.0.113.5/32)
 
 allowed_security_group_names:  # Optional: allow access from specific security groups
   - "app-servers-sg"          # Application servers
@@ -510,6 +514,16 @@ The entity provides comprehensive error handling:
 - **Validation Errors**: Input validation with helpful error messages
 - **Timeout Handling**: Proper timeout management for long-running operations
 - **State Management**: Robust state tracking and recovery
+
+### Common Issues
+
+**CIDR Block Format Error**
+```
+Error: AWS EC2 API error: CIDR block x.x.x.x is malformed (InvalidParameterValue)
+```
+- **Cause**: Single IP addresses need to be in CIDR notation for AWS security groups
+- **Solution**: The entity automatically converts single IPs (e.g., `192.168.1.1`) to CIDR format (`192.168.1.1/32`)
+- **Manual Fix**: Add `/32` to single IP addresses in your configuration
 
 ## Best Practices
 

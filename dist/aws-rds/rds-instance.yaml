@@ -28,9 +28,11 @@ rds-instance:
     port:
       type: number
       description: Database port
-    password_secret_ref:
+    db_name:
       type: string
       description: Secret reference to store/retrieve the master password
+    password_secret_ref:
+      type: string
     vpc_security_group_ids:
       type: array
       items:
@@ -110,42 +112,6 @@ rds-instance:
       - engine
       - master_username
       - allocated_storage
-  state-schema:
-    existing:
-      type: boolean
-      description: Indicates if the instance pre-existed before this entity managed it
-    db_instance_identifier:
-      type: string
-      description: DB instance identifier
-    db_instance_arn:
-      type: string
-      description: DB instance ARN
-    db_instance_status:
-      type: string
-      description: 'Current DB instance status (e.g., available)'
-    endpoint_address:
-      type: string
-      description: Endpoint address
-    endpoint_port:
-      type: number
-      description: Endpoint port
-    allocated_storage:
-      type: number
-      description: Allocated storage in GB
-    creation_time:
-      type: string
-      description: Instance creation timestamp
-    last_modified:
-      type: string
-      description: Last modified timestamp
-    created_security_group_id:
-      type: string
-      description: ID of the auto-created security group (if any)
-    created_security_group_existing:
-      type: boolean
-      description: Whether the used security group pre-existed
-    required:
-      - existing
   lifecycle:
     sync: <<< rds-instance-sync.js
     get-instance-info: ''

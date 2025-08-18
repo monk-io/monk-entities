@@ -1,0 +1,32 @@
+namespace: aws-rds
+rds-access-list:
+  defines: entity
+  metadata:
+    name: RDSAccessList
+  schema:
+    region:
+      type: string
+    security_group_id:
+      type: string
+    port:
+      type: number
+    allowed_cidr_blocks:
+      type: array
+      items:
+        type: string
+    allowed_security_group_names:
+      type: array
+      items:
+        type: string
+    vpc_id:
+      type: string
+    required:
+      - region
+      - security_group_id
+      - port
+  lifecycle:
+    sync: <<< rds-access-list-sync.js
+  requires:
+    - monkec/base
+    - aws-rds/security-group
+    - cli

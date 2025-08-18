@@ -177,8 +177,14 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
         const skipFinalSnapshot = this.definition.skip_final_snapshot ?? true;
         const finalSnapshotId = this.definition.final_db_snapshot_identifier;
         this.deleteDBInstance(dbInstanceIdentifier, skipFinalSnapshot, finalSnapshotId);
+        console.log(`Waiting for DB instance ${dbInstanceIdentifier} deletion to complete before security group cleanup...`);
+        const deletionComplete = this.waitForDBInstanceDeletion(dbInstanceIdentifier, 40);
+        if (!deletionComplete) {
+          console.log(`Warning: DB instance ${dbInstanceIdentifier} deletion did not complete within timeout. Security group cleanup may fail.`);
+        }
         this.state.existing = false;
-        this.state.db_instance_status = "deleting";
+        this.state.db_instance_status = void 0;
+        this.state.db_instance_identifier = void 0;
       } catch (error) {
         throw new Error(`Failed to delete DB instance ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
