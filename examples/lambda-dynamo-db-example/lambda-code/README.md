@@ -35,17 +35,24 @@ API Gateway/Client → Lambda Function → DynamoDB Table
 
 ### Deploy with Monk
 
-1. **Deploy the complete stack:**
+1. **Build image:**
+  ```bash
+  docker buildx build --platform linux/amd64 --provenance=false -t 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-dynamo-db:latest .
+
+  docker push 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-dynamo-db:latest
+  ```
+
+2. **Deploy the complete stack:**
    ```bash
    monk run lambda-dynamo-example/example-stack
    ```
 
-2. **Check deployment status:**
+3. **Check deployment status:**
    ```bash
    monk describe lambda-dynamo-example/lambda-dynamo-function
    ```
 
-3. **Test the Lambda function:**
+4. **Test the Lambda function:**
    ```bash
    
    # Invoke the function directly

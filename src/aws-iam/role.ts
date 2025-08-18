@@ -2,19 +2,30 @@ import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
 
 // IAM Role specific interfaces
 export interface IAMRoleDefinition extends AWSIAMDefinition {
+    /** @description IAM role name */
     role_name: string;
+    /** @description Trust policy document allowing principals to assume this role */
     assume_role_policy_document: any; // JSON object representing the trust policy
+    /** @description Optional path for the role (defaults to "/") */
     path?: string;
+    /** @description Human-readable description for the role */
     role_description?: string;
+    /** @description Session duration in seconds (3600-43200) */
     max_session_duration?: number; // Session duration in seconds (3600-43200)
+    /** @description Resource tags for the role */
     tags?: Record<string, string>;
+    /** @description List of managed policy ARNs to attach to the role */
     attached_policies?: string[]; // Array of policy ARNs to attach to the role
 }
 
 export interface IAMRoleState extends AWSIAMState {
+    /** @description Role ARN */
     role_arn?: string;
+    /** @description Role ID */
     role_id?: string;
+    /** @description Creation timestamp */
     create_date?: string;
+    /** @description Whether role pre-existed before this entity managed it */
     existing?: boolean;
 }
 

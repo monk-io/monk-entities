@@ -3,19 +3,30 @@ import cli from "cli";
 
 // IAM Policy specific interfaces
 export interface IAMPolicyDefinition extends AWSIAMDefinition {
+    /** @description IAM policy name */
     policy_name: string;
+    /** @description Policy document (JSON object or string) */
     policy_document: any; // JSON object representing the policy
+    /** @description Optional path for the policy (defaults to "/") */
     path?: string;
+    /** @description Human-readable description for the policy */
     policy_description?: string;
+    /** @description Resource tags for the policy */
     tags?: Record<string, string>;
 }
 
 export interface IAMPolicyState extends AWSIAMState {
+    /** @description Policy ARN */
     policy_arn?: string;
+    /** @description Policy ID */
     policy_id?: string;
+    /** @description Default version identifier */
     default_version_id?: string;
+    /** @description Number of attachments to principals */
     attachment_count?: number;
+    /** @description Creation timestamp */
     create_date?: string;
+    /** @description Last update timestamp */
     update_date?: string;
 }
 

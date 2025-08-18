@@ -6,22 +6,40 @@ lambda-function:
   schema:
     region:
       type: string
+      description: AWS region where the Lambda function will be managed
     blob_name:
       type: string
+      description: >-
+        Name of the blob that contains the ZIP archive for code deployments
+        (used when `package_type` is Zip)
+    image_uri:
+      type: string
+      description: >-
+        ECR image URI for container image deployments (used when `package_type`
+        is Image)
     function_name:
       type: string
+      description: Lambda function name
     runtime:
       type: string
+      description: 'Lambda runtime (e.g., nodejs20.x). Optional for container images'
     role:
       type: string
+      description: IAM role ARN assumed by the Lambda function
     handler:
       type: string
+      description: 'Handler entrypoint (e.g., index.handler). Optional for container images'
     summary:
       type: string
+      description: Human-readable description for the function
     timeout:
       type: number
+      description: Function timeout in seconds
+      default: 3
     memory_size:
       type: number
+      description: Memory size in MB
+      default: 128
     environment:
       type: object
       properties:
@@ -29,29 +47,40 @@ lambda-function:
           type: object
           additionalProperties:
             type: string
+            description: Key/value environment variables
+          description: Key/value environment variables
       additionalProperties: false
+      description: Environment variables
     dead_letter_config:
       type: object
       properties:
         target_arn:
           type: string
+          description: Target ARN for dead-letter messages
       additionalProperties: false
+      description: Dead-letter queue configuration
     kms_key_arn:
       type: string
+      description: KMS key ARN for encrypting environment variables
     tracing_config:
       type: object
       properties:
         mode:
           type: string
+          description: 'Tracing mode (e.g., Active, PassThrough)'
       additionalProperties: false
+      description: AWS X-Ray tracing configuration
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags to apply to the function
+      description: Resource tags to apply to the function
     layers:
       type: array
       items:
         type: string
+      description: Layer ARNs to attach
     file_system_configs:
       type: array
       items:
@@ -59,12 +88,15 @@ lambda-function:
         properties:
           arn:
             type: string
+            description: EFS Access Point ARN
           local_mount_path:
             type: string
+            description: Local mount path inside the Lambda environment
         required:
           - arn
           - local_mount_path
         additionalProperties: false
+      description: EFS file system configurations
     image_config:
       type: object
       properties:
@@ -72,54 +104,119 @@ lambda-function:
           type: array
           items:
             type: string
+          description: Container entry point
         command:
           type: array
           items:
             type: string
+          description: Container command
         working_directory:
           type: string
+          description: Working directory inside the container
       additionalProperties: false
+      description: Container image runtime configuration overrides
     code_signing_config_arn:
       type: string
+      description: Code signing configuration ARN
     architectures:
       type: array
       items:
         type: string
+      description: 'Instruction set architectures (e.g., x86_64, arm64)'
     ephemeral_storage:
       type: object
       properties:
         size:
           type: number
+          description: Size in MB for /tmp storage
       additionalProperties: false
+      description: Ephemeral /tmp storage configuration
     snap_start:
       type: object
       properties:
         apply_on:
           type: string
+          description: Apply SnapStart on PublishedVersions or None
       additionalProperties: false
+      description: SnapStart configuration
     logging_config:
       type: object
       properties:
         log_format:
           type: string
+          description: 'Log format (e.g., JSON)'
         application_log_level:
           type: string
+          description: Application log level
         system_log_level:
           type: string
+          description: System log level
         log_group:
           type: string
+          description: CloudWatch Logs group name
       additionalProperties: false
+      description: Logging configuration
     package_type:
       type: string
+      description: Deployment package type (Zip or Image)
+      default: Zip
     publish:
       type: boolean
+      description: Whether to publish a new version on create/update
+      default: false
     required:
       - region
-      - blob_name
       - function_name
-      - runtime
       - role
-      - handler
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the function pre-existed before this entity managed it
+    function_name:
+      type: string
+      description: Lambda function name
+    function_arn:
+      type: string
+      description: ARN of the Lambda function
+    code_sha256:
+      type: string
+      description: SHA-256 hash of the currently deployed code
+    last_modified:
+      type: string
+      description: Timestamp of the last modification (ISO 8601)
+    state:
+      type: string
+      description: 'Current function lifecycle state (e.g., Active)'
+    state_reason:
+      type: string
+      description: 'Reason for the current state, if any'
+    runtime:
+      type: string
+      description: Effective runtime
+    role:
+      type: string
+      description: Role ARN bound to the function
+    handler:
+      type: string
+      description: Handler entrypoint
+    timeout:
+      type: number
+      description: Effective timeout in seconds
+    memory_size:
+      type: number
+      description: Effective memory size in MB
+    code_size:
+      type: number
+      description: Deployed code size in bytes
+    version:
+      type: string
+      description: Published function version
+    last_update_status:
+      type: string
+      description: Status of the last update operation
+    revision_id:
+      type: string
+      description: Revision identifier
   lifecycle:
     sync: <<< lambda-function-sync.js
     invoke: ''

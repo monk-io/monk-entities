@@ -158,6 +158,48 @@ lambda-dynamo-function:
         - lambda-dynamo-example/users-table
       timeout: 300
 
+lambda-dynamo-container-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  image_uri: 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-dynamo-db:latest
+  function_name: lambda-dynamo-container-function
+  package_type: Image
+  role: <- connection-target("role") entity-state get-member("role_arn")
+  summary: "Lambda function demonstrating DynamoDB CRUD operations"
+  timeout: 30
+  memory_size: 256
+  
+  # Environment variables for DynamoDB integration
+  environment:
+    variables:
+      DYNAMODB_TABLE_NAME: <- connection-target("table") entity-state get-member("table_name")
+      NODE_ENV: "production"
+      LOG_LEVEL: "info"
+  
+  tags:
+    Owner: lambda-dynamo-example
+    Service: lambda
+    Integration: dynamodb
+    
+  services:
+    function:
+      protocol: custom
+      
+  connections:
+    role:
+      runnable: lambda-dynamo-example/lambda-execution-role
+      service: role
+    table:
+      runnable: lambda-dynamo-example/users-table
+      service: table
+      
+  depends:
+    wait-for:
+      runnables:
+        - lambda-dynamo-example/lambda-execution-role
+        - lambda-dynamo-example/users-table
+      timeout: 300
+
 # Complete example stack
 example-stack:
   defines: process-group
@@ -165,4 +207,5 @@ example-stack:
     - lambda-dynamo-example/users-table
     - lambda-dynamo-example/lambda-dynamodb-policy
     - lambda-dynamo-example/lambda-execution-role
-    - lambda-dynamo-example/lambda-dynamo-function 
+    # - lambda-dynamo-example/lambda-dynamo-function
+    - lambda-dynamo-example/lambda-dynamo-container-function

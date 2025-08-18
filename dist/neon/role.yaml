@@ -8,6 +8,7 @@ role:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for Neon API authentication
     project-id:
       type: string
       description: 'The Neon project ID (format: project-name-123456)'
@@ -30,6 +31,30 @@ role:
       - projectId
       - branchId
       - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    name:
+      type: string
+      description: Name of the database role
+    password:
+      type: string
+      description: Generated password for the role
+    protected:
+      type: boolean
+      description: 'If true, role cannot be modified/deleted'
+    createdAt:
+      type: string
+      format: date-time
+      description: When the role was created
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the role was last updated
+    operationId:
+      type: string
+      description: ID of the operation that created the role
   lifecycle:
     sync: <<< role-sync.js
     reset-role-password: ''

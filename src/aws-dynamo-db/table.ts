@@ -22,7 +22,7 @@ import {
 
 export interface DynamoDBTableDefinition extends AWSDynamoDBDefinition {
     /**
-     * The name of the DynamoDB table
+     * @description The name of the DynamoDB table
      * @minLength 3
      * @maxLength 255
      * @pattern ^[a-zA-Z0-9_.-]+$
@@ -30,75 +30,78 @@ export interface DynamoDBTableDefinition extends AWSDynamoDBDefinition {
     table_name: string;
     
     /**
-     * Attribute definitions for the table
+     * @description Attribute definitions for the table
      */
     attribute_definitions?: AttributeDefinition[];
     
     /**
-     * Key schema for the table (hash and range keys)
+     * @description Key schema for the table (hash and range keys)
      */
     key_schema?: KeySchemaElement[];
     
     /**
-     * Billing mode for the table
+     * @description Billing mode for the table
      * @default "PAY_PER_REQUEST"
      */
     billing_mode?: 'PROVISIONED' | 'PAY_PER_REQUEST';
     
     /**
-     * Provisioned throughput settings (required if billing_mode is PROVISIONED)
+     * @description Provisioned throughput settings (required if billing_mode is PROVISIONED)
      */
     provisioned_throughput?: ProvisionedThroughput;
     
     /**
-     * Global secondary indexes
+     * @description Global secondary indexes
      */
     global_secondary_indexes?: GlobalSecondaryIndex[];
     
     /**
-     * Local secondary indexes
+     * @description Local secondary indexes
      */
     local_secondary_indexes?: LocalSecondaryIndex[];
     
     /**
-     * Server-side encryption specification
+     * @description Server-side encryption specification
      */
     sse_specification?: SSESpecification;
     
     /**
-     * DynamoDB stream configuration
+     * @description DynamoDB stream configuration
      */
     stream_specification?: StreamSpecification;
     
     /**
-     * Table class
+     * @description Table class
      * @default "STANDARD"
      */
     table_class?: 'STANDARD' | 'STANDARD_INFREQUENT_ACCESS';
     
     /**
-     * Deletion protection enabled
+     * @description Deletion protection enabled
      * @default false
      */
     deletion_protection_enabled?: boolean;
     
     /**
-     * Point-in-time recovery enabled
+     * @description Point-in-time recovery enabled
      * @default false
      */
     point_in_time_recovery_enabled?: boolean;
     
     /**
-     * Resource tags
+     * @description Resource tags
      */
     tags?: Record<string, string>;
 }
 
 export interface DynamoDBTableState extends AWSDynamoDBState {
-    // Minimal state - only essential information needed for other operations
+    /** @description Table name */
     table_name?: string;
+    /** @description Table ARN */
     table_arn?: string;
+    /** @description Current table status (e.g., ACTIVE) */
     table_status?: string;
+    /** @description Indicates if the table pre-existed before this entity managed it */
     existing?: boolean;
 }
 

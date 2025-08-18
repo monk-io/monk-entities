@@ -5,52 +5,93 @@ import { authorizeSecurityGroupIngress, checkSecurityGroupExists, createSecurity
 import cli from "cli";
 
 export interface AWSRDSDefinition {
+    /** @description AWS region for the RDS instance */
     region: string;
+    /** @description DB instance identifier (1-63 chars, starts with letter) */
     db_instance_identifier: string;
+    /** @description Instance class (e.g., db.t3.micro) */
     db_instance_class: string;
+    /** @description Database engine (e.g., mysql, postgres) */
     engine: string;
+    /** @description Master username for the database */
     master_username: string;
+    /** @description Allocated storage in GB */
     allocated_storage: number;
+    /** @description Specific engine version */
     engine_version?: string;
+    /** @description Database port */
     port?: number;
+    /** @description Secret reference to store/retrieve the master password */
     db_name?: string;
     password_secret_ref?: string;
+    /** @description VPC security group IDs to associate */
     vpc_security_group_ids?: string[];
+    /** @description DB subnet group name */
     db_subnet_group_name?: string;
+    /** @description Backup retention period (days) */
     backup_retention_period?: number;
+    /** @description Preferred backup window (UTC, hh24:mi-hh24:mi) */
     preferred_backup_window?: string;
+    /** @description Preferred maintenance window (UTC, ddd:hh24:mi-ddd:hh24:mi) */
     preferred_maintenance_window?: string;
+    /** @description Enable automatic minor version upgrades */
     auto_minor_version_upgrade?: boolean;
+    /** @description Multi-AZ deployment */
     multi_az?: boolean;
+    /** @description Public accessibility */
     publicly_accessible?: boolean;
+    /** @description Storage type (e.g., gp2, gp3, io1) */
     storage_type?: string;
+    /** @description Enable storage encryption */
     storage_encrypted?: boolean;
+    /** @description KMS key ID for encryption */
     kms_key_id?: string;
+    /** @description Enable deletion protection */
     deletion_protection?: boolean;
+    /** @description Skip final snapshot on delete */
     skip_final_snapshot?: boolean;
+    /** @description Final snapshot identifier when not skipping */
     final_db_snapshot_identifier?: string;
+    /** @description Resource tags for the instance */
     tags?: Record<string, string>;
     // Security group auto-creation options
+    /** @description Auto-create a security group and manage ingress rules */
     auto_create_security_group?: boolean;
+    /** @description Name for the auto-created security group */
     security_group_name?: string;
+    /** @description Description for the auto-created security group */
     security_group_description?: string;
+    /** @description VPC ID to use when creating or resolving security groups */
     vpc_id?: string;
+    /** @description Allowed CIDR blocks for ingress on the DB port */
     allowed_cidr_blocks?: string[];
+    /** @description Allowed security group names for ingress on the DB port */
     allowed_security_group_names?: string[];
 }
 
 export interface AWSRDSState {
+    /** @description Indicates if the instance pre-existed before this entity managed it */
     existing: boolean;
+    /** @description DB instance identifier */
     db_instance_identifier?: string;
+    /** @description DB instance ARN */
     db_instance_arn?: string;
+    /** @description Current DB instance status (e.g., available) */
     db_instance_status?: string;
+    /** @description Endpoint address */
     endpoint_address?: string;
+    /** @description Endpoint port */
     endpoint_port?: number;
+    /** @description Allocated storage in GB */
     allocated_storage?: number;
+    /** @description Instance creation timestamp */
     creation_time?: string;
+    /** @description Last modified timestamp */
     last_modified?: string;
     // Security group state
+    /** @description ID of the auto-created security group (if any) */
     created_security_group_id?: string;
+    /** @description Whether the used security group pre-existed */
     created_security_group_existing?: boolean;
     // Note: No previous_allowed_* fields - we query AWS directly for current rules
 }

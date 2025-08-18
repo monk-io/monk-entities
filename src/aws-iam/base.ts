@@ -2,10 +2,12 @@ import { MonkEntity } from "monkec/base";
 import aws from "cloud/aws";
 
 export interface AWSIAMDefinition {
+    /** @description AWS region for IAM operations (signing region) */
     region: string;
 }
 
 export interface AWSIAMState {
+    /** @description Indicates if the resource pre-existed before this entity managed it */
     existing?: boolean;
 }
 

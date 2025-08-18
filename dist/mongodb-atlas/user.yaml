@@ -8,25 +8,58 @@ user:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
     name:
       type: string
       minLength: 1
       maxLength: 100
+      description: Database username
     project_id:
       type: string
       minLength: 1
       maxLength: 24
+      description: Project ID where the user will be created
     password_secret_ref:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for user password
     role:
       type: string
+      description: Database role for the user
+      default: readWriteAnyDatabase
     required:
       - secret_ref
       - name
       - project_id
       - password_secret_ref
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    name:
+      type: string
+      description: Username
+    project_id:
+      type: string
+      description: Project ID
+    database_name:
+      type: string
+      description: Database name (always "admin" for Atlas)
+    roles:
+      type: array
+      items:
+        type: object
+        properties:
+          databaseName:
+            type: string
+          roleName:
+            type: string
+        required:
+          - databaseName
+          - roleName
+        additionalProperties: false
+      description: User roles
   lifecycle:
     sync: <<< user-sync.js
   requires:

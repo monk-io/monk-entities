@@ -6,58 +6,109 @@ import {
 } from "./common.ts";
 
 export interface AWSS3Definition {
+    /** @description AWS region for the bucket */
     region: string;
+    /** @description S3 bucket name */
     bucket_name: string;
+    /** @description Enable or disable bucket versioning
+     *  @default false
+     */
     versioning?: boolean;
+    /** @description Whether to allow public reads (controls public access block)
+     *  @default false
+     */
     public_read_access?: boolean;
+    /** @description Whether to allow public writes (controls public ACLs)
+     *  @default false
+     */
     public_write_access?: boolean;
+    /**
+     * Cross-Origin Resource Sharing (CORS) configuration
+     */
     cors_configuration?: {
+        /** @description List of CORS rules applied to the bucket */
         cors_rules: Array<{
+            /** @description Allowed headers for CORS requests */
             allowed_headers?: string[];
+            /** @description Allowed HTTP methods */
             allowed_methods: string[];
+            /** @description Allowed origins */
             allowed_origins: string[];
+            /** @description Response headers to expose */
             expose_headers?: string[];
+            /** @description Max age for preflight results */
             max_age_seconds?: number;
         }>;
     };
+    /**
+     * Lifecycle rules for automatic object transitions/expiration
+     */
     lifecycle_configuration?: {
+        /** @description Lifecycle rules */
         rules: Array<{
+            /** @description Rule identifier */
             id: string;
+            /** @description Rule status */
             status: "Enabled" | "Disabled";
+            /** @description Object filter for the rule */
             filter?: {
+                /** @description Key prefix filter */
                 prefix?: string;
+                /** @description Tag filter */
                 tags?: Record<string, string>;
             };
+            /** @description Expiration settings */
             expiration?: {
+                /** @description Expire after this many days */
                 days?: number;
+                /** @description Expire on specific date (YYYY-MM-DD) */
                 date?: string;
             };
+            /** @description Noncurrent version expiration settings */
             noncurrent_version_expiration?: {
+                /** @description Days until noncurrent versions expire */
                 noncurrent_days: number;
             };
+            /** @description Storage class transition rules */
             transitions?: Array<{
+                /** @description Transition after this many days */
                 days?: number;
+                /** @description Transition on specific date */
                 date?: string;
+                /** @description Target storage class */
                 storage_class: "STANDARD_IA" | "ONEZONE_IA" | "GLACIER" | "DEEP_ARCHIVE";
             }>;
         }>;
     };
+    /**
+     * Default server-side encryption configuration
+     */
     server_side_encryption?: {
+        /** @description Encryption rules */
         rules: Array<{
+            /** @description Default encryption settings */
             apply_server_side_encryption_by_default: {
+                /** @description Algorithm to use */
                 sse_algorithm: "AES256" | "aws:kms";
+                /** @description KMS key ID/ARN for aws:kms */
                 kms_master_key_id?: string;
             };
+            /** @description Enable S3 Bucket Keys for KMS */
             bucket_key_enabled?: boolean;
         }>;
     };
+    /** @description Resource tags for the bucket */
     tags?: Record<string, string>;
 }
 
 export interface AWSS3State {
+    /** @description Indicates if the bucket pre-existed before this entity managed it */
     existing: boolean;
+    /** @description Bucket name */
     bucket_name?: string;
+    /** @description Bucket region */
     region?: string;
+    /** @description Bucket location constraint reported by AWS */
     location?: string;
 }
 

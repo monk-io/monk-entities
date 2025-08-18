@@ -8,18 +8,34 @@ project:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
     name:
       type: string
       minLength: 1
       maxLength: 100
+      description: Project name
     organization:
       type: string
       minLength: 1
       maxLength: 100
+      description: Organization Name
     required:
       - secret_ref
       - name
       - organization
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Project ID
+    organization_id:
+      type: string
+      description: Project Organization ID
+    name:
+      type: string
+      description: Project Name
   lifecycle:
     sync: <<< project-sync.js
   requires:

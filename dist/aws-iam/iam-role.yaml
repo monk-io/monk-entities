@@ -6,26 +6,48 @@ iam-role:
   schema:
     region:
       type: string
+      description: AWS region for IAM operations (signing region)
     role_name:
       type: string
-    assume_role_policy_document: {}
+      description: IAM role name
+    assume_role_policy_document:
+      description: Trust policy document allowing principals to assume this role
     path:
       type: string
+      description: Optional path for the role (defaults to "/")
     role_description:
       type: string
+      description: Human-readable description for the role
     max_session_duration:
       type: number
+      description: Session duration in seconds (3600-43200)
     tags:
       type: object
       additionalProperties:
         type: string
+        description: Resource tags for the role
+      description: Resource tags for the role
     attached_policies:
       type: array
       items:
         type: string
+      description: List of managed policy ARNs to attach to the role
     required:
       - region
       - role_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Whether role pre-existed before this entity managed it
+    role_arn:
+      type: string
+      description: Role ARN
+    role_id:
+      type: string
+      description: Role ID
+    create_date:
+      type: string
+      description: Creation timestamp
   lifecycle:
     sync: <<< iam-role-sync.js
   checks:

@@ -2,13 +2,18 @@ import { MonkEntity } from "monkec/base";
 import aws from "cloud/aws";
 
 export interface AWSDynamoDBDefinition {
+    /** @description AWS region for the DynamoDB table */
     region: string;
 }
 
 export interface AWSDynamoDBState {
+    /** @description Indicates if the table pre-existed before this entity managed it */
     existing?: boolean;
+    /** @description Table name */
     table_name?: string;
+    /** @description Table ARN */
     table_arn?: string;
+    /** @description Current table status (e.g., ACTIVE) */
     table_status?: string;
 }
 

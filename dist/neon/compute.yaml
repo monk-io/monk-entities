@@ -8,6 +8,7 @@ compute:
       type: string
       minLength: 1
       maxLength: 24
+      description: Secret Reference for Neon API authentication
     project-id:
       type: string
       description: 'The Neon project ID (format: project-name-123456)'
@@ -44,6 +45,43 @@ compute:
       - secret_ref
       - projectId
       - branchId
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: 'Unique identifier for the compute (format: ep-name-123456)'
+    host:
+      type: string
+      description: Hostname for connecting to the compute
+    proxyHost:
+      type: string
+      description: Proxy hostname for connecting to the compute
+    currentState:
+      type: string
+      description: 'Current state of the compute (active, idle, etc)'
+    pendingState:
+      type: string
+      description: Pending state if compute is transitioning
+    createdAt:
+      type: string
+      format: date-time
+      description: When the compute was created
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the compute was last updated
+    lastActive:
+      type: string
+      format: date-time
+      description: When the compute was last active
+    disabled:
+      type: boolean
+      description: 'If true, compute is disabled'
+    operationId:
+      type: string
+      description: ID of the operation that created the compute
   lifecycle:
     sync: <<< compute-sync.js
     restart-compute: ''

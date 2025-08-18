@@ -62,61 +62,118 @@ interface CreateFunctionRequest extends LambdaFunctionConfig {
 }
 
 export interface LambdaFunctionDefinition extends AWSLambdaDefinition {
+    /** @description Lambda function name */
     function_name: string;
-    runtime: string;
+    /**
+     * @description Lambda runtime (e.g., nodejs20.x). Optional for container images
+     */
+    runtime?: string;  // Optional for container images (defined in image)
+    /** @description IAM role ARN assumed by the Lambda function */
     role: string;
-    handler: string;
+    /**
+     * @description Handler entrypoint (e.g., index.handler). Optional for container images
+     */
+    handler?: string;  // Optional for container images (defined in image)
+    /** @description Human-readable description for the function */
     summary?: string;
+    /** @description Function timeout in seconds
+     *  @default 3
+     */
     timeout?: number;
+    /** @description Memory size in MB
+     *  @default 128
+     */
     memory_size?: number;
+    /** @description Environment variables */
     environment?: {
+        /** @description Key/value environment variables */
         variables?: Record<string, string>;
     };
+    /** @description Dead-letter queue configuration */
     dead_letter_config?: {
+        /** @description Target ARN for dead-letter messages */
         target_arn?: string;
     };
+    /** @description KMS key ARN for encrypting environment variables */
     kms_key_arn?: string;
+    /** @description AWS X-Ray tracing configuration */
     tracing_config?: {
+        /** @description Tracing mode (e.g., Active, PassThrough) */
         mode?: string;
     };
+    /** @description Resource tags to apply to the function */
     tags?: Record<string, string>;
+    /** @description Layer ARNs to attach */
     layers?: string[];
+    /** @description EFS file system configurations */
     file_system_configs?: Array<{
+        /** @description EFS Access Point ARN */
         arn: string;
+        /** @description Local mount path inside the Lambda environment */
         local_mount_path: string;
     }>;
+    /** @description Container image runtime configuration overrides */
     image_config?: {
+        /** @description Container entry point */
         entry_point?: string[];
+        /** @description Container command */
         command?: string[];
+        /** @description Working directory inside the container */
         working_directory?: string;
     };
+    /** @description Code signing configuration ARN */
     code_signing_config_arn?: string;
+    /** @description Instruction set architectures (e.g., x86_64, arm64) */
     architectures?: string[];
+    /** @description Ephemeral /tmp storage configuration */
     ephemeral_storage?: {
+        /** @description Size in MB for /tmp storage */
         size?: number;
     };
+    /** @description SnapStart configuration */
     snap_start?: {
+        /** @description Apply SnapStart on PublishedVersions or None */
         apply_on?: string;
     };
+    /** @description Logging configuration */
     logging_config?: {
+        /** @description Log format (e.g., JSON) */
         log_format?: string;
+        /** @description Application log level */
         application_log_level?: string;
+        /** @description System log level */
         system_log_level?: string;
+        /** @description CloudWatch Logs group name */
         log_group?: string;
     };
+    /** @description Deployment package type (Zip or Image)
+     *  @default Zip
+     */
     package_type?: string;
+    /** @description Whether to publish a new version on create/update
+     *  @default false
+     */
     publish?: boolean;
 }
 
 export interface LambdaFunctionState extends AWSLambdaState {
+    /** @description Effective runtime */
     runtime?: string;
+    /** @description Role ARN bound to the function */
     role?: string;
+    /** @description Handler entrypoint */
     handler?: string;
+    /** @description Effective timeout in seconds */
     timeout?: number;
+    /** @description Effective memory size in MB */
     memory_size?: number;
+    /** @description Deployed code size in bytes */
     code_size?: number;
+    /** @description Published function version */
     version?: string;
+    /** @description Status of the last update operation */
     last_update_status?: string;
+    /** @description Revision identifier */
     revision_id?: string;
 }
 
@@ -129,21 +186,69 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         return this.definition.function_name;
     }
 
+    private validateContainerImageConfiguration(): void {
+        const packageType = this.definition.package_type || "Zip";
+        
+        if (packageType === "Image") {
+            if (!this.definition.image_uri) {
+                throw new Error("image_uri is required when package_type is 'Image'");
+            }
+            
+            // Validate ECR URI format
+            const ecrUriPattern = /^[0-9]{12}\.dkr\.ecr\.[a-z0-9\-]+\.amazonaws\.com\/[a-zA-Z0-9\-_\/]+:[a-zA-Z0-9\-_\.]+$/;
+            if (!ecrUriPattern.test(this.definition.image_uri)) {
+                throw new Error(
+                    `Invalid ECR image URI format: ${this.definition.image_uri}\n` +
+                    `Expected format: 123456789012.dkr.ecr.region.amazonaws.com/repository:tag\n` +
+                    `Note: AWS Lambda only supports ECR images, not Docker Hub or other registries`
+                );
+            }
+            
+            // Extract region from URI and validate it matches function region
+            const uriRegionMatch = this.definition.image_uri.match(/\.dkr\.ecr\.([a-z0-9\-]+)\.amazonaws\.com\//);
+            if (uriRegionMatch && uriRegionMatch[1] !== this.definition.region) {
+                throw new Error(
+                    `ECR image region (${uriRegionMatch[1]}) does not match Lambda function region (${this.definition.region})\n` +
+                    `The ECR repository must be in the same region as the Lambda function`
+                );
+            }
+        }
+    }
+
     private buildCreateFunctionRequest(): CreateFunctionRequest {
-        // Get ZIP content from blob
-        const zipContent = this.getLambdaZipFromBlob();
+        const packageType = this.definition.package_type || "Zip";
+        
+        // Validate deployment type configuration
+        if (packageType === "Image") {
+            this.validateContainerImageConfiguration();
+        } else {
+            if (!this.definition.runtime) {
+                throw new Error("runtime is required when package_type is 'Zip'");
+            }
+            if (!this.definition.handler) {
+                throw new Error("handler is required when package_type is 'Zip'");
+            }
+        }
 
         const request: CreateFunctionRequest = {
             FunctionName: this.definition.function_name,
-            Runtime: this.definition.runtime,
             Role: this.definition.role,
-            Handler: this.definition.handler,
-            Code: {
-                ZipFile: zipContent,
-            },
-            PackageType: this.definition.package_type || "Zip",
+            PackageType: packageType,
             Publish: this.definition.publish || false,
+            Code: {},
         };
+
+        // Configure code source based on package type
+        if (packageType === "Image") {
+            request.Code.ImageUri = this.definition.image_uri;
+            // Runtime and Handler are not used for container images
+        } else {
+            // ZIP package deployment
+            const zipContent = this.getLambdaZipFromBlob();
+            request.Code.ZipFile = zipContent;
+            request.Runtime = this.definition.runtime;
+            request.Handler = this.definition.handler;
+        }
 
         // Add optional configuration
         if (this.definition.summary) {
@@ -236,9 +341,21 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     private buildUpdateConfigurationRequest(): Partial<LambdaFunctionConfig> {
+        const packageType = this.definition.package_type || "Zip";
+        
         const config: Partial<LambdaFunctionConfig> = {
             FunctionName: this.definition.function_name,
         };
+
+        // Add runtime and handler only for ZIP packages
+        if (packageType === "Zip") {
+            if (this.definition.runtime !== undefined) {
+                config.Runtime = this.definition.runtime;
+            }
+            if (this.definition.handler !== undefined) {
+                config.Handler = this.definition.handler;
+            }
+        }
 
         // Add optional configuration
         if (this.definition.summary !== undefined) {
@@ -373,11 +490,24 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         }
 
         try {
-            // Update function code from blob
-            const zipContent = this.getLambdaZipFromBlob();
-            const updateCodeRequest = {
-                ZipFile: zipContent,
-            };
+            // Update function code based on package type
+            const packageType = this.definition.package_type || "Zip";
+            let updateCodeRequest: { ZipFile?: string; ImageUri?: string };
+            
+            if (packageType === "Image") {
+                if (!this.definition.image_uri) {
+                    throw new Error("image_uri is required for container image updates");
+                }
+                updateCodeRequest = {
+                    ImageUri: this.definition.image_uri,
+                };
+            } else {
+                // ZIP package update
+                const zipContent = this.getLambdaZipFromBlob();
+                updateCodeRequest = {
+                    ZipFile: zipContent,
+                };
+            }
             
             this.makeAWSRequest(
                 "PUT", 
@@ -517,10 +647,26 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         }
 
         try {
-            const zipContent = this.getLambdaZipFromBlob();
-            const updateCodeRequest = {
-                ZipFile: zipContent,
-            };
+            // Update function code based on package type
+            const packageType = this.definition.package_type || "Zip";
+            let updateCodeRequest: { ZipFile?: string; ImageUri?: string };
+            
+            if (packageType === "Image") {
+                if (!this.definition.image_uri) {
+                    throw new Error("image_uri is required for container image updates");
+                }
+                updateCodeRequest = {
+                    ImageUri: this.definition.image_uri,
+                };
+                cli.output(`Updating Lambda function code with container image: ${this.definition.image_uri}`);
+            } else {
+                // ZIP package update
+                const zipContent = this.getLambdaZipFromBlob();
+                updateCodeRequest = {
+                    ZipFile: zipContent,
+                };
+                cli.output(`Updating Lambda function code from blob: ${this.definition.blob_name}`);
+            }
             
             const response = this.makeAWSRequest(
                 "PUT", 
@@ -529,6 +675,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             );
             
             this.updateStateFromResponse(response);
+            cli.output("Function code updated successfully");
         } catch (error) {
             throw new Error(`Failed to update function code: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }

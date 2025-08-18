@@ -8,9 +8,12 @@ project:
       type: string
       minLength: 1
       maxLength: 24
+      description: |-
+        Secret Reference for Vercel API authentication
+        Defaults to "default-vercel-token" if not provided
     team_id:
       type: string
-      description: Team ID for team-specific resources
+      description: Team ID for team-specific operations (optional)
     name:
       type: string
       minLength: 1
@@ -59,6 +62,74 @@ project:
       description: Environment variables for the project
     required:
       - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Unique identifier for the project
+    name:
+      type: string
+      description: Current name of the project
+    url:
+      type: string
+      description: The public URL of the project
+    domains:
+      type: array
+      items:
+        type: string
+      description: Domains associated with the project
+    status:
+      type: string
+      description: Current status of the project
+    created_at:
+      type: string
+      format: date-time
+      description: When the project was created
+    updated_at:
+      type: string
+      format: date-time
+      description: When the project was last updated
+    account_id:
+      type: string
+      description: Account ID that owns the project
+    latest_deployment:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        created_at:
+          type: string
+        state:
+          type: string
+      required:
+        - id
+        - url
+        - created_at
+        - state
+      additionalProperties: false
+      description: Latest deployment information
+    framework:
+      type: string
+      description: Current framework preset for the project
+    build_command:
+      type: string
+      description: Current build command for the project
+    output_directory:
+      type: string
+      description: Current output directory for the project
+    install_command:
+      type: string
+      description: Current install command for the project
+    dev_command:
+      type: string
+      description: Current development command for the project
+    root_directory:
+      type: string
+      description: Current root directory for the project
   lifecycle:
     sync: <<< project-sync.js
     get-project: ''
