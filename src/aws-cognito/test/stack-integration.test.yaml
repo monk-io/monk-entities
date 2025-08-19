@@ -142,7 +142,137 @@ tests:
         - "User Pool Information"
         - "Pool Name: monk-test-user-pool"
 
+  # User Pool Client Tests
+  - name: "Create and start basic User Pool Client"
+    action: "run"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for basic User Pool Client readiness"
+    action: "wait"
+    target: "cognito-test/test-user-pool-client"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get basic User Pool Client information"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-client"
+        - "Client ID:"
+        - "Has Secret: No"
+        - "Auth Flows:"
+
+  - name: "Test authentication configuration"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/test-auth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "Authentication Configuration Test"
+        - "SRP Authentication:"
+        - "Password Authentication:"
+        - "Refresh Token:"
+
+  # OAuth User Pool Client Tests
+  - name: "Create and start OAuth User Pool Client"
+    action: "run"
+    target: "cognito-test/test-oauth-client"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for OAuth User Pool Client readiness"
+    action: "wait"
+    target: "cognito-test/test-oauth-client"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get OAuth User Pool Client information"
+    action: "do"
+    target: "cognito-test/test-oauth-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-oauth-client"
+        - "Client ID:"
+        - "Has Secret: Yes"
+        - "OAuth Flows:"
+
+  - name: "Get OAuth configuration"
+    action: "do"
+    target: "cognito-test/test-oauth-client/get-oauth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "OAuth/OIDC Configuration"
+        - "Allowed OAuth Flows:"
+        - "Allowed OAuth Scopes:"
+        - "Callback URLs:"
+        - "example.com/callback"
+
+  - name: "Test OAuth authentication configuration"
+    action: "do"
+    target: "cognito-test/test-oauth-client/test-auth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "Authentication Configuration Test"
+        - "OAuth Configuration:"
+        - "OAuth Flows:"
+        - "Callback URLs:"
+
+  # Verify User Pool now shows clients
+  - name: "Check User Pool clients (should show 2 clients)"
+    action: "do"
+    target: "cognito-test/test-user-pool/get-user-pool-clients"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Clients"
+        - "Found 2 clients"
+        - "monk-test-client"
+        - "monk-test-oauth-client"
+
+  # Update User Pool Client
+  - name: "Update basic User Pool Client configuration"
+    action: "update"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+
+  - name: "Verify basic User Pool Client still works after update"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-client"
+
 cleanup:
+  - name: "Stop and delete basic User Pool Client"
+    action: "delete"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+
+  - name: "Stop and delete OAuth User Pool Client"
+    action: "delete"
+    target: "cognito-test/test-oauth-client"
+    expect:
+      exitCode: 0
+
   - name: "Stop and delete basic User Pool"
     action: "delete"
     target: "cognito-test/test-user-pool"
