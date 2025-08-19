@@ -260,7 +260,63 @@ tests:
         - "User Pool Client Information"
         - "Client Name: monk-test-client"
 
+  # User Pool Domain Tests
+  - name: "Create and start User Pool Domain"
+    action: "run"
+    target: "cognito-test/test-user-pool-domain"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for User Pool Domain readiness"
+    action: "wait"
+    target: "cognito-test/test-user-pool-domain"
+    waitFor:
+      condition: "ready"
+      timeout: 180000  # Domains can take up to 3 minutes
+
+  - name: "Get User Pool Domain information"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/get-domain-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Domain Information"
+        - "Domain: monk-cognito-test"
+        - "Status: ACTIVE"
+        - "Full Domain URL:"
+
+  - name: "Get hosted UI URLs"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/get-hosted-ui-url"
+    expect:
+      exitCode: 0
+      output:
+        - "Hosted UI URLs"
+        - "monk-cognito-test.auth."
+        - "Login:"
+        - "Signup:"
+        - "OAuth 2.0 Endpoints:"
+
+  - name: "Test domain access"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/test-domain-access"
+    expect:
+      exitCode: 0
+      output:
+        - "Domain Access Test"
+        - "Domain: monk-cognito-test"
+        - "Domain Status: Active"
+        - "Domain Type: Cognito Prefix Domain"
+
 cleanup:
+  - name: "Stop and delete User Pool Domain"
+    action: "delete"
+    target: "cognito-test/test-user-pool-domain"
+    expect:
+      exitCode: 0
+
   - name: "Stop and delete basic User Pool Client"
     action: "delete"
     target: "cognito-test/test-user-pool-client"

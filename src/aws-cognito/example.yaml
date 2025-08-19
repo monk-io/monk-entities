@@ -500,3 +500,33 @@ amazon-identity-provider:
     given_name: given_name
     family_name: family_name
     name: name
+
+# ===== AWS Cognito User Pool Domain Examples =====
+
+# Basic Cognito prefix domain (simple setup)
+basic-user-pool-domain:
+  defines: aws-cognito/user-pool-domain
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  domain: myapp-auth
+  # Results in: https://myapp-auth.auth.us-east-1.amazoncognito.com
+
+# Custom domain with SSL certificate
+custom-user-pool-domain:
+  defines: aws-cognito/user-pool-domain
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  domain: auth.mycompany.com
+  custom_domain_config:
+    certificate_arn: arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012
+    managed_login_version: 2  # Use new managed login experience
+
+# Enterprise custom domain with classic UI
+enterprise-user-pool-domain:
+  defines: aws-cognito/user-pool-domain
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  domain: login.enterprise.com
+  custom_domain_config:
+    certificate_arn: arn:aws:acm:us-east-1:123456789012:certificate/87654321-4321-4321-4321-210987654321
+    managed_login_version: 1  # Use classic hosted UI

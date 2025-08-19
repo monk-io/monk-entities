@@ -287,3 +287,19 @@ test-oidc-provider:
     name: name
   idp_identifiers:
     - example.com
+
+# Test User Pool Domain (Cognito prefix domain)
+test-user-pool-domain:
+  defines: aws-cognito/user-pool-domain
+  connections:
+    user-pool:
+      runnable: cognito-test/test-user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-test/test-user-pool
+      timeout: 600
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  domain: monk-cognito-domain-test-2025
