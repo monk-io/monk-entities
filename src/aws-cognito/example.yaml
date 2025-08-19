@@ -376,3 +376,127 @@ server-user-pool-client:
   prevent_user_existence_errors: ENABLED
   enable_token_revocation: true
   auth_session_validity: 5
+
+# Google Social Identity Provider
+google-identity-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: Google
+  provider_type: Google
+  provider_details:
+    client_id: your-google-client-id.apps.googleusercontent.com
+    client_secret: your-google-client-secret
+    authorize_scopes: email openid profile
+  attribute_mapping:
+    email: email
+    given_name: given_name
+    family_name: family_name
+    name: name
+    picture: picture
+
+# Facebook Social Identity Provider
+facebook-identity-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: Facebook
+  provider_type: Facebook
+  provider_details:
+    client_id: your-facebook-app-id
+    client_secret: your-facebook-app-secret
+    api_version: v12.0
+    authorize_scopes: email,public_profile
+  attribute_mapping:
+    email: email
+    given_name: first_name
+    family_name: last_name
+    name: name
+    picture: picture
+
+# Corporate SAML Identity Provider
+corporate-saml-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: CorporateAD
+  provider_type: SAML
+  provider_details:
+    MetadataURL: https://your-company.com/federationmetadata/2007-06/federationmetadata.xml
+    SSORedirectBindingURI: https://your-company.com/adfs/ls/
+    SLORedirectBindingURI: https://your-company.com/adfs/ls/
+  attribute_mapping:
+    email: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress
+    given_name: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname
+    family_name: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname
+    name: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name
+    custom:department: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/department
+    custom:employee_id: http://schemas.xmlsoap.org/ws/2005/05/identity/claims/employeeid
+  idp_identifiers:
+    - urn:your-company:adfs:services:trust
+
+# OpenID Connect Identity Provider
+oidc-identity-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: CustomOIDC
+  provider_type: OIDC
+  provider_details:
+    client_id: your-oidc-client-id
+    client_secret: your-oidc-client-secret
+    attributes_request_method: GET
+    oidc_issuer: https://your-oidc-provider.com
+    authorize_scopes: openid email profile
+    authorize_url: https://your-oidc-provider.com/auth
+    token_url: https://your-oidc-provider.com/token
+    attributes_url: https://your-oidc-provider.com/userinfo
+    jwks_uri: https://your-oidc-provider.com/.well-known/jwks.json
+  attribute_mapping:
+    email: email
+    email_verified: email_verified
+    given_name: given_name
+    family_name: family_name
+    name: name
+    preferred_username: preferred_username
+  idp_identifiers:
+    - your-oidc-provider.com
+
+# Sign in with Apple Identity Provider
+apple-identity-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: SignInWithApple
+  provider_type: SignInWithApple
+  provider_details:
+    client_id: com.yourcompany.yourapp
+    team_id: YOUR_APPLE_TEAM_ID
+    key_id: YOUR_APPLE_KEY_ID
+    private_key: |
+      -----BEGIN PRIVATE KEY-----
+      YOUR_PRIVATE_KEY_CONTENT_HERE
+      -----END PRIVATE KEY-----
+    authorize_scopes: email name
+  attribute_mapping:
+    email: email
+    given_name: firstName
+    family_name: lastName
+    name: name
+
+# Amazon Login Identity Provider
+amazon-identity-provider:
+  defines: aws-cognito/identity-provider
+  region: us-east-1
+  user_pool_id: <- `my-app-users.user_pool_id`
+  provider_name: LoginWithAmazon
+  provider_type: LoginWithAmazon
+  provider_details:
+    client_id: amzn1.application-oa2-client.your-client-id
+    client_secret: your-amazon-client-secret
+    authorize_scopes: profile
+  attribute_mapping:
+    email: email
+    given_name: given_name
+    family_name: family_name
+    name: name

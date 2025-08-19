@@ -231,3 +231,59 @@ test-oauth-client:
   prevent_user_existence_errors: ENABLED
   enable_token_revocation: true
   auth_session_validity: 5
+
+# Test Identity Provider (Google for testing)
+test-google-provider:
+  defines: aws-cognito/identity-provider
+  connections:
+    user-pool:
+      runnable: cognito-test/test-user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-test/test-user-pool
+      timeout: 600
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  provider_name: Google
+  provider_type: Google
+  provider_details:
+    client_id: test-google-client-id.apps.googleusercontent.com
+    client_secret: test-google-client-secret
+    authorize_scopes: email openid profile
+  attribute_mapping:
+    email: email
+    given_name: given_name
+    family_name: family_name
+    name: name
+
+# Test OIDC Identity Provider
+test-oidc-provider:
+  defines: aws-cognito/identity-provider
+  connections:
+    user-pool:
+      runnable: cognito-test/test-user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-test/test-user-pool
+      timeout: 600
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  provider_name: TestOIDC
+  provider_type: OIDC
+  provider_details:
+    client_id: test-oidc-client-id
+    client_secret: test-oidc-client-secret
+    attributes_request_method: GET
+    oidc_issuer: https://example.com
+    authorize_scopes: openid email profile
+  attribute_mapping:
+    email: email
+    given_name: given_name
+    family_name: family_name
+    name: name
+  idp_identifiers:
+    - example.com
