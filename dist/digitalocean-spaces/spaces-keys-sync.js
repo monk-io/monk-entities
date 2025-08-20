@@ -11,7 +11,7 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
 });
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// input/digitalocean-spaces/spacesKeysV3.ts
+// input/digitalocean-spaces/spacesKeys.ts
 const base = require("monkec/base");
 const MonkEntity = base.MonkEntity;
 const secret = require("secret");
