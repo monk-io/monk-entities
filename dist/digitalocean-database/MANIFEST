@@ -1,0 +1,3 @@
+REPO digitalocean-database
+LOAD common.yaml digitalocean-base.yaml digital-ocean-database.yaml
+RESOURCES digital-ocean-database-sync.js digitalocean-base.js common.js

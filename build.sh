@@ -7,7 +7,7 @@ set -ex
 
 # Default modules if none specified.
 # No quotes around expansion to allow word splitting for the default value.
-modules=(${@:-monkec mongodb-atlas neon netlify vercel aws-dynamo-db aws-s3 aws-sqs aws-iam aws-lambda aws-rds})
+modules=(${@:-monkec mongodb-atlas neon netlify vercel aws-dynamo-db aws-s3 aws-sqs aws-iam aws-lambda aws-rds digitalocean-database})
 
 for module in "${modules[@]}"; do
     echo "Building $module..."
