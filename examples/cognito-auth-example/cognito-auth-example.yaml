@@ -1,0 +1,236 @@
+namespace: cognito-auth-example
+
+# Complete Cognito Authentication Infrastructure Example
+# This demonstrates a real-world setup with User Pool, Domain, Client, Identity Provider, and Identity Pool
+
+# User Pool - The foundation for user management
+user-pool:
+  defines: aws-cognito/user-pool
+  region: us-east-1
+  pool_name: CognitoAuthExample
+  username_attributes:
+    - email
+  auto_verified_attributes:
+    - email
+  password_policy:
+    minimum_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_symbols: false
+  device_configuration:
+    challenge_required_on_new_device: false
+    device_only_remembered_on_user_prompt: false
+  user_pool_tags:
+    Project: CognitoAuthExample
+    Environment: Demo
+
+# Hosted UI Domain - Provides login/signup interface
+auth-domain:
+  defines: aws-cognito/user-pool-domain
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+      timeout: 300
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  domain: monk-auth-demo-2025
+
+# Web Application Client - For the React frontend
+web-app-client:
+  defines: aws-cognito/user-pool-client
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+        # - cognito-auth-example/google-provider
+      timeout: 600
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  client_name: CognitoAuthWebApp
+  generate_secret: false
+  refresh_token_validity: 30
+  id_token_validity: 1
+  access_token_validity: 1
+  token_validity_units:
+    RefreshToken: days
+    IdToken: hours
+    AccessToken: hours
+  explicit_auth_flows:
+    - ALLOW_USER_PASSWORD_AUTH
+    - ALLOW_USER_SRP_AUTH
+    - ALLOW_REFRESH_TOKEN_AUTH
+  supported_identity_providers:
+    - COGNITO
+    # - Google
+  callback_urls:
+    - http://localhost:3000/callback
+    - http://localhost:3000/
+  logout_urls:
+    - http://localhost:3000/logout
+    - http://localhost:3000/
+  allowed_oauth_flows:
+    - code
+    - implicit
+  allowed_oauth_scopes:
+    - email
+    - openid
+    - profile
+  allowed_oauth_flows_user_pool_client: true
+
+# Google Social Login Provider
+google-provider:
+  defines: aws-cognito/identity-provider
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+      timeout: 300
+  region: us-east-1
+  user_pool_id: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+  provider_name: Google
+  provider_type: Google
+  provider_details:
+    client_id: your-google-client-id.apps.googleusercontent.com
+    client_secret: your-google-client-secret
+    authorize_scopes: email openid profile
+  attribute_mapping:
+    email: email
+    given_name: given_name
+    family_name: family_name
+    name: name
+
+# Identity Pool - Enables AWS resource access for authenticated users
+identity-pool:
+  defines: aws-cognito/identity-pool
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+    web-app-client:
+      runnable: cognito-auth-example/web-app-client
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+        - cognito-auth-example/web-app-client
+      timeout: 300
+  region: us-east-1                              
+  identity_pool_name: CognitoAuthExampleIdentityPool
+  allow_unauthenticated_identities: false
+  auto_create_roles: true  # Automatically create and attach IAM roles
+  cognito_identity_providers:
+    - ProviderName: <- "cognito-idp.us-east-1.amazonaws.com/" connection-target("user-pool") entity-state get-member("user_pool_id") concat
+      ClientId: <- connection-target("web-app-client") entity-state get-member("client_id")
+      ServerSideTokenCheck: true
+  identity_pool_tags:
+    Project: CognitoAuthExample
+    Environment: Demo
+
+# Frontend Web Application
+web-app:
+  defines: runnable
+  containers:
+    web-app:
+      image: docker.io/imanachyn/cognito-auth-frontend:v1
+      ports:
+        - 3000:3000
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+    web-app-client:
+      runnable: cognito-auth-example/web-app-client
+      service: default
+    auth-domain:
+      runnable: cognito-auth-example/auth-domain
+      service: default
+    # google-provider:
+    #   runnable: cognito-auth-example/google-provider
+    #   service: default
+    identity-pool:
+      runnable: cognito-auth-example/identity-pool
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+        - cognito-auth-example/auth-domain
+        - cognito-auth-example/web-app-client
+        # - cognito-auth-example/google-provider
+        - cognito-auth-example/identity-pool
+      timeout: 600
+  variables:
+    region:
+      env: REACT_APP_REGION
+      value: us-east-1
+      type: string
+    user_pool_id:
+      env: REACT_APP_USER_POOL_ID
+      value: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+      type: string
+    client_id:
+      env: REACT_APP_CLIENT_ID
+      value: <- connection-target("web-app-client") entity-state get-member("client_id")
+      type: string
+    domain:
+      env: REACT_APP_DOMAIN
+      value: <- connection-target("auth-domain") entity get-member("domain")
+      type: string
+    identity_pool_id:
+      env: REACT_APP_IDENTITY_POOL_ID
+      value: <- connection-target("identity-pool") entity-state get-member("identity_pool_id")
+      type: string
+
+# Backend API Service (Express.js)
+api-server:
+  defines: runnable
+  containers:
+    api-server:
+      image: docker.io/imanachyn/cognito-auth-api:v1
+    ports:
+      - 3001:3001
+  connections:
+    user-pool:
+      runnable: cognito-auth-example/user-pool
+      service: default
+  services:
+    api:
+      container: api-server
+      port: 3001
+      protocol: tcp
+  depends:
+    wait-for:
+      runnables:
+        - cognito-auth-example/user-pool
+      timeout: 600
+  variables:
+    user_pool_id:
+      env: USER_POOL_ID
+      value: <- connection-target("user-pool") entity-state get-member("user_pool_id")
+      type: string
+    region:
+      env: REGION
+      value: us-east-1
+      type: string
+    port:
+      env: PORT
+      value: 3001
+    node_env:
+      env: NODE_ENV
+      value: production
+      type: string

@@ -1,3 +1,3 @@
 REPO aws-cognito
-LOAD cognito-base.yaml identity-pool.yaml base.yaml user-pool.yaml user-pool-client.yaml identity-provider.yaml common.yaml
-RESOURCES common.js cognito-base.js identity-pool-sync.js user-pool-client-sync.js user-pool-sync.js base.js identity-provider-sync.js
+LOAD user-pool-domain.yaml cognito-base.yaml identity-pool.yaml base.yaml user-pool.yaml user-pool-client.yaml identity-provider.yaml common.yaml
+RESOURCES common.js cognito-base.js identity-pool-sync.js user-pool-domain-sync.js user-pool-client-sync.js user-pool-sync.js base.js identity-provider-sync.js

@@ -60,6 +60,25 @@ identity-pool:
         type: string
         description: Identity Pool tags
       description: Identity Pool tags
+    auto_create_roles:
+      type: boolean
+      description: Whether to auto-create IAM roles for authenticated users
+    authenticated_role_arn:
+      type: string
+      description: Custom authenticated role ARN (if not auto-creating)
+    unauthenticated_role_arn:
+      type: string
+      description: Custom unauthenticated role ARN (if not auto-creating)
+    authenticated_role_policies:
+      type: array
+      items:
+        type: string
+      description: Custom policies to attach to authenticated role
+    unauthenticated_role_policies:
+      type: array
+      items:
+        type: string
+      description: Custom policies to attach to unauthenticated role
     required:
       - region
       - identity_pool_name

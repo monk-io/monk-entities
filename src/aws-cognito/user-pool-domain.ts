@@ -90,14 +90,20 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
             throw new Error('User Pool ID is required for User Pool Domain creation');
         }
         
+        // Validate domain format
+        this.validateDomainFormat(domain);
+        
         try {
             // Check if domain already exists
+            console.log(`Checking if domain ${domain} already exists...`);
             const existingDomain = this.checkDomainExists(domain);
             if (existingDomain) {
-                console.log(`User Pool Domain ${domain} already exists, marking as existing`);
+                console.log(`User Pool Domain ${domain} already exists with status: ${existingDomain.Status}, marking as existing`);
                 const state = this.formatDomainState(existingDomain, true);
                 Object.assign(this.state, state);
                 return;
+            } else {
+                console.log(`Domain ${domain} does not exist, proceeding with creation`);
             }
             
             // Determine if this is a custom domain
@@ -125,8 +131,10 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
             }
             
             // Create the domain
-            this.makeCognitoIdpRequest('CreateUserPoolDomain', params);
-            console.log(`Successfully created User Pool Domain: ${domain}`);
+            console.log(`Creating User Pool Domain: ${domain} with params:`, params);
+            const createResponse = this.makeCognitoIdpRequest('CreateUserPoolDomain', params);
+            console.log(`CreateUserPoolDomain API response:`, createResponse);
+            console.log(`Successfully initiated User Pool Domain creation: ${domain}`);
             
             // Wait a moment and then retrieve domain info
             // Some AWS services need a moment after creation
@@ -151,6 +159,18 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
             }
             
         } catch (error) {
+            console.error(`Error creating User Pool Domain ${domain}:`, error);
+            if (error instanceof Error) {
+                console.error(`Error details: ${error.message}`);
+                // Check for common domain creation errors
+                if (error.message.includes('InvalidParameterException')) {
+                    throw new Error(`Invalid parameter for User Pool Domain ${domain}: ${error.message}`);
+                } else if (error.message.includes('LimitExceededException')) {
+                    throw new Error(`Domain limit exceeded for User Pool Domain ${domain}: ${error.message}`);
+                } else if (error.message.includes('ResourceConflictException')) {
+                    throw new Error(`Domain ${domain} already exists or conflicts with existing domain: ${error.message}`);
+                }
+            }
             throw new Error(`Failed to create User Pool Domain ${domain}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
@@ -354,6 +374,54 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
     }
     
     /**
+     * Debug domain creation issues
+     */
+    @action("debug-domain")
+    debugDomain(): void {
+        const domain = this.definition.domain;
+        const userPoolId = this.definition.user_pool_id;
+        
+        try {
+            cli.output("=== Domain Debug Information ===");
+            cli.output(`Domain: ${domain}`);
+            cli.output(`User Pool ID: ${userPoolId}`);
+            cli.output(`Region: ${this.region}`);
+            cli.output("");
+            
+            // Validate domain format
+            try {
+                this.validateDomainFormat(domain);
+                cli.output("✅ Domain format validation: PASSED");
+            } catch (error) {
+                cli.output(`❌ Domain format validation: FAILED - ${error instanceof Error ? error.message : 'Unknown error'}`);
+                return;
+            }
+            
+            // Check if domain exists
+            const existingDomain = this.checkDomainExists(domain);
+            if (existingDomain) {
+                cli.output("✅ Domain exists in AWS");
+                cli.output(`Status: ${existingDomain.Status}`);
+                cli.output(`User Pool ID: ${existingDomain.UserPoolId}`);
+            } else {
+                cli.output("❌ Domain does not exist in AWS");
+            }
+            
+            // Check entity state
+            cli.output("");
+            cli.output("=== Entity State ===");
+            cli.output(`State domain: ${this.state.domain || 'Not set'}`);
+            cli.output(`State existing: ${this.state.existing}`);
+            cli.output(`State status: ${this.state.status || 'Not set'}`);
+            
+        } catch (error) {
+            const errorMsg = `Failed to debug domain: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            cli.output(errorMsg);
+            throw new Error(errorMsg);
+        }
+    }
+    
+    /**
      * Test domain accessibility and SSL configuration
      */
     @action("test-domain-access")
@@ -423,9 +491,19 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
      */
     private checkDomainExists(domain: string): Record<string, unknown> | null {
         try {
-            return this.describeDomain(domain);
-        } catch (_error) {
-            // Domain doesn't exist
+            console.log(`Checking if domain ${domain} exists...`);
+            const result = this.describeDomain(domain);
+            if (result && typeof result === 'object' && 'DomainDescription' in result) {
+                const domainDesc = result.DomainDescription as Record<string, unknown>;
+                console.log(`Domain ${domain} exists with status: ${domainDesc.Status}`);
+                return domainDesc;
+            } else {
+                console.log(`Domain ${domain} does not exist (no DomainDescription in response)`);
+                return null;
+            }
+        } catch (error) {
+            console.log(`Domain ${domain} does not exist (API error): ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Domain doesn't exist or API error
             return null;
         }
     }
@@ -455,6 +533,50 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
             }
             console.log(`Error describing domain ${domain}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error;
+        }
+    }
+    
+    /**
+     * Validate domain format according to AWS Cognito requirements
+     */
+    private validateDomainFormat(domain: string): void {
+        if (!domain || domain.length === 0) {
+            throw new Error('Domain cannot be empty');
+        }
+        
+        // Check if it's a custom domain (contains dots)
+        if (domain.includes('.')) {
+            // Custom domain validation
+            if (domain.length > 63) {
+                throw new Error('Custom domain name cannot exceed 63 characters');
+            }
+            // Basic domain format validation
+            const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+            if (!domainRegex.test(domain)) {
+                throw new Error(`Invalid custom domain format: ${domain}`);
+            }
+        } else {
+            // Cognito prefix domain validation
+            if (domain.length < 1 || domain.length > 63) {
+                throw new Error('Cognito domain prefix must be between 1 and 63 characters');
+            }
+            // Cognito prefix can only contain lowercase letters, numbers, and hyphens
+            const prefixRegex = /^[a-z0-9-]+$/;
+            if (!prefixRegex.test(domain)) {
+                throw new Error(`Invalid Cognito domain prefix: ${domain}. Only lowercase letters, numbers, and hyphens are allowed`);
+            }
+            // Cannot start or end with hyphen
+            if (domain.startsWith('-') || domain.endsWith('-')) {
+                throw new Error('Cognito domain prefix cannot start or end with a hyphen');
+            }
+            // Cannot contain forbidden words
+            const forbiddenWords = ['aws', 'amazon', 'cognito'];
+            const lowerDomain = domain.toLowerCase();
+            for (const word of forbiddenWords) {
+                if (lowerDomain.includes(word)) {
+                    throw new Error(`Domain prefix cannot contain the word "${word}". AWS restricts the use of aws, amazon, or cognito in domain prefixes.`);
+                }
+            }
         }
     }
     

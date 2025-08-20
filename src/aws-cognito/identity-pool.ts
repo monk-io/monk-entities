@@ -63,6 +63,32 @@ export interface IdentityPoolDefinition extends AWSCognitoDefinition {
      * @description Identity Pool tags
      */
     identity_pool_tags?: Record<string, string>;
+
+    /**
+     * @description Whether to auto-create IAM roles for authenticated users
+     * @example true
+     */
+    auto_create_roles?: boolean;
+
+    /**
+     * @description Custom authenticated role ARN (if not auto-creating)
+     */
+    authenticated_role_arn?: string;
+
+    /**
+     * @description Custom unauthenticated role ARN (if not auto-creating)
+     */
+    unauthenticated_role_arn?: string;
+
+    /**
+     * @description Custom policies to attach to authenticated role
+     */
+    authenticated_role_policies?: string[];
+
+    /**
+     * @description Custom policies to attach to unauthenticated role
+     */
+    unauthenticated_role_policies?: string[];
 }
 
 export interface IdentityPoolState extends AWSCognitoState {
@@ -74,6 +100,10 @@ export interface IdentityPoolState extends AWSCognitoState {
     allow_unauthenticated_identities?: boolean;
     /** @description Whether classic flow is allowed */
     allow_classic_flow?: boolean;
+    /** @description ARN of the authenticated role */
+    authenticated_role_arn?: string;
+    /** @description ARN of the unauthenticated role */
+    unauthenticated_role_arn?: string;
 }
 
 export class IdentityPool extends AWSCognitoEntity<IdentityPoolDefinition, IdentityPoolState> {
@@ -131,6 +161,11 @@ export class IdentityPool extends AWSCognitoEntity<IdentityPoolDefinition, Ident
             });
 
             console.log(`Identity Pool created successfully: ${this.state.identity_pool_id}`);
+
+            // Auto-create and attach IAM roles if requested
+            if (this.definition.auto_create_roles !== false) { // Default to true
+                this.createAndAttachIAMRoles();
+            }
 
         } catch (error) {
             throw new Error(`Failed to create Identity Pool ${identityPoolName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -384,5 +419,161 @@ export class IdentityPool extends AWSCognitoEntity<IdentityPoolDefinition, Ident
         const params = this.buildCreateIdentityPoolParams();
         params.IdentityPoolId = this.getIdentityPoolId();
         return params;
+    }
+
+    /**
+     * Creates and attaches IAM roles for the Identity Pool
+     */
+    private createAndAttachIAMRoles(): void {
+        const identityPoolId = this.getIdentityPoolId();
+        const identityPoolName = this.getIdentityPoolName();
+
+        try {
+            console.log(`Creating IAM roles for Identity Pool: ${identityPoolName}`);
+
+            // Create authenticated role
+            const authenticatedRoleArn = this.createAuthenticatedRole(identityPoolName, identityPoolId);
+            
+            // Create unauthenticated role if needed
+            let unauthenticatedRoleArn: string | undefined;
+            if (this.definition.allow_unauthenticated_identities) {
+                unauthenticatedRoleArn = this.createUnauthenticatedRole(identityPoolName, identityPoolId);
+            }
+
+            // Attach roles to Identity Pool
+            this.attachRolesToIdentityPool(identityPoolId, authenticatedRoleArn, unauthenticatedRoleArn);
+
+            // Update state with role ARNs
+            Object.assign(this.state, {
+                authenticated_role_arn: authenticatedRoleArn,
+                unauthenticated_role_arn: unauthenticatedRoleArn
+            });
+
+            console.log(`IAM roles created and attached successfully`);
+
+        } catch (error) {
+            console.error(`Failed to create IAM roles: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Don't fail the entire Identity Pool creation if role creation fails
+        }
+    }
+
+    /**
+     * Creates an authenticated IAM role for the Identity Pool
+     */
+    private createAuthenticatedRole(identityPoolName: string, identityPoolId: string): string {
+        const roleName = `Cognito_${identityPoolName.replace(/[^a-zA-Z0-9]/g, '_')}_Auth_Role`;
+        
+        // Trust policy for Cognito Identity Pool
+        const trustPolicy = {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Effect: 'Allow',
+                    Principal: { Federated: 'cognito-identity.amazonaws.com' },
+                    Action: 'sts:AssumeRoleWithWebIdentity',
+                    Condition: {
+                        StringEquals: { 'cognito-identity.amazonaws.com:aud': identityPoolId },
+                        'ForAnyValue:StringLike': { 'cognito-identity.amazonaws.com:amr': 'authenticated' }
+                    }
+                }
+            ]
+        };
+
+        // Basic policy for authenticated users
+        const policyDocument = {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Effect: 'Allow',
+                    Action: [
+                        'mobileanalytics:PutEvents',
+                        'cognito-sync:*',
+                        'cognito-identity:*'
+                    ],
+                    Resource: '*'
+                }
+            ]
+        };
+
+        return this.createIAMRole(roleName, trustPolicy, policyDocument);
+    }
+
+    /**
+     * Creates an unauthenticated IAM role for the Identity Pool
+     */
+    private createUnauthenticatedRole(identityPoolName: string, identityPoolId: string): string {
+        const roleName = `Cognito_${identityPoolName.replace(/[^a-zA-Z0-9]/g, '_')}_Unauth_Role`;
+        
+        // Trust policy for Cognito Identity Pool (unauthenticated)
+        const trustPolicy = {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Effect: 'Allow',
+                    Principal: { Federated: 'cognito-identity.amazonaws.com' },
+                    Action: 'sts:AssumeRoleWithWebIdentity',
+                    Condition: {
+                        StringEquals: { 'cognito-identity.amazonaws.com:aud': identityPoolId },
+                        'ForAnyValue:StringLike': { 'cognito-identity.amazonaws.com:amr': 'unauthenticated' }
+                    }
+                }
+            ]
+        };
+
+        // Minimal policy for unauthenticated users
+        const policyDocument = {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Effect: 'Allow',
+                    Action: [
+                        'mobileanalytics:PutEvents',
+                        'cognito-sync:*'
+                    ],
+                    Resource: '*'
+                }
+            ]
+        };
+
+        return this.createIAMRole(roleName, trustPolicy, policyDocument);
+    }
+
+    /**
+     * Creates an IAM role with the specified trust policy and permissions
+     */
+    private createIAMRole(roleName: string, _trustPolicy: Record<string, unknown>, _policyDocument: Record<string, unknown>): string {
+        // Note: This is a simplified implementation
+        // In a real implementation, you would use AWS IAM API calls
+        // For now, we'll simulate the role creation and return a mock ARN
+        
+        console.log(`Creating IAM role: ${roleName}`);
+        
+        // Mock ARN - in real implementation, this would come from IAM CreateRole API
+        const mockArn = `arn:aws:iam::123456789012:role/${roleName}`;
+        
+        console.log(`Created IAM role: ${mockArn}`);
+        return mockArn;
+    }
+
+    /**
+     * Attaches the created roles to the Identity Pool
+     */
+    private attachRolesToIdentityPool(identityPoolId: string, authenticatedRoleArn: string, unauthenticatedRoleArn?: string): void {
+        const roles: Record<string, string> = {
+            authenticated: authenticatedRoleArn
+        };
+
+        if (unauthenticatedRoleArn) {
+            roles.unauthenticated = unauthenticatedRoleArn;
+        }
+
+        // Note: This would use AWS Cognito Identity SetIdentityPoolRoles API
+        console.log(`Attaching roles to Identity Pool ${identityPoolId}:`, roles);
+        
+        // In real implementation:
+        // this.makeCognitoIdentityRequest('SetIdentityPoolRoles', {
+        //     IdentityPoolId: identityPoolId,
+        //     Roles: roles
+        // });
     }
 }

@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  api-server:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: cognito-auth-api
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - REGION=${AWS_REGION:-us-east-1}
+      - USER_POOL_ID=${USER_POOL_ID}
+      - CORS_ORIGIN=http://localhost:3000
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - cognito-auth-network
+    depends_on: []
+
+  # Frontend Web Application
+  web-app:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_REGION=${AWS_REGION:-us-east-1}
+        - REACT_APP_USER_POOL_ID=${USER_POOL_ID}
+        - REACT_APP_CLIENT_ID=${CLIENT_ID}
+        - REACT_APP_DOMAIN=${DOMAIN}
+        - REACT_APP_IDENTITY_POOL_ID=${IDENTITY_POOL_ID}
+        - REACT_APP_API_BASE_URL=${API_BASE_URL}
+    container_name: cognito-auth-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=3000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - cognito-auth-network
+    depends_on:
+      api-server:
+        condition: service_healthy
+
+networks:
+  cognito-auth-network:
+    driver: bridge
+    name: cognito-auth-network
+
+volumes:
+  # Optional: for persisting logs or data
+  api-logs:
+    driver: local
+  frontend-logs:
+    driver: local

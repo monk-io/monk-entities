@@ -29,6 +29,7 @@ user-pool-domain:
     sync: <<< user-pool-domain-sync.js
     get-domain-info: ''
     get-hosted-ui-url: ''
+    debug-domain: ''
     test-domain-access: ''
   checks:
     readiness:

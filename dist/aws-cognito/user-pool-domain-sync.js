@@ -54,8 +54,8 @@ const AWSCognitoEntity = cognitoBase.AWSCognitoEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
-var _testDomainAccess_dec, _getHostedUIUrl_dec, _getDomainInfo_dec, _a, _init;
-var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _getDomainInfo_dec = [action("get-domain-info")], _getHostedUIUrl_dec = [action("get-hosted-ui-url")], _testDomainAccess_dec = [action("test-domain-access")], _a) {
+var _testDomainAccess_dec, _debugDomain_dec, _getHostedUIUrl_dec, _getDomainInfo_dec, _a, _init;
+var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _getDomainInfo_dec = [action("get-domain-info")], _getHostedUIUrl_dec = [action("get-hosted-ui-url")], _debugDomain_dec = [action("debug-domain")], _testDomainAccess_dec = [action("test-domain-access")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -73,13 +73,17 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
     if (!userPoolId) {
       throw new Error("User Pool ID is required for User Pool Domain creation");
     }
+    this.validateDomainFormat(domain);
     try {
+      console.log(`Checking if domain ${domain} already exists...`);
       const existingDomain = this.checkDomainExists(domain);
       if (existingDomain) {
-        console.log(`User Pool Domain ${domain} already exists, marking as existing`);
+        console.log(`User Pool Domain ${domain} already exists with status: ${existingDomain.Status}, marking as existing`);
         const state = this.formatDomainState(existingDomain, true);
         Object.assign(this.state, state);
         return;
+      } else {
+        console.log(`Domain ${domain} does not exist, proceeding with creation`);
       }
       const isCustomDomain = this.isCustomDomain(domain);
       const params = {
@@ -97,8 +101,10 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
       } else if (isCustomDomain) {
         throw new Error(`Custom domain ${domain} requires custom_domain_config with certificate_arn`);
       }
-      this.makeCognitoIdpRequest("CreateUserPoolDomain", params);
-      console.log(`Successfully created User Pool Domain: ${domain}`);
+      console.log(`Creating User Pool Domain: ${domain} with params:`, params);
+      const createResponse = this.makeCognitoIdpRequest("CreateUserPoolDomain", params);
+      console.log(`CreateUserPoolDomain API response:`, createResponse);
+      console.log(`Successfully initiated User Pool Domain creation: ${domain}`);
       const domainInfo = this.describeDomain(domain);
       if (!domainInfo) {
         console.log(`Domain created but info not immediately available, storing basic state`);
@@ -118,6 +124,17 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
         Object.assign(this.state, state);
       }
     } catch (error) {
+      console.error(`Error creating User Pool Domain ${domain}:`, error);
+      if (error instanceof Error) {
+        console.error(`Error details: ${error.message}`);
+        if (error.message.includes("InvalidParameterException")) {
+          throw new Error(`Invalid parameter for User Pool Domain ${domain}: ${error.message}`);
+        } else if (error.message.includes("LimitExceededException")) {
+          throw new Error(`Domain limit exceeded for User Pool Domain ${domain}: ${error.message}`);
+        } else if (error.message.includes("ResourceConflictException")) {
+          throw new Error(`Domain ${domain} already exists or conflicts with existing domain: ${error.message}`);
+        }
+      }
       throw new Error(`Failed to create User Pool Domain ${domain}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
@@ -278,6 +295,41 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
       throw new Error(errorMsg);
     }
   }
+  debugDomain() {
+    const domain = this.definition.domain;
+    const userPoolId = this.definition.user_pool_id;
+    try {
+      cli.output("=== Domain Debug Information ===");
+      cli.output(`Domain: ${domain}`);
+      cli.output(`User Pool ID: ${userPoolId}`);
+      cli.output(`Region: ${this.region}`);
+      cli.output("");
+      try {
+        this.validateDomainFormat(domain);
+        cli.output("\u2705 Domain format validation: PASSED");
+      } catch (error) {
+        cli.output(`\u274C Domain format validation: FAILED - ${error instanceof Error ? error.message : "Unknown error"}`);
+        return;
+      }
+      const existingDomain = this.checkDomainExists(domain);
+      if (existingDomain) {
+        cli.output("\u2705 Domain exists in AWS");
+        cli.output(`Status: ${existingDomain.Status}`);
+        cli.output(`User Pool ID: ${existingDomain.UserPoolId}`);
+      } else {
+        cli.output("\u274C Domain does not exist in AWS");
+      }
+      cli.output("");
+      cli.output("=== Entity State ===");
+      cli.output(`State domain: ${this.state.domain || "Not set"}`);
+      cli.output(`State existing: ${this.state.existing}`);
+      cli.output(`State status: ${this.state.status || "Not set"}`);
+    } catch (error) {
+      const errorMsg = `Failed to debug domain: ${error instanceof Error ? error.message : "Unknown error"}`;
+      cli.output(errorMsg);
+      throw new Error(errorMsg);
+    }
+  }
   testDomainAccess() {
     const domain = this.state.domain || this.definition.domain;
     try {
@@ -332,8 +384,18 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
    */
   checkDomainExists(domain) {
     try {
-      return this.describeDomain(domain);
-    } catch (_error) {
+      console.log(`Checking if domain ${domain} exists...`);
+      const result = this.describeDomain(domain);
+      if (result && typeof result === "object" && "DomainDescription" in result) {
+        const domainDesc = result.DomainDescription;
+        console.log(`Domain ${domain} exists with status: ${domainDesc.Status}`);
+        return domainDesc;
+      } else {
+        console.log(`Domain ${domain} does not exist (no DomainDescription in response)`);
+        return null;
+      }
+    } catch (error) {
+      console.log(`Domain ${domain} does not exist (API error): ${error instanceof Error ? error.message : "Unknown error"}`);
       return null;
     }
   }
@@ -361,6 +423,41 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
       }
       console.log(`Error describing domain ${domain}: ${error instanceof Error ? error.message : "Unknown error"}`);
       throw error;
+    }
+  }
+  /**
+   * Validate domain format according to AWS Cognito requirements
+   */
+  validateDomainFormat(domain) {
+    if (!domain || domain.length === 0) {
+      throw new Error("Domain cannot be empty");
+    }
+    if (domain.includes(".")) {
+      if (domain.length > 63) {
+        throw new Error("Custom domain name cannot exceed 63 characters");
+      }
+      const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      if (!domainRegex.test(domain)) {
+        throw new Error(`Invalid custom domain format: ${domain}`);
+      }
+    } else {
+      if (domain.length < 1 || domain.length > 63) {
+        throw new Error("Cognito domain prefix must be between 1 and 63 characters");
+      }
+      const prefixRegex = /^[a-z0-9-]+$/;
+      if (!prefixRegex.test(domain)) {
+        throw new Error(`Invalid Cognito domain prefix: ${domain}. Only lowercase letters, numbers, and hyphens are allowed`);
+      }
+      if (domain.startsWith("-") || domain.endsWith("-")) {
+        throw new Error("Cognito domain prefix cannot start or end with a hyphen");
+      }
+      const forbiddenWords = ["aws", "amazon", "cognito"];
+      const lowerDomain = domain.toLowerCase();
+      for (const word of forbiddenWords) {
+        if (lowerDomain.includes(word)) {
+          throw new Error(`Domain prefix cannot contain the word "${word}". AWS restricts the use of aws, amazon, or cognito in domain prefixes.`);
+        }
+      }
     }
   }
   /**
@@ -399,6 +496,7 @@ var _UserPoolDomain = class _UserPoolDomain extends (_a = AWSCognitoEntity, _get
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getDomainInfo", _getDomainInfo_dec, _UserPoolDomain);
 __decorateElement(_init, 1, "getHostedUIUrl", _getHostedUIUrl_dec, _UserPoolDomain);
+__decorateElement(_init, 1, "debugDomain", _debugDomain_dec, _UserPoolDomain);
 __decorateElement(_init, 1, "testDomainAccess", _testDomainAccess_dec, _UserPoolDomain);
 __decoratorMetadata(_init, _UserPoolDomain);
 __name(_UserPoolDomain, "UserPoolDomain");
