@@ -1,0 +1,151 @@
+namespace: digitalocean-spaces
+spaces-bucket:
+  defines: entity
+  metadata:
+    name: SpacesBucket
+  schema:
+    region:
+      type: string
+      description: 'DO Spaces region, e.g. nyc3, ams3, sfo3'
+    access_key_secret_ref:
+      type: string
+      description: Secret name for Spaces access key (defaults to do-spaces-access-key)
+    secret_key_secret_ref:
+      type: string
+      description: Secret name for Spaces secret key (defaults to do-spaces-secret-key)
+    bucket_name:
+      type: string
+      description: Space (bucket) name
+    versioning:
+      type: boolean
+      description: 'Enable or disable bucket versioning (default: false)'
+    public_read_access:
+      type: boolean
+      description: >-
+        Whether to allow public reads/writes (DO doesn't support
+        PublicAccessBlock; logs a warning)
+    public_write_access:
+      type: boolean
+    cors_configuration:
+      type: object
+      properties:
+        cors_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              allowed_headers:
+                type: array
+                items:
+                  type: string
+              allowed_methods:
+                type: array
+                items:
+                  type: string
+              allowed_origins:
+                type: array
+                items:
+                  type: string
+              expose_headers:
+                type: array
+                items:
+                  type: string
+              max_age_seconds:
+                type: number
+            required:
+              - allowed_methods
+              - allowed_origins
+            additionalProperties: false
+      required:
+        - cors_rules
+      additionalProperties: false
+      description: CORS configuration for the bucket
+    lifecycle_configuration:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              status:
+                type: string
+                enum:
+                  - Enabled
+                  - Disabled
+              filter:
+                type: object
+                properties:
+                  prefix:
+                    type: string
+                  tags:
+                    type: object
+                    additionalProperties:
+                      type: string
+                additionalProperties: false
+              expiration:
+                type: object
+                properties:
+                  days:
+                    type: number
+                  date:
+                    type: string
+                additionalProperties: false
+              transitions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    days:
+                      type: number
+                    date:
+                      type: string
+                    storage_class:
+                      type: string
+                  required:
+                    - storage_class
+                  additionalProperties: false
+            required:
+              - id
+              - status
+            additionalProperties: false
+      required:
+        - rules
+      additionalProperties: false
+      description: >-
+        Lifecycle rules (S3-compatible). Note: lifecycle entity removed;
+        configure via bucket
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the bucket
+      description: Resource tags for the bucket
+    required:
+      - region
+      - bucket_name
+  state-schema:
+    existing:
+      type: boolean
+    bucket_name:
+      type: string
+    region:
+      type: string
+  lifecycle:
+    sync: <<< spaces-bucket-sync.js
+    get-bucket-info: ''
+    list-objects: ''
+    generate-presigned-url: ''
+    empty-bucket: ''
+    get-bucket-statistics: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - digitalocean-spaces/do-s3-base
+    - cli
+    - monkec/base

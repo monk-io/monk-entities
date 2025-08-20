@@ -1,0 +1,3 @@
+REPO digitalocean-spaces
+LOAD spaces-bucket.yaml do-s3-base.yaml spaces-keys.yaml
+RESOURCES spaces-keys-sync.js do-s3-base.js spaces-bucket-sync.js
