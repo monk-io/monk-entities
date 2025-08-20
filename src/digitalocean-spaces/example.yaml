@@ -1,0 +1,44 @@
+namespace: do-spaces-example
+
+# -----------------------------------------------------------------------------
+# DigitalOcean Spaces Keys
+# Creates a Spaces access key/secret via DigitalOcean API and stores them
+# into Monk secrets for later use. You need a DO API token (PAT) in secret
+# `do-api-token`. See docs: https://docs.digitalocean.com/reference/api/digitalocean/#tag/Spaces-Keys
+# -----------------------------------------------------------------------------
+spaces-keys:
+  defines: digitalocean-spaces/spaces-keys
+  permitted-secrets:
+    do-spaces-access-key: true
+    do-spaces-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+# After running the spaces-keys entity, export the generated credentials so
+# S3-compatible requests (used by lifecycle) are signed properly:
+#   export AWS_ACCESS_KEY_ID=$(monk secret get do-spaces-access-key)
+#   export AWS_SECRET_ACCESS_KEY=$(monk secret get do-spaces-secret-key)
+#
+# Alternatively, set these env vars in your runtime before running lifecycle.
+
+# Create a new Space (bucket)
+# Requires AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY exported from keys step
+# or using from secrets directly
+# -----------------------------------------------------------------------------
+space:
+  defines: digitalocean-spaces/spaces-bucket
+  region: nyc3
+  bucket_name: test-unique-backet-sergey
+  permitted-secrets:
+    do-spaces-access-key: true
+    do-spaces-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+# Usage:
+# 1) Load:    monk load dist/digitalocean-spaces/MANIFEST
+# 2) Create:  monk run do-spaces-example/spaces-keys
+# 3) Export:  export AWS_ACCESS_KEY_ID=$(monk secret get do-spaces-access-key)
+#             export AWS_SECRET_ACCESS_KEY=$(monk secret get do-spaces-secret-key)
