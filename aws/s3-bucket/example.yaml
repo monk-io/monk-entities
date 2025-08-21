@@ -1,6 +1,0 @@
-namespace: aws
-
-mybucket:
-  defines: aws/s3-bucket
-  name: testmyuniquebucket
-  region: us-east-1

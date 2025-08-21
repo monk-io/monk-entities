@@ -1,3 +1,0 @@
-REPO aws
-LOAD efs.yml
-RESOURCES efs.js

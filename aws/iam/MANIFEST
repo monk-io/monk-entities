@@ -1,3 +1,0 @@
-REPO iam
-LOAD user.yaml group.yaml policy.yaml accesskey.yaml
-RESOURCES user-sync.js group-sync.js policy-sync.js accesskey-sync.js
