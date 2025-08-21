@@ -1,8 +1,0 @@
-namespace: aws
-
-my-fs:
-  defines: aws/efs
-  region: eu-north-1
-  performance_mode: generalPurpose
-  token: my-fs
-  encrypted: true
