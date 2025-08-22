@@ -1,0 +1,26 @@
+namespace: digitalocean-database
+api-token:
+  defines: entity
+  metadata:
+    name: ApiToken
+  schema:
+    name:
+      type: string
+  state-schema:
+    id:
+      type: string
+    token:
+      type: string
+    existing:
+      type: boolean
+  lifecycle:
+    sync: <<< api-token-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - secret
+    - cli
