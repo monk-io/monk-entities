@@ -1,0 +1,3 @@
+REPO digitalocean-domains
+LOAD domain.yaml common.yaml
+RESOURCES domain-sync.js common.js

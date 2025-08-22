@@ -1,0 +1,37 @@
+namespace: do-domains-example
+
+# -----------------------------------------------------------------------------
+# DigitalOcean Domain Management
+# Creates and manages domains using DigitalOcean API. Requires DigitalOcean
+# provider to be configured with API token.
+# See docs: https://docs.digitalocean.com/reference/api/digitalocean/#tag/Domains
+# -----------------------------------------------------------------------------
+
+# Create a domain with A record pointing to IP
+domain-with-ip:
+  defines: digitalocean-domains/domain
+  name: example.com
+  ip_address: 192.168.1.1
+  ttl: 3600
+  services:
+    data:
+      protocol: custom
+
+# Create a domain without initial A record
+domain-only:
+  defines: digitalocean-domains/domain
+  name: monk-test-domain-unique-12345.com
+  services:
+    data:
+      protocol: custom
+
+# Usage:
+# 1) Configure DigitalOcean provider with your API token
+# 2) Load the module:
+#    monk load dist/digitalocean-domains/MANIFEST
+# 3) Create domain:
+#    monk run do-domains-example/domain-with-ip
+# 4) Check domain:
+#    monk describe do-domains-example/domain-with-ip
+# 5) Delete domain:
+#    monk delete do-domains-example/domain-with-ip
