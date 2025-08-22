@@ -1,0 +1,75 @@
+name: "Redis Cloud Development Stack Test"
+description: "Test development stack deployment with Redis Cloud entities"
+timeout: 540000
+
+secrets:
+  global:
+    redis-cloud-account-key: "$REDIS_CLOUD_ACCOUNT_KEY"
+    redis-cloud-user-key: "$REDIS_CLOUD_USER_KEY"
+
+setup:
+  - name: "Load compiled Redis Cloud entities"
+    action: "load"
+    target: "dist/input/redis-cloud/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy essentials development stack"
+    action: "run"
+    target: "redis-cloud-example/essentials-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for essentials stack readiness"
+    action: "wait"
+    target: "redis-cloud-example/essentials-stack"
+    waitFor:
+      condition: "ready"
+      timeout: 300000
+
+  - name: "Verify essentials subscription status"
+    action: "describe"
+    target: "redis-cloud-example/essentials-subscription"
+    expect:
+      exitCode: 0
+
+  - name: "Verify essentials database status"
+    action: "describe"
+    target: "redis-cloud-example/essentials-database"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for essentials connection test to exit"
+    action: "wait"
+    target: "redis-cloud-example/essentials-connection-test"
+    waitFor:
+      condition: "exited"
+      timeout: 150000
+
+  - name: "Check essentials connection test logs"
+    action: "logs"
+    target: "redis-cloud-example/essentials-connection-test"
+    expect:
+      exitCode: 0
+      contains:
+        - "Connected to Redis Cloud Essentials successfully!"
+        - "Redis Cloud Essentials test completed successfully!"
+
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete essentials development stack"
+    action: "delete"
+    target: "redis-cloud-example/essentials-stack"
+    expect:
+      exitCode: 0

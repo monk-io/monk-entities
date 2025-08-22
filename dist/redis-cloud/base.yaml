@@ -1,0 +1,5 @@
+namespace: redis-cloud
+
+base:
+  defines: module
+  source: <<< base.js
