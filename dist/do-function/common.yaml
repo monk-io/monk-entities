@@ -1,0 +1,5 @@
+namespace: do-function
+
+common:
+  defines: module
+  source: <<< common.js

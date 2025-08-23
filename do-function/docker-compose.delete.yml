@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Dedicated delete service - much simpler to use
+  delete-function:
+    build: .
+    environment:
+      # Required: DigitalOcean API token
+      - DO_API_TOKEN=${DO_API_TOKEN}
+      
+      # Required: Function name to delete
+      - FUNCTION_NAME=${FUNCTION_NAME}
+      
+      # Optional: Namespace (default: "default")
+      - NAMESPACE_NAME=${NAMESPACE_NAME:-default}
+      
+      # Optional: Post-delete script
+      - POST_DELETE=${POST_DELETE:-}
+    
+    # Use the dedicated delete script
+    command: ["/app/delete.sh"]
+    
+    # No need to mount function code for deletion
+    # volumes: []
+    
+    # Exit after deletion
+    restart: "no"

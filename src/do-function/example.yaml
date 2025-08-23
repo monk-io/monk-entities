@@ -1,0 +1,235 @@
+# DigitalOcean App Platform Functions Examples
+
+namespace: do-functions-examples
+
+# Basic Node.js function
+basic-nodejs-function:
+  defines: do-function/function
+  app_name: my-nodejs-app
+  component_name: hello-function
+  github_repo: https://github.com/digitalocean/sample-functions-nodejs-helloworld
+  github_branch: main
+  region: nyc1
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  api_token_secret_ref: do-api-token
+
+# Python function with environment variables
+python-function-with-env:
+  defines: do-function/function
+  app_name: my-python-app
+  component_name: api-function
+  github_repo: https://github.com/your-org/python-function-repo
+  github_branch: main
+  source_dir: /api
+  region: sfo3
+  environment_slug: python
+  instance_count: 2
+  instance_size_slug: basic-xs
+  api_token_secret_ref: do-api-token
+  envs:
+    - key: NODE_ENV
+      value: production
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: DATABASE_URL
+      value: secret("database-url")
+      scope: RUN_TIME
+      type: SECRET
+    - key: API_KEY
+      value: secret("api-key")
+      scope: RUN_TIME
+      type: SECRET
+  routes:
+    - path: /api
+      preserve_path_prefix: true
+
+# Go function with custom domain and alerts
+go-function-production:
+  defines: do-function/function
+  app_name: go-microservice
+  component_name: service-function
+  github_repo: https://github.com/your-org/go-microservice
+  github_branch: production
+  source_dir: /
+  region: fra1
+  environment_slug: go
+  instance_count: 3
+  instance_size_slug: professional-xs
+  cpu_kind: dedicated
+  api_token_secret_ref: do-api-token
+  github_deploy_on_push: true
+  build_command: go build -o main .
+  run_command: ./main
+  envs:
+    - key: GO_ENV
+      value: production
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: JWT_SECRET
+      value: secret("jwt-secret")
+      scope: RUN_TIME
+      type: SECRET
+    - key: REDIS_URL
+      value: secret("redis-url")
+      scope: RUN_TIME
+      type: SECRET
+  domains:
+    - domain: api.example.com
+      type: PRIMARY
+      zone: example.com
+      minimum_tls_version: "1.2"
+  alerts:
+    - rule: DEPLOYMENT_FAILED
+      disabled: false
+    - rule: FUNCTIONS_ERROR_RATE_PER_MINUTE
+      disabled: false
+  routes:
+    - path: /
+      preserve_path_prefix: false
+
+# Function with log forwarding to Datadog
+function-with-datadog-logs:
+  defines: do-function/function
+  app_name: monitored-app
+  component_name: monitored-function
+  github_repo: https://github.com/your-org/monitored-function
+  github_branch: main
+  region: nyc3
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-s
+  api_token_secret_ref: do-api-token
+  envs:
+    - key: LOG_LEVEL
+      value: info
+      scope: RUN_TIME
+      type: GENERAL
+    - key: APP_NAME
+      value: monitored-function
+      scope: RUN_TIME
+      type: GENERAL
+  log_destinations:
+    - name: datadog-logs
+      datadog:
+        endpoint: https://http-intake.logs.datadoghq.com
+        api_key_secret_ref: datadog-api-key
+
+# Function with log forwarding to Logtail
+function-with-logtail-logs:
+  defines: do-function/function
+  app_name: logged-app
+  component_name: logged-function
+  github_repo: https://github.com/your-org/logged-function
+  github_branch: main
+  region: lon1
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  api_token_secret_ref: do-api-token
+  log_destinations:
+    - name: logtail-logs
+      logtail:
+        token_secret_ref: logtail-token
+
+# PHP function with multiple routes
+php-function-multi-route:
+  defines: do-function/function
+  app_name: php-api
+  component_name: api-function
+  github_repo: https://github.com/your-org/php-api
+  github_branch: main
+  source_dir: /src
+  region: ams3
+  environment_slug: php
+  instance_count: 2
+  instance_size_slug: basic-s
+  api_token_secret_ref: do-api-token
+  envs:
+    - key: PHP_ENV
+      value: production
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: DB_PASSWORD
+      value: secret("db-password")
+      scope: RUN_TIME
+      type: SECRET
+  routes:
+    - path: /api/v1
+      preserve_path_prefix: true
+    - path: /health
+      preserve_path_prefix: false
+
+# Development function with minimal configuration
+dev-function:
+  defines: do-function/function
+  app_name: dev-test-app
+  component_name: test-function
+  github_repo: https://github.com/your-org/test-function
+  github_branch: develop
+  region: nyc1
+  api_token_secret_ref: do-api-token
+  github_deploy_on_push: true
+  envs:
+    - key: NODE_ENV
+      value: development
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+
+# Multi-environment deployment group
+multi-env-deployment:
+  defines: process-group
+  runnable-list:
+    - staging-function
+    - production-function
+
+staging-function:
+  defines: do-function/function
+  app_name: myapp-staging
+  component_name: api-function
+  github_repo: https://github.com/your-org/myapp
+  github_branch: staging
+  region: nyc1
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  api_token_secret_ref: do-api-token
+  envs:
+    - key: NODE_ENV
+      value: staging
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: DATABASE_URL
+      value: secret("staging-database-url")
+      scope: RUN_TIME
+      type: SECRET
+
+production-function:
+  defines: do-function/function
+  app_name: myapp-production
+  component_name: api-function
+  github_repo: https://github.com/your-org/myapp
+  github_branch: main
+  region: fra1
+  environment_slug: node-js
+  instance_count: 3
+  instance_size_slug: professional-s
+  cpu_kind: dedicated
+  api_token_secret_ref: do-api-token
+  envs:
+    - key: NODE_ENV
+      value: production
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: DATABASE_URL
+      value: secret("production-database-url")
+      scope: RUN_TIME
+      type: SECRET
+  domains:
+    - domain: api.myapp.com
+      type: PRIMARY
+      zone: myapp.com
+  alerts:
+    - rule: DEPLOYMENT_FAILED
+    - rule: FUNCTIONS_ERROR_RATE_PER_MINUTE
