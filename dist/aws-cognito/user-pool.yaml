@@ -1,0 +1,259 @@
+namespace: aws-cognito
+user-pool:
+  defines: entity
+  metadata:
+    name: UserPool
+  schema:
+    region:
+      type: string
+      description: AWS region where the Cognito resources will be managed
+    pool_name:
+      type: string
+      description: Name of the User Pool
+    mfa_configuration:
+      type: string
+      enum:
+        - 'OFF'
+        - 'ON'
+        - OPTIONAL
+      description: Multi-factor authentication configuration
+    schema:
+      type: array
+      items:
+        type: object
+        properties:
+          Name:
+            type: string
+          AttributeDataType:
+            type: string
+            enum:
+              - String
+              - Number
+              - DateTime
+              - Boolean
+          Required:
+            type: boolean
+          Mutable:
+            type: boolean
+          DeveloperOnlyAttribute:
+            type: boolean
+          StringAttributeConstraints:
+            type: object
+            properties:
+              MinLength:
+                type: string
+              MaxLength:
+                type: string
+            additionalProperties: false
+          NumberAttributeConstraints:
+            type: object
+            properties:
+              MinValue:
+                type: string
+              MaxValue:
+                type: string
+            additionalProperties: false
+        required:
+          - Name
+          - AttributeDataType
+        additionalProperties: false
+      description: Custom attributes for user profiles
+    password_policy:
+      type: object
+      properties:
+        MinimumLength:
+          type: number
+        RequireUppercase:
+          type: boolean
+        RequireLowercase:
+          type: boolean
+        RequireNumbers:
+          type: boolean
+        RequireSymbols:
+          type: boolean
+        TemporaryPasswordValidityDays:
+          type: number
+      additionalProperties: false
+      description: Password policy settings
+    admin_create_user_config:
+      type: object
+      properties:
+        AllowAdminCreateUserOnly:
+          type: boolean
+        UnusedAccountValidityDays:
+          type: number
+        InviteMessageAction:
+          type: string
+          enum:
+            - EMAIL
+            - SMS
+            - SUPPRESS
+        TemporaryPasswordValidityDays:
+          type: number
+      additionalProperties: false
+      description: Admin create user configuration
+    device_configuration:
+      type: object
+      properties:
+        ChallengeRequiredOnNewDevice:
+          type: boolean
+        DeviceOnlyRememberedOnUserPrompt:
+          type: boolean
+      additionalProperties: false
+      description: Device configuration settings
+    email_configuration:
+      type: object
+      properties:
+        EmailSendingAccount:
+          type: string
+          enum:
+            - COGNITO_DEFAULT
+            - DEVELOPER
+        SourceArn:
+          type: string
+        ReplyToEmailAddress:
+          type: string
+        ConfigurationSet:
+          type: string
+        From:
+          type: string
+      additionalProperties: false
+      description: Email configuration for user communications
+    sms_configuration:
+      type: object
+      properties:
+        SnsCallerArn:
+          type: string
+        ExternalId:
+          type: string
+        SnsRegion:
+          type: string
+      required:
+        - SnsCallerArn
+      additionalProperties: false
+      description: SMS configuration for user communications
+    auto_verified_attributes:
+      type: array
+      items:
+        type: string
+        enum:
+          - email
+          - phone_number
+      description: Auto-verified attributes
+    alias_attributes:
+      type: array
+      items:
+        type: string
+        enum:
+          - email
+          - phone_number
+          - preferred_username
+      description: Alias attributes for sign-in
+    username_attributes:
+      type: array
+      items:
+        type: string
+        enum:
+          - email
+          - phone_number
+      description: Username attributes for sign-in
+    verification_message_template:
+      type: object
+      properties:
+        SmsMessage:
+          type: string
+        EmailMessage:
+          type: string
+        EmailSubject:
+          type: string
+        EmailMessageByLink:
+          type: string
+        EmailSubjectByLink:
+          type: string
+        DefaultEmailOption:
+          type: string
+          enum:
+            - CONFIRM_WITH_LINK
+            - CONFIRM_WITH_CODE
+      additionalProperties: false
+      description: Custom verification message templates
+    account_recovery_setting:
+      type: object
+      properties:
+        RecoveryMechanisms:
+          type: array
+          items:
+            type: object
+            properties:
+              Priority:
+                type: number
+                enum:
+                  - 1
+                  - 2
+              Name:
+                type: string
+                enum:
+                  - verified_email
+                  - verified_phone_number
+                  - admin_only
+            required:
+              - Priority
+              - Name
+            additionalProperties: false
+      required:
+        - RecoveryMechanisms
+      additionalProperties: false
+      description: Account recovery settings
+    username_configuration:
+      type: object
+      properties:
+        CaseSensitive:
+          type: boolean
+      additionalProperties: false
+      description: Username configuration
+    user_pool_add_ons:
+      type: object
+      properties:
+        AdvancedSecurityMode:
+          type: string
+          enum:
+            - 'OFF'
+            - AUDIT
+            - ENFORCED
+      additionalProperties: false
+      description: User pool add-ons
+    user_attribute_update_settings:
+      type: object
+      properties:
+        AttributesRequireVerificationBeforeUpdate:
+          type: array
+          items:
+            type: string
+            enum:
+              - email
+              - phone_number
+      additionalProperties: false
+      description: User attribute update settings
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Tags to apply to the User Pool
+      description: Tags to apply to the User Pool
+    required:
+      - region
+      - pool_name
+  lifecycle:
+    sync: <<< user-pool-sync.js
+    get-pool-info: ''
+    list-users: ''
+    create-user: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - monkec/base
+    - cli
+    - aws-cognito/cognito-base

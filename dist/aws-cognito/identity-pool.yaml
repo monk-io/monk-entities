@@ -1,0 +1,98 @@
+namespace: aws-cognito
+identity-pool:
+  defines: entity
+  metadata:
+    name: IdentityPool
+  schema:
+    region:
+      type: string
+      description: AWS region where the Cognito resources will be managed
+    identity_pool_name:
+      type: string
+      description: Name of the Identity Pool
+    allow_unauthenticated_identities:
+      type: boolean
+      description: Whether to allow unauthenticated identities
+    allow_classic_flow:
+      type: boolean
+      description: Whether to allow classic (basic) authentication flow
+    cognito_identity_providers:
+      type: array
+      items:
+        type: object
+        properties:
+          ProviderName:
+            type: string
+            description: User Pool ID
+          ClientId:
+            type: string
+            description: User Pool Client ID
+          ServerSideTokenCheck:
+            type: boolean
+            description: Whether server-side token check is enabled
+        required:
+          - ProviderName
+          - ClientId
+        additionalProperties: false
+      description: Cognito Identity Providers configuration
+    saml_providers:
+      type: array
+      items:
+        type: string
+      description: SAML Identity Providers
+    openid_connect_provider_arns:
+      type: array
+      items:
+        type: string
+      description: OpenID Connect Providers
+    supported_login_providers:
+      type: object
+      additionalProperties:
+        type: string
+        description: 'Supported login providers (e.g., Facebook, Google, Amazon)'
+      description: 'Supported login providers (e.g., Facebook, Google, Amazon)'
+    developer_provider_name:
+      type: string
+      description: Developer provider name for custom authentication
+    identity_pool_tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Identity Pool tags
+      description: Identity Pool tags
+    auto_create_roles:
+      type: boolean
+      description: Whether to auto-create IAM roles for authenticated users
+    authenticated_role_arn:
+      type: string
+      description: Custom authenticated role ARN (if not auto-creating)
+    unauthenticated_role_arn:
+      type: string
+      description: Custom unauthenticated role ARN (if not auto-creating)
+    authenticated_role_policies:
+      type: array
+      items:
+        type: string
+      description: Custom policies to attach to authenticated role
+    unauthenticated_role_policies:
+      type: array
+      items:
+        type: string
+      description: Custom policies to attach to unauthenticated role
+    required:
+      - region
+      - identity_pool_name
+  lifecycle:
+    sync: <<< identity-pool-sync.js
+    get-pool-info: ''
+    get-credentials-for-identity: ''
+    get-identity-id: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - monkec/base
+    - cli
+    - aws-cognito/cognito-base

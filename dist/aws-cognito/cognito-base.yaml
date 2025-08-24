@@ -1,0 +1,5 @@
+namespace: aws-cognito
+
+cognito-base:
+  defines: module
+  source: <<< cognito-base.js

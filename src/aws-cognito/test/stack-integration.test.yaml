@@ -1,0 +1,342 @@
+name: "AWS Cognito User Pool Integration Test"
+description: "Complete integration test for AWS Cognito User Pool entity using Monk runtime"
+timeout: 300000
+
+setup:
+  - name: "Load compiled Cognito entities"
+    action: "load"
+    target: "dist/input/aws-cognito/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load User Pool test template"
+    action: "load" 
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Basic User Pool Tests
+  - name: "Create and start basic User Pool"
+    action: "run"
+    target: "cognito-test/test-user-pool"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for basic User Pool readiness"
+    action: "wait"
+    target: "cognito-test/test-user-pool"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get basic User Pool information"
+    action: "do"
+    target: "cognito-test/test-user-pool/get-pool-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Information"
+        - "Pool ID:"
+        - "Pool Name: monk-test-user-pool"
+        - "Status:"
+
+  - name: "List users in basic User Pool (should be empty)"
+    action: "do"
+    target: "cognito-test/test-user-pool/list-users"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Users"
+        - "No users found"
+
+  - name: "Get User Pool clients (should be empty)"
+    action: "do"
+    target: "cognito-test/test-user-pool/get-user-pool-clients"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Clients"
+        - "No clients found"
+
+  - name: "Create a test user in basic User Pool"
+    action: "do"
+    target: "cognito-test/test-user-pool/create-user"
+    args:
+      username: "testuser@example.com"
+      temporary_password: "TempPass123!"
+      message_action: "SUPPRESS"
+      user_attributes: '{"email": "testuser@example.com", "given_name": "Test", "family_name": "User"}'
+    expect:
+      exitCode: 0
+      output:
+        - "User Created Successfully"
+        - "Username: testuser@example.com"
+
+  - name: "List users after creation (should show 1 user)"
+    action: "do"
+    target: "cognito-test/test-user-pool/list-users"
+    expect:
+      exitCode: 0
+      output:
+        - "Found 1 users"
+        - "testuser@example.com"
+
+  # Advanced User Pool Tests
+  - name: "Create and start advanced User Pool"
+    action: "run"
+    target: "cognito-test/test-advanced-user-pool"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for advanced User Pool readiness"
+    action: "wait"
+    target: "cognito-test/test-advanced-user-pool"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get advanced User Pool information"
+    action: "do"
+    target: "cognito-test/test-advanced-user-pool/get-pool-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Information"
+        - "Pool Name: monk-test-advanced-user-pool"
+        - "MFA Configuration: ON"
+        - "Password Policy"
+        - "Minimum Length: 10"
+
+  - name: "Create admin user in advanced User Pool"
+    action: "do"
+    target: "cognito-test/test-advanced-user-pool/create-user"
+    args:
+      username: "admin@example.com"
+      temporary_password: "AdminPass123!"
+      message_action: "SUPPRESS"
+      user_attributes: '{"email": "admin@example.com", "given_name": "Admin", "family_name": "User", "custom:department": "IT", "custom:employee_id": "12345"}'
+    expect:
+      exitCode: 0
+      output:
+        - "User Created Successfully"
+        - "Username: admin@example.com"
+
+  # Update Tests
+  - name: "Update basic User Pool configuration"
+    action: "update"
+    target: "cognito-test/test-user-pool"
+    expect:
+      exitCode: 0
+
+  - name: "Verify basic User Pool still works after update"
+    action: "do"
+    target: "cognito-test/test-user-pool/get-pool-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Information"
+        - "Pool Name: monk-test-user-pool"
+
+  # User Pool Client Tests
+  - name: "Create and start basic User Pool Client"
+    action: "run"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for basic User Pool Client readiness"
+    action: "wait"
+    target: "cognito-test/test-user-pool-client"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get basic User Pool Client information"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-client"
+        - "Client ID:"
+        - "Has Secret: No"
+        - "Auth Flows:"
+
+  - name: "Test authentication configuration"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/test-auth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "Authentication Configuration Test"
+        - "SRP Authentication:"
+        - "Password Authentication:"
+        - "Refresh Token:"
+
+  # OAuth User Pool Client Tests
+  - name: "Create and start OAuth User Pool Client"
+    action: "run"
+    target: "cognito-test/test-oauth-client"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for OAuth User Pool Client readiness"
+    action: "wait"
+    target: "cognito-test/test-oauth-client"
+    waitFor:
+      condition: "ready"
+      timeout: 60000
+
+  - name: "Get OAuth User Pool Client information"
+    action: "do"
+    target: "cognito-test/test-oauth-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-oauth-client"
+        - "Client ID:"
+        - "Has Secret: Yes"
+        - "OAuth Flows:"
+
+  - name: "Get OAuth configuration"
+    action: "do"
+    target: "cognito-test/test-oauth-client/get-oauth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "OAuth/OIDC Configuration"
+        - "Allowed OAuth Flows:"
+        - "Allowed OAuth Scopes:"
+        - "Callback URLs:"
+        - "example.com/callback"
+
+  - name: "Test OAuth authentication configuration"
+    action: "do"
+    target: "cognito-test/test-oauth-client/test-auth-config"
+    expect:
+      exitCode: 0
+      output:
+        - "Authentication Configuration Test"
+        - "OAuth Configuration:"
+        - "OAuth Flows:"
+        - "Callback URLs:"
+
+  # Verify User Pool now shows clients
+  - name: "Check User Pool clients (should show 2 clients)"
+    action: "do"
+    target: "cognito-test/test-user-pool/get-user-pool-clients"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Clients"
+        - "Found 2 clients"
+        - "monk-test-client"
+        - "monk-test-oauth-client"
+
+  # Update User Pool Client
+  - name: "Update basic User Pool Client configuration"
+    action: "update"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+
+  - name: "Verify basic User Pool Client still works after update"
+    action: "do"
+    target: "cognito-test/test-user-pool-client/get-client-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Client Information"
+        - "Client Name: monk-test-client"
+
+  # User Pool Domain Tests
+  - name: "Create and start User Pool Domain"
+    action: "run"
+    target: "cognito-test/test-user-pool-domain"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for User Pool Domain readiness"
+    action: "wait"
+    target: "cognito-test/test-user-pool-domain"
+    waitFor:
+      condition: "ready"
+      timeout: 180000  # Domains can take up to 3 minutes
+
+  - name: "Get User Pool Domain information"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/get-domain-info"
+    expect:
+      exitCode: 0
+      output:
+        - "User Pool Domain Information"
+        - "Domain: monk-cognito-test"
+        - "Status: ACTIVE"
+        - "Full Domain URL:"
+
+  - name: "Get hosted UI URLs"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/get-hosted-ui-url"
+    expect:
+      exitCode: 0
+      output:
+        - "Hosted UI URLs"
+        - "monk-cognito-test.auth."
+        - "Login:"
+        - "Signup:"
+        - "OAuth 2.0 Endpoints:"
+
+  - name: "Test domain access"
+    action: "do"
+    target: "cognito-test/test-user-pool-domain/test-domain-access"
+    expect:
+      exitCode: 0
+      output:
+        - "Domain Access Test"
+        - "Domain: monk-cognito-test"
+        - "Domain Status: Active"
+        - "Domain Type: Cognito Prefix Domain"
+
+cleanup:
+  - name: "Stop and delete User Pool Domain"
+    action: "delete"
+    target: "cognito-test/test-user-pool-domain"
+    expect:
+      exitCode: 0
+
+  - name: "Stop and delete basic User Pool Client"
+    action: "delete"
+    target: "cognito-test/test-user-pool-client"
+    expect:
+      exitCode: 0
+
+  - name: "Stop and delete OAuth User Pool Client"
+    action: "delete"
+    target: "cognito-test/test-oauth-client"
+    expect:
+      exitCode: 0
+
+  - name: "Stop and delete basic User Pool"
+    action: "delete"
+    target: "cognito-test/test-user-pool"
+    expect:
+      exitCode: 0
+
+  - name: "Stop and delete advanced User Pool"
+    action: "delete"
+    target: "cognito-test/test-advanced-user-pool"
+    expect:
+      exitCode: 0

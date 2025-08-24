@@ -1,0 +1,42 @@
+namespace: aws-cognito
+user-pool-domain:
+  defines: entity
+  metadata:
+    name: UserPoolDomain
+  schema:
+    region:
+      type: string
+      description: AWS region where the Cognito resources will be managed
+    user_pool_id:
+      type: string
+    domain:
+      type: string
+    custom_domain_config:
+      type: object
+      properties:
+        certificate_arn:
+          type: string
+        managed_login_version:
+          type: number
+      required:
+        - certificate_arn
+      additionalProperties: false
+    required:
+      - region
+      - user_pool_id
+      - domain
+  lifecycle:
+    sync: <<< user-pool-domain-sync.js
+    get-domain-info: ''
+    get-hosted-ui-url: ''
+    debug-domain: ''
+    test-domain-access: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-cognito/cognito-base
+    - monkec/base
+    - cli
