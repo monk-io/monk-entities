@@ -1,0 +1,46 @@
+namespace: digitalocean-domains
+domain:
+  defines: entity
+  metadata:
+    name: Domain
+  schema:
+    name:
+      type: string
+      description: 'Domain name (e.g., example.com)'
+    ip_address:
+      type: string
+      description: IP address for the domain's A record (optional)
+    ttl:
+      type: number
+      description: 'TTL for DNS records in seconds (default: 1800)'
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+    name:
+      type: string
+      description: Domain name
+    ttl:
+      type: number
+      description: Domain TTL
+    zone_file:
+      type: string
+      description: Zone file content
+  lifecycle:
+    sync: <<< domain-sync.js
+    info: ''
+    records: ''
+    add-a-record: ''
+    add-cname-record: ''
+    list-all-domains: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - digitalocean-domains/common
+    - monkec/base
+    - monkec/base
+    - cli
