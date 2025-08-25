@@ -47,7 +47,7 @@ function validateRegistryRegion(region) {
 function validateSubscriptionTier(tier) {
   const validTiers = ["basic", "professional"];
   if (!validTiers.includes(tier)) {
-    throw new Error(`Invalid subscription tier: ${tier}. Valid tiers: ${validTiers.join(", ")}`);
+    throw new Error(`Invalid subscription tier: ${tier}. Valid tiers: ${validTiers.join(", ")}. Note: 'starter' tier is only available through DigitalOcean web interface, not API.`);
   }
   return tier;
 }

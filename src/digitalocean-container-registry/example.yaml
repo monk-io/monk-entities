@@ -1,6 +1,6 @@
 namespace: digitalocean-container-registry-example
 
-# Basic Container Registry with basic tier
+# Basic Container Registry with basic tier ($5/month)
 my-basic-registry:
   defines: digitalocean-container-registry/digital-ocean-container-registry
   name: my-docker-registry

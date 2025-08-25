@@ -3,7 +3,7 @@
  */
 
 /**
- * Container Registry subscription tiers
+ * Container Registry subscription tiers (API only supports basic and professional)
  */
 export type RegistrySubscriptionTier = "basic" | "professional";
 
@@ -69,7 +69,7 @@ export function validateRegistryRegion(region: string): RegistryRegion {
 export function validateSubscriptionTier(tier: string): RegistrySubscriptionTier {
     const validTiers: RegistrySubscriptionTier[] = ["basic", "professional"];
     if (!validTiers.includes(tier as RegistrySubscriptionTier)) {
-        throw new Error(`Invalid subscription tier: ${tier}. Valid tiers: ${validTiers.join(", ")}`);
+        throw new Error(`Invalid subscription tier: ${tier}. Valid tiers: ${validTiers.join(", ")}. Note: 'starter' tier is only available through DigitalOcean web interface, not API.`);
     }
     return tier as RegistrySubscriptionTier;
 }

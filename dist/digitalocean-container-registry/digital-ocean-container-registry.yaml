@@ -28,7 +28,9 @@ digital-ocean-container-registry:
       enum:
         - basic
         - professional
-      description: The subscription tier for the registry (basic or professional)
+      description: >-
+        The subscription tier for the registry (basic or professional). Note:
+        starter tier only available via web interface.
     storage_quota_bytes:
       type: number
       description: Storage quota for the registry in bytes
@@ -60,6 +62,9 @@ digital-ocean-container-registry:
     get-docker-credentials: ''
     run-garbage-collection: ''
     get-storage-usage: ''
+    create-registry: ''
+    delete-registry: ''
+    list-registries: ''
   checks:
     readiness:
       period: 15

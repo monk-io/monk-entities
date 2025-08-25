@@ -58,8 +58,8 @@ const validateRegistryRegion = common.validateRegistryRegion;
 const validateSubscriptionTier = common.validateSubscriptionTier;
 const validateGarbageCollectionType = common.validateGarbageCollectionType;
 const cli = require("cli");
-var _getStorageUsage_dec, _runGarbageCollection_dec, _getDockerCredentials_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
-var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extends (_a = DOProviderEntity, _getRegistry_dec = [action("getRegistry")], _listRepositories_dec = [action("listRepositories")], _getDockerCredentials_dec = [action("getDockerCredentials")], _runGarbageCollection_dec = [action("runGarbageCollection")], _getStorageUsage_dec = [action("getStorageUsage")], _a) {
+var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _getDockerCredentials_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
+var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _getDockerCredentials_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -81,7 +81,7 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
     const createRequest = {
       name: this.definition.name,
       region: validatedRegion,
-      subscription_tier: validatedTier
+      subscription_tier_slug: validatedTier
     };
     if (validatedTier === "professional" && this.definition.storage_quota_bytes) {
       createRequest.storage_quota_bytes = this.definition.storage_quota_bytes;
@@ -91,7 +91,16 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
       if (response.registry) {
         this.updateStateFromRegistry(response.registry);
         cli.output(`\u2705 Container Registry created successfully: ${this.state.name}`);
-        cli.output(`   Server URL: ${this.state.server_url}`);
+        cli.output(`   Region: ${this.state.region}`);
+        if (this.state.server_url) {
+          cli.output(`   Server URL: ${this.state.server_url}`);
+        } else {
+          cli.output(`   Server URL: (will be available shortly)`);
+        }
+        if (response.subscription) {
+          cli.output(`   Subscription Tier: ${response.subscription.tier.name} (${response.subscription.tier.slug})`);
+          cli.output(`   Monthly Price: $${response.subscription.tier.monthly_price_in_cents / 100}`);
+        }
       } else {
         throw new Error("Invalid response from DigitalOcean API - no registry object returned");
       }
@@ -117,7 +126,7 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
       cli.output(`\u{1F4CA} Updating subscription tier to: ${this.definition.subscription_tier}`);
       try {
         const updateRequest = {
-          subscription_tier: validateSubscriptionTier(this.definition.subscription_tier)
+          subscription_tier_slug: validateSubscriptionTier(this.definition.subscription_tier)
         };
         if (this.definition.subscription_tier === "professional" && this.definition.storage_quota_bytes) {
           updateRequest.storage_quota_bytes = this.definition.storage_quota_bytes;
@@ -307,17 +316,190 @@ Registry: ${this.state.name}`);
       throw new Error(`Failed to get storage usage: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  createRegistry(args) {
+    cli.output("\u{1F680} Creating Container Registry via action...");
+    const registryName = args.name || this.definition.name;
+    const region = args.region || this.definition.region;
+    const subscriptionTier = args.subscription_tier || this.definition.subscription_tier;
+    const storageQuota = args.storage_quota_bytes || this.definition.storage_quota_bytes;
+    try {
+      const existingRegistry = this.findExistingRegistry();
+      if (existingRegistry) {
+        cli.output(`\u2705 Container Registry already exists: ${existingRegistry.name}`);
+        this.updateStateFromRegistry(existingRegistry);
+        return {
+          status: "exists",
+          registry: existingRegistry
+        };
+      }
+      if (!registryName || !region || !subscriptionTier) {
+        throw new Error("Missing required parameters: name, region, and subscription_tier are required");
+      }
+      const validatedRegion = validateRegistryRegion(region);
+      const validatedTier = validateSubscriptionTier(subscriptionTier);
+      const createRequest = {
+        name: registryName,
+        region: validatedRegion,
+        subscription_tier_slug: validatedTier
+      };
+      if (validatedTier === "professional" && storageQuota) {
+        createRequest.storage_quota_bytes = storageQuota;
+      }
+      cli.output(`\u{1F4CB} Creating registry with configuration:`);
+      cli.output(`   Name: ${registryName}`);
+      cli.output(`   Region: ${validatedRegion}`);
+      cli.output(`   Subscription Tier: ${validatedTier}`);
+      if (createRequest.storage_quota_bytes) {
+        cli.output(`   Storage Quota: ${createRequest.storage_quota_bytes} bytes`);
+      }
+      const response = this.makeRequest("POST", "/registry", createRequest);
+      if (response.registry) {
+        this.updateStateFromRegistry(response.registry);
+        cli.output(`\u2705 Container Registry created successfully: ${response.registry.name}`);
+        cli.output(`   Region: ${response.registry.region}`);
+        if (response.registry.server_url) {
+          cli.output(`   Server URL: ${response.registry.server_url}`);
+        } else {
+          cli.output(`   Server URL: (will be available shortly)`);
+        }
+        if (response.subscription) {
+          cli.output(`   Subscription Tier: ${response.subscription.tier.name} (${response.subscription.tier.slug})`);
+          cli.output(`   Monthly Price: $${response.subscription.tier.monthly_price_in_cents / 100}`);
+        }
+        return {
+          status: "created",
+          registry: response.registry,
+          subscription: response.subscription
+        };
+      } else {
+        throw new Error("Invalid response from DigitalOcean API - no registry object returned");
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes("409") && error.message.includes("Conflict")) {
+          cli.output(`\u26A0\uFE0F  Registry name already exists. This might be due to:`);
+          cli.output(`   1. Registry exists in another region`);
+          cli.output(`   2. Registry name is reserved`);
+          cli.output(`   3. Registry was recently deleted (names have cooldown period)`);
+          try {
+            const existingRegistry = this.findExistingRegistry();
+            if (existingRegistry) {
+              cli.output(`\u2705 Found existing registry: ${existingRegistry.name}`);
+              this.updateStateFromRegistry(existingRegistry);
+              return {
+                status: "exists",
+                registry: existingRegistry,
+                message: "Registry with this name already exists"
+              };
+            } else {
+              cli.output(`\u274C No registry found in account, but name "${registryName}" is not available`);
+              return {
+                status: "name_unavailable",
+                message: `Registry name "${registryName}" is not available. Try a different name or check if it was recently deleted.`,
+                suggested_action: "Try a different registry name"
+              };
+            }
+          } catch (checkError) {
+            cli.output(`\u26A0\uFE0F  Unable to check existing registries: ${checkError instanceof Error ? checkError.message : "Unknown error"}`);
+            return {
+              status: "name_unavailable",
+              message: `Registry name "${registryName}" is not available. Try a different name.`,
+              suggested_action: "Try a different registry name"
+            };
+          }
+        }
+        cli.output(`\u274C Failed to create registry: ${error.message}`);
+        throw new Error(`Failed to create container registry: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+  deleteRegistry(_args) {
+    cli.output("\u{1F5D1}\uFE0F  Deleting Container Registry via action...");
+    try {
+      const existingRegistry = this.findExistingRegistry();
+      if (!existingRegistry) {
+        cli.output("\u26AA No registry found to delete");
+        return {
+          status: "not_found",
+          message: "No registry found to delete"
+        };
+      }
+      cli.output(`\u{1F50D} Found registry to delete: ${existingRegistry.name}`);
+      this.makeRequest("DELETE", "/registry");
+      this.state.name = void 0;
+      this.state.server_url = void 0;
+      this.state.storage_usage_bytes = void 0;
+      this.state.region = void 0;
+      this.state.subscription_tier = void 0;
+      this.state.storage_quota_bytes = void 0;
+      this.state.created_at = void 0;
+      cli.output(`\u2705 Container Registry deleted successfully: ${existingRegistry.name}`);
+      return {
+        status: "deleted",
+        registry_name: existingRegistry.name
+      };
+    } catch (error) {
+      cli.output(`\u274C Failed to delete registry: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to delete container registry: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  listRegistries(_args) {
+    cli.output("\u{1F4CB} Listing Container Registries...");
+    try {
+      const existingRegistry = this.findExistingRegistry();
+      if (!existingRegistry) {
+        cli.output("\u26AA No container registries found");
+        return {
+          registries: [],
+          count: 0
+        };
+      }
+      cli.output(`\u{1F4CA} Container Registry Information:`);
+      cli.output(`   Name: ${existingRegistry.name}`);
+      cli.output(`   Region: ${existingRegistry.region}`);
+      cli.output(`   Subscription Tier: ${existingRegistry.subscription_tier}`);
+      cli.output(`   Server URL: ${existingRegistry.server_url}`);
+      cli.output(`   Created: ${existingRegistry.created_at}`);
+      if (existingRegistry.storage_quota_bytes) {
+        const quotaMB = Math.round(existingRegistry.storage_quota_bytes / (1024 * 1024));
+        cli.output(`   Storage Quota: ${existingRegistry.storage_quota_bytes} bytes (${quotaMB} MB)`);
+      }
+      if (existingRegistry.storage_usage_bytes !== void 0) {
+        const usageMB = Math.round(existingRegistry.storage_usage_bytes / (1024 * 1024));
+        cli.output(`   Storage Usage: ${existingRegistry.storage_usage_bytes} bytes (${usageMB} MB)`);
+      }
+      return {
+        registries: [existingRegistry],
+        count: 1
+      };
+    } catch (error) {
+      cli.output(`\u274C Failed to list registries: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to list container registries: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   /**
    * Find existing registry (DigitalOcean allows only one registry per account)
    */
   findExistingRegistry() {
     try {
+      cli.output("\u{1F50D} Checking for existing registry...");
       const response = this.makeRequest("GET", "/registry");
       if (response.registry) {
+        cli.output(`\u2705 Found existing registry: ${response.registry.name} in ${response.registry.region}`);
         return response.registry;
       }
+      cli.output("\u26AA No existing registry found");
       return null;
     } catch (error) {
+      if (error instanceof Error) {
+        cli.output(`\u26A0\uFE0F  Error checking for existing registry: ${error.message}`);
+        if (error.message.includes("404")) {
+          cli.output("\u26AA No registry configured for this account (404 response)");
+          return null;
+        }
+      }
+      cli.output("\u26A0\uFE0F  Unable to check for existing registry, assuming none exists");
       return null;
     }
   }
@@ -340,6 +522,9 @@ __decorateElement(_init, 1, "listRepositories", _listRepositories_dec, _DigitalO
 __decorateElement(_init, 1, "getDockerCredentials", _getDockerCredentials_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "runGarbageCollection", _runGarbageCollection_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "getStorageUsage", _getStorageUsage_dec, _DigitalOceanContainerRegistry);
+__decorateElement(_init, 1, "createRegistry", _createRegistry_dec, _DigitalOceanContainerRegistry);
+__decorateElement(_init, 1, "deleteRegistry", _deleteRegistry_dec, _DigitalOceanContainerRegistry);
+__decorateElement(_init, 1, "listRegistries", _listRegistries_dec, _DigitalOceanContainerRegistry);
 __decoratorMetadata(_init, _DigitalOceanContainerRegistry);
 __name(_DigitalOceanContainerRegistry, "DigitalOceanContainerRegistry");
 var DigitalOceanContainerRegistry = _DigitalOceanContainerRegistry;
