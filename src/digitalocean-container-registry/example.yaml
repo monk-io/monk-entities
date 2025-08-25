@@ -1,0 +1,39 @@
+namespace: digitalocean-container-registry-example
+
+# Basic Container Registry with basic tier
+my-basic-registry:
+  defines: digitalocean-container-registry/digital-ocean-container-registry
+  name: my-docker-registry
+  region: nyc1
+  subscription_tier: basic
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Professional Container Registry with storage quota
+my-professional-registry:
+  defines: digitalocean-container-registry/digital-ocean-container-registry
+  name: my-pro-registry
+  region: sfo3
+  subscription_tier: professional
+  storage_quota_bytes: 107374182400  # 100 GB in bytes
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Container Registry in Europe
+my-eu-registry:
+  defines: digitalocean-container-registry/digital-ocean-container-registry
+  name: my-eu-registry
+  region: fra1
+  subscription_tier: professional
+  storage_quota_bytes: 53687091200   # 50 GB in bytes
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Container Registry in Asia
+my-asia-registry:
+  defines: digitalocean-container-registry/digital-ocean-container-registry
+  name: my-asia-registry
+  region: sgp1
+  subscription_tier: basic
+  permitted-secrets:
+    digitalocean-api-key: true
