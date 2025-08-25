@@ -231,6 +231,10 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
         this.state.name = undefined;
         this.state.server_url = undefined;
         this.state.storage_usage_bytes = undefined;
+        this.state.region = undefined;
+        this.state.subscription_tier = undefined;
+        this.state.storage_quota_bytes = undefined;
+        this.state.created_at = undefined;
     }
 
     checkReadiness(): boolean {

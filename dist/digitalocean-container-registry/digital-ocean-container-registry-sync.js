@@ -172,6 +172,10 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
     this.state.name = void 0;
     this.state.server_url = void 0;
     this.state.storage_usage_bytes = void 0;
+    this.state.region = void 0;
+    this.state.subscription_tier = void 0;
+    this.state.storage_quota_bytes = void 0;
+    this.state.created_at = void 0;
   }
   checkReadiness() {
     if (!this.state.name) {
