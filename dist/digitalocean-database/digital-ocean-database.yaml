@@ -1,0 +1,143 @@
+namespace: digitalocean-database
+digital-ocean-database:
+  defines: entity
+  metadata:
+    name: DigitalOceanDatabase
+  schema:
+    name:
+      type: string
+      description: >-
+        Name of the database cluster (3-63 characters, alphanumeric and hyphens
+        only)
+    engine:
+      type: string
+      enum:
+        - mysql
+        - pg
+        - redis
+        - mongodb
+        - kafka
+        - opensearch
+      description: >-
+        The database engine to use (mysql, pg, redis, mongodb, kafka,
+        opensearch)
+    version:
+      type: string
+      description: 'Version of the database engine (optional, uses latest if not specified)'
+    num_nodes:
+      type: number
+      minimum: 1
+      maximum: 10
+      description: >-
+        Number of nodes for the database cluster (1 for single node, 2+ for
+        cluster)
+    region:
+      type: string
+      enum:
+        - ams3
+        - blr1
+        - fra1
+        - lon1
+        - nyc1
+        - nyc3
+        - sfo3
+        - sgp1
+        - tor1
+        - syd1
+      description: The DigitalOcean region where the database will be created
+    size:
+      type: string
+      enum:
+        - db-s-1vcpu-1gb
+        - db-s-1vcpu-2gb
+        - db-s-2vcpu-4gb
+        - db-s-4vcpu-8gb
+        - db-s-6vcpu-16gb
+        - db-s-8vcpu-32gb
+      description: The size/performance tier of the database cluster
+    tags:
+      type: array
+      items:
+        type: string
+      description: Tags to apply to the database cluster
+    private_network_uuid:
+      type: string
+      description: VPC UUID for private networking (optional)
+    db_config:
+      type: object
+      additionalProperties:
+        description: Engine-specific configuration settings
+      description: Engine-specific configuration settings
+    required:
+      - name
+      - engine
+      - num_nodes
+      - region
+      - size
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    name:
+      type: string
+    engine:
+      type: string
+    version:
+      type: string
+    status:
+      type: string
+      enum:
+        - creating
+        - online
+        - forking
+        - migrating
+        - resizing
+    num_nodes:
+      type: number
+    region:
+      type: string
+    size:
+      type: string
+    connection:
+      type: object
+      properties:
+        uri:
+          type: string
+        host:
+          type: string
+        port:
+          type: number
+        user:
+          type: string
+        password:
+          type: string
+        database:
+          type: string
+        ssl:
+          type: boolean
+      additionalProperties: false
+    created_at:
+      type: string
+    tags:
+      type: array
+      items:
+        type: string
+  lifecycle:
+    sync: <<< digital-ocean-database-sync.js
+    get-database: ''
+    list-databases: ''
+    create-database: ''
+    delete-database: ''
+    get-connection-info: ''
+    resize-cluster: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
+  requires:
+    - monkec/base
+    - digitalocean-database/do-provider-base
+    - digitalocean-database/common
+    - cli

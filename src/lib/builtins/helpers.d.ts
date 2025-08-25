@@ -23,6 +23,12 @@ declare function atob(encoded: string): string;
  */
 declare function btoa(plain: string): string;
 
+/**
+ * Sleeps for the specified number of milliseconds
+ * @param msec - Milliseconds to sleep; values <= 0 are no-ops
+ */
+declare function sleep(msec: number): void;
+
 declare module "helpers" {
   /**
    * Helper utilities interface
@@ -48,6 +54,12 @@ declare module "helpers" {
      * @returns The base64 encoded string
      */
     btoa(plain: string): string;
+
+    /**
+     * Sleeps for the specified number of milliseconds
+     * @param msec - Milliseconds to sleep; values <= 0 are no-ops
+     */
+    sleep(msec: number): void;
   }
 
   const helpers: HelpersModule;

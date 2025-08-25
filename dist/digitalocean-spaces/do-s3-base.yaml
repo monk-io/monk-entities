@@ -1,0 +1,5 @@
+namespace: digitalocean-spaces
+
+do-s3-base:
+  defines: module
+  source: <<< do-s3-base.js

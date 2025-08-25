@@ -1,0 +1,26 @@
+namespace: digitalocean-spaces
+spaces-keys:
+  defines: entity
+  metadata:
+    name: SpacesKeys
+  schema:
+    name:
+      type: string
+  state-schema:
+    id:
+      type: string
+    access_key:
+      type: string
+    existing:
+      type: boolean
+  lifecycle:
+    sync: <<< spaces-keys-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - secret
+    - cli
