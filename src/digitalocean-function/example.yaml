@@ -4,7 +4,7 @@ namespace: do-functions-examples
 
 # Basic Node.js function
 basic-nodejs-function:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: my-nodejs-app
   component_name: hello-function
   github_repo: https://github.com/digitalocean/sample-functions-nodejs-helloworld
@@ -17,7 +17,7 @@ basic-nodejs-function:
 
 # Python function with environment variables
 python-function-with-env:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: my-python-app
   component_name: api-function
   github_repo: https://github.com/your-org/python-function-repo
@@ -47,7 +47,7 @@ python-function-with-env:
 
 # Go function with custom domain and alerts
 go-function-production:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: go-microservice
   component_name: service-function
   github_repo: https://github.com/your-org/go-microservice
@@ -91,7 +91,7 @@ go-function-production:
 
 # Function with log forwarding to Datadog
 function-with-datadog-logs:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: monitored-app
   component_name: monitored-function
   github_repo: https://github.com/your-org/monitored-function
@@ -118,7 +118,7 @@ function-with-datadog-logs:
 
 # Function with log forwarding to Logtail
 function-with-logtail-logs:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: logged-app
   component_name: logged-function
   github_repo: https://github.com/your-org/logged-function
@@ -135,7 +135,7 @@ function-with-logtail-logs:
 
 # PHP function with multiple routes
 php-function-multi-route:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: php-api
   component_name: api-function
   github_repo: https://github.com/your-org/php-api
@@ -163,7 +163,7 @@ php-function-multi-route:
 
 # Development function with minimal configuration
 dev-function:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: dev-test-app
   component_name: test-function
   github_repo: https://github.com/your-org/test-function
@@ -185,7 +185,7 @@ multi-env-deployment:
     - production-function
 
 staging-function:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: myapp-staging
   component_name: api-function
   github_repo: https://github.com/your-org/myapp
@@ -206,7 +206,7 @@ staging-function:
       type: SECRET
 
 production-function:
-  defines: do-function/function
+  defines: digitalocean-function/app-function
   app_name: myapp-production
   component_name: api-function
   github_repo: https://github.com/your-org/myapp

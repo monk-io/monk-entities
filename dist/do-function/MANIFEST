@@ -1,3 +1,0 @@
-REPO do-function
-LOAD do-app-function.yaml base.yaml common.yaml
-RESOURCES common.js do-app-function-sync.js base.js

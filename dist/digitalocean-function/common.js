@@ -17,7 +17,7 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// input/do-function/common.ts
+// input/digitalocean-function/common.ts
 var common_exports = {};
 __export(common_exports, {
   buildDefaultRoutes: () => buildDefaultRoutes,

@@ -1,4 +1,4 @@
-namespace: do-function
+namespace: digitalocean-function
 
 common:
   defines: module

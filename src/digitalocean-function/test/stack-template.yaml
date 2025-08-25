@@ -2,7 +2,7 @@ namespace: test-instances
 
 # Basic Node.js function test
 test-nodejs-function:
-  defines: do-function/do-app-function
+  defines: digitalocean-function/app-function
   app_name: test-nodejs-app
   component_name: test-hello-function
   github_repo: https://github.com/manachyn/sample-functions-nodejs-helloworld
@@ -29,7 +29,7 @@ test-nodejs-function:
 
 # Python function test with environment variables
 test-python-function:
-  defines: do-function/do-app-function
+  defines: digitalocean-function/app-function
   app_name: test-python-app
   component_name: test-api-function
   github_repo: https://github.com/manachyn/sample-functions-python-helloworld

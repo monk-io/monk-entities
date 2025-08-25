@@ -1,8 +1,8 @@
-namespace: do-function
-do-app-function:
+namespace: digitalocean-function
+app-function:
   defines: entity
   metadata:
-    name: DOAppFunction
+    name: AppFunction
   schema:
     app_name:
       type: string
@@ -142,7 +142,7 @@ do-app-function:
       - component_name
       - github_repo
   lifecycle:
-    sync: <<< do-app-function-sync.js
+    sync: <<< app-function-sync.js
     info: ''
     url: ''
     logs: ''
@@ -153,7 +153,7 @@ do-app-function:
       initialDelay: 5
       attempts: 20
   requires:
-    - do-function/base
+    - digitalocean-function/base
     - monkec/base
     - cli
-    - do-function/common
+    - digitalocean-function/common

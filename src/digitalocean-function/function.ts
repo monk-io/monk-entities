@@ -18,14 +18,14 @@ import {
 /**
  * Extended definition interface for DigitalOcean Function with additional fields
  */
-export interface DOAppFunctionDefinition extends DOFunctionDefinition {
+export interface AppFunctionDefinition extends DOFunctionDefinition {
     // All properties inherited from DOFunctionDefinition
 }
 
 /**
  * DigitalOcean App Platform Function entity implementation
  */
-export class DOAppFunction extends DOFunctionEntity<DOAppFunctionDefinition, DOFunctionState> {
+export class AppFunction extends DOFunctionEntity<AppFunctionDefinition, DOFunctionState> {
     
     // Customize readiness check parameters
     static readonly readiness = { period: 10, initialDelay: 5, attempts: 20 };

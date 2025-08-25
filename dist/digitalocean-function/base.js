@@ -29,7 +29,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// input/do-function/base.ts
+// input/digitalocean-function/base.ts
 var base_exports = {};
 __export(base_exports, {
   DOFunctionEntity: () => DOFunctionEntity

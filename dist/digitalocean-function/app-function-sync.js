@@ -49,12 +49,12 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// input/do-function/function.ts
-const base = require("do-function/base");
+// input/digitalocean-function/function.ts
+const base = require("digitalocean-function/base");
 const DOFunctionEntity = base.DOFunctionEntity;
 const MonkecBase = require("monkec/base");
 const cli = require("cli");
-const common = require("do-function/common");
+const common = require("digitalocean-function/common");
 const validateFunctionDefinition = common.validateFunctionDefinition;
 const formatFunctionState = common.formatFunctionState;
 const isDeploymentReady = common.isDeploymentReady;
@@ -67,7 +67,7 @@ const buildLogDestinations = common.buildLogDestinations;
 const normalizeGitHubRepo = common.normalizeGitHubRepo;
 var action2 = MonkecBase.action;
 var _deploy_dec, _getLogs_dec, _getUrl_dec, _getInfo_dec, _a, _init;
-var _DOAppFunction = class _DOAppFunction extends (_a = DOFunctionEntity, _getInfo_dec = [action2("info")], _getUrl_dec = [action2("url")], _getLogs_dec = [action2("logs")], _deploy_dec = [action2("deploy")], _a) {
+var _AppFunction = class _AppFunction extends (_a = DOFunctionEntity, _getInfo_dec = [action2("info")], _getUrl_dec = [action2("url")], _getLogs_dec = [action2("logs")], _deploy_dec = [action2("deploy")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -357,19 +357,19 @@ ${errors.join("\n")}`);
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getInfo", _getInfo_dec, _DOAppFunction);
-__decorateElement(_init, 1, "getUrl", _getUrl_dec, _DOAppFunction);
-__decorateElement(_init, 1, "getLogs", _getLogs_dec, _DOAppFunction);
-__decorateElement(_init, 1, "deploy", _deploy_dec, _DOAppFunction);
-__decoratorMetadata(_init, _DOAppFunction);
-__name(_DOAppFunction, "DOAppFunction");
+__decorateElement(_init, 1, "getInfo", _getInfo_dec, _AppFunction);
+__decorateElement(_init, 1, "getUrl", _getUrl_dec, _AppFunction);
+__decorateElement(_init, 1, "getLogs", _getLogs_dec, _AppFunction);
+__decorateElement(_init, 1, "deploy", _deploy_dec, _AppFunction);
+__decoratorMetadata(_init, _AppFunction);
+__name(_AppFunction, "AppFunction");
 // Customize readiness check parameters
-__publicField(_DOAppFunction, "readiness", { period: 10, initialDelay: 5, attempts: 20 });
-var DOAppFunction = _DOAppFunction;
+__publicField(_AppFunction, "readiness", { period: 10, initialDelay: 5, attempts: 20 });
+var AppFunction = _AppFunction;
 
 
 
 function main(def, state, ctx) {
-  const entity = new DOAppFunction(def, state, ctx);
+  const entity = new AppFunction(def, state, ctx);
   return entity.main(ctx);
 }

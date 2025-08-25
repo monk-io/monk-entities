@@ -12,7 +12,7 @@ secrets:
 setup:
   - name: "Load compiled entity"
     action: "load"
-    target: "dist/input/do-function/MANIFEST"
+    target: "dist/input/digitalocean-function/MANIFEST"
     expect:
       exitCode: 0
 
