@@ -47,7 +47,7 @@ function getApiToken(secretRef) {
   return token;
 }
 function validateDatabaseEngine(engine) {
-  const validEngines = ["mysql", "pg", "redis", "mongodb", "kafka", "opensearch"];
+  const validEngines = ["mysql", "pg", "mongodb", "kafka", "opensearch", "valkey"];
   if (!validEngines.includes(engine)) {
     throw new Error(`Invalid database engine: ${engine}. Valid engines: ${validEngines.join(", ")}`);
   }

@@ -33,7 +33,7 @@ my-mysql-cluster:
 my-redis-cache:
   defines: digitalocean-database/database
   name: my-redis-cache
-  engine: redis
+  engine: valkey
   version: "7"
   num_nodes: 1
   region: fra1
