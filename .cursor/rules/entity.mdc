@@ -1,0 +1,82 @@
+---
+description: Entity authoring and testing workflow for MonkEC-based entities
+globs: src/**
+alwaysApply: false
+---
+You are working on Monk Entities compiled from TypeScript via MonkEC.
+
+Build and compile
+
+- Single module: `INPUT_DIR=./src/<module>/ OUTPUT_DIR=./dist/<module>/ ./monkec.sh compile`
+- All default modules: `./build.sh`
+
+Load compiled entities into Monk
+
+- From a module directory: `cd dist/<module>/ && monk load MANIFEST`
+- Load all compiled repos: `monk load MANIFEST` at repo root if MANIFEST aggregates
+
+Run instances from templates
+
+- Templates live alongside sources (see `src/<module>/**/example.yaml` or `test/stack-template.yaml`).
+- Load a template: `monk load path/to/template.yaml`
+- Start/update an instance: `monk update namespace/name`
+- List: `monk ps -a`
+- Describe: `monk describe namespace/name`
+- Delete: `monk delete --force namespace/name`
+
+Stacks (process groups)
+
+```
+stack:
+  defines: process-group
+  runnable-list:
+    - namespace/name1
+    - namespace/name2
+```
+
+Secrets management
+
+- Grant in template via `permitted-secrets`.
+- Add global secret: `monk secrets add -g secret_name='secret_value'`
+- Add entity-scoped secret: `monk secrets add -r namespace/name secret_name='secret_value'`
+
+Testing with MonkEC wrapper
+
+- Run tests for a module: `sudo INPUT_DIR=./src/<module>/ ./monkec.sh test [--verbose] [--watch] [--test-file path]`
+- Inside container, compiled MANIFEST path is `dist/input/<module>/MANIFEST`.
+
+Readiness checks
+
+- Implement `checkReadiness()` in your entity; optionally set static `readiness = { period, initialDelay, attempts }` to control polling.
+- For integrations that cannot create resources in CI, support a test mode by adding `create_when_missing?: boolean` in Definition and return ready=true when false and no id is present.
+
+Dependencies and connections
+
+- Express ordering with `depends.wait-for.runnables` and read values from other entities using `connections` + `connection-target("service") entity-state get-member("field")`.
+- Ensure providers that are data-only expose a `services: { data: { protocol: custom } }` block so others can connect.
+
+Reserved names
+
+- Avoid JSON Schema keywords in Definition/State (e.g., `type`, `enum`, `items`, `properties`, `$ref`). Prefer specific names like `zone_type`, `record_type`.
+
+CRUD preflight (before writing tests)
+
+1) Compile and load MANIFEST
+2) Load example or test template
+3) Add required secrets (`monk secrets add -g ...`)
+4) `monk update namespace/stack` and `monk describe namespace/<entity>` to check state and readiness
+5) Only then run `./monkec.sh test`
+
+Troubleshooting
+
+- Decode base64-encoded Monk errors: `echo '<error>' | monk decode-err`
+- Inspect loaded templates: `monk ls` and `monk dump namespace/name`
+
+References
+
+- See `doc/monk-cli.md` for CLI quick reference
+- See `doc/templates.md` for template and stack patterns
+- See `doc/testing.md` for the test framework
+- Keep `doc/common-issues.md` up to date with new problems and fixes; consult it when errors occur
+- Follow conventions in `doc/entity-conventions.md`; use provider default secret names (no need to ask for secret names), kebab-case for actions, snake_case properties, provider base classes, and JSDoc on Definition/State
+- For new entities, start from `doc/scaffold.md` and provider docs; prefer doc-driven implementation with minimal follow-ups; add tests and example templates; if credentials are provided, create a local `test/.env` with the provided variable name(s) and map via test `secrets`

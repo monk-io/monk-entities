@@ -1,0 +1,60 @@
+namespace: cloudflare
+cloudflare-dns-record:
+  defines: entity
+  metadata:
+    name: CloudflareDNSRecord
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    zone_id:
+      type: string
+      description: Zone ID; alternatively provide zone_name
+    zone_name:
+      type: string
+      description: Zone name; used to resolve zone_id if zone_id not provided
+    record_type:
+      type: string
+      description: 'DNS record type (A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, etc.)'
+    name:
+      type: string
+      description: 'Record name (e.g., www or full name like www.example.com)'
+    content:
+      type: string
+      description: 'Record content (IP address, target, text, etc.)'
+    ttl:
+      type: number
+      description: TTL in seconds (1 for auto)
+    proxied:
+      type: boolean
+      description: Whether the record is proxied by Cloudflare (A/AAAA/CNAME only)
+    priority:
+      type: number
+      description: Record priority (for MX/SRV)
+    data:
+      description: Additional data for complex types (SRV/CAA)
+    required:
+      - record_type
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    record_id:
+      type: string
+      description: Record identifier in Cloudflare
+    zone_id:
+      type: string
+      description: Zone id resolved for this record
+  lifecycle:
+    sync: <<< cloudflare-dns-record-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 20
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

@@ -214,11 +214,11 @@ my-app:
 ### Compilation Test
 
 ```bash
-# Compile the MongoDB Atlas entity
-deno task compile examples/mongodb-atlas mongodb-atlas
+# Compile the MongoDB Atlas module
+INPUT_DIR=./src/mongodb-atlas/ OUTPUT_DIR=./dist/mongodb-atlas/ ./monkec.sh compile
 
-# Run the comprehensive test suite
-./test-mongodb.sh
+# Run the comprehensive test suite (example wrapper)
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 ```
 
 ### Integration Test

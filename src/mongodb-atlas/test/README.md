@@ -30,7 +30,7 @@ The testing framework automatically loads environment variables from a `.env` fi
 
 3. **The .env file is automatically loaded** when running tests:
    ```bash
-   deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+   sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
    ```
 
 ### Environment Variables
@@ -50,18 +50,17 @@ You can also set environment variables directly in your shell:
 
 ```bash
 export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
-deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 ```
 
 ## Quick Start
 
 ### 1. Compile the Entity
 
-First, compile the MongoDB Atlas entity:
+First, compile the MongoDB Atlas module:
 
 ```bash
-cd /path/to/monkec
-deno task compile examples/mongodb-atlas mongodb-atlas
+INPUT_DIR=./src/mongodb-atlas/ OUTPUT_DIR=./dist/mongodb-atlas/ ./monkec.sh compile
 ```
 
 ### 2. Load the Entity
@@ -91,17 +90,17 @@ export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
 
 ### 4. Run Functional Tests
 
-Use the monkec test runner to execute comprehensive functional tests:
+Use the wrapper to execute comprehensive functional tests:
 
 ```bash
 # Run with automatic .env loading
-deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 
 # Run with verbose output
-deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml --verbose
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml --verbose
 
 # Run with custom environment
-MONGODB_ATLAS_TOKEN="your-token" deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml
+MONGODB_ATLAS_TOKEN="your-token" sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 ```
 
 Alternatively, run the stack manually:
@@ -192,10 +191,10 @@ monk delete --force mongodb-test-stack/dev-project
 
 ```bash
 # Enable verbose mode in .env file
-echo "MONKEC_VERBOSE=true" >> examples/mongodb-atlas/test/.env
+echo "MONKEC_VERBOSE=true" >> src/mongodb-atlas/test/.env
 
 # Run with verbose output
-deno task test examples/mongodb-atlas --test-file test/stack-integration.test.yaml --verbose
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml --verbose
 
 # Check entity state
 monk describe mongodb-test-stack/dev-cluster

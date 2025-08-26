@@ -1,0 +1,5 @@
+namespace: cloudflare
+
+cloudflare-base:
+  defines: module
+  source: <<< cloudflare-base.js
