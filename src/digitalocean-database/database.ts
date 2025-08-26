@@ -146,7 +146,7 @@ export interface DigitalOceanDatabaseState extends DOProviderStateBase {
  * This entity provides complete lifecycle management for DigitalOcean database clusters
  * including creation, updates, deletion, and monitoring operations.
  */
-export class DigitalOceanDatabase extends DOProviderEntity<
+export class Database extends DOProviderEntity<
     DatabaseDefinition,
     DigitalOceanDatabaseState
 > {
@@ -555,14 +555,18 @@ export class DigitalOceanDatabase extends DOProviderEntity<
 
         // Update connection information if available
         if (database.connection) {
+            const previousConnection = this.state.connection || {};
             this.state.connection = {
-                uri: database.connection.uri,
-                host: database.connection.host,
-                port: database.connection.port,
-                user: database.connection.user,
-                password: database.connection.password,
-                database: database.connection.database,
-                ssl: database.connection.ssl
+                // Never overwrite once set in state
+                uri: previousConnection.uri !== undefined ? previousConnection.uri : database.connection.uri,
+                password: previousConnection.password !== undefined ? previousConnection.password : database.connection.password,
+
+                // Merge others: use API value when present, otherwise keep previous
+                host: database.connection.host !== undefined ? database.connection.host : previousConnection.host,
+                port: database.connection.port !== undefined ? database.connection.port : previousConnection.port,
+                user: database.connection.user !== undefined ? database.connection.user : previousConnection.user,
+                database: database.connection.database !== undefined ? database.connection.database : previousConnection.database,
+                ssl: database.connection.ssl !== undefined ? database.connection.ssl : previousConnection.ssl
             };
         }
     }

@@ -19,7 +19,7 @@ export function getApiToken(secretRef: string): string {
 /**
  * Database engine types supported by DigitalOcean
  */
-export type DatabaseEngine = "mysql" | "pg" | "redis" | "mongodb" | "kafka" | "opensearch";
+export type DatabaseEngine = "mysql" | "pg" | "redis" | "mongodb" | "kafka" | "opensearch" | "valkey";
 
 /**
  * Database region codes supported by DigitalOcean
@@ -69,7 +69,7 @@ export type DatabaseStatus = "creating" | "online" | "forking" | "migrating" | "
  * Validate database engine
  */
 export function validateDatabaseEngine(engine: string): DatabaseEngine {
-    const validEngines: DatabaseEngine[] = ["mysql", "pg", "redis", "mongodb", "kafka", "opensearch"];
+    const validEngines: DatabaseEngine[] = ["mysql", "pg", "mongodb", "kafka", "opensearch", "valkey"];
     if (!validEngines.includes(engine as DatabaseEngine)) {
         throw new Error(`Invalid database engine: ${engine}. Valid engines: ${validEngines.join(", ")}`);
     }

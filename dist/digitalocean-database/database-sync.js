@@ -59,7 +59,7 @@ const validateDatabaseRegion = common.validateDatabaseRegion;
 const validateDatabaseSize = common.validateDatabaseSize;
 const cli = require("cli");
 var _resizeCluster_dec, _getConnectionInfo_dec, _deleteDatabase_dec, _createDatabase_dec, _listDatabases_dec, _getDatabase_dec, _a, _init;
-var _DigitalOceanDatabase = class _DigitalOceanDatabase extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _a) {
+var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -369,32 +369,35 @@ Cluster ID: ${this.state.id}
     this.state.created_at = database.created_at;
     this.state.tags = database.tags;
     if (database.connection) {
+      const previousConnection = this.state.connection || {};
       this.state.connection = {
-        uri: database.connection.uri,
-        host: database.connection.host,
-        port: database.connection.port,
-        user: database.connection.user,
-        password: database.connection.password,
-        database: database.connection.database,
-        ssl: database.connection.ssl
+        // Never overwrite once set in state
+        uri: previousConnection.uri !== void 0 ? previousConnection.uri : database.connection.uri,
+        password: previousConnection.password !== void 0 ? previousConnection.password : database.connection.password,
+        // Merge others: use API value when present, otherwise keep previous
+        host: database.connection.host !== void 0 ? database.connection.host : previousConnection.host,
+        port: database.connection.port !== void 0 ? database.connection.port : previousConnection.port,
+        user: database.connection.user !== void 0 ? database.connection.user : previousConnection.user,
+        database: database.connection.database !== void 0 ? database.connection.database : previousConnection.database,
+        ssl: database.connection.ssl !== void 0 ? database.connection.ssl : previousConnection.ssl
       };
     }
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getDatabase", _getDatabase_dec, _DigitalOceanDatabase);
-__decorateElement(_init, 1, "listDatabases", _listDatabases_dec, _DigitalOceanDatabase);
-__decorateElement(_init, 1, "createDatabase", _createDatabase_dec, _DigitalOceanDatabase);
-__decorateElement(_init, 1, "deleteDatabase", _deleteDatabase_dec, _DigitalOceanDatabase);
-__decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _DigitalOceanDatabase);
-__decorateElement(_init, 1, "resizeCluster", _resizeCluster_dec, _DigitalOceanDatabase);
-__decoratorMetadata(_init, _DigitalOceanDatabase);
-__name(_DigitalOceanDatabase, "DigitalOceanDatabase");
-var DigitalOceanDatabase = _DigitalOceanDatabase;
+__decorateElement(_init, 1, "getDatabase", _getDatabase_dec, _Database);
+__decorateElement(_init, 1, "listDatabases", _listDatabases_dec, _Database);
+__decorateElement(_init, 1, "createDatabase", _createDatabase_dec, _Database);
+__decorateElement(_init, 1, "deleteDatabase", _deleteDatabase_dec, _Database);
+__decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _Database);
+__decorateElement(_init, 1, "resizeCluster", _resizeCluster_dec, _Database);
+__decoratorMetadata(_init, _Database);
+__name(_Database, "Database");
+var Database = _Database;
 
 
 
 function main(def, state, ctx) {
-  const entity = new DigitalOceanDatabase(def, state, ctx);
+  const entity = new Database(def, state, ctx);
   return entity.main(ctx);
 }

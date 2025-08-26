@@ -1,8 +1,8 @@
 namespace: digitalocean-database
-digital-ocean-database:
+database:
   defines: entity
   metadata:
-    name: DigitalOceanDatabase
+    name: Database
   schema:
     name:
       type: string
@@ -18,6 +18,7 @@ digital-ocean-database:
         - mongodb
         - kafka
         - opensearch
+        - valkey
       description: >-
         The database engine to use (mysql, pg, redis, mongodb, kafka,
         opensearch)
@@ -124,7 +125,7 @@ digital-ocean-database:
       items:
         type: string
   lifecycle:
-    sync: <<< digital-ocean-database-sync.js
+    sync: <<< database-sync.js
     get-database: ''
     list-databases: ''
     create-database: ''
