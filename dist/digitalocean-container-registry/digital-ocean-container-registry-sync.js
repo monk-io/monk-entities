@@ -58,8 +58,8 @@ const validateRegistryRegion = common.validateRegistryRegion;
 const validateSubscriptionTier = common.validateSubscriptionTier;
 const validateGarbageCollectionType = common.validateGarbageCollectionType;
 const cli = require("cli");
-var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _getDockerCredentials_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
-var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _getDockerCredentials_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
+var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
+var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -76,11 +76,19 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
         cli.output(`\u2705 Container Registry ${this.definition.name} already exists in ${existingRegistry.region}`);
         this.state.existing = true;
         this.updateStateFromRegistry(existingRegistry);
+        const username = this.fetchUsername();
+        if (username) {
+          this.state.username = username;
+        }
         return;
       } else {
         cli.output(`\u26A0\uFE0F  Registry "${existingRegistry.name}" already exists. DigitalOcean allows only one registry per account. Using existing registry.`);
         this.state.existing = true;
         this.updateStateFromRegistry(existingRegistry);
+        const username = this.fetchUsername();
+        if (username) {
+          this.state.username = username;
+        }
         return;
       }
     }
@@ -96,6 +104,10 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
       const response = this.makeRequest("POST", "/registry", createRequest);
       if (response.registry) {
         this.updateStateFromRegistry(response.registry);
+        const username = this.fetchUsername();
+        if (username) {
+          this.state.username = username;
+        }
         const serverUrl = this.state.server_url || "(will be available shortly)";
         let subscriptionInfo = "";
         if (response.subscription) {
@@ -112,6 +124,10 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
           cli.output(`\u2705 Using existing registry: ${conflictRegistry.name} in ${conflictRegistry.region}`);
           this.state.existing = true;
           this.updateStateFromRegistry(conflictRegistry);
+          const username = this.fetchUsername();
+          if (username) {
+            this.state.username = username;
+          }
           return;
         } else {
           throw new Error(`Registry name "${this.definition.name}" is already taken but registry is not accessible`);
@@ -125,6 +141,10 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
     if (existingRegistry) {
       this.updateStateFromRegistry(existingRegistry);
       this.state.existing = true;
+      const username = this.fetchUsername();
+      if (username) {
+        this.state.username = username;
+      }
       let warnings = [];
       if (this.definition.subscription_tier !== this.state.subscription_tier) {
         warnings.push("subscription tier change");
@@ -153,6 +173,7 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
     this.state.subscription_tier = void 0;
     this.state.storage_quota_bytes = void 0;
     this.state.created_at = void 0;
+    this.state.username = void 0;
   }
   checkReadiness() {
     if (!this.state.name) {
@@ -216,7 +237,10 @@ Server: ${this.state.server_url}`);
       throw new Error(`Failed to list repositories: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  getDockerCredentials(_args) {
+  /**
+   * Private method to fetch and extract username from Docker credentials
+   */
+  fetchUsername() {
     try {
       const response = this.makeRequest("GET", "/registry/docker-credentials");
       if (response.auths && Object.keys(response.auths).length > 0) {
@@ -224,18 +248,15 @@ Server: ${this.state.server_url}`);
         const auth = response.auths[serverUrl];
         try {
           const decoded = atob(auth.auth);
-          const [username, password] = decoded.split(":");
-          cli.output(`Username: ${username}
-Password: ${password}`);
+          const [username] = decoded.split(":");
+          return username;
         } catch (decodeError) {
-          cli.output(auth.auth);
+          return void 0;
         }
-      } else {
-        cli.output("No credentials found");
       }
-      return response;
+      return void 0;
     } catch (error) {
-      throw new Error(`Failed to get Docker credentials: ${error instanceof Error ? error.message : "Unknown error"}`);
+      return void 0;
     }
   }
   runGarbageCollection(args) {
@@ -294,6 +315,10 @@ Password: ${password}`);
       if (existingRegistry) {
         cli.output(`\u2705 Container Registry already exists: ${existingRegistry.name} in ${existingRegistry.region}`);
         this.updateStateFromRegistry(existingRegistry);
+        const username = this.fetchUsername();
+        if (username) {
+          this.state.username = username;
+        }
         return {
           status: "exists",
           registry: existingRegistry
@@ -315,6 +340,10 @@ Password: ${password}`);
       const response = this.makeRequest("POST", "/registry", createRequest);
       if (response.registry) {
         this.updateStateFromRegistry(response.registry);
+        const username = this.fetchUsername();
+        if (username) {
+          this.state.username = username;
+        }
         const serverUrl = response.registry.server_url || "(will be available shortly)";
         let subscriptionInfo = "";
         if (response.subscription) {
@@ -337,6 +366,10 @@ Password: ${password}`);
             if (existingRegistry) {
               cli.output(`\u2705 Found existing registry: ${existingRegistry.name} in ${existingRegistry.region}`);
               this.updateStateFromRegistry(existingRegistry);
+              const username = this.fetchUsername();
+              if (username) {
+                this.state.username = username;
+              }
               return {
                 status: "exists",
                 registry: existingRegistry,
@@ -382,6 +415,7 @@ Password: ${password}`);
       this.state.subscription_tier = void 0;
       this.state.storage_quota_bytes = void 0;
       this.state.created_at = void 0;
+      this.state.username = void 0;
       cli.output(`\u2705 Registry deleted: ${existingRegistry.name}`);
       return {
         status: "deleted",
@@ -457,7 +491,6 @@ Password: ${password}`);
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getRegistry", _getRegistry_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "listRepositories", _listRepositories_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "getDockerCredentials", _getDockerCredentials_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "runGarbageCollection", _runGarbageCollection_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "getStorageUsage", _getStorageUsage_dec, _DigitalOceanContainerRegistry);
 __decorateElement(_init, 1, "createRegistry", _createRegistry_dec, _DigitalOceanContainerRegistry);

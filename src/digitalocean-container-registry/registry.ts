@@ -76,6 +76,11 @@ export interface DigitalOceanContainerRegistryState extends DOProviderStateBase 
      * Creation timestamp
      */
     created_at?: string;
+
+    /**
+     * Docker registry username (email)
+     */
+    username?: string;
 }
 
 /**
@@ -106,12 +111,26 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
                 cli.output(`✅ Container Registry ${this.definition.name} already exists in ${existingRegistry.region}`);
                 this.state.existing = true;
                 this.updateStateFromRegistry(existingRegistry);
+                
+                // Fetch and store username for Docker authentication
+                const username = this.fetchUsername();
+                if (username) {
+                    this.state.username = username;
+                }
+                
                 return;
             } else {
                 // Different name - DigitalOcean only allows one registry per account
                 cli.output(`⚠️  Registry "${existingRegistry.name}" already exists. DigitalOcean allows only one registry per account. Using existing registry.`);
                 this.state.existing = true;
                 this.updateStateFromRegistry(existingRegistry);
+                
+                // Fetch and store username for Docker authentication
+                const username = this.fetchUsername();
+                if (username) {
+                    this.state.username = username;
+                }
+                
                 return;
             }
         }
@@ -133,6 +152,13 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
             
             if (response.registry) {
                 this.updateStateFromRegistry(response.registry);
+                
+                // Fetch and store username for Docker authentication
+                const username = this.fetchUsername();
+                if (username) {
+                    this.state.username = username;
+                }
+                
                 const serverUrl = this.state.server_url || "(will be available shortly)";
                 let subscriptionInfo = "";
                 if (response.subscription) {
@@ -152,6 +178,13 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
                     cli.output(`✅ Using existing registry: ${conflictRegistry.name} in ${conflictRegistry.region}`);
                     this.state.existing = true;
                     this.updateStateFromRegistry(conflictRegistry);
+                    
+                    // Fetch and store username for Docker authentication
+                    const username = this.fetchUsername();
+                    if (username) {
+                        this.state.username = username;
+                    }
+                    
                     return;
                 } else {
                     throw new Error(`Registry name "${this.definition.name}" is already taken but registry is not accessible`);
@@ -169,6 +202,12 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
             // Registry exists, update our state
             this.updateStateFromRegistry(existingRegistry);
             this.state.existing = true;
+            
+            // Fetch and store username for Docker authentication
+            const username = this.fetchUsername();
+            if (username) {
+                this.state.username = username;
+            }
             
             // Check for configuration differences and warn about recreating
             let warnings: string[] = [];
@@ -207,6 +246,7 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
         this.state.subscription_tier = undefined;
         this.state.storage_quota_bytes = undefined;
         this.state.created_at = undefined;
+        this.state.username = undefined;
     }
 
     checkReadiness(): boolean {
@@ -292,10 +332,9 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
     }
 
     /**
-     * Get Docker credentials for the registry
+     * Private method to fetch and extract username from Docker credentials
      */
-    @action()
-    getDockerCredentials(_args: Args): any {
+    private fetchUsername(): string | undefined {
         try {
             const response = this.makeRequest("GET", "/registry/docker-credentials");
             
@@ -304,23 +343,21 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
                 const auth = response.auths[serverUrl];
                 
                 // auth.auth is base64 encoded "username:password"
-                // Let's decode it to get the actual username and password
+                // Let's decode it to get the actual username
                 try {
                     const decoded = atob(auth.auth);
-                    const [username, password] = decoded.split(':');
-                    
-                    cli.output(`Username: ${username}\nPassword: ${password}`);
+                    const [username] = decoded.split(':');
+                    return username;
                 } catch (decodeError) {
-                    // Fallback to raw auth if decoding fails
-                    cli.output(auth.auth);
+                    // If decoding fails, return undefined
+                    return undefined;
                 }
-            } else {
-                cli.output("No credentials found");
             }
             
-            return response;
+            return undefined;
         } catch (error) {
-            throw new Error(`Failed to get Docker credentials: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // If we can't get credentials, return undefined
+            return undefined;
         }
     }
 
@@ -411,6 +448,13 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
             if (existingRegistry) {
                 cli.output(`✅ Container Registry already exists: ${existingRegistry.name} in ${existingRegistry.region}`);
                 this.updateStateFromRegistry(existingRegistry);
+                
+                // Fetch and store username for Docker authentication
+                const username = this.fetchUsername();
+                if (username) {
+                    this.state.username = username;
+                }
+                
                 return {
                     status: "exists",
                     registry: existingRegistry
@@ -441,6 +485,13 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
             
             if (response.registry) {
                 this.updateStateFromRegistry(response.registry);
+                
+                // Fetch and store username for Docker authentication
+                const username = this.fetchUsername();
+                if (username) {
+                    this.state.username = username;
+                }
+                
                 const serverUrl = response.registry.server_url || "(will be available shortly)";
                 let subscriptionInfo = "";
                 if (response.subscription) {
@@ -468,6 +519,13 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
                         if (existingRegistry) {
                             cli.output(`✅ Found existing registry: ${existingRegistry.name} in ${existingRegistry.region}`);
                             this.updateStateFromRegistry(existingRegistry);
+                            
+                            // Fetch and store username for Docker authentication
+                            const username = this.fetchUsername();
+                            if (username) {
+                                this.state.username = username;
+                            }
+                            
                             return {
                                 status: "exists",
                                 registry: existingRegistry,
@@ -525,6 +583,7 @@ export class DigitalOceanContainerRegistry extends DOProviderEntity<
             this.state.subscription_tier = undefined;
             this.state.storage_quota_bytes = undefined;
             this.state.created_at = undefined;
+            this.state.username = undefined;
             
             cli.output(`✅ Registry deleted: ${existingRegistry.name}`);
             

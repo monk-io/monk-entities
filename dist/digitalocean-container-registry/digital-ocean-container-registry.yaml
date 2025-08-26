@@ -55,11 +55,12 @@ digital-ocean-container-registry:
       type: string
     created_at:
       type: string
+    username:
+      type: string
   lifecycle:
     sync: <<< digital-ocean-container-registry-sync.js
     get-registry: ''
     list-repositories: ''
-    get-docker-credentials: ''
     run-garbage-collection: ''
     get-storage-usage: ''
     create-registry: ''
