@@ -1,0 +1,5 @@
+namespace: digitalocean-agent
+
+gradient-base:
+  defines: module
+  source: <<< gradient-base.js

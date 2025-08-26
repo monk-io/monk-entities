@@ -1,0 +1,109 @@
+namespace: digitalocean-agent
+agent:
+  defines: entity
+  metadata:
+    name: Agent
+  schema:
+    name:
+      type: string
+      description: Agent display name
+    instruction:
+      type: string
+      description: System instruction for the agent
+    model_uuid:
+      type: string
+      description: Model UUID to use (or provide model_id/inference_name instead)
+    model_id:
+      type: string
+      description: 'Human-readable model identifier, e.g. "openai-o3" (resolved to UUID)'
+    inference_name:
+      type: string
+      description: Inference name (alias to model_id)
+    project_id:
+      type: string
+      description: Optional project id
+    knowledge_base_uuids:
+      type: array
+      items:
+        type: string
+      description: 'Knowledge base UUIDs (alias: knowledge_base_uuid)'
+    guardrail_uuids:
+      type: array
+      items:
+        type: string
+      description: Guardrail UUIDs
+    tags:
+      type: array
+      items:
+        type: string
+      description: Optional tags
+    region:
+      type: string
+      description: Region slug where the agent lives (e.g. tor1)
+    provide_citations:
+      type: boolean
+      description: Whether to include citations in responses
+    retrieval_method:
+      type: string
+      description: Retrieval method type
+    k:
+      type: number
+      description: Number of documents to retrieve (k)
+    temperature:
+      type: number
+      description: Sampling temperature
+    top_p:
+      type: number
+      description: Nucleus sampling top_p
+    max_tokens:
+      type: number
+      description: Max tokens to generate
+    wait_ready:
+      type: boolean
+      description: 'If true, wait for readiness after create/update (default: true)'
+    wait_timeout_sec:
+      type: number
+      description: 'Total seconds to wait for readiness (default: 120)'
+    wait_interval_sec:
+      type: number
+      description: 'Poll interval seconds while waiting (default: 5)'
+    public_endpoint:
+      type: boolean
+      description: Make the agent endpoint public (attempt during deploy)
+    publish:
+      type: boolean
+      description: Publish deployment publicly by default (alias to public_endpoint)
+    required:
+      - name
+      - instruction
+  state-schema:
+    id:
+      type: string
+    status:
+      type: string
+    endpoint:
+      type: string
+    existing:
+      type: boolean
+    endpoint_api_key:
+      type: string
+  lifecycle:
+    sync: <<< agent-sync.js
+    get: ''
+    set-guardrails: ''
+    set-knowledge-bases: ''
+    create-api-key: ''
+    revoke-api-key: ''
+    delete-api-key: ''
+    list-api-keys: ''
+    deploy: ''
+    make-public: ''
+    models: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - cli
+    - monkec/base
