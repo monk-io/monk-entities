@@ -1,0 +1,5 @@
+namespace: digitalocean-container-registry
+
+do-provider-base:
+  defines: module
+  source: <<< do-provider-base.js

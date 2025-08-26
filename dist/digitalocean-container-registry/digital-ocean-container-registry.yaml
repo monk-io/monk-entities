@@ -1,0 +1,77 @@
+namespace: digitalocean-container-registry
+digital-ocean-container-registry:
+  defines: entity
+  metadata:
+    name: DigitalOceanContainerRegistry
+  schema:
+    name:
+      type: string
+      description: >-
+        Name of the container registry (3-63 characters, alphanumeric and
+        hyphens only)
+    region:
+      type: string
+      enum:
+        - ams3
+        - blr1
+        - fra1
+        - lon1
+        - nyc1
+        - nyc3
+        - sfo3
+        - sgp1
+        - tor1
+        - syd1
+      description: The DigitalOcean region where the registry will be created
+    subscription_tier:
+      type: string
+      enum:
+        - basic
+        - professional
+      description: >-
+        The subscription tier for the registry (basic or professional). Note:
+        starter tier only available via web interface.
+    storage_quota_bytes:
+      type: number
+      description: Storage quota for the registry in bytes
+    required:
+      - name
+      - region
+      - subscription_tier
+  state-schema:
+    existing:
+      type: boolean
+    name:
+      type: string
+    region:
+      type: string
+    subscription_tier:
+      type: string
+    storage_quota_bytes:
+      type: number
+    storage_usage_bytes:
+      type: number
+    server_url:
+      type: string
+    created_at:
+      type: string
+  lifecycle:
+    sync: <<< digital-ocean-container-registry-sync.js
+    get-registry: ''
+    list-repositories: ''
+    get-docker-credentials: ''
+    run-garbage-collection: ''
+    get-storage-usage: ''
+    create-registry: ''
+    delete-registry: ''
+    list-registries: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
+  requires:
+    - monkec/base
+    - digitalocean-container-registry/do-provider-base
+    - digitalocean-container-registry/common
+    - cli
