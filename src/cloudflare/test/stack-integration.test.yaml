@@ -1,0 +1,69 @@
+name: Cloudflare DNS Zone & Record Integration Test
+description: Load entities, run process-group stack with zone and record
+timeout: 300000
+
+secrets:
+  global:
+    cloudflare-api-token: "$CLOUDFLARE_API_TOKEN"
+
+setup:
+  - name: Load compiled entity (skipped if no Monk permissions)
+    action: load
+    target: dist/input/cloudflare/MANIFEST
+    expect:
+      exitCode: 0
+    continueOnError: true
+
+  - name: Load zone+record template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Start stack
+    action: run
+    target: cloudflare-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Describe record state
+    action: describe
+    target: cloudflare-test/record
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/record"
+        - "existing"
+
+  - name: Describe zone state
+    action: describe
+    target: cloudflare-test/zone
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/zone"
+        - "existing"
+
+  - name: List zones
+    action: action
+    target: cloudflare-test/zone
+    actionName: list-zones
+    expect:
+      exitCode: 0
+
+  - name: Get zone info
+    action: action
+    target: cloudflare-test/zone
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete stack
+    action: delete
+    target: cloudflare-test/stack
+    expect:
+      exitCode: 0
+
+

@@ -1,0 +1,3 @@
+REPO cloudflare
+LOAD cloudflare-dns-zone.yaml cloudflare-dns-record.yaml cloudflare-base.yaml
+RESOURCES cloudflare-dns-zone-sync.js cloudflare-dns-record-sync.js cloudflare-base.js

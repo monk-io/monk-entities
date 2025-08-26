@@ -19,16 +19,13 @@ This repository contains examples of Monk entities implemented using TypeScript 
 ### Building and Loading Entities
 
 ```bash
-# Build all default modules (monkec, mongodb-atlas, neon)
+# Build all default entity packages (monkec, mongodb-atlas, neon, ...)
 ./build.sh
 
-# Build specific modules
+# Build specific entity packages
 ./build.sh mongodb-atlas neon
 
-# Load all entities
-monk load MANIFEST
-
-# Load specific entity
+# Load compiled entity package MANIFEST
 cd dist/mongodb-atlas/
 monk load MANIFEST
 ```
@@ -39,13 +36,13 @@ monk load MANIFEST
 # Test with automatic environment loading
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test
 
-# Test with verbose output
+# Verbose output
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --verbose
 
-# Test specific test file
+# Specific test file
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 
-# Watch mode for development
+# Watch mode
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --watch
 ```
 
@@ -72,6 +69,26 @@ src/
 │   └── builtins/            # Built-in module types
 └── monkec/                  # MonkEC compiler implementation
 ```
+
+See also:
+
+- `doc/new-entity-guide.md` — end-to-end authoring/testing guide
+- `doc/monk-cli.md` — Monk CLI quick reference
+- `doc/templates.md` — Templates, stacks, and secrets
+- `doc/testing.md` — Test framework and patterns
+- `doc/entity-conventions.md` — Standard patterns for consistent entities
+- `doc/scaffold.md` — Canonical scaffold for new entities
+- `doc/common-issues.md` — Troubleshooting common problems
+
+### Adding a new entity package to the repo
+
+After creating `src/<package>/`:
+
+- Update the build script defaults in `build.sh` to include `<package>` in the `modules=(...)` list so `./build.sh` compiles it by default.
+- Update the root `MANIFEST` to include `dist/<package>` in the `DIRS` line so `monk load MANIFEST` picks it up after compilation.
+- Then run:
+  - `INPUT_DIR=./src/<package>/ OUTPUT_DIR=./dist/<package>/ ./monkec.sh compile`
+  - `monk load MANIFEST` (from repo root) or `cd dist/<package>/ && monk load MANIFEST`
 
 ### Entity Implementation
 
@@ -512,6 +529,10 @@ http-client:
 - **Features**: Base classes, HTTP client, and compilation tools
 - **Documentation**: See `src/monkec/base.ts` and `src/monkec/http-client.ts`
 
+### ArrowScript (Context)
+
+- This repo uses TypeScript entities compiled by MonkEC; see `doc/arrowscript.md` for how ArrowScript relates and when to use it.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -565,6 +586,49 @@ When contributing new entities:
 6. Use the module system for reusable functionality
 7. Implement proper error handling and logging
 8. Add readiness checks with appropriate timeouts
+
+### Cursor doc-based integration prompt
+
+Use this minimal prompt in Cursor when adding a new entity package from external docs:
+
+```
+Build a new MonkEC entity package using the linked API docs and this repo’s conventions.
+
+Inputs:
+- Documentation URL(s)
+- Entity package name
+- Credential env var(s) (names and values)
+
+References: doc/entity-conventions.md, doc/scaffold.md, doc/templates.md, doc/testing.md, doc/monkec.md, doc/monk-cli.md
+
+Deliverables:
+- Code in src/<package>/ following conventions (snake_case Definition/State, kebab-case actions, optional secret_ref with provider default, reserved-name avoidance)
+- Tests in src/<package>/test (stack-template.yaml with depends/connections and a data service for providers, stack-integration.test.yaml, env.example; create .env if credentials provided)
+- example.yaml and package README
+
+Process:
+- Compile: `INPUT_DIR=./src/<package>/ OUTPUT_DIR=./dist/<package>/ ./monkec.sh compile`
+- Test: `sudo INPUT_DIR=./src/<package>/ ./monkec.sh test --verbose`
+- In tests, MANIFEST path inside container is `dist/input/<package>/MANIFEST`
+- Use `existing` state flag to mark resources discovered vs created; readiness should reflect existing resources appropriately
+- Use `depends` + `connections` with `connection-target("service") entity-state get-member("field")`
+- Map .env vars to provider default secret name(s) via test `secrets`
+- Minimal follow-ups only if docs are ambiguous; otherwise iterate via tests
+
+Output only the changed/added files with complete contents.
+```
+
+Example for Cloudflare:
+
+```
+Build a new MonkEC entity package using the linked API docs and this repo’s conventions.
+
+Inputs:
+- Documentation URL(s): https://developers.cloudflare.com/api/ (DNS management)
+- Entity package name: cloudflare
+- Credential env var(s) (names and values): api token <TOKEN>
+...
+```
 
 See source code in subfolders and README.md for usage. 
 

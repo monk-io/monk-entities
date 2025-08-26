@@ -1,0 +1,37 @@
+namespace: cloudflare-test
+
+zone:
+  defines: cloudflare/cloudflare-dns-zone
+  name: example.com
+  permitted-secrets:
+    cloudflare-api-token: true
+  services:
+    data:
+      protocol: custom
+
+record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_name: <- connection-target("zone-service") entity-state get-member("name")
+  record_type: A
+  name: www
+  content: 203.0.113.10
+  ttl: 120
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone-service:
+      runnable: cloudflare-test/zone
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-test/zone
+      timeout: 60
+
+stack:
+  defines: process-group
+  runnable-list:
+    - cloudflare-test/zone
+    - cloudflare-test/record
+
+

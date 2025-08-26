@@ -1,0 +1,49 @@
+namespace: cloudflare
+cloudflare-dns-zone:
+  defines: entity
+  metadata:
+    name: CloudflareDNSZone
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    name:
+      type: string
+      description: 'Zone name (e.g., example.com)'
+    zone_type:
+      type: string
+      enum:
+        - full
+        - partial
+      description: Zone type (full or partial)
+    account_id:
+      type: string
+      description: Account ID if required for zone creation
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Cloudflare Zone ID
+    status:
+      type: string
+      description: 'Current status (e.g., pending, active)'
+    name:
+      type: string
+      description: Zone name for consumers via connections
+  lifecycle:
+    sync: <<< cloudflare-dns-zone-sync.js
+    get-info: ''
+    list-zones: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 30
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

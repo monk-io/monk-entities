@@ -47,11 +47,11 @@ NEON_API_KEY=your_neon_api_key_here
 
 ### Test Execution
 ```bash
-# From the monkec root directory
-deno task test examples/neon/test/stack-integration.test.yaml
+# From the repository root (requires access to Monk socket)
+sudo INPUT_DIR=./src/neon/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 
 # With verbose output for debugging
-deno task test examples/neon/test/stack-integration.test.yaml --verbose
+sudo INPUT_DIR=./src/neon/ ./monkec.sh test --test-file test/stack-integration.test.yaml --verbose
 ```
 
 ## Troubleshooting
