@@ -1,5 +1,5 @@
 namespace: digitalocean-database
-digital-ocean-database:
+database:
   defines: entity
   metadata:
     name: DigitalOceanDatabase

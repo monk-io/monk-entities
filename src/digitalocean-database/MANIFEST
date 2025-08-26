@@ -1,2 +1,2 @@
-digital-ocean-database: database.ts
+database: database.ts
 api-token: api-token.ts

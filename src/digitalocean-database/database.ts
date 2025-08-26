@@ -14,7 +14,7 @@ import cli from "cli";
 /**
  * Defines the immutable configuration properties for a DigitalOcean Database entity.
  */
-export interface DigitalOceanDatabaseDefinition extends DOProviderDefinitionBase {
+export interface DatabaseDefinition extends DOProviderDefinitionBase {
     /**
      * Database cluster name
      * @description Name of the database cluster (3-63 characters, alphanumeric and hyphens only)
@@ -147,7 +147,7 @@ export interface DigitalOceanDatabaseState extends DOProviderStateBase {
  * including creation, updates, deletion, and monitoring operations.
  */
 export class DigitalOceanDatabase extends DOProviderEntity<
-    DigitalOceanDatabaseDefinition,
+    DatabaseDefinition,
     DigitalOceanDatabaseState
 > {
 
