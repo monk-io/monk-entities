@@ -263,7 +263,6 @@ var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [actio
     if (!this.state.id) return false;
     try {
       const data = this.httpGet(`/v2/gen-ai/agents/${this.state.id}`);
-      console.log("checkReadiness", JSON.stringify(data));
       const agent = data.agent || data || {};
       const deployment = agent.deployment || {};
       const rawStatus = deployment.status || agent.status || agent.state || "";
@@ -282,7 +281,6 @@ var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [actio
       }
       if (endpoint) this.state.endpoint = endpoint;
       this.state.status = status;
-      console.log("checkReadiness", status, endpoint);
       return ["active", "ready", "running", "enabled"].includes(status);
     } catch (_e) {
       return false;

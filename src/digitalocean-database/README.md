@@ -73,7 +73,7 @@ This directory contains a TypeScript entity for managing DigitalOcean Database c
 namespace: my-app
 
 my-postgres:
-  defines: digitalocean-database/digital-ocean-database
+  defines: digitalocean-database/database
   name: my-postgres-db
   engine: pg
   version: "16"
@@ -88,7 +88,7 @@ my-postgres:
 namespace: my-app
 
 my-mysql-cluster:
-  defines: digitalocean-database/digital-ocean-database
+  defines: digitalocean-database/database
   name: production-mysql
   engine: mysql
   version: "8.0"
@@ -109,7 +109,7 @@ my-mysql-cluster:
 namespace: my-app
 
 my-redis:
-  defines: digitalocean-database/digital-ocean-database
+  defines: digitalocean-database/database
   name: app-cache
   engine: redis
   version: "7"
@@ -128,7 +128,7 @@ If you prefer to manage API tokens manually instead of using the provider:
 namespace: my-app
 
 my-postgres-manual:
-  defines: digitalocean-database/digital-ocean-database
+  defines: digitalocean-database/database
   api_token_secret_ref: my-custom-do-token
   name: my-postgres-manual
   engine: pg
@@ -315,7 +315,7 @@ If you're upgrading from the previous version:
    ```yaml
    # Old (v1.x)
    my-db:
-     defines: digitalocean-database/digital-ocean-database
+     defines: digitalocean-database/database
      secret_ref: digitalocean-api-key
      permitted-secrets:
        digitalocean-api-key: true
@@ -323,7 +323,7 @@ If you're upgrading from the previous version:
    
    # New (v2.0)
    my-db:
-     defines: digitalocean-database/digital-ocean-database
+     defines: digitalocean-database/database
      # ... other config (no secrets needed!)
    ```
 

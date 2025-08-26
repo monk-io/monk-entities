@@ -2,8 +2,7 @@ namespace: digitalocean-database-example
 
 # Basic PostgreSQL database cluster
 my-postgres-db:
-  defines: digitalocean-database/digital-ocean-database
-  secret_ref: digitalocean-api-key
+  defines: digitalocean-database/database
   name: my-postgres-cluster
   engine: pg
   version: "16"
@@ -13,13 +12,10 @@ my-postgres-db:
   tags:
     - environment:production
     - application:my-app
-  permitted-secrets:
-    digitalocean-api-key: true
 
 # MySQL database cluster with multiple nodes
 my-mysql-cluster:
-  defines: digitalocean-database/digital-ocean-database
-  secret_ref: digitalocean-api-key
+  defines: digitalocean-database/database
   name: my-mysql-cluster
   engine: mysql
   version: "8.0"
@@ -32,13 +28,10 @@ my-mysql-cluster:
   db_config:
     sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO"
     default_time_zone: "UTC"
-  permitted-secrets:
-    digitalocean-api-key: true
 
 # Redis cache cluster
 my-redis-cache:
-  defines: digitalocean-database/digital-ocean-database
-  secret_ref: digitalocean-api-key
+  defines: digitalocean-database/database
   name: my-redis-cache
   engine: redis
   version: "7"
@@ -50,13 +43,10 @@ my-redis-cache:
     - application:cache
   db_config:
     redis_maxmemory_policy: "allkeys-lru"
-  permitted-secrets:
-    digitalocean-api-key: true
 
 # MongoDB cluster
 my-mongodb:
-  defines: digitalocean-database/digital-ocean-database
-  secret_ref: digitalocean-api-key
+  defines: digitalocean-database/database
   name: my-mongodb-cluster
   engine: mongodb
   version: "7.0"
@@ -66,5 +56,3 @@ my-mongodb:
   tags:
     - environment:production
     - application:document-store
-  permitted-secrets:
-    digitalocean-api-key: true
