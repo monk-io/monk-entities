@@ -1,0 +1,3 @@
+REPO digitalocean-agent
+LOAD agent.yaml gradient-base.yaml
+RESOURCES agent-sync.js gradient-base.js

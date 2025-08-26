@@ -1,0 +1,54 @@
+namespace: do-agent-example
+
+agent:
+  defines: digitalocean-agent/agent
+  name: api-create
+  instruction: "be a weather reporter"
+  model_id: "openai-gpt-oss-120b"
+  project_id: ""
+  tags: ["tag1"]
+  region: "tor1"
+  publish: true
+  checks:
+    readiness:
+      period: 15
+      attempts: 10
+      initialDelay: 5
+  services:
+    data:
+      protocol: custom
+
+
+app-user:
+  defines: runnable
+  containers:
+    defines: containers
+    foo:
+      image: nginx:latest
+      entrypoint: sleep 36000
+  depends:
+    wait-for:
+      runnables:
+        -  do-agent-example/agent
+      timeout: 120
+  variables:
+    defines: variables
+    endpoint-url:
+      type: string
+      value: <- connection-target("agent") entity-state get-member("endpoint")
+      env: ENDPOINT_URL
+    endpoint-api-key:
+      type: string
+      value: <- connection-target("agent") entity-state get-member("endpoint_api_key")
+      env: ENDPOINT_API_KEY
+  connections:
+    agent:
+      runnable: do-agent-example/agent
+      service: data
+
+
+stack:
+  defines: process-group
+  members:
+    - do-agent-example/agent
+    - do-agent-example/app-user
