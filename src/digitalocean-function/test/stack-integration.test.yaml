@@ -1,0 +1,137 @@
+name: "DigitalOcean App Platform Functions Integration Test"
+description: "Complete integration test for DigitalOcean App Platform Functions entity using Monk runtime"
+timeout: 900000  # 15 minutes
+
+# Secrets configuration
+secrets:
+  global:
+    shared-config: "test-mode"
+    test-do-api-token: "$DO_API_TOKEN"
+    test-secret: "$TEST_SECRET"
+
+setup:
+  - name: "Load compiled entity"
+    action: "load"
+    target: "dist/input/digitalocean-function/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load entity template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Test 1: Basic Node.js Function Deployment
+  - name: "Create Node.js function"
+    action: "run"
+    target: "test-instances/test-nodejs-function"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for Node.js function to be ready"
+    action: "wait"
+    target: "test-instances/test-nodejs-function"
+    waitFor:
+      condition: "ready"
+      timeout: 300000  # 5 minutes
+
+  - name: "Get Node.js function information"
+    action: "do"
+    target: "test-instances/test-nodejs-function/info"
+    expect:
+      exitCode: 0
+      output:
+        - "Function Information"
+        - "test-nodejs-app"
+        - "test-hello-function"
+
+  - name: "Get Node.js function URL"
+    action: "do"
+    target: "test-instances/test-nodejs-function/url"
+    expect:
+      exitCode: 0
+      output:
+        - "Function URL:"
+
+  - name: "Get Node.js function logs"
+    action: "do"
+    target: "test-instances/test-nodejs-function/logs"
+    expect:
+      exitCode: 0
+      output:
+        - "Deployment Status"
+
+  - name: "Trigger Node.js function redeploy"
+    action: "do"
+    target: "test-instances/test-nodejs-function/deploy"
+    expect:
+      exitCode: 0
+      output:
+        - "Deployment triggered"
+
+  - name: "Stop Node.js function"
+    action: "stop"
+    target: "test-instances/test-nodejs-function"
+    expect:
+      exitCode: 0
+
+  # Test 2: Python Function with Environment Variables
+  - name: "Create Python function"
+    action: "run"
+    target: "test-instances/test-python-function"
+    expect:
+      exitCode: 0
+      output:
+        - "Started"
+
+  - name: "Wait for Python function to be ready"
+    action: "wait"
+    target: "test-instances/test-python-function"
+    waitFor:
+      condition: "ready"
+      timeout: 300000  # 5 minutes
+
+  - name: "Get Python function information"
+    action: "do"
+    target: "test-instances/test-python-function/info"
+    expect:
+      exitCode: 0
+      output:
+        - "Function Information"
+        - "test-python-app"
+        - "test-api-function"
+
+  - name: "Get Python function URL"
+    action: "do"
+    target: "test-instances/test-python-function/url"
+    expect:
+      exitCode: 0
+      output:
+        - "Function URL:"
+
+  - name: "Update Python function"
+    action: "update"
+    target: "test-instances/test-python-function"
+    expect:
+      exitCode: 0
+
+  - name: "Stop Python function"
+    action: "stop"
+    target: "test-instances/test-python-function"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Ensure Node.js function cleanup"
+    action: "delete"
+    target: "test-instances/test-nodejs-function"
+    expect:
+      exitCode: 0
+
+  - name: "Ensure Python function cleanup"
+    action: "delete"
+    target: "test-instances/test-python-function"
+    expect:
+      exitCode: 0

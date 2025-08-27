@@ -1,0 +1,3 @@
+REPO digitalocean-function
+LOAD app-function.yaml base.yaml common.yaml
+RESOURCES common.js base.js app-function-sync.js
