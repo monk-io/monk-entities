@@ -129,6 +129,9 @@ spaces-bucket:
   state-schema:
     existing:
       type: boolean
+    endpoint:
+      type: string
+      description: Endpoint information for the resource
     bucket_name:
       type: string
     region:

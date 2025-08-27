@@ -77,6 +77,9 @@ export interface DOSpacesS3DefinitionBase {
 
 export interface DOSpacesS3StateBase {
     existing?: boolean;
+    /** @description Endpoint information for the resource */
+    endpoint?: string;
+    /** @description Public address (hostname or URL) of the bucket/service */
 }
 
 export abstract class DOSpacesS3Entity<

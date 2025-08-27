@@ -1,5 +1,0 @@
-namespace: digitalocean-database
-
-common:
-  defines: module
-  source: <<< common.js

@@ -53,6 +53,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
             this.state.existing = true;
             this.state.bucket_name = bucketName;
             this.state.region = this.region;
+            this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
             cli.output(`Space '${bucketName}' already exists in region ${this.region}`);
             // Still attempt to apply configuration on existing bucket
             this.configureBucket();
@@ -63,6 +64,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
         this.state.existing = true;;
         this.state.bucket_name = bucketName;
         this.state.region = this.region;
+        this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
         cli.output(`Created Space '${bucketName}' in region ${this.region}`);
 
         this.configureBucket();
@@ -72,6 +74,9 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
         if (!this.state.bucket_name) {
             this.create();
             return;
+        }
+        if (!this.state.endpoint) {
+            this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
         }
         this.configureBucket();
     }
@@ -85,6 +90,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
         this.deleteBucket(bucketName);
         this.state.bucket_name = undefined;
         this.state.region = undefined;
+        this.state.endpoint = undefined;
         this.state.existing = false;
         cli.output(`Deleted Space '${bucketName}'`);
     }

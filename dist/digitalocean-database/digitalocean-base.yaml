@@ -1,5 +1,0 @@
-namespace: digitalocean-database
-
-digitalocean-base:
-  defines: module
-  source: <<< digitalocean-base.js
