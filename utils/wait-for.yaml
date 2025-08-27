@@ -1,0 +1,19 @@
+namespace: utils
+
+wait-for-action:
+  defines: entity
+  schema:
+    target:
+      type: string
+    action:
+      type: string
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 20
+      code: |
+        function main(def) {
+          const action = require("action");
+          action.do(`${def.target}/${def.action}`);
+        }

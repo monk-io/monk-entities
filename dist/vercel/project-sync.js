@@ -390,13 +390,20 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
     }
     cli.output(`\u{1F517} Getting production URLs for project: ${this.definition.name}`);
     const project = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`);
+    const urls = [];
     if (project.targets && project.targets.production && project.targets.production.alias) {
       cli.output(`\u2705 Production URLs:`);
       project.targets.production.alias.forEach((url, index) => {
         cli.output(`   ${index + 1}. https://${url}`);
+        urls.push(`https://${url}`);
       });
     } else {
       cli.output(`\u2139\uFE0F  No production URLs available yet. Deploy the project first.`);
+    }
+    if (urls.length > 0) {
+      this.state.url = urls[0];
+    } else {
+      throw new Error("No production URLs available");
     }
   }
 };

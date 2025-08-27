@@ -174,7 +174,7 @@ export interface ProjectState extends VercelEntityState {
 }
 
 export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
-    
+
     protected getEntityName(): string {
         return this.definition.name;
     }
@@ -183,7 +183,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
     override create(): void {
         // Check if project already exists by name
         const existingProject = this.findExistingProject();
-        
+
         if (existingProject) {
             // Project already exists, use it
             this.state = {
@@ -250,7 +250,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             createObj = this.makeRequest("POST", VERCEL_API_ENDPOINTS.PROJECTS_V11, body);
         } catch (error) {
             let errorMessage = "Unknown error";
-            
+
             if (error instanceof Error) {
                 errorMessage = error.message;
             } else if (typeof error === "string") {
@@ -258,9 +258,9 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             } else {
                 errorMessage = "Project creation failed";
             }
-            
+
             cli.output(`❌ Project creation failed: ${errorMessage}`);
-            
+
             // Check if it's a 409 conflict error (project already exists)
             if (errorMessage.includes("409") || errorMessage.includes("already exists")) {
                 cli.output(`🔄 Project creation failed with 409 (project already exists), trying to find existing project...`);
@@ -289,7 +289,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
                     return;
                 }
             }
-            
+
             throw new Error(`Failed to create project: ${errorMessage}`);
         }
 
@@ -312,7 +312,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             root_directory: createObj.rootDirectory,
             existing: false
         };
-        
+
         cli.output(`✅ Created Vercel project: ${createObj.name}`);
     }
 
@@ -325,15 +325,15 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         const body: any = {
             ...this.getTeamBody()
         };
-        
+
         let hasChanges = false;
-        
+
         // Only include name if it's different from current state
         if (this.definition.name !== this.state.name) {
             body.name = this.definition.name;
             hasChanges = true;
         }
-        
+
         // Add optional fields if provided and different from current state
         if (this.definition.framework && this.definition.framework !== this.state.framework) {
             body.framework = this.definition.framework;
@@ -364,15 +364,15 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             body.rootDirectory = this.definition.root_directory;
             hasChanges = true;
         }
-        
+
         // Skip update if nothing has changed
         if (!hasChanges) {
             cli.output(`ℹ️  No changes detected for project: ${this.definition.name}`);
             return;
         }
-        
+
         const updatedProject = this.makeRequest("PATCH", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`, body);
-        
+
         // Update state with new info
         this.state = {
             ...this.state,
@@ -389,7 +389,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             dev_command: updatedProject.devCommand,
             root_directory: updatedProject.rootDirectory
         };
-        
+
         cli.output(`✅ Updated Vercel project: ${updatedProject.name}`);
     }
 
@@ -398,7 +398,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
             cli.output("Project does not exist, nothing to delete");
             return;
         }
-        
+
         this.deleteResource(`${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`, "Project");
     }
 
@@ -424,14 +424,14 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         try {
             const teamPath = this.getTeamPath();
             const allProjects = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}${teamPath}`);
-            
+
             if (allProjects && Array.isArray(allProjects.projects)) {
                 return allProjects.projects.find((p: any) => p.name === this.definition.name);
             }
         } catch (error) {
             cli.output(`⚠️  Could not check for existing projects: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-        
+
         return null;
     }
 
@@ -443,15 +443,15 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`📋 Getting details for project: ${this.definition.name}`);
-        
+
         const project = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`);
-        
+
         cli.output(`✅ Project Details:`);
         cli.output(`   ID: ${project.id}`);
         cli.output(`   Name: ${project.name}`);
         cli.output(`   Framework: ${project.framework || 'None'}`);
         cli.output(`   Created: ${project.createdAt || 'Unknown'}`);
-        
+
         if (project.domains && project.domains.length > 0) {
             cli.output(`   Domains: ${project.domains.join(", ")}`);
         }
@@ -465,12 +465,12 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
 
         const limit = args?.limit || 10;
         cli.output(`📋 Listing deployments for project: ${this.definition.name} (limit: ${limit})`);
-        
+
         const teamPath = this.getTeamPath();
         const queryParams = `projectId=${this.state.id}&limit=${limit}`;
         const path = teamPath ? `${VERCEL_API_ENDPOINTS.DEPLOYMENTS}${teamPath}&${queryParams}` : `${VERCEL_API_ENDPOINTS.DEPLOYMENTS}?${queryParams}`;
         const deployments = this.makeRequest("GET", path);
-        
+
         if (deployments && Array.isArray(deployments.deployments)) {
             cli.output(`✅ Found ${deployments.deployments.length} deployments:`);
             deployments.deployments.forEach((deployment: any, index: number) => {
@@ -489,15 +489,15 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
 
         const name = args?.name || `deployment-${Date.now()}`;
         cli.output(`🚀 Creating deployment for project: ${this.definition.name}`);
-        
+
         const body = {
             name: name,
             projectId: this.state.id,
             ...this.getTeamBody()
         };
-        
+
         const deployment = this.makeRequest("POST", VERCEL_API_ENDPOINTS.DEPLOYMENTS_V13, body);
-        
+
         cli.output(`✅ Deployment created successfully!`);
         cli.output(`   Deployment ID: ${deployment.id}`);
         cli.output(`   URL: ${deployment.url}`);
@@ -516,9 +516,9 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`📋 Getting deployment details: ${deploymentId}`);
-        
+
         const deployment = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.DEPLOYMENTS_V13}/${deploymentId}`);
-        
+
         cli.output(`✅ Deployment Details:`);
         cli.output(`   ID: ${deployment.id}`);
         cli.output(`   URL: ${deployment.url}`);
@@ -534,10 +534,10 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`📋 Listing domains for project: ${this.definition.name}`);
-        
+
         const teamPath = this.getTeamPath();
         const domains = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains${teamPath}`);
-        
+
         if (domains && Array.isArray(domains)) {
             cli.output(`✅ Found ${domains.length} domains:`);
             domains.forEach((domain: any, index: number) => {
@@ -560,14 +560,14 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`🌐 Adding domain ${domain} to project: ${this.definition.name}`);
-        
+
         const body = {
             name: domain,
             ...this.getTeamBody()
         };
-        
+
         const result = this.makeRequest("POST", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains`, body);
-        
+
         cli.output(`✅ Domain added successfully!`);
         cli.output(`   Domain: ${result.name}`);
         cli.output(`   Status: ${result.verification?.status || 'unknown'}`);
@@ -585,9 +585,9 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`🗑️  Removing domain ${domain} from project: ${this.definition.name}`);
-        
+
         this.makeRequest("DELETE", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains/${domain}`);
-        
+
         cli.output(`✅ Domain removed successfully!`);
     }
 
@@ -598,16 +598,22 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         cli.output(`🔗 Getting production URLs for project: ${this.definition.name}`);
-        
+
         const project = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`);
-        
+        const urls: string[] = [];
         if (project.targets && project.targets.production && project.targets.production.alias) {
             cli.output(`✅ Production URLs:`);
             project.targets.production.alias.forEach((url: string, index: number) => {
                 cli.output(`   ${index + 1}. https://${url}`);
+                urls.push(`https://${url}`);
             });
         } else {
             cli.output(`ℹ️  No production URLs available yet. Deploy the project first.`);
+        }
+        if (urls.length > 0) {
+            this.state.url = urls[0]; // Set the first URL as the main project URL
+        } else {
+            throw new Error("No production URLs available");
         }
     }
 } 
