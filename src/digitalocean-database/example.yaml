@@ -47,12 +47,12 @@ my-redis-cache:
 # MongoDB cluster
 my-mongodb:
   defines: digitalocean-database/database
-  name: my-mongodb-cluster
+  name: my-mongodb-cluster3
   engine: mongodb
   version: "7.0"
-  num_nodes: 3
+  num_nodes: 1
   region: lon1
-  size: db-s-4vcpu-8gb
+  size: db-s-2vcpu-4gb
   tags:
     - environment:production
     - application:document-store

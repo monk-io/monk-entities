@@ -118,6 +118,20 @@ database:
         ssl:
           type: boolean
       additionalProperties: false
+    connection_uri:
+      type: string
+    connection_password:
+      type: string
+    connection_host:
+      type: string
+    connection_port:
+      type: number
+    connection_user:
+      type: string
+    connection_database:
+      type: string
+    connection_ssl:
+      type: boolean
     created_at:
       type: string
     tags:

@@ -69,6 +69,7 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
       this.state.existing = true;
       this.state.bucket_name = bucketName;
       this.state.region = this.region;
+      this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
       cli.output(`Space '${bucketName}' already exists in region ${this.region}`);
       this.configureBucket();
       return;
@@ -78,6 +79,7 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
     ;
     this.state.bucket_name = bucketName;
     this.state.region = this.region;
+    this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
     cli.output(`Created Space '${bucketName}' in region ${this.region}`);
     this.configureBucket();
   }
@@ -85,6 +87,9 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
     if (!this.state.bucket_name) {
       this.create();
       return;
+    }
+    if (!this.state.endpoint) {
+      this.state.endpoint = `${this.region}.digitaloceanspaces.com`;
     }
     this.configureBucket();
   }
@@ -97,6 +102,7 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
     this.deleteBucket(bucketName);
     this.state.bucket_name = void 0;
     this.state.region = void 0;
+    this.state.endpoint = void 0;
     this.state.existing = false;
     cli.output(`Deleted Space '${bucketName}'`);
   }

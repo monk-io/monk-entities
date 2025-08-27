@@ -302,15 +302,15 @@ Cluster ID: ${this.state.id}
     }
     cli.output(`\u{1F517} Connection Information for "${this.state.name}":`);
     cli.output(`   Engine: ${this.state.engine}`);
-    cli.output(`   Host: ${this.state.connection.host}`);
-    cli.output(`   Port: ${this.state.connection.port}`);
-    cli.output(`   User: ${this.state.connection.user}`);
-    cli.output(`   Database: ${this.state.connection.database}`);
-    cli.output(`   SSL: ${this.state.connection.ssl ? "enabled" : "disabled"}`);
-    if (this.state.connection.uri) {
+    cli.output(`   Host: ${this.state.connection_host}`);
+    cli.output(`   Port: ${this.state.connection_port}`);
+    cli.output(`   User: ${this.state.connection_user}`);
+    cli.output(`   Database: ${this.state.connection_database}`);
+    cli.output(`   SSL: ${this.state.connection_ssl ? "enabled" : "disabled"}`);
+    if (this.state.connection_uri) {
       cli.output(`
 \u{1F4CB} Connection URI:`);
-      cli.output(`   ${this.state.connection.uri}`);
+      cli.output(`   ${this.state.connection_uri}`);
     }
   }
   resizeCluster(args) {
@@ -368,19 +368,27 @@ Cluster ID: ${this.state.id}
     this.state.size = database.size;
     this.state.created_at = database.created_at;
     this.state.tags = database.tags;
+    if (!this.state.connection_uri) {
+      this.state.connection_uri = database.connection.uri;
+    }
+    if (!this.state.connection_password) {
+      this.state.connection_password = database.connection.password;
+    }
+    this.state.connection_host = database.connection.host;
+    this.state.connection_port = database.connection.port;
+    this.state.connection_user = database.connection.user;
+    this.state.connection_database = database.connection.database;
+    this.state.connection_ssl = database.connection.ssl;
     if (database.connection) {
-      const previousConnection = this.state.connection || {};
-      this.state.connection = {
-        // Never overwrite once set in state
-        uri: previousConnection.uri !== void 0 ? previousConnection.uri : database.connection.uri,
-        password: previousConnection.password !== void 0 ? previousConnection.password : database.connection.password,
-        // Merge others: use API value when present, otherwise keep previous
-        host: database.connection.host !== void 0 ? database.connection.host : previousConnection.host,
-        port: database.connection.port !== void 0 ? database.connection.port : previousConnection.port,
-        user: database.connection.user !== void 0 ? database.connection.user : previousConnection.user,
-        database: database.connection.database !== void 0 ? database.connection.database : previousConnection.database,
-        ssl: database.connection.ssl !== void 0 ? database.connection.ssl : previousConnection.ssl
-      };
+      const connection = this.state.connection || {};
+      if (!connection.uri) {
+        connection.uri = database.connection.uri;
+      }
+      if (!connection.password) {
+        connection.password = database.connection.password;
+      }
+      connection.host = database.connection.host !== void 0 ? database.connection.host : connection.host, connection.port = database.connection.port !== void 0 ? database.connection.port : connection.port, connection.user = database.connection.user !== void 0 ? database.connection.user : connection.user, connection.database = database.connection.database !== void 0 ? database.connection.database : connection.database, connection.ssl = database.connection.ssl !== void 0 ? database.connection.ssl : connection.ssl;
+      this.state.connection = connection;
     }
   }
 };
