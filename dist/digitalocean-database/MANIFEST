@@ -1,0 +1,3 @@
+REPO digitalocean-database
+LOAD api-token.yaml common.yaml database.yaml do-provider-base.yaml digitalocean-base.yaml
+RESOURCES do-provider-base.js digitalocean-base.js api-token-sync.js common.js database-sync.js
