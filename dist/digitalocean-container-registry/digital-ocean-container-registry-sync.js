@@ -108,7 +108,7 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
         if (username) {
           this.state.username = username;
         }
-        const serverUrl = this.state.server_url || "(will be available shortly)";
+        const serverUrl = this.state.server_url || `registry.digitalocean.com/${this.state.name}`;
         let subscriptionInfo = "";
         if (response.subscription) {
           subscriptionInfo = ` | Tier: ${response.subscription.tier.name} | Price: $${response.subscription.tier.monthly_price_in_cents / 100}/month`;
@@ -196,7 +196,7 @@ var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extend
       if (response.registry) {
         this.updateStateFromRegistry(response.registry);
         const registry = response.registry;
-        const serverUrl = registry.server_url || `registry.digitalocean.com/${registry.name}`;
+        const serverUrl = `registry.digitalocean.com/${registry.name}`;
         const subscriptionTier = registry.subscription_tier || "basic";
         const storageQuota = registry.storage_quota_bytes ? ` | Storage Quota: ${registry.storage_quota_bytes} bytes` : "";
         const storageUsage = registry.storage_usage_bytes !== void 0 ? ` | Storage Usage: ${registry.storage_usage_bytes} bytes` : "";
@@ -260,7 +260,7 @@ Server: ${this.state.server_url}`);
     }
   }
   runGarbageCollection(args) {
-    const gcType = args.type || "unreferenced_blobs_only";
+    const gcType = args.type || "untagged_manifests_only";
     try {
       if (!this.state.name) {
         throw new Error("Registry name not available. Ensure registry exists first.");
@@ -344,7 +344,7 @@ Server: ${this.state.server_url}`);
         if (username) {
           this.state.username = username;
         }
-        const serverUrl = response.registry.server_url || "(will be available shortly)";
+        const serverUrl = `registry.digitalocean.com/${response.registry.name}`;
         let subscriptionInfo = "";
         if (response.subscription) {
           subscriptionInfo = ` | Tier: ${response.subscription.tier.name} | Price: $${response.subscription.tier.monthly_price_in_cents / 100}/month`;
@@ -436,7 +436,7 @@ Server: ${this.state.server_url}`);
           count: 0
         };
       }
-      const serverUrl = existingRegistry.server_url || `registry.digitalocean.com/${existingRegistry.name}`;
+      const serverUrl = `registry.digitalocean.com/${existingRegistry.name}`;
       const subscriptionTier = existingRegistry.subscription_tier || "basic";
       let storageInfo = "";
       if (existingRegistry.storage_quota_bytes) {
@@ -484,7 +484,7 @@ Server: ${this.state.server_url}`);
     this.state.subscription_tier = registry.subscription_tier;
     this.state.storage_quota_bytes = registry.storage_quota_bytes;
     this.state.storage_usage_bytes = registry.storage_usage_bytes;
-    this.state.server_url = registry.server_url;
+    this.state.server_url = `registry.digitalocean.com/${registry.name}`;
     this.state.created_at = registry.created_at;
   }
 };
