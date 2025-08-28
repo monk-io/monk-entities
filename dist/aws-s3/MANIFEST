@@ -1,3 +1,3 @@
 REPO aws-s3
-LOAD s3-bucket.yaml common.yaml base.yaml
-RESOURCES common.js base.js s3-bucket-sync.js
+LOAD base.yaml common.yaml s3-bucket.yaml
+RESOURCES common.js s3-bucket-sync.js base.js

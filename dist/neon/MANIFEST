@@ -1,3 +1,3 @@
 REPO neon
-LOAD branch.yaml compute.yaml role.yaml database.yaml project.yaml neon-base.yaml common.yaml
-RESOURCES common.js role-sync.js compute-sync.js branch-sync.js neon-base.js database-sync.js project-sync.js
+LOAD branch.yaml compute.yaml database.yaml neon-base.yaml role.yaml common.yaml project.yaml
+RESOURCES common.js neon-base.js project-sync.js role-sync.js compute-sync.js database-sync.js branch-sync.js

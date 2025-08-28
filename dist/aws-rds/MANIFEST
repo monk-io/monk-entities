@@ -1,3 +1,3 @@
 REPO aws-rds
-LOAD rds-access-list.yaml rds-instance.yaml security-group.yaml common.yaml base.yaml
-RESOURCES common.js base.js security-group.js rds-instance-sync.js rds-access-list-sync.js
+LOAD rds-instance.yaml base.yaml common.yaml security-group.yaml rds-access-list.yaml
+RESOURCES common.js security-group.js rds-instance-sync.js base.js rds-access-list-sync.js

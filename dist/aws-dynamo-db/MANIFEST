@@ -1,3 +1,3 @@
 REPO aws-dynamo-db
-LOAD dynamo-db-table.yaml common.yaml base.yaml
+LOAD base.yaml common.yaml dynamo-db-table.yaml
 RESOURCES common.js base.js dynamo-db-table-sync.js
