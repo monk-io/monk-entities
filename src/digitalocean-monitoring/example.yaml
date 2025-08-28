@@ -1,0 +1,92 @@
+namespace: digitalocean-monitoring-example
+
+# Basic CPU monitoring alert for high CPU usage
+monk-cpu-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-cpu-high-alert
+  metric_type: v1/insights/droplet/cpu
+  compare: GreaterThan
+  value: 80
+  window: 10m
+  tags:
+    - production
+    - web-server
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true
+
+monk-memory-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-memory-high-alert
+  metric_type: v1/insights/droplet/memory_utilization_percent
+  compare: GreaterThan
+  value: 90
+  window: 5m
+  tags:
+    - production
+    - database
+  slack_channels:
+    - channel: "#alerts"
+      url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Disk utilization monitoring
+monk-disk-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-disk-full-alert
+  metric_type: v1/insights/droplet/disk_utilization_percent
+  compare: GreaterThan
+  value: 85
+  window: 30m
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Load average monitoring
+monk-load-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-load-high-alert
+  metric_type: v1/insights/droplet/load_5
+  compare: GreaterThan
+  value: 2.0
+  window: 10m
+  tags:
+    - production
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Network bandwidth monitoring
+monk-bandwidth-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-bandwidth-high-alert
+  metric_type: v1/insights/droplet/public_outbound_bandwidth
+  compare: GreaterThan
+  value: 1000000000  # 1GB in bytes
+  window: 1h
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true
+
+# Disk I/O monitoring
+monk-disk-io-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-disk-write-alert
+  metric_type: v1/insights/droplet/disk_write
+  compare: GreaterThan
+  value: 50000000  # 50MB/s in bytes
+  window: 10m
+  tags:
+    - database
+    - high-io
+  enabled: true
+  create_when_missing: true
+  permitted-secrets:
+    digitalocean-api-key: true

@@ -1,0 +1,199 @@
+namespace: digitalocean-monitoring
+digital-ocean-monitoring:
+  defines: entity
+  metadata:
+    name: DigitalOceanMonitoring
+  schema:
+    name:
+      type: string
+      description: Name of the alert policy
+    alert_description:
+      type: string
+      description: Description of the alert policy
+    metric_type:
+      type: string
+      enum:
+        - v1/insights/droplet/load_1
+        - v1/insights/droplet/load_5
+        - v1/insights/droplet/load_15
+        - v1/insights/droplet/memory_utilization_percent
+        - v1/insights/droplet/disk_utilization_percent
+        - v1/insights/droplet/cpu
+        - v1/insights/droplet/disk_read
+        - v1/insights/droplet/disk_write
+        - v1/insights/droplet/public_outbound_bandwidth
+        - v1/insights/droplet/public_inbound_bandwidth
+        - v1/insights/droplet/private_outbound_bandwidth
+        - v1/insights/droplet/private_inbound_bandwidth
+      description: Type of metric to monitor
+    compare:
+      type: string
+      enum:
+        - GreaterThan
+        - LessThan
+      description: Comparison operator for the threshold
+    value:
+      type: number
+      description: Threshold value for the alert
+    window:
+      type: string
+      enum:
+        - 5m
+        - 10m
+        - 30m
+        - 1h
+      description: Time window for evaluation
+    entities:
+      type: array
+      items:
+        type: string
+      description: Array of Droplet IDs to monitor
+    tags:
+      type: array
+      items:
+        type: string
+      description: Array of tags to match Droplets
+    emails:
+      type: array
+      items:
+        type: string
+      description: Array of email addresses for notifications
+    slack_channels:
+      type: array
+      items:
+        type: object
+        properties:
+          channel:
+            type: string
+            description: Slack channel name
+          url:
+            type: string
+            description: Slack webhook URL
+        required:
+          - channel
+          - url
+        additionalProperties: false
+      description: Slack webhook configurations for notifications
+    enabled:
+      type: boolean
+      description: Whether the alert is enabled
+      default: true
+    create_when_missing:
+      type: boolean
+      description: Whether to create resources when missing (for testing)
+      default: true
+    required:
+      - name
+      - metric_type
+      - compare
+      - value
+      - window
+  state-schema:
+    existing:
+      type: boolean
+    uuid:
+      type: string
+    name:
+      type: string
+    alert_description:
+      type: string
+    metric_type:
+      type: string
+      enum:
+        - v1/insights/droplet/load_1
+        - v1/insights/droplet/load_5
+        - v1/insights/droplet/load_15
+        - v1/insights/droplet/memory_utilization_percent
+        - v1/insights/droplet/disk_utilization_percent
+        - v1/insights/droplet/cpu
+        - v1/insights/droplet/disk_read
+        - v1/insights/droplet/disk_write
+        - v1/insights/droplet/public_outbound_bandwidth
+        - v1/insights/droplet/public_inbound_bandwidth
+        - v1/insights/droplet/private_outbound_bandwidth
+        - v1/insights/droplet/private_inbound_bandwidth
+    compare:
+      type: string
+      enum:
+        - GreaterThan
+        - LessThan
+    value:
+      type: number
+    window:
+      type: string
+      enum:
+        - 5m
+        - 10m
+        - 30m
+        - 1h
+    entities:
+      type: array
+      items:
+        type: string
+    tags:
+      type: array
+      items:
+        type: string
+    emails:
+      type: array
+      items:
+        type: string
+    slack_channels:
+      type: array
+      items:
+        type: object
+        properties:
+          channel:
+            type: string
+          url:
+            type: string
+        required:
+          - channel
+          - url
+        additionalProperties: false
+    enabled:
+      type: boolean
+    created_at:
+      type: string
+  lifecycle:
+    sync: <<< digital-ocean-monitoring-sync.js
+    create-alert-policy: ''
+    list-alert-policies: ''
+    get-alert-policy: ''
+    update-alert-policy: ''
+    get-account-info: ''
+    get-droplet-metrics: ''
+    get-droplet-cpu-metrics: ''
+    get-droplet-memory-metrics: ''
+    get-droplet-disk-metrics: ''
+    get-droplet-network-metrics: ''
+    get-app-metrics: ''
+    get-load-balancer-metrics: ''
+    get-database-metrics: ''
+    enable-alert-policy: ''
+    disable-alert-policy: ''
+    get-volume-metrics: ''
+    get-droplet-bandwidth-inbound: ''
+    get-droplet-bandwidth-outbound: ''
+    get-droplet-private-bandwidth-inbound: ''
+    get-droplet-private-bandwidth-outbound: ''
+    get-droplet-disk-read: ''
+    get-droplet-disk-write: ''
+    get-droplet-load-average1: ''
+    get-droplet-load-average5: ''
+    get-droplet-load-average15: ''
+    list-droplets: ''
+    delete-alert-policy: ''
+    list-sinks: ''
+    get-sink: ''
+    get-all-droplet-metrics: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
+  requires:
+    - monkec/base
+    - digitalocean-monitoring/do-provider-base
+    - digitalocean-monitoring/common
+    - cli

@@ -1,0 +1,3 @@
+REPO digitalocean-monitoring
+LOAD digital-ocean-monitoring.yaml common.yaml do-provider-base.yaml
+RESOURCES do-provider-base.js digital-ocean-monitoring-alert-policy-sync.js common.js digital-ocean-monitoring-sync.js

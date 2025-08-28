@@ -1,0 +1,5 @@
+namespace: digitalocean-monitoring
+
+do-provider-base:
+  defines: module
+  source: <<< do-provider-base.js
