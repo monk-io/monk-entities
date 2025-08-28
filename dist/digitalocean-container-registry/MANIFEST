@@ -1,0 +1,4 @@
+REPO digitalocean-container-registry
+digital-ocean-container-registry: registry.ts
+LOAD registry.yaml common.yaml do-provider-base.yaml
+RESOURCES do-provider-base.js common.js registry-sync.js
