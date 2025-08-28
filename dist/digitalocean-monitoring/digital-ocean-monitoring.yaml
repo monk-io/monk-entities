@@ -1,5 +1,5 @@
 namespace: digitalocean-monitoring
-digital-ocean-monitoring:
+monitoring:
   defines: entity
   metadata:
     name: DigitalOceanMonitoring
