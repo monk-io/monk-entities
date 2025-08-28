@@ -59,13 +59,14 @@ The entity maintains the following runtime state:
 - `server_url` - Registry endpoint URL
 - `created_at` - Creation timestamp
 - `existing` - Whether registry existed before entity creation
+- `username` - Email of the user
 
 ## Authentication
 
 Uses DigitalOcean provider for authentication. The provider should be configured with:
 
 1. A DigitalOcean API token with Container Registry permissions
-2. Token stored in Monk secrets
+2. Token stored in Provider Store
 3. Provider configuration in your Monk setup
 
 ## Example Usage
@@ -75,7 +76,7 @@ Uses DigitalOcean provider for authentication. The provider should be configured
 ```yaml
 namespace: my-app
 my-registry:
-  defines: digitalocean-container-registry/digital-ocean-container-registry
+  defines: digitalocean-container-registry/registry
   name: my-docker-registry
   region: nyc1
   subscription_tier: basic
@@ -86,7 +87,7 @@ my-registry:
 ```yaml
 namespace: my-app
 my-pro-registry:
-  defines: digitalocean-container-registry/digital-ocean-container-registry
+  defines: digitalocean-container-registry/registry
   name: my-pro-registry
   region: sfo3
   subscription_tier: professional

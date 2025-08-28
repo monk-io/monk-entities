@@ -139,10 +139,6 @@ var DOProviderEntity = class extends import_base.MonkEntity {
    * Helper method to handle resource deletion with proper existing resource checks
    */
   deleteResource(path, resourceName) {
-    if (this.state.existing) {
-      import_cli.default.output(`${resourceName} wasn't created by this entity, skipping delete`);
-      return;
-    }
     try {
       this.makeRequest("DELETE", path);
       import_cli.default.output(`Successfully deleted ${resourceName}`);

@@ -1,8 +1,8 @@
 namespace: digitalocean-container-registry
-digital-ocean-container-registry:
+registry:
   defines: entity
   metadata:
-    name: DigitalOceanContainerRegistry
+    name: Registry
   schema:
     name:
       type: string
@@ -58,7 +58,7 @@ digital-ocean-container-registry:
     username:
       type: string
   lifecycle:
-    sync: <<< digital-ocean-container-registry-sync.js
+    sync: <<< registry-sync.js
     get-registry: ''
     list-repositories: ''
     run-garbage-collection: ''

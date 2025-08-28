@@ -59,7 +59,7 @@ const validateSubscriptionTier = common.validateSubscriptionTier;
 const validateGarbageCollectionType = common.validateGarbageCollectionType;
 const cli = require("cli");
 var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
-var _DigitalOceanContainerRegistry = class _DigitalOceanContainerRegistry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
+var _Registry = class _Registry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -489,20 +489,20 @@ Server: ${this.state.server_url}`);
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getRegistry", _getRegistry_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "listRepositories", _listRepositories_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "runGarbageCollection", _runGarbageCollection_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "getStorageUsage", _getStorageUsage_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "createRegistry", _createRegistry_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "deleteRegistry", _deleteRegistry_dec, _DigitalOceanContainerRegistry);
-__decorateElement(_init, 1, "listRegistries", _listRegistries_dec, _DigitalOceanContainerRegistry);
-__decoratorMetadata(_init, _DigitalOceanContainerRegistry);
-__name(_DigitalOceanContainerRegistry, "DigitalOceanContainerRegistry");
-var DigitalOceanContainerRegistry = _DigitalOceanContainerRegistry;
+__decorateElement(_init, 1, "getRegistry", _getRegistry_dec, _Registry);
+__decorateElement(_init, 1, "listRepositories", _listRepositories_dec, _Registry);
+__decorateElement(_init, 1, "runGarbageCollection", _runGarbageCollection_dec, _Registry);
+__decorateElement(_init, 1, "getStorageUsage", _getStorageUsage_dec, _Registry);
+__decorateElement(_init, 1, "createRegistry", _createRegistry_dec, _Registry);
+__decorateElement(_init, 1, "deleteRegistry", _deleteRegistry_dec, _Registry);
+__decorateElement(_init, 1, "listRegistries", _listRegistries_dec, _Registry);
+__decoratorMetadata(_init, _Registry);
+__name(_Registry, "Registry");
+var Registry = _Registry;
 
 
 
 function main(def, state, ctx) {
-  const entity = new DigitalOceanContainerRegistry(def, state, ctx);
+  const entity = new Registry(def, state, ctx);
   return entity.main(ctx);
 }

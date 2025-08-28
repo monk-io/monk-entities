@@ -12,7 +12,7 @@ import cli from "cli";
 /**
  * Defines the immutable configuration properties for a DigitalOcean Container Registry entity.
  */
-export interface DigitalOceanContainerRegistryDefinition extends DOProviderDefinitionBase {
+export interface RegistryDefinition extends DOProviderDefinitionBase {
     /**
      * Registry name
      * @description Name of the container registry (3-63 characters, alphanumeric and hyphens only)
@@ -41,7 +41,7 @@ export interface DigitalOceanContainerRegistryDefinition extends DOProviderDefin
 /**
  * Represents the mutable runtime state of a DigitalOcean Container Registry.
  */
-export interface DigitalOceanContainerRegistryState extends DOProviderStateBase {
+export interface RegistryState extends DOProviderStateBase {
     /**
      * Registry name
      */
@@ -89,9 +89,9 @@ export interface DigitalOceanContainerRegistryState extends DOProviderStateBase 
  * This entity provides complete lifecycle management for DigitalOcean container registries
  * including creation, updates, deletion, and monitoring operations.
  */
-export class DigitalOceanContainerRegistry extends DOProviderEntity<
-    DigitalOceanContainerRegistryDefinition,
-    DigitalOceanContainerRegistryState
+export class Registry extends DOProviderEntity<
+    RegistryDefinition,
+    RegistryState
 > {
 
     protected getEntityName(): string {

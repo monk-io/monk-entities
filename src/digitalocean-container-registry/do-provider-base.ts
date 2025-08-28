@@ -154,11 +154,6 @@ export abstract class DOProviderEntity<
      * Helper method to handle resource deletion with proper existing resource checks
      */
     protected deleteResource(path: string, resourceName: string): void {
-        if (this.state.existing) {
-            cli.output(`${resourceName} wasn't created by this entity, skipping delete`);
-            return;
-        }
-
         try {
             this.makeRequest("DELETE", path);
             cli.output(`Successfully deleted ${resourceName}`);
