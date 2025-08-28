@@ -170,6 +170,20 @@ sudo INPUT_DIR=./src/your-entity/ ./monkec.sh test --verbose
 - Use `checkReadiness()` and static polling config for reliable waits.
 - Prefer `@action()` for operational commands and demonstrate them in README and tests.
 
+### Idempotent updates (recommended)
+
+By default, the base `MonkEntity` stores a `definition_hash` in state after `create()` and auto-skips `update()` when the current hash matches. You can customize the hashed input by overriding `getDefinitionForHash()` in your entity to exclude ephemeral fields:
+
+```ts
+protected getDefinitionForHash(): unknown {
+  // Return a sanitized subset of the definition for hashing
+  const { /* e.g., exclude optional runtime-only flags */ ...rest } = this.definition as any;
+  return rest;
+}
+```
+
+See `doc/entity-conventions.md` → Change detection and idempotent updates for details and safeguards.
+
 ## 10) Troubleshooting
 
 - Re-load `MANIFEST` after recompiling.

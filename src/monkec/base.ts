@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 const BuiltinActions = [
     "create",
     "start",
@@ -144,6 +146,10 @@ export abstract class MonkEntity<D extends object, S extends object> {
             case "create":
                 if (this.isMethodImplemented("create")) {
                     this.create();
+                    // After successful create, persist the current definition hash
+                    if (this.isIdempotentUpdateEnabled()) {
+                        this.persistCurrentDefinitionHash();
+                    }
                     return true;
                 }
                 break;
@@ -167,6 +173,20 @@ export abstract class MonkEntity<D extends object, S extends object> {
                 break;
             case "update":
                 if (this.isMethodImplemented("update")) {
+                    if (this.isIdempotentUpdateEnabled()) {
+                        const currentHash = this.computeDefinitionHash();
+                        const previousHash = this.getPersistedDefinitionHash();
+                        if (previousHash && previousHash === currentHash) {
+                            // No changes; skip subclass update
+                            console.log("No definition changes detected; skipping update");
+                            return true;
+                        }
+                        // Run subclass update and then persist new hash
+                        this.update();
+                        this.setPersistedDefinitionHash(currentHash);
+                        return true;
+                    }
+                    // Fallback: no idempotence; always call update
                     this.update();
                     return true;
                 }
@@ -295,5 +315,58 @@ export abstract class MonkEntity<D extends object, S extends object> {
     checkReadiness(): boolean {
         // Default implementation returns true
         return true;
+    }
+
+    /**
+     * Whether base-level idempotent update short-circuiting by definition hash is enabled.
+     * Subclasses can override to opt-out for providers that require always-on reconciliation.
+     */
+    protected isIdempotentUpdateEnabled(): boolean {
+        return true;
+    }
+
+    /**
+     * Allows subclasses to customize what part of the definition participates in the hash.
+     * Default: the entire definition.
+     */
+    protected getDefinitionForHash(): unknown {
+        return this.definition;
+    }
+
+    /** Compute a stable SHA-256 hash of the definition used for idempotence. */
+    private computeDefinitionHash(): string {
+        const canonical = MonkEntity.canonicalStringify(this.getDefinitionForHash());
+        return crypto.sha256(canonical);
+    }
+
+    /** Persist the current definition hash into state. */
+    private persistCurrentDefinitionHash(): void {
+        const hash = this.computeDefinitionHash();
+        this.setPersistedDefinitionHash(hash);
+    }
+
+    /** Read the persisted definition hash from state, if present. */
+    private getPersistedDefinitionHash(): string | undefined {
+        const s: any = this.state as any;
+        return s && typeof s.definition_hash === "string" ? s.definition_hash : undefined;
+    }
+
+    /** Write the definition hash into state. */
+    private setPersistedDefinitionHash(hash: string): void {
+        (this.state as any).definition_hash = hash;
+    }
+
+    /** Stable stringify that sorts object keys recursively for deterministic hashing. */
+    private static canonicalStringify(value: unknown): string {
+        if (Array.isArray(value)) {
+            return `[${value.map(v => MonkEntity.canonicalStringify(v)).join(',')}]`;
+        }
+        if (value && typeof value === "object") {
+            const entries = Object.entries(value as Record<string, unknown>)
+                .filter(([, v]) => v !== undefined)
+                .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+            return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${MonkEntity.canonicalStringify(v)}`).join(',')}}`;
+        }
+        return JSON.stringify(value);
     }
 } 

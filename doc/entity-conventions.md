@@ -63,6 +63,19 @@ This prevents schema validation warnings/errors like "Invalid type. Expected str
 - Implement `create`, `update`, `delete`
 - Implement `checkReadiness()` and expose static `readiness` where waiting is needed
 
+## Change detection and idempotent updates
+
+- Purpose: avoid unnecessary provider API calls when nothing has changed.
+- Built-in behavior: the base `MonkEntity` computes a stable SHA-256 hash of the entity definition and stores it in `state.definition_hash` after `create()`. On `update()`, if the current hash equals the stored one, the base layer skips the subclass `update()` entirely.
+
+Customization hooks:
+- Override `protected isIdempotentUpdateEnabled(): boolean` to disable the behavior for entities that must reconcile every run.
+- Override `protected getDefinitionForHash(): unknown` to return a sanitized subset of the definition used for hashing (e.g., exclude non-applicable or ephemeral fields). By default, the entire definition is used.
+
+Notes:
+- Do not include raw secret values in `getDefinitionForHash()`. Keep references like `*_secret_ref` in the definition and resolve at runtime.
+- If a provider needs fine-grained diffs, you can still implement them in your `update()`. The base skip happens only when the sanitized hash is unchanged.
+
 ## HTTP and Secrets
 
 - Use `HttpClient` from `monkec/http-client`; configure in `before()`
