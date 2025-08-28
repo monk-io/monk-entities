@@ -221,6 +221,7 @@ var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [actio
       this.create();
       return;
     }
+    return;
     const body = {};
     if (this.definition.instruction) body.instruction = this.definition.instruction;
     if (this.definition.knowledge_base_uuids) body.knowledge_base_uuid = this.definition.knowledge_base_uuids;
