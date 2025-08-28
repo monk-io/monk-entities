@@ -235,6 +235,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
 
     override update(): void {
         if (!this.state.id) { this.create(); return; }
+        return; // TODO: remove later, this is a temp change to stop updates from timing out due to DO slowness!
         const body: any = {};
         if (this.definition.instruction) body.instruction = this.definition.instruction;
         if (this.definition.knowledge_base_uuids) body.knowledge_base_uuid = this.definition.knowledge_base_uuids;
