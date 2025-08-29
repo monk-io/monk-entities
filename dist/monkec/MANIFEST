@@ -1,5 +1,5 @@
 REPO monkec
-VERSION_HASH 89d1afcd8c1e
+VERSION_HASH 1e31de784c59
 VERSION 0.1.0
-LOAD http-client.yaml base.yaml
-RESOURCES base.js http-client.js
+LOAD base.yaml http-client.yaml
+RESOURCES http-client.js base.js

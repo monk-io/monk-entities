@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import cli from "cli";
 
 const BuiltinActions = [
     "create",
@@ -188,7 +189,7 @@ export abstract class MonkEntity<D extends object, S extends object> {
                         const previousHash = (this.state as any).definition_hash as string | undefined;
                         if (previousHash && previousHash === currentHash) {
                             // No changes; skip subclass update
-                            console.log("No definition changes detected; skipping update");
+                            cli.output("No changes detected for " + this.path + ": skipping update");
                             return true;
                         }
                         // Run subclass update and then persist new hash

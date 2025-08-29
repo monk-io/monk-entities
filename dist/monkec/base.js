@@ -37,6 +37,7 @@ __export(base_exports, {
 });
 module.exports = __toCommonJS(base_exports);
 var import_crypto = __toESM(require("crypto"));
+var import_cli = __toESM(require("cli"));
 var ACTION_METADATA_KEY = Symbol("monk:actions");
 function camelToKebab(str) {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -146,7 +147,7 @@ var MonkEntity = class _MonkEntity {
             const currentHash = this.computeDefinitionHash();
             const previousHash = this.state.definition_hash;
             if (previousHash && previousHash === currentHash) {
-              console.log("No definition changes detected; skipping update");
+              import_cli.default.output("No changes detected for " + this.path + ": skipping update");
               return true;
             }
             this.update();
