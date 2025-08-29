@@ -2,4 +2,6 @@ namespace: neon
 
 common:
   defines: module
+  metadata:
+    version-hash: 188a99a3ae63
   source: <<< common.js

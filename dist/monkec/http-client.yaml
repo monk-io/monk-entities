@@ -2,4 +2,7 @@ namespace: monkec
 
 http-client:
   defines: module
+  metadata:
+    version: 0.1.0
+    version-hash: 6eed026264dd
   source: <<< http-client.js

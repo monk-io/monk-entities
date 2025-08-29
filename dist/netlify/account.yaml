@@ -3,6 +3,7 @@ account:
   defines: entity
   metadata:
     name: Account
+    version-hash: c5366b9218cb
   schema:
     secret_ref:
       type: string

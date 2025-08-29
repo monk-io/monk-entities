@@ -63,6 +63,20 @@ This prevents schema validation warnings/errors like "Invalid type. Expected str
 - Implement `create`, `update`, `delete`
 - Implement `checkReadiness()` and expose static `readiness` where waiting is needed
 
+## Change detection and idempotent updates
+
+- Purpose: skip provider API calls when nothing changed.
+- Built-in: the base stores a stable SHA-256 `definition_hash` after `create()`. On `update()`, if the new hash matches, it skips `update()`.
+- Hash inputs: by default `{ __meta__: { version, version_hash }, definition }` (metadata is optional but included when present).
+
+Customize:
+- `protected isIdempotentUpdateEnabled(): boolean` — return `false` to always run `update()`.
+- `protected getDefinitionForHash(): unknown` — return what should be hashed. Prefer `const base = super.getDefinitionForHash()` and tweak `base.definition` (e.g., remove ephemeral fields).
+
+Notes:
+- Do not include raw secret values in `getDefinitionForHash()`. Keep references like `*_secret_ref` in the definition and resolve at runtime.
+- If a provider needs fine-grained diffs, you can still implement them in your `update()`. The base skip happens only when the sanitized hash is unchanged.
+
 ## HTTP and Secrets
 
 - Use `HttpClient` from `monkec/http-client`; configure in `before()`

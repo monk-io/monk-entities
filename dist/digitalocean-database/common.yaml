@@ -2,4 +2,6 @@ namespace: digitalocean-database
 
 common:
   defines: module
+  metadata:
+    version-hash: bfdec5a57b97
   source: <<< common.js

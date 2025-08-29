@@ -170,6 +170,29 @@ sudo INPUT_DIR=./src/your-entity/ ./monkec.sh test --verbose
 - Use `checkReadiness()` and static polling config for reliable waits.
 - Prefer `@action()` for operational commands and demonstrate them in README and tests.
 
+### Idempotent updates (recommended)
+
+The base `MonkEntity` stores a `definition_hash` after `create()` and skips `update()` when the hash is unchanged. Default hash material: `{ __meta__: { version, version_hash }, definition }`.
+You can disable this by overriding `isIdempotentUpdateEnabled()` to return `false`.
+
+Customize by overriding `getDefinitionForHash`:
+
+```ts
+protected getDefinitionForHash(): unknown {
+  const base = super.getDefinitionForHash() as any;
+  // Example: remove a runtime-only field
+  if (base?.definition) {
+    const { runtime_only_flag, ...rest } = base.definition;
+    base.definition = rest;
+  }
+  return base;
+}
+```
+
+See `doc/entity-conventions.md` → Change detection and idempotent updates for details and safeguards.
+
+Note: The hash automatically incorporates runtime metadata `version` and `version-hash` (when provided by the runner), so changing the compiled entity version or its content hash will trigger updates even if the definition is unchanged.
+
 ## 10) Troubleshooting
 
 - Re-load `MANIFEST` after recompiling.

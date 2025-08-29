@@ -1,3 +1,5 @@
 REPO monkec
-LOAD http-client.yaml base.yaml
+VERSION_HASH 6eed026264dd
+VERSION 0.1.0
+LOAD base.yaml http-client.yaml
 RESOURCES base.js http-client.js

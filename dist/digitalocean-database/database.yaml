@@ -3,6 +3,7 @@ database:
   defines: entity
   metadata:
     name: Database
+    version-hash: bfdec5a57b97
   schema:
     name:
       type: string

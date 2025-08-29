@@ -3,6 +3,7 @@ project:
   defines: entity
   metadata:
     name: Project
+    version-hash: 4d03df7a14e9
   schema:
     secret_ref:
       type: string
