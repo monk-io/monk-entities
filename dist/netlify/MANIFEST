@@ -1,3 +1,4 @@
 REPO netlify
+VERSION_HASH c5366b9218cb
 LOAD netlify-base.yaml common.yaml account.yaml form.yaml site.yaml
 RESOURCES account-sync.js form-sync.js site-sync.js netlify-base.js common.js

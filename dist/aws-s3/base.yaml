@@ -2,4 +2,6 @@ namespace: aws-s3
 
 base:
   defines: module
+  metadata:
+    version-hash: f2ddf8a4bf22
   source: <<< base.js

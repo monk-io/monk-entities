@@ -2,4 +2,6 @@ namespace: netlify
 
 netlify-base:
   defines: module
+  metadata:
+    version-hash: c5366b9218cb
   source: <<< netlify-base.js

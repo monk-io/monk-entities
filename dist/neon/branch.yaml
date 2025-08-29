@@ -3,6 +3,7 @@ branch:
   defines: entity
   metadata:
     name: Branch
+    version-hash: 188a99a3ae63
   schema:
     secret_ref:
       type: string

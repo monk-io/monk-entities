@@ -3,6 +3,7 @@ rds-access-list:
   defines: entity
   metadata:
     name: RDSAccessList
+    version-hash: b14f775077d5
   schema:
     region:
       type: string

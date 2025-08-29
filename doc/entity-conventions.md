@@ -65,12 +65,13 @@ This prevents schema validation warnings/errors like "Invalid type. Expected str
 
 ## Change detection and idempotent updates
 
-- Purpose: avoid unnecessary provider API calls when nothing has changed.
-- Built-in behavior: the base `MonkEntity` computes a stable SHA-256 hash of the entity definition and stores it in `state.definition_hash` after `create()`. On `update()`, if the current hash equals the stored one, the base layer skips the subclass `update()` entirely.
+- Purpose: skip provider API calls when nothing changed.
+- Built-in: the base stores a stable SHA-256 `definition_hash` after `create()`. On `update()`, if the new hash matches, it skips `update()`.
+- Hash inputs: by default `{ __meta__: { version, version_hash }, definition }` (metadata is optional but included when present).
 
-Customization hooks:
-- Override `protected isIdempotentUpdateEnabled(): boolean` to disable the behavior for entities that must reconcile every run.
-- Override `protected getDefinitionForHash(): unknown` to return a sanitized subset of the definition used for hashing (e.g., exclude non-applicable or ephemeral fields). By default, the entire definition is used.
+Customize:
+- `protected isIdempotentUpdateEnabled(): boolean` — return `false` to always run `update()`.
+- `protected getDefinitionForHash(): unknown` — return what should be hashed. Prefer `const base = super.getDefinitionForHash()` and tweak `base.definition` (e.g., remove ephemeral fields).
 
 Notes:
 - Do not include raw secret values in `getDefinitionForHash()`. Keep references like `*_secret_ref` in the definition and resolve at runtime.

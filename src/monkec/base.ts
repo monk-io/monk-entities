@@ -11,6 +11,8 @@ const BuiltinActions = [
 
 export type Args = Record<string, string>;
 
+export type Metadata = Record<string, string>;
+
 // Symbol to store action metadata
 const ACTION_METADATA_KEY = Symbol("monk:actions");
 
@@ -46,6 +48,8 @@ export type MonkContext = {
     status?: Record<string, unknown>;
     /** Optional arguments passed to the operation */
     args?: Args;
+    /** Optional metadata passed to the operation */
+    metadata?: Metadata;
     /** Path to the entity */
     path: string;
     /** Action to perform */
@@ -81,6 +85,8 @@ export abstract class MonkEntity<D extends object, S extends object> {
 
     path: string;
 
+    metadata?: Metadata;
+
     /**
      * Creates a new MonkEntity instance
      * @param definition - The entity definition
@@ -100,6 +106,9 @@ export abstract class MonkEntity<D extends object, S extends object> {
      */
     main(ctx: MonkContext): S {
         const action = ctx.action;
+        if (ctx.metadata) {
+            this.metadata = ctx.metadata;
+        }
 
         if (!action) {
             console.log("No action provided");
@@ -148,7 +157,8 @@ export abstract class MonkEntity<D extends object, S extends object> {
                     this.create();
                     // After successful create, persist the current definition hash
                     if (this.isIdempotentUpdateEnabled()) {
-                        this.persistCurrentDefinitionHash();
+                        const hashAfterCreate = this.computeDefinitionHash();
+                        (this.state as any).definition_hash = hashAfterCreate;
                     }
                     return true;
                 }
@@ -175,7 +185,7 @@ export abstract class MonkEntity<D extends object, S extends object> {
                 if (this.isMethodImplemented("update")) {
                     if (this.isIdempotentUpdateEnabled()) {
                         const currentHash = this.computeDefinitionHash();
-                        const previousHash = this.getPersistedDefinitionHash();
+                        const previousHash = (this.state as any).definition_hash as string | undefined;
                         if (previousHash && previousHash === currentHash) {
                             // No changes; skip subclass update
                             console.log("No definition changes detected; skipping update");
@@ -183,10 +193,10 @@ export abstract class MonkEntity<D extends object, S extends object> {
                         }
                         // Run subclass update and then persist new hash
                         this.update();
-                        this.setPersistedDefinitionHash(currentHash);
+                        (this.state as any).definition_hash = currentHash;
                         return true;
                     }
-                    // Fallback: no idempotence; always call update
+                    // If idempotence disabled, always call update
                     this.update();
                     return true;
                 }
@@ -326,34 +336,25 @@ export abstract class MonkEntity<D extends object, S extends object> {
     }
 
     /**
-     * Allows subclasses to customize what part of the definition participates in the hash.
-     * Default: the entire definition.
+     * Allows subclasses to customize what participates in the idempotence hash.
+     * Default: current definition bundled with optional metadata version signals.
      */
     protected getDefinitionForHash(): unknown {
-        return this.definition;
+        const meta = this.metadata || {};
+        return {
+            __meta__: {
+                version: meta.version || "",
+                version_hash: (meta as any)["version-hash"] || "",
+            },
+            definition: this.definition,
+        } as const;
     }
 
-    /** Compute a stable SHA-256 hash of the definition used for idempotence. */
+    /** Compute a stable SHA-256 hash of the hash material returned by getDefinitionForHash(). */
     private computeDefinitionHash(): string {
-        const canonical = MonkEntity.canonicalStringify(this.getDefinitionForHash());
+        const material = this.getDefinitionForHash();
+        const canonical = MonkEntity.canonicalStringify(material);
         return crypto.sha256(canonical);
-    }
-
-    /** Persist the current definition hash into state. */
-    private persistCurrentDefinitionHash(): void {
-        const hash = this.computeDefinitionHash();
-        this.setPersistedDefinitionHash(hash);
-    }
-
-    /** Read the persisted definition hash from state, if present. */
-    private getPersistedDefinitionHash(): string | undefined {
-        const s: any = this.state as any;
-        return s && typeof s.definition_hash === "string" ? s.definition_hash : undefined;
-    }
-
-    /** Write the definition hash into state. */
-    private setPersistedDefinitionHash(hash: string): void {
-        (this.state as any).definition_hash = hash;
     }
 
     /** Stable stringify that sorts object keys recursively for deterministic hashing. */

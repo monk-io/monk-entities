@@ -3,6 +3,7 @@ site:
   defines: entity
   metadata:
     name: Site
+    version-hash: c5366b9218cb
   schema:
     secret_ref:
       type: string

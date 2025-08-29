@@ -3,6 +3,7 @@ dynamo-db-table:
   defines: entity
   metadata:
     name: DynamoDBTable
+    version-hash: fec481553b25
   schema:
     region:
       type: string

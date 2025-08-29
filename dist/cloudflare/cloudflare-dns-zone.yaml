@@ -3,6 +3,7 @@ cloudflare-dns-zone:
   defines: entity
   metadata:
     name: CloudflareDNSZone
+    version-hash: 9ad7d46140b1
   schema:
     secret_ref:
       type: string

@@ -1,3 +1,4 @@
 REPO aws-iam
+VERSION_HASH 827128c5086a
 LOAD base.yaml common.yaml iam-policy.yaml iam-role.yaml
 RESOURCES base.js common.js iam-policy-sync.js iam-role-sync.js

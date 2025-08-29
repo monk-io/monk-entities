@@ -66,6 +66,7 @@ var MonkEntity = class _MonkEntity {
     /** The entity state */
     __publicField(this, "state");
     __publicField(this, "path");
+    __publicField(this, "metadata");
     this.definition = definition;
     this.state = state;
     this.path = ctx?.path || "";
@@ -77,6 +78,9 @@ var MonkEntity = class _MonkEntity {
    */
   main(ctx) {
     const action2 = ctx.action;
+    if (ctx.metadata) {
+      this.metadata = ctx.metadata;
+    }
     if (!action2) {
       console.log("No action provided");
       return this.state;
@@ -269,7 +273,16 @@ var MonkEntity = class _MonkEntity {
   }
   /** Compute a stable SHA-256 hash of the definition used for idempotence. */
   computeDefinitionHash() {
-    const canonical = _MonkEntity.canonicalStringify(this.getDefinitionForHash());
+    const base = this.getDefinitionForHash();
+    const meta = this.metadata || {};
+    const withMeta = {
+      __meta__: {
+        version: meta.version || "",
+        version_hash: meta["version-hash"] || ""
+      },
+      definition: base
+    };
+    const canonical = _MonkEntity.canonicalStringify(withMeta);
     return import_crypto.default.sha256(canonical);
   }
   /** Persist the current definition hash into state. */

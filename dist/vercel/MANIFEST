@@ -1,3 +1,4 @@
 REPO vercel
+VERSION_HASH e52ddaa6cf33
 LOAD common.yaml vercel-base.yaml deployment.yaml project.yaml
 RESOURCES common.js vercel-base.js deployment-sync.js project-sync.js

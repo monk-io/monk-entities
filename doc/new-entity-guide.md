@@ -172,17 +172,26 @@ sudo INPUT_DIR=./src/your-entity/ ./monkec.sh test --verbose
 
 ### Idempotent updates (recommended)
 
-By default, the base `MonkEntity` stores a `definition_hash` in state after `create()` and auto-skips `update()` when the current hash matches. You can customize the hashed input by overriding `getDefinitionForHash()` in your entity to exclude ephemeral fields:
+The base `MonkEntity` stores a `definition_hash` after `create()` and skips `update()` when the hash is unchanged. Default hash material: `{ __meta__: { version, version_hash }, definition }`.
+You can disable this by overriding `isIdempotentUpdateEnabled()` to return `false`.
+
+Customize by overriding `getDefinitionForHash`:
 
 ```ts
 protected getDefinitionForHash(): unknown {
-  // Return a sanitized subset of the definition for hashing
-  const { /* e.g., exclude optional runtime-only flags */ ...rest } = this.definition as any;
-  return rest;
+  const base = super.getDefinitionForHash() as any;
+  // Example: remove a runtime-only field
+  if (base?.definition) {
+    const { runtime_only_flag, ...rest } = base.definition;
+    base.definition = rest;
+  }
+  return base;
 }
 ```
 
 See `doc/entity-conventions.md` → Change detection and idempotent updates for details and safeguards.
+
+Note: The hash automatically incorporates runtime metadata `version` and `version-hash` (when provided by the runner), so changing the compiled entity version or its content hash will trigger updates even if the definition is unchanged.
 
 ## 10) Troubleshooting
 
