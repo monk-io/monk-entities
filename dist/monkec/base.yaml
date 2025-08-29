@@ -4,5 +4,5 @@ base:
   defines: module
   metadata:
     version: 0.1.0
-    version-hash: 6eed026264dd
+    version-hash: 89d1afcd8c1e
   source: <<< base.js

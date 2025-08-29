@@ -1,4 +1,4 @@
 REPO aws-sqs
 VERSION_HASH 5131fe42f863
-LOAD base.yaml common.yaml sqs-queue.yaml
-RESOURCES base.js common.js sqs-queue-sync.js
+LOAD sqs-queue.yaml base.yaml common.yaml
+RESOURCES common.js sqs-queue-sync.js base.js

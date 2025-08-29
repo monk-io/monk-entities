@@ -1,4 +1,4 @@
 REPO digitalocean-agent
 VERSION_HASH 6a8eb96d7eb7
-LOAD agent.yaml gradient-base.yaml
-RESOURCES gradient-base.js agent-sync.js
+LOAD gradient-base.yaml agent.yaml
+RESOURCES agent-sync.js gradient-base.js

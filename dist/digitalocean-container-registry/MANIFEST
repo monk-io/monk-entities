@@ -1,4 +1,5 @@
 REPO digitalocean-container-registry
+VERSION_HASH 4b5ca628f82d
 digital-ocean-container-registry: registry.ts
 LOAD do-provider-base.yaml registry.yaml common.yaml
 RESOURCES common.js do-provider-base.js registry-sync.js

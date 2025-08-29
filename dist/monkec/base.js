@@ -116,7 +116,8 @@ var MonkEntity = class _MonkEntity {
         if (this.isMethodImplemented("create")) {
           this.create();
           if (this.isIdempotentUpdateEnabled()) {
-            this.persistCurrentDefinitionHash();
+            const hashAfterCreate = this.computeDefinitionHash();
+            this.state.definition_hash = hashAfterCreate;
           }
           return true;
         }
@@ -143,13 +144,13 @@ var MonkEntity = class _MonkEntity {
         if (this.isMethodImplemented("update")) {
           if (this.isIdempotentUpdateEnabled()) {
             const currentHash = this.computeDefinitionHash();
-            const previousHash = this.getPersistedDefinitionHash();
+            const previousHash = this.state.definition_hash;
             if (previousHash && previousHash === currentHash) {
               console.log("No definition changes detected; skipping update");
               return true;
             }
             this.update();
-            this.setPersistedDefinitionHash(currentHash);
+            this.state.definition_hash = currentHash;
             return true;
           }
           this.update();
@@ -265,39 +266,24 @@ var MonkEntity = class _MonkEntity {
     return true;
   }
   /**
-   * Allows subclasses to customize what part of the definition participates in the hash.
-   * Default: the entire definition.
+   * Allows subclasses to customize what participates in the idempotence hash.
+   * Default: current definition bundled with optional metadata version signals.
    */
   getDefinitionForHash() {
-    return this.definition;
-  }
-  /** Compute a stable SHA-256 hash of the definition used for idempotence. */
-  computeDefinitionHash() {
-    const base = this.getDefinitionForHash();
     const meta = this.metadata || {};
-    const withMeta = {
+    return {
       __meta__: {
         version: meta.version || "",
         version_hash: meta["version-hash"] || ""
       },
-      definition: base
+      definition: this.definition
     };
-    const canonical = _MonkEntity.canonicalStringify(withMeta);
+  }
+  /** Compute a stable SHA-256 hash of the hash material returned by getDefinitionForHash(). */
+  computeDefinitionHash() {
+    const material = this.getDefinitionForHash();
+    const canonical = _MonkEntity.canonicalStringify(material);
     return import_crypto.default.sha256(canonical);
-  }
-  /** Persist the current definition hash into state. */
-  persistCurrentDefinitionHash() {
-    const hash = this.computeDefinitionHash();
-    this.setPersistedDefinitionHash(hash);
-  }
-  /** Read the persisted definition hash from state, if present. */
-  getPersistedDefinitionHash() {
-    const s = this.state;
-    return s && typeof s.definition_hash === "string" ? s.definition_hash : void 0;
-  }
-  /** Write the definition hash into state. */
-  setPersistedDefinitionHash(hash) {
-    this.state.definition_hash = hash;
   }
   /** Stable stringify that sorts object keys recursively for deterministic hashing. */
   static canonicalStringify(value) {

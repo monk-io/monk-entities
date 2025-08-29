@@ -1,4 +1,4 @@
 REPO aws-lambda
 VERSION_HASH 1c644bdfede8
-LOAD base.yaml common.yaml lambda-function.yaml
-RESOURCES base.js common.js lambda-function-sync.js
+LOAD lambda-function.yaml base.yaml common.yaml
+RESOURCES common.js lambda-function-sync.js base.js

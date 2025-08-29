@@ -1,4 +1,4 @@
 REPO digitalocean-database
 VERSION_HASH bfdec5a57b97
-LOAD api-token.yaml common.yaml digitalocean-base.yaml do-provider-base.yaml database.yaml
-RESOURCES api-token-sync.js common.js digitalocean-base.js do-provider-base.js database-sync.js
+LOAD do-provider-base.yaml api-token.yaml database.yaml digitalocean-base.yaml common.yaml
+RESOURCES common.js api-token-sync.js do-provider-base.js database-sync.js digitalocean-base.js
