@@ -74,8 +74,29 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
       this.state.existing = true;
       return;
     }
-    this.state.zone_id = zoneId;
-    this.state.existing = false;
+    const payload = {
+      type: this.definition.record_type,
+      name: this.definition.name
+    };
+    if (this.definition.content !== void 0) payload.content = this.definition.content;
+    if (typeof this.definition.ttl === "number") payload.ttl = this.definition.ttl;
+    if (typeof this.definition.proxied === "boolean") payload.proxied = this.definition.proxied;
+    if (typeof this.definition.priority === "number") payload.priority = this.definition.priority;
+    if (this.definition.data) payload.data = this.definition.data;
+    const created = this.request("POST", `/zones/${zoneId}/dns_records`, payload);
+    const createdId = created?.result?.id;
+    if (createdId) {
+      this.state.record_id = createdId;
+      this.state.zone_id = zoneId;
+      this.state.existing = false;
+    } else {
+      const newRec = this.findRecord(zoneId, this.definition.record_type, this.definition.name);
+      if (newRec) {
+        this.state.record_id = newRec.id;
+        this.state.zone_id = zoneId;
+        this.state.existing = false;
+      }
+    }
     return;
   }
   update() {
@@ -151,15 +172,25 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
     }
   }
   findRecord(zoneId, recordType, name) {
-    try {
-      const query = `/zones/${zoneId}/dns_records?type=${encodeURIComponent(recordType)}&name=${encodeURIComponent(name)}`;
-      const res = this.request("GET", query);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id, type: first.type, name: first.name };
-      return null;
-    } catch {
-      return null;
+    const candidateNames = [name];
+    const zoneName = this.definition.zone_name;
+    if (zoneName) {
+      if (name == "@") {
+        candidateNames.push(zoneName);
+      } else if (!name.includes(".")) {
+        candidateNames.push(`${name}.${zoneName}`);
+      }
     }
+    for (const candidate of candidateNames) {
+      try {
+        const query = `/zones/${zoneId}/dns_records?type=${encodeURIComponent(recordType)}&name=${encodeURIComponent(candidate)}`;
+        const res = this.request("GET", query);
+        const first = res?.result?.[0];
+        if (first?.id) return { id: first.id, type: first.type, name: first.name };
+      } catch {
+      }
+    }
+    return null;
   }
 };
 _init = __decoratorStart(_a);

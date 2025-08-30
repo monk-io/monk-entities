@@ -3,7 +3,7 @@ cloudflare-dns-record:
   defines: entity
   metadata:
     name: CloudflareDNSRecord
-    version-hash: 9ad7d46140b1
+    version-hash: e0206fa9d712
   schema:
     secret_ref:
       type: string

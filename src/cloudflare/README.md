@@ -16,7 +16,7 @@ interface CloudflareDNSZoneDefinition {
   name: string;        // zone name, e.g., example.com
   zone_type?: "full" | "partial"; // default: full
   account_id?: string; // optional account id for creation
-  create_when_missing?: boolean; // skip creation in tests when false
+  // Records are created by default when missing. No opt-out flag.
 }
 ```
 
@@ -35,6 +35,9 @@ Actions (kebab-case):
 - `list-zones`: lists zones in the account
 
 Readiness: waits until zone `status` is `active` (or `pending` during tests).
+
+Deletion policy:
+- Zone deletion is disabled by design (failsafe). The entity's delete() is a no-op.
 
 ### `cloudflare-dns-record`
 
