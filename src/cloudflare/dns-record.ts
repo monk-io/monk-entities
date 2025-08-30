@@ -52,9 +52,32 @@ export class CloudflareDNSRecord extends CloudflareEntity<CloudflareDNSRecordDef
       this.state.existing = true;
       return;
     }
-    // Detection-only: skip creation in this package
-    this.state.zone_id = zoneId;
-    this.state.existing = false;
+    // Create DNS record when missing
+    const payload: any = {
+      type: this.definition.record_type,
+      name: this.definition.name,
+    };
+    if (this.definition.content !== undefined) payload.content = this.definition.content;
+    if (typeof this.definition.ttl === "number") payload.ttl = this.definition.ttl;
+    if (typeof this.definition.proxied === "boolean") payload.proxied = this.definition.proxied;
+    if (typeof this.definition.priority === "number") payload.priority = this.definition.priority;
+    if (this.definition.data) payload.data = this.definition.data;
+
+    const created = this.request<any>("POST", `/zones/${zoneId}/dns_records`, payload);
+    const createdId = created?.result?.id;
+    if (createdId) {
+      this.state.record_id = createdId;
+      this.state.zone_id = zoneId;
+      this.state.existing = false;
+    } else {
+      // Fallback: attempt to locate after creation
+      const newRec = this.findRecord(zoneId, this.definition.record_type, this.definition.name);
+      if (newRec) {
+        this.state.record_id = newRec.id;
+        this.state.zone_id = zoneId;
+        this.state.existing = false;
+      }
+    }
     return;
   }
 
@@ -140,15 +163,26 @@ export class CloudflareDNSRecord extends CloudflareEntity<CloudflareDNSRecordDef
   }
 
   private findRecord(zoneId: string, recordType: string, name: string): { id: string; type: string; name: string } | null {
-    try {
-      const query = `/zones/${zoneId}/dns_records?type=${encodeURIComponent(recordType)}&name=${encodeURIComponent(name)}`;
-      const res = this.request<any>("GET", query);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id, type: first.type, name: first.name };
-      return null;
-    } catch {
-      return null;
+    const candidateNames: string[] = [name];
+    const zoneName = this.definition.zone_name;
+    if (zoneName) {
+      if (name == "@") {
+        candidateNames.push(zoneName);
+      } else if (!name.includes(".")) {
+        candidateNames.push(`${name}.${zoneName}`);
+      }
     }
+    for (const candidate of candidateNames) {
+      try {
+        const query = `/zones/${zoneId}/dns_records?type=${encodeURIComponent(recordType)}&name=${encodeURIComponent(candidate)}`;
+        const res = this.request<any>("GET", query);
+        const first = res?.result?.[0];
+        if (first?.id) return { id: first.id, type: first.type, name: first.name };
+      } catch {
+        // continue trying other candidates
+      }
+    }
+    return null;
   }
 }
 

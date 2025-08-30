@@ -81,16 +81,8 @@ var _CloudflareDNSZone = class _CloudflareDNSZone extends (_a = CloudflareEntity
     }
   }
   delete() {
-    if (!this.state.id) {
-      cli.output("Zone does not exist, nothing to delete");
-      return;
-    }
-    if (this.state.existing) {
-      cli.output("Zone wasn't created by this entity, skipping delete");
-      return;
-    }
-    this.request("DELETE", `/zones/${this.state.id}`);
-    cli.output("Deleted Cloudflare zone");
+    cli.output("Zone delete is disabled by design; skipping");
+    return;
   }
   checkReadiness() {
     if (!this.state.id) return true;

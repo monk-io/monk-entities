@@ -51,16 +51,9 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
   }
 
   override delete(): void {
-    if (!this.state.id) {
-      cli.output("Zone does not exist, nothing to delete");
-      return;
-    }
-    if (this.state.existing) {
-      cli.output("Zone wasn't created by this entity, skipping delete");
-      return;
-    }
-    this.request("DELETE", `/zones/${this.state.id}`);
-    cli.output("Deleted Cloudflare zone");
+    // Failsafe: never delete zones via this entity
+    cli.output("Zone delete is disabled by design; skipping");
+    return;
   }
 
   override checkReadiness(): boolean {
