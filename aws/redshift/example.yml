@@ -1,0 +1,15 @@
+namespace: aws
+
+my-redshift:
+  defines: aws/redshift
+  region: eu-north-1
+  instance: dc2.large
+  identifier: my-db1
+  password-secret: my-password
+  nodes: 2
+  permitted-secrets:
+    my-password: true
+  username: myusername
+  skip-final-snapshot: true
+  signature-version: 4
+  signature-method: HmacSHA256
