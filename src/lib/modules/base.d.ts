@@ -41,6 +41,7 @@ export abstract class MonkEntity<D extends object, S extends object> {
   delete(): void;
   checkReadiness(): boolean;
   protected handleUnknownAction(action: string, args?: Args): void;
+  protected isIdempotentUpdateEnabled(): boolean;
 }
 
 // Decorator to register a method as an action

@@ -43,6 +43,10 @@ var AWSLambdaEntity = class extends import_base.MonkEntity {
     super(...arguments);
     __publicField(this, "region");
   }
+  // disable skipping updates, as Lambda updates are not fully idempotent
+  isIdempotentUpdateEnabled() {
+    return false;
+  }
   before() {
     this.region = this.definition.region;
   }
