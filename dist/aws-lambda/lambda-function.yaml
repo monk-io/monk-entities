@@ -3,7 +3,7 @@ lambda-function:
   defines: entity
   metadata:
     name: LambdaFunction
-    version-hash: 1c644bdfede8
+    version-hash: 88ac9e832adb
   schema:
     region:
       type: string
