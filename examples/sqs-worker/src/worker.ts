@@ -27,7 +27,21 @@ class SQSWorker {
     const roleArn = process.env.AWS_ROLE_ARN;
     const sessionName = process.env.AWS_ROLE_SESSION_NAME;
     const externalId = process.env.AWS_EXTERNAL_ID;
-    const durationSeconds = parseInt(process.env.AWS_ROLE_DURATION || '3600');
+    
+    // Parse and validate AWS_ROLE_DURATION with proper error handling
+    let durationSeconds = 3600; // Default: 1 hour
+    if (process.env.AWS_ROLE_DURATION) {
+      const parsedDuration = parseInt(process.env.AWS_ROLE_DURATION, 10);
+      if (isNaN(parsedDuration)) {
+        console.warn(`⚠️  Invalid AWS_ROLE_DURATION value: "${process.env.AWS_ROLE_DURATION}". Using default: ${durationSeconds} seconds`);
+      } else if (parsedDuration < 900) {
+        console.warn(`⚠️  AWS_ROLE_DURATION too low: ${parsedDuration}s (minimum: 900s). Using default: ${durationSeconds} seconds`);
+      } else if (parsedDuration > 43200) {
+        console.warn(`⚠️  AWS_ROLE_DURATION too high: ${parsedDuration}s (maximum: 43200s). Using default: ${durationSeconds} seconds`);
+      } else {
+        durationSeconds = parsedDuration;
+      }
+    }
     
     if (roleArn && sessionName) {
       // Use AssumeRole credentials
