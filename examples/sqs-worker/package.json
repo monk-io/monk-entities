@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.0.0",
+    "@aws-sdk/client-sts": "^3.0.0",
+    "@aws-sdk/credential-providers": "^3.0.0",
     "dotenv": "^16.0.0"
   },
   "devDependencies": {

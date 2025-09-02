@@ -1,0 +1,121 @@
+namespace: aws-iam-user-examples
+
+# Basic IAM User with Access Keys
+basic-app-user:
+  defines: aws-iam/iam-user
+  region: us-east-1
+  user_name: basic-application-user
+  create_access_keys: true
+  access_key_id_secret_ref: basic-app-access-key-id
+  secret_access_key_secret_ref: basic-app-secret-access-key
+  tags:
+    Environment: development
+    Purpose: application-access
+    ManagedBy: monk
+
+# IAM User with Attached Policies
+s3-access-user:
+  defines: aws-iam/iam-user
+  region: us-east-1
+  user_name: s3-application-user
+  path: "/applications/"
+  create_access_keys: true
+  attached_policy_arns:
+    - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+  tags:
+    Environment: production
+    Service: file-storage
+    Department: engineering
+
+# IAM User for AssumeRole Pattern
+assume-role-user:
+  defines: aws-iam/iam-user
+  region: us-east-1
+  user_name: assume-role-client-user
+  create_access_keys: true
+  access_key_id_secret_ref: assume-role-client-key-id
+  secret_access_key_secret_ref: assume-role-client-secret-key
+  attached_policy_arns:
+    - <- connection-target("assume-policy") entity-state get-member("policy_arn")
+  connections:
+    assume-policy:
+      runnable: aws-iam-user-examples/cross-account-assume-policy
+      service: policy
+  depends:
+    wait-for:
+      runnables:
+        - aws-iam-user-examples/cross-account-assume-policy
+      timeout: 60
+  tags:
+    Environment: production
+    Purpose: cross-account-access
+    Type: assume-role-user
+
+# Policy allowing AssumeRole
+cross-account-assume-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: CrossAccountAssumeRolePolicy
+  policy_description: "Allow assuming cross-account service roles"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action: sts:AssumeRole
+        Resource:
+          - "arn:aws:iam::*:role/ServiceRole*"
+          - "arn:aws:iam::*:role/CrossAccountRole*"
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "secure-external-id-123"
+  tags:
+    Purpose: cross-account-assume-role
+    Type: security-policy
+
+# Service Role (for AssumeRole pattern)
+service-execution-role:
+  defines: aws-iam/role
+  region: us-east-1
+  role_name: ServiceExecutionRole
+  role_description: "Role for executing service operations"
+  max_session_duration: 3600
+  assume_role_policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Principal:
+          AWS: <- connection-target("assume-user") entity-state get-member("user_arn")
+        Action: sts:AssumeRole
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "secure-external-id-123"
+  attached_policies:
+    - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+    - "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+  connections:
+    assume-user:
+      runnable: aws-iam-user-examples/assume-role-user
+      service: user
+  depends:
+    wait-for:
+      runnables:
+        - aws-iam-user-examples/assume-role-user
+      timeout: 60
+  tags:
+    Purpose: service-execution
+    Type: assumed-role
+
+# Complete AssumeRole Example Stack
+assume-role-example-stack:
+  defines: process-group
+  runnable-list:
+    - aws-iam-user-examples/cross-account-assume-policy
+    - aws-iam-user-examples/assume-role-user
+    - aws-iam-user-examples/service-execution-role
+
+# Basic User Example Stack
+basic-user-stack:
+  defines: process-group
+  runnable-list:
+    - aws-iam-user-examples/basic-app-user
+    - aws-iam-user-examples/s3-access-user

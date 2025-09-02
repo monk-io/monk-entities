@@ -1,4 +1,6 @@
 import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, Message } from '@aws-sdk/client-sqs';
+import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
+import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -20,10 +22,40 @@ class SQSWorker {
 
   constructor(config: WorkerConfig) {
     this.config = config;
-    this.sqsClient = new SQSClient({ 
-      region: config.region,
-      // AWS credentials will be automatically picked up from environment or IAM role
-    });
+    
+    // Check if AssumeRole configuration is present
+    const roleArn = process.env.AWS_ROLE_ARN;
+    const sessionName = process.env.AWS_ROLE_SESSION_NAME;
+    const externalId = process.env.AWS_EXTERNAL_ID;
+    const durationSeconds = parseInt(process.env.AWS_ROLE_DURATION || '3600');
+    
+    if (roleArn && sessionName) {
+      // Use AssumeRole credentials
+      console.log('🔐 Using AssumeRole authentication');
+      console.log(`   Role ARN: ${roleArn}`);
+      console.log(`   Session Name: ${sessionName}`);
+      console.log(`   External ID: ${externalId || 'Not specified'}`);
+      console.log(`   Duration: ${durationSeconds} seconds`);
+      
+      this.sqsClient = new SQSClient({ 
+        region: config.region,
+        credentials: fromTemporaryCredentials({
+          params: {
+            RoleArn: roleArn,
+            RoleSessionName: sessionName,
+            DurationSeconds: durationSeconds,
+            ...(externalId && { ExternalId: externalId })
+          }
+        })
+      });
+    } else {
+      // Use direct credentials (default AWS SDK credential chain)
+      console.log('🔑 Using direct credentials (AWS SDK credential chain)');
+      this.sqsClient = new SQSClient({ 
+        region: config.region,
+        // AWS credentials will be automatically picked up from environment or IAM role
+      });
+    }
   }
 
   /**

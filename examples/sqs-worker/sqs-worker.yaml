@@ -80,9 +80,32 @@ sqs-worker:
     worker:
       image: sqs-worker:latest
 
-# Complete example stack with queue and worker
+# Complete example stack with queue and worker (manual credential setup)
 example-stack:
   defines: process-group
   runnable-list:
     - sqs-example/test-queue
     - sqs-example/sqs-worker 
+
+# ========================================
+# ENHANCED EXAMPLES WITH AUTOMATIC IAM SETUP
+# ========================================
+#
+# For production use, choose one of these enhanced examples:
+#
+# 1. DIRECT ACCESS PATTERN (sqs-worker-direct-access.yaml)
+#    - Creates dedicated IAM user with direct SQS permissions
+#    - Generates and manages access keys automatically
+#    - Simpler setup, but uses long-lived credentials
+#    - Good for: Development, simple production workloads
+#
+# 2. ASSUME ROLE PATTERN (sqs-worker-assume-role.yaml)  
+#    - Creates minimal IAM user + service role
+#    - Uses temporary credentials via AssumeRole
+#    - More secure with automatic credential rotation
+#    - Good for: Production, enterprise, multi-account scenarios
+#
+# To use enhanced examples:
+# monk load sqs-worker-direct-access.yaml
+# monk load sqs-worker-assume-role.yaml
+# ======================================== 

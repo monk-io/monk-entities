@@ -3,7 +3,6 @@ iam-policy:
   defines: entity
   metadata:
     name: IAMPolicy
-    version-hash: 827128c5086a
   schema:
     region:
       type: string
@@ -28,30 +27,9 @@ iam-policy:
     required:
       - region
       - policy_name
-  state-schema:
-    existing:
-      type: boolean
-      description: Indicates if the resource pre-existed before this entity managed it
-    policy_arn:
-      type: string
-      description: Policy ARN
-    policy_id:
-      type: string
-      description: Policy ID
-    default_version_id:
-      type: string
-      description: Default version identifier
-    attachment_count:
-      type: number
-      description: Number of attachments to principals
-    create_date:
-      type: string
-      description: Creation timestamp
-    update_date:
-      type: string
-      description: Last update timestamp
   lifecycle:
     sync: <<< iam-policy-sync.js
   requires:
     - aws-iam/base
+    - aws-iam/common
     - cli

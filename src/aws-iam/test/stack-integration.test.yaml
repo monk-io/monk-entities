@@ -1,5 +1,5 @@
-name: "AWS IAM Policy Entity Integration Test"
-description: "Complete integration test for AWS IAM Policy entity including policy creation, updates, and deletion"
+name: "AWS IAM Entities Integration Test"
+description: "Complete integration test for AWS IAM entities including policies, users, and access key management"
 timeout: 300000
 
 setup:
@@ -34,7 +34,73 @@ tests:
     expect:
       exitCode: 0
 
+  - name: "Create standalone IAM user"
+    action: "run"
+    target: "aws-iam-test/test-iam-user-standalone"
+    expect:
+      exitCode: 0
+
+  - name: "Verify standalone user creation"
+    action: "describe"
+    target: "aws-iam-test/test-iam-user-standalone"
+    expect:
+      exitCode: 0
+
+  - name: "Test user get-user-info action"
+    action: "do"
+    target: "aws-iam-test/test-iam-user-standalone/get-user-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test user get-credentials action"
+    action: "do"
+    target: "aws-iam-test/test-iam-user-standalone/get-credentials"
+    expect:
+      exitCode: 0
+
+  - name: "Test user list-access-keys action"
+    action: "do"
+    target: "aws-iam-test/test-iam-user-standalone/list-access-keys"
+    expect:
+      exitCode: 0
+
+  - name: "Create IAM user with attached policy"
+    action: "run"
+    target: "aws-iam-test/test-iam-user"
+    expect:
+      exitCode: 0
+
+  - name: "Verify user with policy attachment"
+    action: "describe"
+    target: "aws-iam-test/test-iam-user"
+    expect:
+      exitCode: 0
+
+  - name: "Test attached user get-user-info action"
+    action: "do"
+    target: "aws-iam-test/test-iam-user/get-user-info"
+    expect:
+      exitCode: 0
+
+  - name: "Update IAM user"
+    action: "update"
+    target: "aws-iam-test/test-iam-user"
+    expect:
+      exitCode: 0
+
 cleanup:
+  - name: "Delete IAM user with policy"
+    action: "delete"
+    target: "aws-iam-test/test-iam-user"
+    expect:
+      exitCode: 0
+
+  - name: "Delete standalone IAM user"
+    action: "delete"
+    target: "aws-iam-test/test-iam-user-standalone"
+    expect:
+      exitCode: 0
+
   - name: "Delete IAM policy"
     action: "delete"
     target: "aws-iam-test/test-iam-policy"

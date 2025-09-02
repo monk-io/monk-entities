@@ -1,0 +1,54 @@
+namespace: aws-iam
+iam-user:
+  defines: entity
+  metadata:
+    name: IAMUser
+  schema:
+    region:
+      type: string
+      description: AWS region for IAM operations (signing region)
+    user_name:
+      type: string
+      description: Name of the IAM user
+    path:
+      type: string
+      description: 'Path for the user (default: "/")'
+    permissions_boundary:
+      type: string
+      description: Permissions boundary policy ARN for the user
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Tags to apply to the user
+      description: Tags to apply to the user
+    attached_policy_arns:
+      type: array
+      items:
+        type: string
+      description: List of policy ARNs to attach to the user
+    create_access_keys:
+      type: boolean
+      description: Whether to create access keys for this user
+    access_key_id_secret_ref:
+      type: string
+      description: Secret reference for storing the access key ID
+    secret_access_key_secret_ref:
+      type: string
+      description: Secret reference for storing the secret access key
+    required:
+      - region
+      - user_name
+  lifecycle:
+    sync: <<< iam-user-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 12
+  requires:
+    - aws-iam/base
+    - aws-iam/common
+    - monkec/base
+    - cli
+    - secret

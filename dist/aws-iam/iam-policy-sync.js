@@ -8,6 +8,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 // input/aws-iam/policy.ts
 const base = require("aws-iam/base");
 const AWSIAMEntity = base.AWSIAMEntity;
+const common = require("aws-iam/common");
+const IAM_ACTIONS = common.IAM_ACTIONS;
 const cli = require("cli");
 var _IAMPolicy = class _IAMPolicy extends AWSIAMEntity {
   getPolicyName() {
@@ -84,7 +86,7 @@ var _IAMPolicy = class _IAMPolicy extends AWSIAMEntity {
       }
     }
     try {
-      const response = this.makeAWSRequest("POST", "CreatePolicy", params);
+      const response = this.makeAWSRequest("POST", IAM_ACTIONS.CREATE_POLICY, params);
       if (response.Policy) {
         this.state = {
           policy_arn: response.Policy.Arn,
@@ -112,7 +114,7 @@ var _IAMPolicy = class _IAMPolicy extends AWSIAMEntity {
       SetAsDefault: true
     };
     try {
-      const response = this.makeAWSRequest("POST", "CreatePolicyVersion", params);
+      const response = this.makeAWSRequest("POST", IAM_ACTIONS.CREATE_POLICY_VERSION, params);
       if (response.PolicyVersion) {
         this.state.default_version_id = response.PolicyVersion.VersionId;
         this.state.update_date = response.PolicyVersion.CreateDate;
@@ -127,26 +129,87 @@ var _IAMPolicy = class _IAMPolicy extends AWSIAMEntity {
     if (!this.state.policy_arn) {
       return;
     }
+    if (this.state.existing) {
+      return;
+    }
     try {
-      if (this.state.attachment_count && this.state.attachment_count > 0) {
-        cli.output(`Warning: Policy has ${this.state.attachment_count} attachments. You may need to detach it first.`);
-      }
+      this.detachPolicyFromAllEntities();
       this.deleteNonDefaultVersions();
       this.deletePolicy(this.state.policy_arn, this.definition.policy_name);
     } catch (error) {
       throw new Error(`Failed to delete IAM Policy ${this.definition.policy_name}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  detachPolicyFromAllEntities() {
+    if (!this.state.policy_arn) {
+      return;
+    }
+    try {
+      const response = this.makeAWSRequest("POST", IAM_ACTIONS.LIST_ENTITIES_FOR_POLICY, {
+        PolicyArn: this.state.policy_arn
+      });
+      if (response.PolicyUsers) {
+        const users = Array.isArray(response.PolicyUsers) ? response.PolicyUsers : [response.PolicyUsers];
+        for (const user of users) {
+          const userName = typeof user === "string" ? user : user.UserName;
+          if (userName) {
+            try {
+              this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_USER_POLICY, {
+                UserName: userName,
+                PolicyArn: this.state.policy_arn
+              });
+            } catch (error) {
+              cli.output(`Warning: Failed to detach policy from user ${userName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+            }
+          }
+        }
+      }
+      if (response.PolicyRoles) {
+        const roles = Array.isArray(response.PolicyRoles) ? response.PolicyRoles : [response.PolicyRoles];
+        for (const role of roles) {
+          const roleName = typeof role === "string" ? role : role.RoleName;
+          if (roleName) {
+            try {
+              this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_ROLE_POLICY, {
+                RoleName: roleName,
+                PolicyArn: this.state.policy_arn
+              });
+            } catch (error) {
+              cli.output(`Warning: Failed to detach policy from role ${roleName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+            }
+          }
+        }
+      }
+      if (response.PolicyGroups) {
+        const groups = Array.isArray(response.PolicyGroups) ? response.PolicyGroups : [response.PolicyGroups];
+        for (const group of groups) {
+          const groupName = typeof group === "string" ? group : group.GroupName;
+          if (groupName) {
+            try {
+              this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_GROUP_POLICY, {
+                GroupName: groupName,
+                PolicyArn: this.state.policy_arn
+              });
+            } catch (error) {
+              cli.output(`Warning: Failed to detach policy from group ${groupName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      cli.output(`Warning: Failed to list policy attachments: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   deleteNonDefaultVersions() {
     try {
-      const response = this.makeAWSRequest("POST", "ListPolicyVersions", {
+      const response = this.makeAWSRequest("POST", IAM_ACTIONS.LIST_POLICY_VERSIONS, {
         PolicyArn: this.state.policy_arn
       });
       if (response.Versions) {
         const nonDefaultVersions = response.Versions.filter((v) => !v.IsDefaultVersion);
         for (const version of nonDefaultVersions) {
           try {
-            this.makeAWSRequest("POST", "DeletePolicyVersion", {
+            this.makeAWSRequest("POST", IAM_ACTIONS.DELETE_POLICY_VERSION, {
               PolicyArn: this.state.policy_arn,
               VersionId: version.VersionId
             });
