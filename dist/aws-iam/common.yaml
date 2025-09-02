@@ -2,4 +2,6 @@ namespace: aws-iam
 
 common:
   defines: module
+  metadata:
+    version-hash: beb0ea564843
   source: <<< common.js

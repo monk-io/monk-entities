@@ -3,6 +3,7 @@ iam-user:
   defines: entity
   metadata:
     name: IAMUser
+    version-hash: beb0ea564843
   schema:
     region:
       type: string
@@ -39,6 +40,30 @@ iam-user:
     required:
       - region
       - user_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    user_arn:
+      type: string
+      description: IAM user ARN
+    user_id:
+      type: string
+      description: IAM user ID
+    create_date:
+      type: string
+      description: IAM user creation date
+    access_key_id:
+      type: string
+      description: Access key ID (if created)
+    access_keys_created:
+      type: boolean
+      description: Whether access keys were created by this entity
+    attached_policies:
+      type: array
+      items:
+        type: string
+      description: List of attached policy ARNs
   lifecycle:
     sync: <<< iam-user-sync.js
   checks:

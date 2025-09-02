@@ -3,6 +3,7 @@ iam-role:
   defines: entity
   metadata:
     name: IAMRole
+    version-hash: beb0ea564843
   schema:
     region:
       type: string
@@ -35,6 +36,19 @@ iam-role:
     required:
       - region
       - role_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Whether role pre-existed before this entity managed it
+    role_arn:
+      type: string
+      description: Role ARN
+    role_id:
+      type: string
+      description: Role ID
+    create_date:
+      type: string
+      description: Creation timestamp
   lifecycle:
     sync: <<< iam-role-sync.js
   checks:

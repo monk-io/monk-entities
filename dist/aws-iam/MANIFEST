@@ -1,3 +1,4 @@
 REPO aws-iam
+VERSION_HASH beb0ea564843
 LOAD iam-policy.yaml base.yaml common.yaml iam-role.yaml iam-user.yaml
 RESOURCES common.js iam-user-sync.js iam-policy-sync.js iam-role-sync.js base.js

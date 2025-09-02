@@ -2,4 +2,6 @@ namespace: aws-iam
 
 base:
   defines: module
+  metadata:
+    version-hash: beb0ea564843
   source: <<< base.js
