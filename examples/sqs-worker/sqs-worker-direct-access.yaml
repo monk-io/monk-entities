@@ -1,0 +1,166 @@
+# SQS Worker with Direct Access Keys (Option 1)
+# Creates a dedicated IAM user with direct SQS permissions and access keys
+
+namespace: sqs-example-direct
+
+# SQS Queue
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-sqs-queue-direct
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 60
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  services:
+    queue:
+      protocol: custom
+  tags:
+    Environment: test
+    Purpose: direct-access-example
+
+# IAM Policy for SQS access
+sqs-worker-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: SQSWorkerDirectAccessPolicy
+  policy_description: "Direct SQS access for worker application"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+          - sqs:GetQueueUrl
+        Resource: 
+          - <- connection-target("queue") entity-state get-member("queue_arn")
+      - Effect: Allow
+        Action:
+          - sqs:ListQueues
+        Resource: "*"
+  services:
+    policy:
+      protocol: custom
+  connections:
+    queue:
+      runnable: sqs-example-direct/test-queue
+      service: queue
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-direct/test-queue
+      timeout: 60
+  tags:
+    Purpose: sqs-worker-access
+    Type: direct-access
+
+# IAM User with access keys
+sqs-worker-user:
+  defines: aws-iam/iam-user
+  permitted-secrets:
+    sqs-worker-direct-access-key-id: true
+    sqs-worker-direct-secret-access-key: true
+  region: us-east-1
+  user_name: sqs-worker-direct-user
+  create_access_keys: true
+  access_key_id_secret_ref: sqs-worker-direct-access-key-id
+  secret_access_key_secret_ref: sqs-worker-direct-secret-access-key
+  attached_policy_arns:
+    - <- connection-target("worker-policy") entity-state get-member("policy_arn")
+  services:
+    user:
+      protocol: custom
+  connections:
+    worker-policy:
+      runnable: sqs-example-direct/sqs-worker-policy
+      service: policy
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-direct/sqs-worker-policy
+      timeout: 60
+  tags:
+    Purpose: sqs-worker-credentials
+    Type: direct-access
+
+# SQS Worker Application
+sqs-worker:
+  defines: runnable
+  permitted-secrets:
+    sqs-worker-direct-access-key-id: true
+    sqs-worker-direct-secret-access-key: true
+  connections:
+    queue:
+      runnable: sqs-example-direct/test-queue
+      service: queue
+    user:
+      runnable: sqs-example-direct/sqs-worker-user
+      service: user
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-direct/test-queue
+        - sqs-example-direct/sqs-worker-user
+      timeout: 180
+  variables:
+    # SQS Queue URL
+    sqs_queue_url:
+      env: SQS_QUEUE_URL
+      value: <- connection-target("queue") entity-state get-member("queue_url")
+      type: string
+    
+    # AWS Region
+    aws_region:
+      env: AWS_REGION
+      value: "us-east-1"
+      type: string
+    
+    # AWS Credentials (automatically generated)
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("sqs-worker-direct-access-key-id")
+      type: string
+    
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("sqs-worker-direct-secret-access-key")
+      type: string
+    
+    # Worker configuration
+    max_messages:
+      env: MAX_MESSAGES
+      value: "10"
+      type: string
+    
+    wait_time_seconds:
+      env: WAIT_TIME_SECONDS
+      value: "20"
+      type: string
+    
+    visibility_timeout_seconds:
+      env: VISIBILITY_TIMEOUT_SECONDS
+      value: "30"
+      type: string
+    
+    polling_interval_ms:
+      env: POLLING_INTERVAL_MS
+      value: "1000"
+      type: string
+
+  containers:
+    worker:
+      image: docker.io/imanachyn/sds-worker:v1
+
+# Complete example stack
+direct-access-stack:
+  defines: process-group
+  runnable-list:
+    - sqs-example-direct/test-queue
+    - sqs-example-direct/sqs-worker-policy  
+    - sqs-example-direct/sqs-worker-user
+    - sqs-example-direct/sqs-worker

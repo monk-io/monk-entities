@@ -3,7 +3,7 @@ iam-policy:
   defines: entity
   metadata:
     name: IAMPolicy
-    version-hash: 827128c5086a
+    version-hash: beb0ea564843
   schema:
     region:
       type: string
@@ -54,4 +54,5 @@ iam-policy:
     sync: <<< iam-policy-sync.js
   requires:
     - aws-iam/base
+    - aws-iam/common
     - cli

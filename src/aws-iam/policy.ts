@@ -1,4 +1,5 @@
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
+import { IAM_ACTIONS } from "./common.ts";
 import cli from "cli";
 
 // IAM Policy specific interfaces
@@ -135,7 +136,7 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
         }
         
         try {
-            const response = this.makeAWSRequest("POST", "CreatePolicy", params);
+            const response = this.makeAWSRequest("POST", IAM_ACTIONS.CREATE_POLICY, params);
             
             if (response.Policy) {
                 this.state = {
@@ -171,7 +172,7 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
         };
 
         try {
-            const response = this.makeAWSRequest("POST", "CreatePolicyVersion", params);
+            const response = this.makeAWSRequest("POST", IAM_ACTIONS.CREATE_POLICY_VERSION, params);
             
             if (response.PolicyVersion) {
                 this.state.default_version_id = response.PolicyVersion.VersionId;
@@ -189,11 +190,14 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
             return;
         }
         
+        // Don't delete pre-existing policies
+        if (this.state.existing) {
+            return;
+        }
+        
         try {
-            // First check if policy has attachments
-            if (this.state.attachment_count && this.state.attachment_count > 0) {
-                cli.output(`Warning: Policy has ${this.state.attachment_count} attachments. You may need to detach it first.`);
-            }
+            // Detach policy from all entities (users, roles, groups)
+            this.detachPolicyFromAllEntities();
 
             // Delete all non-default versions first
             this.deleteNonDefaultVersions();
@@ -205,10 +209,85 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
         }
     }
 
+    private detachPolicyFromAllEntities(): void {
+        if (!this.state.policy_arn) {
+            return;
+        }
+
+        try {
+            // List all entities that have this policy attached
+            const response = this.makeAWSRequest("POST", IAM_ACTIONS.LIST_ENTITIES_FOR_POLICY, {
+                PolicyArn: this.state.policy_arn
+            });
+
+            // Detach from users
+            if (response.PolicyUsers) {
+                const users = Array.isArray(response.PolicyUsers) ? response.PolicyUsers : [response.PolicyUsers];
+                for (const user of users) {
+                    const userName = typeof user === 'string' ? user : user.UserName;
+                    if (userName) {
+                        try {
+                            this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_USER_POLICY, {
+                                UserName: userName,
+                                PolicyArn: this.state.policy_arn
+                            });
+                        } catch (error) {
+                            // Continue with other users if one fails
+                            cli.output(`Warning: Failed to detach policy from user ${userName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        }
+                    }
+                }
+            }
+
+            // Detach from roles
+            if (response.PolicyRoles) {
+                const roles = Array.isArray(response.PolicyRoles) ? response.PolicyRoles : [response.PolicyRoles];
+                for (const role of roles) {
+                    const roleName = typeof role === 'string' ? role : role.RoleName;
+                    if (roleName) {
+                        try {
+                            this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_ROLE_POLICY, {
+                                RoleName: roleName,
+                                PolicyArn: this.state.policy_arn
+                            });
+                        } catch (error) {
+                            // Continue with other roles if one fails
+                            cli.output(`Warning: Failed to detach policy from role ${roleName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        }
+                    }
+                }
+            }
+
+            // Detach from groups
+            if (response.PolicyGroups) {
+                const groups = Array.isArray(response.PolicyGroups) ? response.PolicyGroups : [response.PolicyGroups];
+                for (const group of groups) {
+                    const groupName = typeof group === 'string' ? group : group.GroupName;
+                    if (groupName) {
+                        try {
+                            this.makeAWSRequest("POST", IAM_ACTIONS.DETACH_GROUP_POLICY, {
+                                GroupName: groupName,
+                                PolicyArn: this.state.policy_arn
+                            });
+                        } catch (error) {
+                            // Continue with other groups if one fails
+                            cli.output(`Warning: Failed to detach policy from group ${groupName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            // If listing fails, continue with deletion attempt
+            // The AWS delete will fail with a clear error if attachments remain
+            cli.output(`Warning: Failed to list policy attachments: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     private deleteNonDefaultVersions(): void {
         try {
             // Get all policy versions
-            const response = this.makeAWSRequest("POST", "ListPolicyVersions", {
+            const response = this.makeAWSRequest("POST", IAM_ACTIONS.LIST_POLICY_VERSIONS, {
                 PolicyArn: this.state.policy_arn
             });
 
@@ -217,7 +296,7 @@ export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState>
                 
                 for (const version of nonDefaultVersions) {
                     try {
-                        this.makeAWSRequest("POST", "DeletePolicyVersion", {
+                        this.makeAWSRequest("POST", IAM_ACTIONS.DELETE_POLICY_VERSION, {
                             PolicyArn: this.state.policy_arn,
                             VersionId: version.VersionId
                         });

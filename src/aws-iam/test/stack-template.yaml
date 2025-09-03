@@ -37,4 +37,39 @@ test-iam-policy:
     Environment: test
     Entity: aws-iam
     Purpose: integration-testing
-    Owner: monk-framework 
+    Owner: monk-framework
+
+test-iam-user:
+  defines: aws-iam/iam-user
+  region: us-east-1
+  user_name: test-iam-user-entity
+  create_access_keys: true
+  access_key_id_secret_ref: test-iam-user-access-key-id
+  secret_access_key_secret_ref: test-iam-user-secret-access-key
+  attached_policy_arns:
+    - <- connection-target("test-policy") entity-state get-member("policy_arn")
+  connections:
+    test-policy:
+      runnable: aws-iam-test/test-iam-policy
+      service: policy
+  depends:
+    wait-for:
+      runnables:
+        - aws-iam-test/test-iam-policy
+      timeout: 60
+  tags:
+    Environment: test
+    Entity: aws-iam
+    Purpose: integration-testing
+    Owner: monk-framework
+
+test-iam-user-standalone:
+  defines: aws-iam/iam-user
+  region: us-east-1
+  user_name: test-iam-standalone-user
+  create_access_keys: true
+  tags:
+    Environment: test
+    Entity: aws-iam
+    Purpose: standalone-testing
+    Owner: monk-framework

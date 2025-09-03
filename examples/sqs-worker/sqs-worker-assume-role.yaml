@@ -1,0 +1,260 @@
+# SQS Worker with AssumeRole Pattern (Option 2)
+# Creates a minimal IAM user that can assume a role with SQS permissions
+
+namespace: sqs-example-assume-role
+
+# SQS Queue
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-sqs-queue-assume-role
+  delay_seconds: 0
+  maximum_message_size: 262144
+  message_retention_period: 1209600  # 14 days
+  receive_message_wait_time_seconds: 20
+  visibility_timeout: 60
+  fifo_queue: false
+  sqs_managed_sse_enabled: true
+  services:
+    queue:
+      protocol: custom
+  tags:
+    Environment: test
+    Purpose: assume-role-example
+
+# Service Role with SQS permissions
+sqs-worker-service-role:
+  defines: aws-iam/iam-role
+  region: us-east-1
+  role_name: SQSWorkerServiceRole
+  role_description: "Service role with SQS permissions for worker application"
+  max_session_duration: 3600  # 1 hour sessions
+  assume_role_policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Principal:
+          AWS: <- connection-target("assume-user") entity-state get-member("user_arn")
+        Action: sts:AssumeRole
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "sqs-worker-external-id"
+  attached_policies:
+    - <- connection-target("service-policy") entity-state get-member("policy_arn")
+  services:
+    role:
+      protocol: custom
+  connections:
+    assume-user:
+      runnable: sqs-example-assume-role/sqs-assume-user
+      service: user
+    service-policy:
+      runnable: sqs-example-assume-role/sqs-worker-service-policy
+      service: policy
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-assume-role/sqs-assume-user
+        - sqs-example-assume-role/sqs-worker-service-policy
+      timeout: 60
+  tags:
+    Purpose: sqs-worker-service-role
+    Type: assume-role
+
+# Policy with SQS permissions
+sqs-worker-service-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: SQSWorkerServicePolicy
+  policy_description: "SQS permissions for worker service role"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+          - sqs:GetQueueUrl
+        Resource: 
+          - <- connection-target("queue") entity-state get-member("queue_arn")
+      - Effect: Allow
+        Action:
+          - sqs:ListQueues
+        Resource: "*"
+  services:
+    policy:
+      protocol: custom
+  connections:
+    queue:
+      runnable: sqs-example-assume-role/test-queue
+      service: queue
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-assume-role/test-queue
+      timeout: 60
+  tags:
+    Purpose: sqs-worker-service-access
+    Type: assume-role
+
+
+# AssumeRole policy for the minimal user
+sqs-assume-role-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: SQSAssumeRolePolicy
+  policy_description: "Allow assuming the SQS worker service role"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action: sts:AssumeRole
+        Resource: "arn:aws:iam::*:role/SQSWorkerServiceRole"
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "sqs-worker-external-id"
+  tags:
+    Purpose: assume-role-permission
+    Type: assume-role
+
+# Minimal IAM User (can only assume roles)
+sqs-assume-user:
+  defines: aws-iam/iam-user
+  permitted-secrets:
+    sqs-assume-role-access-key-id: true
+    sqs-assume-role-secret-access-key: true
+  region: us-east-1
+  user_name: sqs-assume-role-user
+  create_access_keys: true
+  access_key_id_secret_ref: sqs-assume-role-access-key-id
+  secret_access_key_secret_ref: sqs-assume-role-secret-access-key
+  attached_policy_arns:
+    - <- connection-target("assume-policy") entity-state get-member("policy_arn")
+  connections:
+    assume-policy:
+      runnable: sqs-example-assume-role/sqs-assume-role-policy
+      service: policy
+  services:
+    user:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-assume-role/sqs-assume-role-policy
+      timeout: 60
+  tags:
+    Purpose: assume-role-user
+    Type: assume-role
+
+# SQS Worker Application
+sqs-worker:
+  defines: runnable
+  permitted-secrets:
+    sqs-assume-role-access-key-id: true
+    sqs-assume-role-secret-access-key: true
+  connections:
+    queue:
+      runnable: sqs-example-assume-role/test-queue
+      service: queue
+    assume-user:
+      runnable: sqs-example-assume-role/sqs-assume-user
+      service: user
+    service-role:
+      runnable: sqs-example-assume-role/sqs-worker-service-role
+      service: role
+  depends:
+    wait-for:
+      runnables:
+        - sqs-example-assume-role/test-queue
+        - sqs-example-assume-role/sqs-assume-user
+        - sqs-example-assume-role/sqs-worker-service-role
+      timeout: 180
+  variables:
+    # SQS Queue URL
+    sqs_queue_url:
+      env: SQS_QUEUE_URL
+      value: <- connection-target("queue") entity-state get-member("queue_url")
+      type: string
+    
+    # AWS Region
+    aws_region:
+      env: AWS_REGION
+      value: "us-east-1"
+      type: string
+    
+    # Base user credentials (minimal permissions)
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("sqs-assume-role-access-key-id")
+      type: string
+    
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("sqs-assume-role-secret-access-key")
+      type: string
+    
+    # Role to assume for actual SQS work
+    aws_role_arn:
+      env: AWS_ROLE_ARN
+      value: <- connection-target("service-role") entity-state get-member("role_arn")
+      type: string
+    
+    aws_role_session_name:
+      env: AWS_ROLE_SESSION_NAME
+      value: "sqs-worker-session"
+      type: string
+    
+    aws_external_id:
+      env: AWS_EXTERNAL_ID
+      value: "sqs-worker-external-id"
+      type: string
+    
+    # Session duration (in seconds)
+    aws_role_duration:
+      env: AWS_ROLE_DURATION
+      value: "3600"
+      type: string
+    
+    # Worker configuration
+    max_messages:
+      env: MAX_MESSAGES
+      value: "10"
+      type: string
+    
+    wait_time_seconds:
+      env: WAIT_TIME_SECONDS
+      value: "20"
+      type: string
+    
+    visibility_timeout_seconds:
+      env: VISIBILITY_TIMEOUT_SECONDS
+      value: "30"
+      type: string
+    
+    polling_interval_ms:
+      env: POLLING_INTERVAL_MS
+      value: "1000"
+      type: string
+
+  containers:
+    worker:
+      image: docker.io/imanachyn/sds-worker:v1
+      # commands:
+      #   - echo "SQS Worker would start here with AssumeRole credentials"
+      #   - sleep 30
+
+# Complete example stack
+assume-role-stack:
+  defines: process-group
+  runnable-list:
+    # Independent entities first
+    - sqs-example-assume-role/test-queue
+    - sqs-example-assume-role/sqs-worker-service-policy
+    - sqs-example-assume-role/sqs-assume-role-policy
+    # User depends on assume-role-policy
+    - sqs-example-assume-role/sqs-assume-user
+    # Service role depends on user and service-policy  
+    - sqs-example-assume-role/sqs-worker-service-role
+    # Worker depends on everything
+    - sqs-example-assume-role/sqs-worker
