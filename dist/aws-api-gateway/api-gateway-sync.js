@@ -121,8 +121,13 @@ var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRout
       body.routeSelectionExpression = "$request.body.action";
     }
     const res = this.makeV2Request("POST", "/v2/apis", body);
-    const apiId = res.ApiId || res.apiId ? String(res.ApiId || res.apiId) : void 0;
-    const endpoint = res.ApiEndpoint || res.apiEndpoint;
+    const rawId = res.ApiId ?? res.apiId;
+    const apiId = typeof rawId === "string" ? rawId : rawId ? String(rawId) : void 0;
+    if (!apiId) {
+      throw new Error("[aws-api-gateway] CreateApi did not return ApiId");
+    }
+    const endpointVal = res.ApiEndpoint ?? res.apiEndpoint;
+    const endpoint = endpointVal ? String(endpointVal) : void 0;
     return { apiId, endpoint };
   }
   getIntegrationId(apiId, integrationUri) {

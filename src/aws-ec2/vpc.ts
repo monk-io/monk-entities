@@ -97,8 +97,9 @@ export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 	}
 
 	override checkReadiness(): boolean {
-		if (!this.getVpcId()) return false;
-		const info = this.describeVpcById(this.getVpcId()!);
+		const vpcId = this.getVpcId();
+		if (!vpcId) return false;
+		const info = this.describeVpcById(vpcId);
 		if (!info) return false;
 		this.state.vpc_id = info.vpcId;
 		this.state.state = info.state;

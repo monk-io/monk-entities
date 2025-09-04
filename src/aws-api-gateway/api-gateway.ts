@@ -97,9 +97,14 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
             body.routeSelectionExpression = "$request.body.action";
         }
         const res = this.makeV2Request("POST", "/v2/apis", body);
-        const apiId = (res.ApiId || res.apiId) ? String(res.ApiId || res.apiId) : undefined;
-        const endpoint = (res.ApiEndpoint || res.apiEndpoint) as string | undefined;
-        return { apiId: apiId!, endpoint };
+        const rawId = (res as any).ApiId ?? (res as any).apiId;
+        const apiId = typeof rawId === "string" ? rawId : (rawId ? String(rawId) : undefined);
+        if (!apiId) {
+            throw new Error("[aws-api-gateway] CreateApi did not return ApiId");
+        }
+        const endpointVal = (res as any).ApiEndpoint ?? (res as any).apiEndpoint;
+        const endpoint = endpointVal ? String(endpointVal) : undefined;
+        return { apiId, endpoint };
     }
 
     private getIntegrationId(apiId: string, integrationUri: string): string | null {
