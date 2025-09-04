@@ -26,6 +26,6 @@ jobs:
           AZURE_OPENAI_EMBEDDING_MODEL: ${{ vars.AZURE_OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
           CHROMA_API_KEY: ${{ secrets.CHROMA_API_KEY }}
           CHROMA_TENANT_ID: ${{ secrets.CHROMA_TENANT_ID }}
-          CHROMA_DATABASE: ${{ vars.CHROMA_DATABASE_YAML || 'monk-entities-yaml' }}
-          CHROMA_COLLECTION_NAME: ${{ vars.CHROMA_COLLECTION_NAME_YAML || 'yaml-forms' }}
+          CHROMA_DATABASE: ${{ vars.CHROMA_DATABASE || 'monk-entities-yaml' }}
+          CHROMA_COLLECTION_NAME: ${{ vars.CHROMA_COLLECTION_NAME || 'yaml-forms' }}
           NODE_ENV: production
