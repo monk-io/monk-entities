@@ -41,6 +41,10 @@ interface LambdaFunctionConfig {
     SnapStart?: {
         ApplyOn?: string;
     };
+    VpcConfig?: {
+        SubnetIds?: string[];
+        SecurityGroupIds?: string[];
+    };
     LoggingConfig?: {
         LogFormat?: string;
         ApplicationLogLevel?: string;
@@ -134,6 +138,11 @@ export interface LambdaFunctionDefinition extends AWSLambdaDefinition {
     snap_start?: {
         /** @description Apply SnapStart on PublishedVersions or None */
         apply_on?: string;
+    };
+    /** @description VPC configuration */
+    vpc_config?: {
+        subnet_ids?: string[];
+        security_group_ids?: string[];
     };
     /** @description Logging configuration */
     logging_config?: {
@@ -328,6 +337,13 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             };
         }
         
+        if (this.definition.vpc_config) {
+            request.VpcConfig = {
+                SubnetIds: this.definition.vpc_config.subnet_ids ? [...this.definition.vpc_config.subnet_ids] : undefined,
+                SecurityGroupIds: this.definition.vpc_config.security_group_ids ? [...this.definition.vpc_config.security_group_ids] : undefined,
+            };
+        }
+
         if (this.definition.logging_config) {
             request.LoggingConfig = {
                 LogFormat: this.definition.logging_config.log_format,
@@ -423,6 +439,13 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             };
         }
         
+        if (this.definition.vpc_config !== undefined) {
+            config.VpcConfig = {
+                SubnetIds: this.definition.vpc_config.subnet_ids ? [...this.definition.vpc_config.subnet_ids] : undefined,
+                SecurityGroupIds: this.definition.vpc_config.security_group_ids ? [...this.definition.vpc_config.security_group_ids] : undefined,
+            };
+        }
+
         if (this.definition.logging_config !== undefined) {
             config.LoggingConfig = {
                 LogFormat: this.definition.logging_config.log_format,

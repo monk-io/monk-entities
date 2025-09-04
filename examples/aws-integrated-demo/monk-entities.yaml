@@ -1,0 +1,409 @@
+namespace: monk-entities
+
+frontend-site:
+  defines: netlify/site
+  name: monk-monk-entities-kpg
+  force_ssl: false
+  secret_ref: default-netlify-pat
+  permitted-secrets:
+    default-netlify-pat: true
+  services:
+    data:
+      protocol: custom
+
+lambda-api-execution-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: lambda-api-execution-policy
+  policy_description: IAM policy for Lambda execution
+  policy_document:
+    Version: 2012-10-17
+    Statement:
+      - Sid: CloudWatchLogsAccess
+        Effect: Allow
+        Action:
+          - "logs:CreateLogGroup"
+          - "logs:CreateLogStream"
+          - "logs:PutLogEvents"
+        Resource:
+          - "*"
+      - Sid: DynamoDBTableAccess
+        Effect: Allow
+        Action:
+          - "dynamodb:GetItem"
+          - "dynamodb:PutItem"
+          - "dynamodb:UpdateItem"
+          - "dynamodb:DeleteItem"
+          - "dynamodb:Scan"
+          - "dynamodb:Query"
+          - "dynamodb:BatchGetItem"
+          - "dynamodb:BatchWriteItem"
+          - "dynamodb:DescribeTable"
+        Resource:
+          - <- connection-target("table-0") entity-state get-member("table_arn")
+          - <- connection-target("table-0") entity-state get-member("table_arn") "/index/*" concat
+          - <- connection-target("table-1") entity-state get-member("table_arn")
+          - <- connection-target("table-1") entity-state get-member("table_arn") "/index/*" concat
+  services:
+    policy:
+      protocol: custom
+  connections:
+    table-0:
+      target: monk-entities/rds-postgresql
+      service: table
+    table-1:
+      target: monk-entities/dynamodb-table
+      service: table
+
+lambda-api-execution-role:
+  defines: aws-iam/iam-role
+  region: us-east-1
+  role_name: lambda-api-execution-role
+  role_description: Lambda execution role
+  assume_role_policy_document:
+    Version: 2012-10-17
+    Statement:
+      - Effect: Allow
+        Principal:
+          Service: lambda.amazonaws.com
+        Action: "sts:AssumeRole"
+  attached_policies:
+    - <- connection-target("policy") entity-state get-member("policy_arn")
+  services:
+    role:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - monk-entities/lambda-api-execution-policy
+      timeout: 60
+  connections:
+    policy:
+      target: monk-entities/lambda-api-execution-policy
+      service: policy
+
+lambda-api:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: lambda-api-code
+  function_name: lambda-api
+  runtime: nodejs20.x
+  role: <- connection-target("role") entity-state get-member("role_arn")
+  handler: src/index.handler
+  summary: "AWS Lambda function serving as the backend API, orchestrating operations between DynamoDB and RDS for todo and user management."
+  timeout: 30
+  memory_size: 256
+  variables:
+    dynamodb-table-name:
+      type: string
+      env: DYNAMODB_TABLE_NAME
+      description: Name of the DynamoDB table for todos.
+      value: <- connection-target("table-1") entity-state get-member("table_name")
+    aws-region:
+      type: string
+      env: AWS_REGION
+      description: AWS region for Lambda and database resources.
+      value: <- $global-aws-region default("us-east-1")
+    rds-host:
+      type: string
+      env: RDS_HOST
+      description: Hostname for the RDS PostgreSQL instance.
+      value: <- connection-hostname("rds")
+    rds-port:
+      type: int
+      env: RDS_PORT
+      description: Port for the RDS PostgreSQL instance.
+      value: <- connection-port("rds")
+    rds-database:
+      type: string
+      env: RDS_DATABASE
+      description: Database name for the RDS PostgreSQL instance.
+      value: <- $global-db-name
+    rds-username:
+      type: string
+      env: RDS_USERNAME
+      description: Username for the RDS PostgreSQL instance.
+      value: <- $global-db-user
+    rds-password-secret:
+      type: string
+      env: RDS_PASSWORD_SECRET
+      description: Secret name in AWS Secrets Manager for the RDS password.
+      value: ''
+    dynamodb-user-index:
+      type: string
+      env: DYNAMODB_USER_INDEX
+      description: Name of the DynamoDB user index.
+      value: UserTodosIndex
+    node-env:
+      type: string
+      env: NODE_ENV
+      description: Node.js environment (development or production).
+      value: development
+    log-level:
+      type: string
+      env: LOG_LEVEL
+      description: Log level for Lambda function logging.
+      value: info
+  services:
+    function:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - monk-entities/lambda-api-execution-role
+        - monk-entities/dynamodb-table
+        - monk-entities/rds-postgresql
+        - monk-entities/dynamodb-table
+      timeout: 60
+  connections:
+    role:
+      target: monk-entities/lambda-api-execution-role
+      service: role
+    table-1:
+      target: monk-entities/dynamodb-table
+      service: table
+    rds:
+      target: monk-entities/rds-postgresql
+      service: postgres
+    dynamodb:
+      target: monk-entities/dynamodb-table
+      service: table
+
+dynamodb:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: dynamodb
+  billing_mode: PAY_PER_REQUEST
+  point_in_time_recovery_enabled: true
+  services:
+    table:
+      protocol: custom
+
+dynamodb-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: users-table
+  billing_mode: PAY_PER_REQUEST
+  point_in_time_recovery_enabled: true
+  services:
+    table:
+      protocol: custom
+
+demo-client:
+  defines: runnable
+  metadata:
+    name: demo-client
+    description: "TypeScript client that tests and demonstrates the Lambda API, DynamoDB, and RDS integration by running automated scenarios."
+  containers:
+    main:
+      image: "demo-client:latest"
+  services: {}
+  connections:
+    rds:
+      target: monk-entities/rds-postgresql
+      service: postgres
+    dynamodb:
+      target: monk-entities/dynamodb-table
+      service: table
+  depends:
+    wait-for:
+      runnables:
+        - monk-entities/rds-postgresql
+        - monk-entities/dynamodb-table
+      timeout: 60
+  variables:
+    lambda-function-arn:
+      type: string
+      env: LAMBDA_FUNCTION_ARN
+      description: ARN of the Lambda function to invoke.
+      value: ''
+    lambda-function-name:
+      type: string
+      env: LAMBDA_FUNCTION_NAME
+      description: Name of the Lambda function to invoke.
+      value: ''
+    rds-endpoint:
+      type: string
+      env: RDS_ENDPOINT
+      description: Endpoint for the RDS PostgreSQL instance.
+      value: <- `${rds-host}`
+    rds-port:
+      type: int
+      env: RDS_PORT
+      description: Port for the RDS PostgreSQL instance.
+      value: <- connection-port("rds")
+    rds-database:
+      type: string
+      env: RDS_DATABASE
+      description: Database name for the RDS PostgreSQL instance.
+      value: <- $global-db-name
+    rds-username:
+      type: string
+      env: RDS_USERNAME
+      description: Username for the RDS PostgreSQL instance.
+      value: <- $global-db-user
+    rds-password:
+      type: string
+      env: RDS_PASSWORD
+      description: Password for the RDS PostgreSQL instance.
+      value: <- $global-db-pass
+    dynamodb-table-name:
+      type: string
+      env: DYNAMODB_TABLE_NAME
+      description: Name of the DynamoDB table for todos.
+      value: ''
+    dynamodb-table-arn:
+      type: string
+      env: DYNAMODB_TABLE_ARN
+      description: ARN of the DynamoDB table.
+      value: ''
+    aws-region:
+      type: string
+      env: AWS_REGION
+      description: AWS region for Lambda and database resources.
+      value: <- $global-aws-region default("us-east-1")
+    demo-users-count:
+      type: int
+      env: DEMO_USERS_COUNT
+      description: Number of demo users to create.
+      value: 5
+    demo-todos-per-user:
+      type: int
+      env: DEMO_TODOS_PER_USER
+      description: Number of todos per demo user.
+      value: 3
+    operation-interval-ms:
+      type: int
+      env: OPERATION_INTERVAL_MS
+      description: Interval in milliseconds between operations.
+      value: 5000
+    node-env:
+      type: string
+      env: NODE_ENV
+      description: Node.js environment (development or production).
+      value: development
+    rds-host:
+      type: string
+      env: RDS_HOST
+      description: "Host for the RDS PostgreSQL instance, extracted from the endpoint."
+      value: <- connection-hostname("rds")
+    rds-connection-string:
+      type: string
+      env: RDS_CONNECTION_STRING
+      description: "PostgreSQL connection string for the RDS instance, constructed from host, port, database, username, and password."
+      value: <- `postgres://${rds-username}:${rds-password}@${rds-host}:${rds-port}/${rds-database}?sslmode=disable`
+
+rds-postgresql:
+  defines: runnable
+  inherits: postgresql/db
+  variables:
+    db_user:
+      type: string
+      env: POSTGRES_USER
+      description: PostgreSQL database user name
+      value: <- $global-db-user default("monk")
+    db_pass:
+      type: string
+      env: POSTGRES_PASSWORD
+      description: PostgreSQL database user password
+      value: <- $global-db-pass default("adminpassword")
+    db_name:
+      type: string
+      env: POSTGRES_DB
+      description: PostgreSQL database name
+      value: <- $global-db-name default("monk")
+
+proxy:
+  defines: runnable
+  inherits: nginx/node-proxy
+  connections:
+    backend:
+      target: monk-entities/lambda-api
+      service: function
+  depends:
+    wait-for:
+      runnables:
+        - monk-entities/lambda-api
+      timeout: 60
+
+frontend:
+  defines: runnable
+  inherits: netlify/deploy
+  containers:
+    deploy:
+      paths:
+        - "blobs://frontend:/home/node/app"
+  variables:
+    deploy-dir: dist
+    site-id: <- connection-target("site") entity-state get-member("id")
+    pre-deploy: |
+      npm install
+      npm run build
+      echo '/* /index.html 200' >> dist/_redirects
+      
+    vite-api-url:
+      type: string
+      env: VITE_API_URL
+      description: Base URL for the Lambda API backend.
+      value: <- "https://" connection-domain-name("lambda-api") concat-all
+    vite-app-version:
+      type: string
+      env: VITE_APP_VERSION
+      description: Frontend application version.
+      value: 1.0.0
+    vite-app-name:
+      type: string
+      env: VITE_APP_NAME
+      description: Frontend application name.
+      value: AWS Integrated Demo
+    vite-dev-mode:
+      type: bool
+      env: VITE_DEV_MODE
+      description: Enable development mode features.
+      value: true
+  connections:
+    site:
+      target: monk-entities/frontend-site
+      service: data
+    lambda-api:
+      target: monk-entities/proxy
+      service: nginx
+  depends:
+    wait-for:
+      runnables:
+        - monk-entities/frontend-site
+        - monk-entities/proxy
+      timeout: 60
+
+stack:
+  defines: group
+  variables:
+    global-db-name:
+      type: string
+      description: Database name for the RDS PostgreSQL instance.
+      value: monk
+    global-db-user:
+      type: string
+      description: Username for the RDS PostgreSQL instance.
+      value: monk
+    global-db-pass:
+      type: string
+      description: Password for the RDS PostgreSQL instance.
+      value: R_wduu1uWQkrd4HB
+    global-aws-region:
+      type: string
+      description: AWS region for Lambda and database resources.
+      value: us-east-1
+  members:
+    - monk-entities/demo-client
+    - monk-entities/rds-postgresql
+    - monk-entities/proxy
+    - monk-entities/frontend-site
+    - monk-entities/frontend
+    - monk-entities/lambda-api-execution-policy
+    - monk-entities/lambda-api-execution-role
+    - monk-entities/lambda-api
+    - monk-entities/dynamodb
+    - monk-entities/dynamodb
+    - monk-entities/dynamodb-table
+

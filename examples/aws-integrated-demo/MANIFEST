@@ -1,0 +1,5 @@
+REPO monk-entities
+LOAD monk-entities.yaml 
+ENTRY monk-entities/stack
+IMAGE demo-client:latest demo-client examples/aws-integrated-demo/demo-client Dockerfile
+BLOBS frontend:examples/aws-integrated-demo/frontend lambda-api-code:examples/aws-integrated-demo/lambda-code

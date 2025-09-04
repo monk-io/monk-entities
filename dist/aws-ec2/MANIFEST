@@ -1,0 +1,3 @@
+REPO aws-ec2
+LOAD subnet.yaml security-group.yaml vpc.yaml base.yaml
+RESOURCES security-group-sync.js vpc-sync.js subnet-sync.js base.js

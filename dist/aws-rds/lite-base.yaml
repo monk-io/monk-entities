@@ -1,5 +1,5 @@
 namespace: aws-rds
 
-base:
+lite-base:
   defines: module
-  source: <<< base.js
+  source: <<< lite-base.js

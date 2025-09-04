@@ -70,6 +70,12 @@ advanced-lambda:
     - arm64
   ephemeral_storage:
     size: 1024
+  vpc_config:
+    subnet_ids:
+      - subnet-aaaa
+      - subnet-bbbb
+    security_group_ids:
+      - sg-xxxx
   logging_config:
     log_format: JSON
     application_log_level: INFO

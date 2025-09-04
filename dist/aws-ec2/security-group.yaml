@@ -1,0 +1,76 @@
+namespace: aws-ec2
+security-group:
+  defines: entity
+  metadata:
+    name: SecurityGroup
+  schema:
+    region:
+      type: string
+    vpc_id:
+      type: string
+    group_name:
+      type: string
+    group_description:
+      type: string
+    group_id:
+      type: string
+    ingress:
+      type: array
+      items:
+        type: object
+        properties:
+          ip_protocol:
+            type: string
+          from_port:
+            type: number
+          to_port:
+            type: number
+          cidr_blocks:
+            type: array
+            items:
+              type: string
+          source_security_group_id:
+            type: string
+        required:
+          - ip_protocol
+        additionalProperties: false
+    egress:
+      type: array
+      items:
+        type: object
+        properties:
+          ip_protocol:
+            type: string
+          from_port:
+            type: number
+          to_port:
+            type: number
+          cidr_blocks:
+            type: array
+            items:
+              type: string
+          source_security_group_id:
+            type: string
+        required:
+          - ip_protocol
+        additionalProperties: false
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - vpc_id
+      - group_name
+      - group_description
+  state-schema:
+    existing:
+      type: boolean
+    group_id:
+      type: string
+    group_name:
+      type: string
+  lifecycle:
+    sync: <<< security-group-sync.js
+  requires:
+    - aws-ec2/base

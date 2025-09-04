@@ -1,0 +1,43 @@
+namespace: aws-api-gateway-examples
+
+# Minimal API Gateway HTTP API with Lambda proxy integration
+minimal-api:
+  defines: aws-api-gateway/api-gateway
+  region: us-east-1
+  name: minimal-http-api
+  protocol_type: HTTP
+  routes:
+    - path: /hello
+      method: ANY
+      integration:
+        type: lambda
+        function: <- connection-target("lambda") entity-state get-member("function_arn")
+  services:
+    api:
+      protocol: custom
+  connections:
+    lambda:
+      runnable: aws-api-gateway-examples/hello-function
+      service: function
+  depends:
+    wait-for:
+      runnables:
+        - aws-api-gateway-examples/hello-function
+      timeout: 120
+
+# Sample Lambda function to integrate with API Gateway
+hello-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: hello-world-code
+  function_name: api-gw-hello-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::123456789012:role/lambda-execution-role
+  handler: index.handler
+  summary: "Hello world for API Gateway"
+  timeout: 10
+  memory_size: 128
+  services:
+    function:
+      protocol: custom
+

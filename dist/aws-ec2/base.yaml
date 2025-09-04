@@ -1,4 +1,4 @@
-namespace: aws-rds
+namespace: aws-ec2
 
 base:
   defines: module
