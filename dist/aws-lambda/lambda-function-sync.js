@@ -176,6 +176,12 @@ The ECR repository must be in the same region as the Lambda function`
         ApplyOn: this.definition.snap_start.apply_on
       };
     }
+    if (this.definition.vpc_config) {
+      request.VpcConfig = {
+        SubnetIds: this.definition.vpc_config.subnet_ids ? [...this.definition.vpc_config.subnet_ids] : void 0,
+        SecurityGroupIds: this.definition.vpc_config.security_group_ids ? [...this.definition.vpc_config.security_group_ids] : void 0
+      };
+    }
     if (this.definition.logging_config) {
       request.LoggingConfig = {
         LogFormat: this.definition.logging_config.log_format,
@@ -250,6 +256,12 @@ The ECR repository must be in the same region as the Lambda function`
     if (this.definition.snap_start !== void 0) {
       config.SnapStart = {
         ApplyOn: this.definition.snap_start.apply_on
+      };
+    }
+    if (this.definition.vpc_config !== void 0) {
+      config.VpcConfig = {
+        SubnetIds: this.definition.vpc_config.subnet_ids ? [...this.definition.vpc_config.subnet_ids] : void 0,
+        SecurityGroupIds: this.definition.vpc_config.security_group_ids ? [...this.definition.vpc_config.security_group_ids] : void 0
       };
     }
     if (this.definition.logging_config !== void 0) {

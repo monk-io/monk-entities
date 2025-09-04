@@ -3,7 +3,7 @@ lambda-function:
   defines: entity
   metadata:
     name: LambdaFunction
-    version-hash: 88ac9e832adb
+    version-hash: c96cf1ec7121
   schema:
     region:
       type: string
@@ -140,6 +140,19 @@ lambda-function:
           description: Apply SnapStart on PublishedVersions or None
       additionalProperties: false
       description: SnapStart configuration
+    vpc_config:
+      type: object
+      properties:
+        subnet_ids:
+          type: array
+          items:
+            type: string
+        security_group_ids:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      description: VPC configuration
     logging_config:
       type: object
       properties:

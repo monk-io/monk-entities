@@ -1,3 +1,4 @@
 REPO aws-api-gateway
+VERSION_HASH 10a5fe14b53d
 LOAD api-gateway.yaml base.yaml
-RESOURCES base.js api-gateway-sync.js
+RESOURCES api-gateway-sync.js base.js

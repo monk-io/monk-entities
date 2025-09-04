@@ -3,6 +3,7 @@ rds-instance:
   defines: entity
   metadata:
     name: RDSInstance
+    version-hash: 3ac3140221a0
   schema:
     region:
       type: string

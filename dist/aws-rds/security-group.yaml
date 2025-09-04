@@ -2,4 +2,6 @@ namespace: aws-rds
 
 security-group:
   defines: module
+  metadata:
+    version-hash: 3ac3140221a0
   source: <<< security-group.js

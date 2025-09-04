@@ -3,6 +3,7 @@ api-gateway:
   defines: entity
   metadata:
     name: APIGateway
+    version-hash: 10a5fe14b53d
   schema:
     region:
       type: string
