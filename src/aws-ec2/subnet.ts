@@ -1,0 +1,91 @@
+import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./base.ts";
+
+export interface SubnetDefinition extends AWSEC2Definition {
+	vpc_id: string;
+	cidr_block: string;
+	availability_zone?: string;
+	map_public_ip_on_launch?: boolean;
+	tags?: Record<string, string>;
+}
+
+export interface SubnetState extends AWSEC2State {
+	subnet_id?: string;
+	state?: string;
+	cidr_block?: string;
+}
+
+export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
+
+	protected getSubnetId(): string | undefined {
+		return this.state.subnet_id;
+	}
+
+	override create(): void {
+		const createParams: Record<string, any> = {
+			VpcId: this.definition.vpc_id,
+			CidrBlock: this.definition.cidr_block,
+		};
+		if (this.definition.availability_zone) {
+			createParams.AvailabilityZone = this.definition.availability_zone;
+		}
+
+		const resp = this.makeEC2Request('CreateSubnet', createParams);
+		const body = resp.body || '';
+		const idMatch = /<subnetId>(subnet-[^<]+)<\/subnetId>/i.exec(body);
+		if (!idMatch) {
+			throw new Error("Failed to parse SubnetId from CreateSubnet response");
+		}
+		const subnetId = idMatch[1];
+
+		if (this.definition.map_public_ip_on_launch !== undefined) {
+			this.makeEC2Request('ModifySubnetAttribute', {
+				SubnetId: subnetId,
+				'MapPublicIpOnLaunch.Value': String(this.definition.map_public_ip_on_launch)
+			});
+		}
+
+		if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
+			let idx = 1;
+			const tagParams: Record<string, any> = { 'ResourceId.1': subnetId };
+			for (const [k, v] of Object.entries(this.definition.tags)) {
+				tagParams[`Tag.${idx}.Key`] = k;
+				tagParams[`Tag.${idx}.Value`] = v;
+				idx++;
+			}
+			this.makeEC2Request('CreateTags', tagParams);
+		}
+
+		this.state.existing = false;
+		this.state.subnet_id = subnetId;
+		this.state.cidr_block = this.definition.cidr_block;
+		this.state.state = 'available';
+	}
+
+	override delete(): void {
+		if (!this.state.subnet_id) return;
+		if (this.state.existing) return;
+		this.makeEC2Request('DeleteSubnet', { SubnetId: this.state.subnet_id });
+		this.state.subnet_id = undefined;
+	}
+
+	override checkReadiness(): boolean {
+		if (!this.state.subnet_id) return false;
+		const info = this.describeSubnetById(this.state.subnet_id);
+		if (!info) return false;
+		this.state.state = info.state;
+		this.state.cidr_block = info.cidr;
+		return info.state === 'available';
+	}
+
+	private describeSubnetById(subnetId: string): { subnetId: string; state: string; cidr: string } | null {
+		const resp = this.makeEC2Request('DescribeSubnets', { 'SubnetId.1': subnetId });
+		const body = resp.body || '';
+		const idMatch = /<subnetId>(subnet-[^<]+)<\/subnetId>/i.exec(body);
+		if (!idMatch) return null;
+		const stateMatch = /<state>(.*?)<\/state>/i.exec(body);
+		const cidrMatch = /<cidrBlock>(.*?)<\/cidrBlock>/i.exec(body);
+		return { subnetId: idMatch[1], state: stateMatch ? stateMatch[1] : 'available', cidr: cidrMatch ? cidrMatch[1] : '' };
+	}
+}
+
+

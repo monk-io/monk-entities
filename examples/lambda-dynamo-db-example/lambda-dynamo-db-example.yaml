@@ -209,3 +209,28 @@ example-stack:
     - lambda-dynamo-example/lambda-execution-role
     # - lambda-dynamo-example/lambda-dynamo-function
     - lambda-dynamo-example/lambda-dynamo-container-function
+    - lambda-dynamo-example/api-gateway
+
+api-gateway:
+  defines: aws-api-gateway/api-gateway
+  region: us-east-1
+  name: lambda-dynamo-api
+  protocol_type: HTTP
+  routes:
+    - path: /users
+      method: ANY
+      integration:
+        type: lambda
+        function: <- connection-target("lambda") entity-state get-member("function_arn")
+  services:
+    api:
+      protocol: custom
+  connections:
+    lambda:
+      runnable: lambda-dynamo-example/lambda-dynamo-container-function
+      service: function
+  depends:
+    wait-for:
+      runnables:
+        - lambda-dynamo-example/lambda-dynamo-container-function
+      timeout: 60

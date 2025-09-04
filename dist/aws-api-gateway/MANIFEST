@@ -1,0 +1,3 @@
+REPO aws-api-gateway
+LOAD api-gateway.yaml base.yaml
+RESOURCES base.js api-gateway-sync.js

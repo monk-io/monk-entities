@@ -1,4 +1,4 @@
-namespace: aws-rds
+namespace: aws-api-gateway
 
 base:
   defines: module

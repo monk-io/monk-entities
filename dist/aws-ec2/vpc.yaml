@@ -1,0 +1,40 @@
+namespace: aws-ec2
+vpc:
+  defines: entity
+  metadata:
+    name: VPC
+  schema:
+    region:
+      type: string
+    vpc_id:
+      type: string
+    cidr_block:
+      type: string
+    enable_dns_support:
+      type: boolean
+    enable_dns_hostnames:
+      type: boolean
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+  state-schema:
+    existing:
+      type: boolean
+    vpc_id:
+      type: string
+    state:
+      type: string
+    cidr_block:
+      type: string
+  lifecycle:
+    sync: <<< vpc-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-ec2/base

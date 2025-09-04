@@ -1,0 +1,49 @@
+namespace: aws-api-gateway
+api-gateway:
+  defines: entity
+  metadata:
+    name: APIGateway
+  schema:
+    region:
+      type: string
+    name:
+      type: string
+    protocol_type:
+      type: string
+      enum:
+        - HTTP
+        - WEBSOCKET
+    routes: {}
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - name
+      - protocol_type
+  state-schema:
+    existing:
+      type: boolean
+    api_id:
+      type: string
+    api_endpoint:
+      type: string
+    name:
+      type: string
+    protocol_type:
+      type: string
+  lifecycle:
+    sync: <<< api-gateway-sync.js
+    sync-routes: ''
+    get-endpoint: ''
+    list-routes: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-api-gateway/base
+    - monkec/base
+    - cli

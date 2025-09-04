@@ -1,0 +1,42 @@
+namespace: aws-ec2
+subnet:
+  defines: entity
+  metadata:
+    name: Subnet
+  schema:
+    region:
+      type: string
+    vpc_id:
+      type: string
+    cidr_block:
+      type: string
+    availability_zone:
+      type: string
+    map_public_ip_on_launch:
+      type: boolean
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - region
+      - vpc_id
+      - cidr_block
+  state-schema:
+    existing:
+      type: boolean
+    subnet_id:
+      type: string
+    state:
+      type: string
+    cidr_block:
+      type: string
+  lifecycle:
+    sync: <<< subnet-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-ec2/base
