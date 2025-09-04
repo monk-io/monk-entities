@@ -1,0 +1,31 @@
+name: Sync YAML to Chroma
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "examples/**/*.yml"
+      - "examples/**/*.yaml"
+      - "src/**/*.yml"
+      - "src/**/*.yaml"
+  workflow_dispatch:
+
+jobs:
+  sync-yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno task sync:yaml
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_EMBEDDING_MODEL: ${{ vars.AZURE_OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small' }}
+          CHROMA_API_KEY: ${{ secrets.CHROMA_API_KEY }}
+          CHROMA_TENANT_ID: ${{ secrets.CHROMA_TENANT_ID }}
+          CHROMA_DATABASE: ${{ vars.CHROMA_DATABASE || 'monk-entities-yaml' }}
+          CHROMA_COLLECTION_NAME: ${{ vars.CHROMA_COLLECTION_NAME || 'yaml-forms' }}
+          NODE_ENV: production

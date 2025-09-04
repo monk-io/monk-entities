@@ -5,5 +5,8 @@
     "imports": {
         "monkec/base": "./src/lib/modules/base.d.ts",
         "monkec/http-client": "./src/lib/modules/http-client.d.ts"
+    },
+    "tasks": {
+        "sync:yaml": "deno run -A scripts/syncYamlFormsToChroma.ts"
     }
 }
