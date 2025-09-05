@@ -4,5 +4,5 @@ DESCRIPTION AWS CloudFront CDN entity for Monk orchestrator
 VERSION 1.0.0
 AUTHOR monk-io
 TAGS aws,cloudfront,cdn,distribution
-LOAD base.yaml cloud-front-distribution.yaml common.yaml
+LOAD cloud-front-distribution.yaml base.yaml common.yaml
 RESOURCES common.js cloud-front-distribution-sync.js base.js
