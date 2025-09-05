@@ -1,0 +1,51 @@
+<svg width="500" height="300" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="500" height="300" fill="url(#gradient)" fill-opacity="0.1"/>
+  
+  <!-- Global network representation -->
+  <circle cx="250" cy="150" r="80" fill="none" stroke="#007AFF" stroke-width="2" stroke-dasharray="5,5"/>
+  <circle cx="250" cy="150" r="120" fill="none" stroke="#007AFF" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  
+  <!-- Central CloudFront logo -->
+  <rect x="235" y="135" width="30" height="30" rx="4" fill="#FF9500"/>
+  <text x="250" y="155" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">CF</text>
+  
+  <!-- Edge locations -->
+  <circle cx="180" cy="100" r="8" fill="#007AFF"/>
+  <text x="180" y="90" text-anchor="middle" fill="#333" font-family="Arial, sans-serif" font-size="10">US-EAST</text>
+  
+  <circle cx="320" cy="100" r="8" fill="#007AFF"/>
+  <text x="320" y="90" text-anchor="middle" fill="#333" font-family="Arial, sans-serif" font-size="10">EU-WEST</text>
+  
+  <circle cx="150" cy="200" r="8" fill="#007AFF"/>
+  <text x="150" y="220" text-anchor="middle" fill="#333" font-family="Arial, sans-serif" font-size="10">US-WEST</text>
+  
+  <circle cx="350" cy="200" r="8" fill="#007AFF"/>
+  <text x="350" y="220" text-anchor="middle" fill="#333" font-family="Arial, sans-serif" font-size="10">ASIA-PAC</text>
+  
+  <!-- Connection lines -->
+  <line x1="235" y1="145" x2="180" y2="108" stroke="#007AFF" stroke-width="2" opacity="0.7"/>
+  <line x1="265" y1="145" x2="320" y2="108" stroke="#007AFF" stroke-width="2" opacity="0.7"/>
+  <line x1="235" y1="165" x2="150" y2="192" stroke="#007AFF" stroke-width="2" opacity="0.7"/>
+  <line x1="265" y1="165" x2="350" y2="192" stroke="#007AFF" stroke-width="2" opacity="0.7"/>
+  
+  <!-- Data flow animation indicators -->
+  <circle cx="200" cy="125" r="3" fill="#FF9500" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="300" cy="125" r="3" fill="#FF9500" opacity="0.8">
+    <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Title -->
+  <text x="250" y="30" text-anchor="middle" fill="#333" font-family="Arial, sans-serif" font-size="18" font-weight="bold">CloudFront Global Network</text>
+  <text x="250" y="50" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="12">400+ Edge Locations Worldwide</text>
+  
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

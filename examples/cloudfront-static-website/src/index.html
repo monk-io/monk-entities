@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudFront Demo - Global Static Website</title>
+    <meta name="description" content="Demonstration of AWS CloudFront CDN with a static website hosted on S3">
+    
+    <!-- Preload critical CSS -->
+    <link rel="preload" href="/assets/css/styles.css" as="style">
+    <link rel="stylesheet" href="/assets/css/styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+    
+    <!-- Open Graph meta tags -->
+    <meta property="og:title" content="CloudFront Demo - Global Static Website">
+    <meta property="og:description" content="Demonstration of AWS CloudFront CDN with a static website">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="/assets/images/og-image.jpg">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="container">
+                <div class="nav-brand">
+                    <img src="/assets/images/cloudfront-logo.svg" alt="CloudFront" class="logo">
+                    <span class="brand-text">CloudFront Demo</span>
+                </div>
+                <ul class="nav-menu">
+                    <li><a href="#features" class="nav-link">Features</a></li>
+                    <li><a href="#performance" class="nav-link">Performance</a></li>
+                    <li><a href="#architecture" class="nav-link">Architecture</a></li>
+                    <li><a href="#api-demo" class="nav-link">API Demo</a></li>
+                </ul>
+                <button class="nav-toggle" aria-label="Toggle navigation">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1 class="hero-title">
+                        Global Content Delivery
+                        <span class="highlight">Made Simple</span>
+                    </h1>
+                    <p class="hero-description">
+                        This static website demonstrates AWS CloudFront's global content delivery network (CDN) 
+                        capabilities. Built with the Monk CloudFront entity, it showcases optimized caching, 
+                        compression, and edge delivery for maximum performance.
+                    </p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary" onclick="testCachePerformance()">
+                            Test Cache Performance
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadDynamicContent()">
+                            Load Dynamic Content
+                        </button>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <img src="/assets/images/cloudfront-network.svg" alt="CloudFront Global Network" class="hero-image">
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features">
+            <div class="container">
+                <h2 class="section-title">CloudFront Features Demonstrated</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🌍</div>
+                        <h3>Global Edge Locations</h3>
+                        <p>Content delivered from 400+ edge locations worldwide for minimal latency</p>
+                        <div class="feature-demo">
+                            <button onclick="showEdgeLocation()" class="demo-btn">Check Your Edge Location</button>
+                            <div id="edge-location-info" class="demo-result"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Intelligent Caching</h3>
+                        <p>Different cache policies for HTML, CSS, JS, and images optimize performance</p>
+                        <div class="feature-demo">
+                            <button onclick="demonstrateCaching()" class="demo-btn">Test Cache Headers</button>
+                            <div id="cache-demo-result" class="demo-result"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🗜️</div>
+                        <h3>Automatic Compression</h3>
+                        <p>Gzip compression reduces bandwidth usage and improves load times</p>
+                        <div class="feature-demo">
+                            <button onclick="testCompression()" class="demo-btn">Check Compression</button>
+                            <div id="compression-result" class="demo-result"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3>HTTPS Everywhere</h3>
+                        <p>SSL/TLS encryption with automatic HTTP to HTTPS redirection</p>
+                        <div class="feature-demo">
+                            <button onclick="checkSSL()" class="demo-btn">Verify SSL</button>
+                            <div id="ssl-result" class="demo-result"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Performance Section -->
+        <section id="performance" class="performance">
+            <div class="container">
+                <h2 class="section-title">Performance Metrics</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="load-time">--</div>
+                        <div class="metric-label">Page Load Time (ms)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="cache-hit-ratio">--</div>
+                        <div class="metric-label">Cache Hit Ratio (%)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="bandwidth-saved">--</div>
+                        <div class="metric-label">Bandwidth Saved (KB)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="edge-location">--</div>
+                        <div class="metric-label">Edge Location</div>
+                    </div>
+                </div>
+                
+                <div class="performance-chart">
+                    <h3>Load Time Comparison</h3>
+                    <canvas id="performance-chart" width="800" height="300"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture" class="architecture">
+            <div class="container">
+                <h2 class="section-title">Architecture Overview</h2>
+                <div class="architecture-content">
+                    <div class="architecture-text">
+                        <h3>How This Demo Works</h3>
+                        <ol class="architecture-steps">
+                            <li>
+                                <strong>S3 Origin:</strong> Static files stored in Amazon S3 bucket
+                            </li>
+                            <li>
+                                <strong>CloudFront Distribution:</strong> Global CDN caches content at edge locations
+                            </li>
+                            <li>
+                                <strong>Cache Behaviors:</strong> Different TTL settings for various file types
+                            </li>
+                            <li>
+                                <strong>Origin Access Identity:</strong> Secure access to S3 content
+                            </li>
+                            <li>
+                                <strong>Custom Domain:</strong> CNAME pointing to CloudFront distribution
+                            </li>
+                        </ol>
+                        
+                        <div class="cache-policies">
+                            <h4>Cache Policies Used:</h4>
+                            <ul>
+                                <li><code>*.html</code> - 5 minutes (short for content updates)</li>
+                                <li><code>*.css, *.js</code> - 1 day (versioned assets)</li>
+                                <li><code>*.jpg, *.png, *.svg</code> - 30 days (static images)</li>
+                                <li><code>/api/*</code> - No caching (dynamic content)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="architecture-diagram">
+                        <img src="/assets/images/architecture-diagram.svg" alt="CloudFront Architecture" class="diagram">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Demo Section -->
+        <section id="api-demo" class="api-demo">
+            <div class="container">
+                <h2 class="section-title">API Integration Demo</h2>
+                <p class="section-description">
+                    This section demonstrates how CloudFront can be used with APIs, 
+                    showing both cached and non-cached requests.
+                </p>
+                
+                <div class="api-tests">
+                    <div class="api-test-card">
+                        <h3>Static API Response (Cached)</h3>
+                        <p>This endpoint returns static data and is cached for 5 minutes</p>
+                        <button onclick="testCachedAPI()" class="btn btn-outline">Test Cached API</button>
+                        <div id="cached-api-result" class="api-result"></div>
+                    </div>
+                    
+                    <div class="api-test-card">
+                        <h3>Dynamic API Response (Not Cached)</h3>
+                        <p>This endpoint returns dynamic data and bypasses CloudFront cache</p>
+                        <button onclick="testDynamicAPI()" class="btn btn-outline">Test Dynamic API</button>
+                        <div id="dynamic-api-result" class="api-result"></div>
+                    </div>
+                </div>
+                
+                <div class="api-metrics">
+                    <h3>Request Metrics</h3>
+                    <div class="metrics-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Request Type</th>
+                                    <th>Response Time</th>
+                                    <th>Cache Status</th>
+                                    <th>Edge Location</th>
+                                </tr>
+                            </thead>
+                            <tbody id="api-metrics-body">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>CloudFront Demo</h4>
+                    <p>Powered by AWS CloudFront and Monk Orchestrator</p>
+                    <p class="build-info">
+                        Build: <span id="build-version">v1.0.0</span> | 
+                        Deployed: <span id="deploy-time">--</span>
+                    </p>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://aws.amazon.com/cloudfront/">AWS CloudFront</a></li>
+                        <li><a href="https://monk.io/">Monk Orchestrator</a></li>
+                        <li><a href="https://github.com/">View Source</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Performance</h4>
+                    <div class="performance-badge">
+                        <div class="badge-score" id="performance-score">95</div>
+                        <div class="badge-label">Performance Score</div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 CloudFront Static Website Demo. Demonstrating global content delivery.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Load JavaScript modules -->
+    <script src="/assets/js/performance.js"></script>
+    <script src="/assets/js/api-demo.js"></script>
+    <script src="/assets/js/main.js"></script>
+    
+    <!-- Analytics and monitoring -->
+    <script>
+        // Initialize performance monitoring
+        document.addEventListener('DOMContentLoaded', function() {
+            measurePagePerformance();
+            initializeDemoFeatures();
+            updateBuildInfo();
+        });
+    </script>
+</body>
+</html>

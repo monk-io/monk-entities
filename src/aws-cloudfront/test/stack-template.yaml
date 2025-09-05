@@ -1,0 +1,112 @@
+namespace: aws-cloudfront-test
+
+# Basic CloudFront distribution test with simple S3 origin
+test-basic-distribution:
+  defines: aws-cloudfront/cloud-front-distribution
+  region: us-east-1
+  comment: "Test CloudFront distribution - basic S3 origin"
+  enabled: true
+  default_root_object: "index.html"
+  
+  origins:
+    - id: "test-s3-origin"
+      domain_name: "example.com"  # Using example.com for testing
+      custom_origin_config:
+        http_port: 80
+        https_port: 443
+        origin_protocol_policy: "https-only"
+  
+  default_cache_behavior:
+    target_origin_id: "test-s3-origin"
+    viewer_protocol_policy: "redirect-to-https"
+    allowed_methods: ["GET", "HEAD"]
+    cached_methods: ["GET", "HEAD"]
+    forward_cookies: "none"
+    forward_query_string: false
+    compress: true
+    min_ttl: 0
+    default_ttl: 86400
+    max_ttl: 31536000
+
+  price_class: "PriceClass_100"
+  is_ipv6_enabled: true
+  http_version: "http2"
+
+  tags:
+    Environment: "test"
+    Project: "cloudfront-entity-test"
+    Type: "basic"
+
+# More complex CloudFront distribution test with multiple cache behaviors
+test-custom-origin-distribution:
+  defines: aws-cloudfront/cloud-front-distribution
+  region: us-east-1
+  comment: "Test CloudFront distribution - custom origin with cache behaviors"
+  enabled: true
+  
+  origins:
+    - id: "test-api-origin"
+      domain_name: "httpbin.org"  # Using httpbin.org for testing
+      origin_path: ""
+      custom_origin_config:
+        http_port: 80
+        https_port: 443
+        origin_protocol_policy: "https-only"
+        origin_ssl_protocols: ["TLSv1.2"]
+        origin_read_timeout: 30
+        origin_keep_alive_timeout: 5
+      connection_attempts: 3
+      connection_timeout: 10
+    
+    - id: "test-static-origin"
+      domain_name: "example.com"
+      custom_origin_config:
+        http_port: 80
+        https_port: 443
+        origin_protocol_policy: "https-only"
+  
+  default_cache_behavior:
+    target_origin_id: "test-static-origin"
+    viewer_protocol_policy: "redirect-to-https"
+    allowed_methods: ["GET", "HEAD"]
+    cached_methods: ["GET", "HEAD"]
+    forward_cookies: "none"
+    forward_query_string: false
+    compress: true
+    min_ttl: 0
+    default_ttl: 86400
+    max_ttl: 31536000
+
+  cache_behaviors:
+    - path_pattern: "/api/*"
+      target_origin_id: "test-api-origin"
+      viewer_protocol_policy: "https-only"
+      allowed_methods: ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods: ["GET", "HEAD"]
+      forward_cookies: "none"
+      forward_query_string: true
+      compress: false
+      min_ttl: 0
+      default_ttl: 0
+      max_ttl: 0
+
+  custom_error_responses:
+    - error_code: 404
+      response_code: 404
+      error_caching_min_ttl: 300
+
+  price_class: "PriceClass_100"
+  is_ipv6_enabled: true
+  http_version: "http2"
+
+  tags:
+    Environment: "test"
+    Project: "cloudfront-entity-test"
+    Type: "advanced"
+
+# Test stack for AWS CloudFront distributions
+cloudfront-test-stack:
+  defines: process-group
+  runnable-list:
+    - aws-cloudfront-test/test-basic-distribution
+    - aws-cloudfront-test/test-custom-origin-distribution

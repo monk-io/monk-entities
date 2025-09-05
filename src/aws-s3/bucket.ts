@@ -95,6 +95,22 @@ export interface S3BucketDefinition extends AWSS3Definition {
             bucket_key_enabled?: boolean;
         }>;
     };
+    /**
+     * Static website hosting configuration
+     */
+    website_configuration?: {
+        /** @description Index document for the website (default: index.html) */
+        index_document?: string;
+        /** @description Error document for the website (default: error.html) */
+        error_document?: string;
+    };
+    /**
+     * Bucket policy configuration for public access
+     */
+    bucket_policy?: {
+        /** @description JSON policy document as string, or 'public-read' for standard public read policy */
+        policy: string | "public-read";
+    };
     /** @description Resource tags for the bucket */
     tags?: Record<string, string>;
 }
@@ -127,6 +143,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         // Check if bucket already exists
         if (this.bucketExists(this.getBucketName())) {
             // Bucket already exists - store essential state
+            cli.output(`Bucket ${this.getBucketName()} already exists, adopting it and applying configuration`);
             this.state.existing = true;
             this.state.bucket_name = this.getBucketName();
             this.state.region = this.region;
@@ -139,10 +156,13 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
                 this.state.location = this.region;
             }
             
+            // Configure existing bucket with current settings
+            this.configureBucket();
             return;
         }
 
         // Create the bucket
+        cli.output(`Creating new bucket: ${this.getBucketName()}`);
         this.createBucket(this.getBucketName());
         
         // Store essential state
@@ -152,6 +172,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         this.state.location = this.region;
 
         // Configure bucket settings
+        cli.output(`Configuring new bucket: ${this.getBucketName()}`);
         this.configureBucket();
     }
 
@@ -182,6 +203,22 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         // Configure server-side encryption if specified
         if (this.definition.server_side_encryption?.rules) {
             this.setBucketEncryption(bucketName, [...this.definition.server_side_encryption.rules]);
+        }
+
+        // Configure website hosting if specified
+        if (this.definition.website_configuration) {
+            const indexDoc = this.definition.website_configuration.index_document || "index.html";
+            const errorDoc = this.definition.website_configuration.error_document;
+            cli.output(`Configuring website hosting: index=${indexDoc}, error=${errorDoc || 'none'}`);
+            this.setBucketWebsite(bucketName, indexDoc, errorDoc);
+            cli.output(`Website hosting configured successfully`);
+        }
+
+        // Configure bucket policy if specified
+        if (this.definition.bucket_policy) {
+            cli.output(`Configuring bucket policy: ${this.definition.bucket_policy.policy}`);
+            this.setBucketPolicy(bucketName, this.definition.bucket_policy.policy);
+            cli.output(`Bucket policy configured successfully`);
         }
 
         // Set tags if specified (skip if fails due to checksum requirement)
@@ -422,6 +459,46 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
             
         } catch (error) {
             throw new Error(`Failed to get bucket statistics: ${(error as Error).message}`);
+        }
+    }
+
+    @action()
+    getWebsiteInfo(_args?: MonkecBase.Args): void {
+        if (!this.state.bucket_name) {
+            throw new Error('Bucket not created yet');
+        }
+        
+        const bucketName = this.getBucketName();
+        
+        try {
+            cli.output(`=== Website Configuration Information ===`);
+            cli.output(`Bucket: ${bucketName}`);
+            cli.output(`Region: ${this.region}`);
+            
+            // Check if website hosting is configured
+            const websiteConfig = this.getBucketWebsite(bucketName);
+            if (websiteConfig) {
+                cli.output(`✅ Website hosting: ENABLED`);
+                cli.output(`📄 Website URL: http://${bucketName}.s3-website-${this.region}.amazonaws.com`);
+                cli.output(`🌍 Website URL (alternative): http://${bucketName}.s3-website.${this.region}.amazonaws.com`);
+                
+                // Parse website configuration from response
+                const indexMatch = websiteConfig.body.match(/<Suffix>(.*?)<\/Suffix>/);
+                const errorMatch = websiteConfig.body.match(/<Key>(.*?)<\/Key>/);
+                
+                if (indexMatch) {
+                    cli.output(`📝 Index document: ${indexMatch[1]}`);
+                }
+                if (errorMatch) {
+                    cli.output(`❌ Error document: ${errorMatch[1]}`);
+                }
+            } else {
+                cli.output(`❌ Website hosting: DISABLED`);
+                cli.output(`💡 To enable: Configure website_configuration in entity definition`);
+            }
+            
+        } catch (error) {
+            throw new Error(`Failed to get website info: ${(error as Error).message}`);
         }
     }
 
