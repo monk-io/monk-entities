@@ -61,8 +61,8 @@ const buildLifecycleConfigXml = common.buildLifecycleConfigXml;
 const buildEncryptionConfigXml = common.buildEncryptionConfigXml;
 const parseS3Error = common.parseS3Error;
 var action2 = MonkecBase.action;
-var _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action2()], _listObjects_dec = [action2()], _generatePresignedUrl_dec = [action2()], _emptyBucket_dec = [action2()], _getBucketStatistics_dec = [action2()], _a) {
+var _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
+var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action2()], _listObjects_dec = [action2()], _generatePresignedUrl_dec = [action2()], _emptyBucket_dec = [action2()], _getBucketStatistics_dec = [action2()], _getWebsiteInfo_dec = [action2()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -75,6 +75,7 @@ var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = 
       throw new Error(`Invalid bucket name: ${this.getBucketName()}`);
     }
     if (this.bucketExists(this.getBucketName())) {
+      cli.output(`Bucket ${this.getBucketName()} already exists, adopting it and applying configuration`);
       this.state.existing = true;
       this.state.bucket_name = this.getBucketName();
       this.state.region = this.region;
@@ -84,13 +85,16 @@ var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = 
       } catch (error) {
         this.state.location = this.region;
       }
+      this.configureBucket();
       return;
     }
+    cli.output(`Creating new bucket: ${this.getBucketName()}`);
     this.createBucket(this.getBucketName());
     this.state.existing = false;
     this.state.bucket_name = this.getBucketName();
     this.state.region = this.region;
     this.state.location = this.region;
+    cli.output(`Configuring new bucket: ${this.getBucketName()}`);
     this.configureBucket();
   }
   configureBucket() {
@@ -110,6 +114,18 @@ var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = 
     }
     if (this.definition.server_side_encryption?.rules) {
       this.setBucketEncryption(bucketName, [...this.definition.server_side_encryption.rules]);
+    }
+    if (this.definition.website_configuration) {
+      const indexDoc = this.definition.website_configuration.index_document || "index.html";
+      const errorDoc = this.definition.website_configuration.error_document;
+      cli.output(`Configuring website hosting: index=${indexDoc}, error=${errorDoc || "none"}`);
+      this.setBucketWebsite(bucketName, indexDoc, errorDoc);
+      cli.output(`Website hosting configured successfully`);
+    }
+    if (this.definition.bucket_policy) {
+      cli.output(`Configuring bucket policy: ${this.definition.bucket_policy.policy}`);
+      this.setBucketPolicy(bucketName, this.definition.bucket_policy.policy);
+      cli.output(`Bucket policy configured successfully`);
     }
     if (this.definition.tags) {
       try {
@@ -285,6 +301,36 @@ ${JSON.stringify(statistics, null, 2)}`);
       throw new Error(`Failed to get bucket statistics: ${error.message}`);
     }
   }
+  getWebsiteInfo(_args) {
+    if (!this.state.bucket_name) {
+      throw new Error("Bucket not created yet");
+    }
+    const bucketName = this.getBucketName();
+    try {
+      cli.output(`=== Website Configuration Information ===`);
+      cli.output(`Bucket: ${bucketName}`);
+      cli.output(`Region: ${this.region}`);
+      const websiteConfig = this.getBucketWebsite(bucketName);
+      if (websiteConfig) {
+        cli.output(`\u2705 Website hosting: ENABLED`);
+        cli.output(`\u{1F4C4} Website URL: http://${bucketName}.s3-website-${this.region}.amazonaws.com`);
+        cli.output(`\u{1F30D} Website URL (alternative): http://${bucketName}.s3-website.${this.region}.amazonaws.com`);
+        const indexMatch = websiteConfig.body.match(/<Suffix>(.*?)<\/Suffix>/);
+        const errorMatch = websiteConfig.body.match(/<Key>(.*?)<\/Key>/);
+        if (indexMatch) {
+          cli.output(`\u{1F4DD} Index document: ${indexMatch[1]}`);
+        }
+        if (errorMatch) {
+          cli.output(`\u274C Error document: ${errorMatch[1]}`);
+        }
+      } else {
+        cli.output(`\u274C Website hosting: DISABLED`);
+        cli.output(`\u{1F4A1} To enable: Configure website_configuration in entity definition`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to get website info: ${error.message}`);
+    }
+  }
   // Helper methods for custom actions
   listBucketObjects(url) {
     const response = aws.get(url, {
@@ -457,6 +503,7 @@ __decorateElement(_init, 1, "listObjects", _listObjects_dec, _S3Bucket);
 __decorateElement(_init, 1, "generatePresignedUrl", _generatePresignedUrl_dec, _S3Bucket);
 __decorateElement(_init, 1, "emptyBucket", _emptyBucket_dec, _S3Bucket);
 __decorateElement(_init, 1, "getBucketStatistics", _getBucketStatistics_dec, _S3Bucket);
+__decorateElement(_init, 1, "getWebsiteInfo", _getWebsiteInfo_dec, _S3Bucket);
 __decoratorMetadata(_init, _S3Bucket);
 __name(_S3Bucket, "S3Bucket");
 var S3Bucket = _S3Bucket;

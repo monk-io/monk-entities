@@ -1,0 +1,265 @@
+name: "AWS CloudFront Entity Integration Test"
+description: "Complete integration test for AWS CloudFront entity including distribution creation, custom actions, cache invalidation, and cleanup"
+timeout: 1800000  # 30 minutes for CloudFront distribution deployment
+
+setup:
+  - name: "Load AWS CloudFront entity manifest"
+    action: "load"
+    target: "dist/input/aws-cloudfront/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Test basic distribution lifecycle
+  - name: "Create basic CloudFront distribution"
+    action: "run"
+    target: "aws-cloudfront-test/test-basic-distribution"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for basic distribution readiness"
+    action: "wait"
+    target: "aws-cloudfront-test/test-basic-distribution"
+    waitFor:
+      condition: "ready"
+      timeout: 1500000  # 25 minutes for CloudFront deployment
+
+  - name: "Verify basic distribution creation"
+    action: "describe"
+    target: "aws-cloudfront-test/test-basic-distribution"
+    expect:
+      exitCode: 0
+
+  # Note: The following tests require cloudfront:GetDistribution permission
+  # If these fail with AccessDenied, add the missing permissions to your AWS user/role
+  - name: "Test get-distribution-info action for basic distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/get-distribution-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "distribution_id"
+        - "domain_name"
+        - "status"
+
+  - name: "Test get-distribution-config action for basic distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/get-distribution-config"
+    expect:
+      exitCode: 0
+      contains:
+        - "Distribution Configuration"
+        - "Origins"
+        - "DefaultCacheBehavior"
+
+  - name: "Test list-invalidations action for basic distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/list-invalidations"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidations for distribution"
+
+  # Test custom origin distribution lifecycle
+  - name: "Create custom origin CloudFront distribution"
+    action: "run"
+    target: "aws-cloudfront-test/test-custom-origin-distribution"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for custom origin distribution readiness"
+    action: "wait"
+    target: "aws-cloudfront-test/test-custom-origin-distribution"
+    waitFor:
+      condition: "ready"
+      timeout: 1500000  # 25 minutes for CloudFront deployment
+
+  - name: "Verify custom origin distribution creation"
+    action: "describe"
+    target: "aws-cloudfront-test/test-custom-origin-distribution"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-distribution-info action for custom origin distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/get-distribution-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "distribution_id"
+        - "domain_name"
+        - "status"
+
+  - name: "Test get-distribution-config action for custom origin distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/get-distribution-config"
+    expect:
+      exitCode: 0
+      contains:
+        - "Distribution Configuration"
+        - "Origins"
+        - "DefaultCacheBehavior"
+        - "CacheBehaviors"
+
+  - name: "Test list-invalidations action for custom origin distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/list-invalidations"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidations for distribution"
+
+  # Test cache invalidation functionality
+  - name: "Test create-invalidation action with default paths"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/create-invalidation"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidation created"
+        - "invalidation_id"
+
+  - name: "Test create-invalidation action with specific paths"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/create-invalidation"
+    args:
+      paths: '["/index.html", "/css/*", "/js/*"]'
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidation created"
+        - "invalidation_id"
+
+  - name: "Test create-invalidation with custom caller reference"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/create-invalidation"
+    args:
+      paths: '["/api/*"]'
+      caller_reference: "test-invalidation-ref-123"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidation created"
+        - "invalidation_id"
+
+  - name: "Verify invalidations were created via list-invalidations"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/list-invalidations"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidations for distribution"
+        - "Status:"
+
+  # Test invalidation on custom origin distribution
+  - name: "Test create-invalidation on custom origin distribution"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/create-invalidation"
+    args:
+      paths: '["/images/*", "/static/*"]'
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidation created"
+        - "invalidation_id"
+
+  - name: "Verify custom origin distribution invalidations"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/list-invalidations"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidations for distribution"
+
+  # Test entity state and management
+  - name: "Verify all distributions are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  - name: "Test basic distribution update operation"
+    action: "update"
+    target: "aws-cloudfront-test/test-basic-distribution"
+    expect:
+      exitCode: 0
+
+  - name: "Test custom origin distribution update operation"
+    action: "update"
+    target: "aws-cloudfront-test/test-custom-origin-distribution"
+    expect:
+      exitCode: 0
+
+  # Verify distribution info after updates
+  - name: "Verify basic distribution info after update"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/get-distribution-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "distribution_id"
+        - "domain_name"
+
+  - name: "Verify custom origin distribution info after update"
+    action: "do"
+    target: "aws-cloudfront-test/test-custom-origin-distribution/get-distribution-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "distribution_id"
+        - "domain_name"
+
+  # Test multiple invalidations to verify functionality
+  - name: "Test batch invalidation operations"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/create-invalidation"
+    args:
+      paths: '["/batch1/*", "/batch2/*", "/batch3/*"]'
+      caller_reference: "batch-test-invalidation"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidation created"
+
+  - name: "Final invalidations list check"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/list-invalidations"
+    expect:
+      exitCode: 0
+      contains:
+        - "Invalidations for distribution"
+
+  - name: "Final distribution configuration check"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/get-distribution-config"
+    expect:
+      exitCode: 0
+      contains:
+        - "Distribution Configuration"
+
+  # Test error handling with invalid invalidation
+  - name: "Test invalidation error handling with empty paths"
+    action: "do"
+    target: "aws-cloudfront-test/test-basic-distribution/create-invalidation"
+    args:
+      paths: '[]'
+    expect:
+      exitCode: 1  # Should fail with empty paths
+
+cleanup:
+  - name: "Delete custom origin distribution"
+    action: "delete"
+    target: "aws-cloudfront-test/test-custom-origin-distribution"
+    expect:
+      exitCode: 0
+
+  - name: "Delete basic distribution"
+    action: "delete"
+    target: "aws-cloudfront-test/test-basic-distribution"
+    expect:
+      exitCode: 0

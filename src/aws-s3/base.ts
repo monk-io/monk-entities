@@ -97,6 +97,22 @@ export interface AWSS3Definition {
             bucket_key_enabled?: boolean;
         }>;
     };
+    /**
+     * Static website hosting configuration
+     */
+    website_configuration?: {
+        /** @description Index document for the website (default: index.html) */
+        index_document?: string;
+        /** @description Error document for the website (default: error.html) */
+        error_document?: string;
+    };
+    /**
+     * Bucket policy configuration for public access
+     */
+    bucket_policy?: {
+        /** @description JSON policy document as string, or 'public-read' for standard public read policy */
+        policy: string | "public-read";
+    };
     /** @description Resource tags for the bucket */
     tags?: Record<string, string>;
 }
@@ -360,6 +376,91 @@ export abstract class AWSS3Entity<TDefinition extends AWSS3Definition, TState ex
         if (response.statusCode !== 200) {
             const error = parseS3Error(response);
             throw new Error(`Failed to set bucket tags: ${error}`);
+        }
+        
+        return response;
+    }
+
+    protected setBucketWebsite(bucketName: string, indexDocument: string, errorDocument?: string): any {
+        const url = this.getBucketUrl(bucketName, "?website");
+        
+        const websiteConfig = `<WebsiteConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <IndexDocument>
+                <Suffix>${indexDocument}</Suffix>
+            </IndexDocument>
+            ${errorDocument ? `<ErrorDocument><Key>${errorDocument}</Key></ErrorDocument>` : ''}
+        </WebsiteConfiguration>`;
+        
+        const response = aws.put(url, {
+            service: 's3',
+            region: this.region,
+            headers: {
+                'Content-Type': 'application/xml'
+            },
+            body: websiteConfig
+        });
+
+        if (response.statusCode !== 200) {
+            const error = parseS3Error(response);
+            throw new Error(`Failed to set bucket website configuration: ${error}`);
+        }
+        
+        return response;
+    }
+
+    protected setBucketPolicy(bucketName: string, policy: string | "public-read"): any {
+        const url = this.getBucketUrl(bucketName, "?policy");
+        
+        let policyDocument: string;
+        if (policy === "public-read") {
+            // Standard public read policy
+            policyDocument = JSON.stringify({
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "PublicReadGetObject",
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": `arn:aws:s3:::${bucketName}/*`
+                    }
+                ]
+            });
+        } else {
+            policyDocument = policy;
+        }
+        
+        const response = aws.put(url, {
+            service: 's3',
+            region: this.region,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: policyDocument
+        });
+
+        if (response.statusCode !== 204) {
+            const error = parseS3Error(response);
+            throw new Error(`Failed to set bucket policy: ${error}`);
+        }
+        
+        return response;
+    }
+
+    protected getBucketWebsite(bucketName: string): any {
+        const url = this.getBucketUrl(bucketName, "?website");
+        
+        const response = aws.get(url, {
+            service: 's3',
+            region: this.region
+        });
+
+        if (response.statusCode !== 200) {
+            if (response.statusCode === 404) {
+                return null; // No website configuration
+            }
+            const error = parseS3Error(response);
+            throw new Error(`Failed to get bucket website configuration: ${error}`);
         }
         
         return response;

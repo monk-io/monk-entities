@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - CloudFront Demo</title>
+    <style>
+        :root {
+            --primary-color: #ff9500;
+            --secondary-color: #007aff;
+            --text-color: #333;
+            --light-bg: #f8f9fa;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .error-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+        }
+        
+        .error-code {
+            font-size: 8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 0;
+            line-height: 1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .error-title {
+            font-size: 2.5rem;
+            margin: 1rem 0;
+            font-weight: 600;
+        }
+        
+        .error-description {
+            font-size: 1.2rem;
+            margin: 1.5rem 0;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #e6860f;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background-color: transparent;
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .btn-secondary:hover {
+            background-color: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.5);
+        }
+        
+        .error-details {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: left;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9rem;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .cloudfront-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .cloudfront-info h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0;
+        }
+        
+        .feature-list li {
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 5rem;
+            }
+            
+            .error-title {
+                font-size: 2rem;
+            }
+            
+            .error-description {
+                font-size: 1.1rem;
+            }
+            
+            .error-actions {
+                flex-direction: column;
+            }
+            
+            .error-container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1 class="error-code">404</h1>
+        <h2 class="error-title">Page Not Found</h2>
+        <p class="error-description">
+            The page you're looking for doesn't exist, but you've discovered our CloudFront-powered error page! 
+            This custom error response is cached at edge locations for better performance.
+        </p>
+        
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">
+                🏠 Back to Home
+            </a>
+            <button onclick="history.back()" class="btn btn-secondary">
+                ← Go Back
+            </button>
+        </div>
+        
+        <div class="error-details">
+            <strong>CloudFront Error Details:</strong><br>
+            Request ID: <span id="request-id">CF-REQ-${Math.random().toString(36).substr(2, 9).toUpperCase()}</span><br>
+            Edge Location: <span id="edge-location">IAD89-C1 (Virginia)</span><br>
+            Cache Status: Custom Error Response<br>
+            Timestamp: <span id="timestamp">${new Date().toISOString()}</span>
+        </div>
+        
+        <div class="cloudfront-info">
+            <h3>🚀 This Error Page Demonstrates:</h3>
+            <ul class="feature-list">
+                <li>Custom error responses served from CloudFront edge locations</li>
+                <li>Error page caching for improved performance</li>
+                <li>Consistent user experience even during failures</li>
+                <li>SSL/TLS encryption for all error pages</li>
+                <li>Global error page delivery with low latency</li>
+            </ul>
+            
+            <p style="margin-top: 1.5rem; font-size: 0.9rem; opacity: 0.8;">
+                <strong>Note:</strong> In a production environment, this error page would be 
+                cached at CloudFront edge locations according to the 
+                <code>error_caching_min_ttl</code> setting (300 seconds in this demo).
+            </p>
+        </div>
+        
+        <script>
+            // Update timestamp periodically to show this is a live page
+            setInterval(() => {
+                document.getElementById('timestamp').textContent = new Date().toISOString();
+            }, 1000);
+            
+            // Simulate different edge locations
+            const edgeLocations = [
+                'IAD89-C1 (Virginia)', 'DFW55-C2 (Dallas)', 'LAX3-C1 (Los Angeles)',
+                'LHR5-C1 (London)', 'FRA56-C1 (Frankfurt)', 'NRT57-C1 (Tokyo)'
+            ];
+            
+            setInterval(() => {
+                const randomLocation = edgeLocations[Math.floor(Math.random() * edgeLocations.length)];
+                document.getElementById('edge-location').textContent = randomLocation;
+            }, 10000);
+            
+            // Generate new request ID periodically
+            setInterval(() => {
+                const requestId = 'CF-REQ-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                document.getElementById('request-id').textContent = requestId;
+            }, 30000);
+        </script>
+    </div>
+</body>
+</html>

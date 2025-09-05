@@ -1,6 +1,6 @@
-# AWS S3 Bucket Entity for Monk Orchestrator
+# AWS S3 Entities for Monk Orchestrator
 
-This directory contains a **production-ready** AWS S3 (Simple Storage Service) bucket entity implementation for the Monk orchestrator platform. The entity provides complete lifecycle management for S3 buckets including creation, configuration, deletion, readiness checks, and bucket management operations.
+This directory contains **production-ready** AWS S3 (Simple Storage Service) entities for the Monk orchestrator platform. The entities provide complete lifecycle management for S3 buckets and static file deployments including creation, configuration, deletion, readiness checks, and comprehensive S3 operations.
 
 ## 🎯 Status: Production Ready ✅
 
@@ -36,7 +36,11 @@ The AWS S3 entity follows the established Monk entity pattern with three main co
 
 ## Entity Usage
 
-### Basic S3 Bucket
+### S3 Bucket Entity
+
+The S3 bucket entity (`aws-s3/s3-bucket`) provides comprehensive bucket lifecycle management with advanced configuration options.
+
+#### Basic S3 Bucket
 
 ```yaml
 my-bucket:

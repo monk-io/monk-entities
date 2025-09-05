@@ -78,4 +78,28 @@ my-secure-bucket:
   tags:
     Environment: production
     Security: high
-    Compliance: required 
+    Compliance: required
+
+# S3 bucket for static website hosting
+my-website-hosting-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-static-website-bucket
+  versioning: false
+  public_read_access: true
+  public_write_access: false
+  website_configuration:
+    index_document: index.html
+    error_document: error.html
+  bucket_policy:
+    policy: public-read
+  cors_configuration:
+    cors_rules:
+      - allowed_methods: ["GET", "HEAD"]
+        allowed_origins: ["*"]
+        allowed_headers: ["*"]
+        max_age_seconds: 3600
+  tags:
+    Environment: production
+    Purpose: static-website
+    Owner: frontend-team

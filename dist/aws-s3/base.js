@@ -236,6 +236,76 @@ var AWSS3Entity = class extends import_base.MonkEntity {
     }
     return response;
   }
+  setBucketWebsite(bucketName, indexDocument, errorDocument) {
+    const url = this.getBucketUrl(bucketName, "?website");
+    const websiteConfig = `<WebsiteConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <IndexDocument>
+                <Suffix>${indexDocument}</Suffix>
+            </IndexDocument>
+            ${errorDocument ? `<ErrorDocument><Key>${errorDocument}</Key></ErrorDocument>` : ""}
+        </WebsiteConfiguration>`;
+    const response = import_aws.default.put(url, {
+      service: "s3",
+      region: this.region,
+      headers: {
+        "Content-Type": "application/xml"
+      },
+      body: websiteConfig
+    });
+    if (response.statusCode !== 200) {
+      const error = parseS3Error(response);
+      throw new Error(`Failed to set bucket website configuration: ${error}`);
+    }
+    return response;
+  }
+  setBucketPolicy(bucketName, policy) {
+    const url = this.getBucketUrl(bucketName, "?policy");
+    let policyDocument;
+    if (policy === "public-read") {
+      policyDocument = JSON.stringify({
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": `arn:aws:s3:::${bucketName}/*`
+          }
+        ]
+      });
+    } else {
+      policyDocument = policy;
+    }
+    const response = import_aws.default.put(url, {
+      service: "s3",
+      region: this.region,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: policyDocument
+    });
+    if (response.statusCode !== 204) {
+      const error = parseS3Error(response);
+      throw new Error(`Failed to set bucket policy: ${error}`);
+    }
+    return response;
+  }
+  getBucketWebsite(bucketName) {
+    const url = this.getBucketUrl(bucketName, "?website");
+    const response = import_aws.default.get(url, {
+      service: "s3",
+      region: this.region
+    });
+    if (response.statusCode !== 200) {
+      if (response.statusCode === 404) {
+        return null;
+      }
+      const error = parseS3Error(response);
+      throw new Error(`Failed to get bucket website configuration: ${error}`);
+    }
+    return response;
+  }
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

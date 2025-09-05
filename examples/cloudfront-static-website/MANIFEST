@@ -1,0 +1,3 @@
+REPO cloudfront-static-website
+LOAD cloudfront-static-website.yaml
+BLOBS cloudfront-static-website:src

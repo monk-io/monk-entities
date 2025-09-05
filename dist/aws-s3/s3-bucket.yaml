@@ -3,7 +3,7 @@ s3-bucket:
   defines: entity
   metadata:
     name: S3Bucket
-    version-hash: f2ddf8a4bf22
+    version-hash: 47bda6b50e2a
   schema:
     region:
       type: string
@@ -182,6 +182,30 @@ s3-bucket:
         - rules
       additionalProperties: false
       description: Default server-side encryption configuration
+    website_configuration:
+      type: object
+      properties:
+        index_document:
+          type: string
+          description: 'Index document for the website (default: index.html)'
+        error_document:
+          type: string
+          description: 'Error document for the website (default: error.html)'
+      additionalProperties: false
+    bucket_policy:
+      type: object
+      properties:
+        policy:
+          anyOf:
+            - type: string
+            - type: string
+              const: public-read
+          description: >-
+            JSON policy document as string, or 'public-read' for standard public
+            read policy
+      required:
+        - policy
+      additionalProperties: false
     tags:
       type: object
       additionalProperties:
@@ -213,6 +237,7 @@ s3-bucket:
     generate-presigned-url: ''
     empty-bucket: ''
     get-bucket-statistics: ''
+    get-website-info: ''
   checks:
     readiness:
       period: 5

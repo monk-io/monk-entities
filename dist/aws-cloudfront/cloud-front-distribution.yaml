@@ -1,0 +1,381 @@
+namespace: aws-cloudfront
+cloud-front-distribution:
+  defines: entity
+  metadata:
+    name: CloudFrontDistribution
+    version: 1.0.0
+    version-hash: 7ac9dd5c976b
+  schema:
+    region:
+      type: string
+      description: >-
+        AWS region for CloudFront operations (global service, but required for
+        API calls)
+    caller_reference:
+      type: string
+      description: Caller reference for the distribution (must be unique)
+    comment:
+      type: string
+      description: Comment for the distribution
+    default_root_object:
+      type: string
+      description: 'Default root object (e.g., index.html)'
+    enabled:
+      type: boolean
+      description: Whether the distribution is enabled
+    origins:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            description: Origin ID (unique within distribution)
+          domain_name:
+            type: string
+            description: Domain name for the origin
+          custom_origin_config:
+            type: object
+            properties:
+              http_port:
+                type: number
+                description: HTTP port
+              https_port:
+                type: number
+                description: HTTPS port
+              origin_protocol_policy:
+                type: string
+                enum:
+                  - http-only
+                  - https-only
+                  - match-viewer
+                description: Origin protocol policy
+              origin_ssl_protocols:
+                type: array
+                items:
+                  type: string
+                description: SSL protocols
+              origin_read_timeout:
+                type: number
+                description: Origin read timeout
+              origin_keep_alive_timeout:
+                type: number
+                description: Origin keep alive timeout
+            required:
+              - origin_protocol_policy
+            additionalProperties: false
+            description: Custom origin configuration
+          s3_origin_config:
+            type: object
+            properties:
+              origin_access_identity:
+                type: string
+                description: Origin access identity
+            additionalProperties: false
+            description: S3 origin configuration
+          origin_path:
+            type: string
+            description: Origin path
+          connection_attempts:
+            type: number
+            description: Connection attempts
+          connection_timeout:
+            type: number
+            description: Connection timeout
+        required:
+          - id
+          - domain_name
+        additionalProperties: false
+      description: Origins configuration
+    default_cache_behavior:
+      type: object
+      properties:
+        target_origin_id:
+          type: string
+          description: Target origin ID
+        viewer_protocol_policy:
+          type: string
+          enum:
+            - allow-all
+            - https-only
+            - redirect-to-https
+          description: Viewer protocol policy
+        allowed_methods:
+          type: array
+          items:
+            type: string
+          description: Allowed HTTP methods
+        cached_methods:
+          type: array
+          items:
+            type: string
+          description: Cached HTTP methods
+        forward_cookies:
+          type: string
+          enum:
+            - none
+            - whitelist
+            - all
+          description: Forward cookies
+        cookies_whitelist:
+          type: array
+          items:
+            type: string
+          description: Cookie whitelist
+        forward_headers:
+          type: array
+          items:
+            type: string
+          description: Forward headers
+        forward_query_string:
+          type: boolean
+          description: Forward query strings
+        min_ttl:
+          type: number
+          description: TTL settings
+        default_ttl:
+          type: number
+        max_ttl:
+          type: number
+        compress:
+          type: boolean
+          description: Compress objects automatically
+        trusted_signers:
+          type: array
+          items:
+            type: string
+          description: Trusted signers
+      required:
+        - target_origin_id
+        - viewer_protocol_policy
+      additionalProperties: false
+      description: Default cache behavior
+    cache_behaviors:
+      type: array
+      items:
+        type: object
+        properties:
+          path_pattern:
+            type: string
+            description: Path pattern
+          target_origin_id:
+            type: string
+            description: Target origin ID
+          viewer_protocol_policy:
+            type: string
+            enum:
+              - allow-all
+              - https-only
+              - redirect-to-https
+            description: Viewer protocol policy
+          allowed_methods:
+            type: array
+            items:
+              type: string
+            description: Allowed HTTP methods
+          cached_methods:
+            type: array
+            items:
+              type: string
+            description: Cached HTTP methods
+          forward_cookies:
+            type: string
+            enum:
+              - none
+              - whitelist
+              - all
+            description: Forward cookies
+          cookies_whitelist:
+            type: array
+            items:
+              type: string
+            description: Cookie whitelist
+          forward_headers:
+            type: array
+            items:
+              type: string
+            description: Forward headers
+          forward_query_string:
+            type: boolean
+            description: Forward query strings
+          min_ttl:
+            type: number
+            description: TTL settings
+          default_ttl:
+            type: number
+          max_ttl:
+            type: number
+          compress:
+            type: boolean
+            description: Compress objects automatically
+          trusted_signers:
+            type: array
+            items:
+              type: string
+            description: Trusted signers
+        required:
+          - path_pattern
+          - target_origin_id
+          - viewer_protocol_policy
+        additionalProperties: false
+      description: Additional cache behaviors
+    custom_error_responses:
+      type: array
+      items:
+        type: object
+        properties:
+          error_code:
+            type: number
+            description: HTTP error code
+          response_page_path:
+            type: string
+            description: Custom error page path
+          response_code:
+            type: number
+            description: Custom response code
+          error_caching_min_ttl:
+            type: number
+            description: Cache TTL for error pages
+        required:
+          - error_code
+        additionalProperties: false
+      description: Custom error pages
+    price_class:
+      type: string
+      enum:
+        - PriceClass_All
+        - PriceClass_100
+        - PriceClass_200
+      description: Price class
+    aliases:
+      type: array
+      items:
+        type: string
+      description: Aliases (CNAMEs)
+    viewer_certificate:
+      type: object
+      properties:
+        cloudfront_default_certificate:
+          type: boolean
+          description: Use CloudFront default certificate
+        acm_certificate_arn:
+          type: string
+          description: ACM certificate ARN
+        iam_certificate_id:
+          type: string
+          description: IAM certificate ID
+        ssl_support_method:
+          type: string
+          enum:
+            - sni-only
+            - vip
+          description: SSL support method
+        minimum_protocol_version:
+          type: string
+          enum:
+            - SSLv3
+            - TLSv1
+            - TLSv1_2016
+            - TLSv1.1_2016
+            - TLSv1.2_2018
+            - TLSv1.2_2019
+            - TLSv1.2_2021
+          description: Minimum protocol version
+        certificate_source:
+          type: string
+          enum:
+            - cloudfront
+            - acm
+            - iam
+          description: Certificate source
+      additionalProperties: false
+      description: Viewer certificate configuration
+    web_acl_id:
+      type: string
+      description: Web ACL ID
+    http_version:
+      type: string
+      enum:
+        - http1.1
+        - http2
+      description: HTTP version
+    is_ipv6_enabled:
+      type: boolean
+      description: IPv6 enabled
+    logging:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Enable logging
+        bucket:
+          type: string
+          description: S3 bucket for logs
+        prefix:
+          type: string
+          description: Log prefix
+        include_cookies:
+          type: boolean
+          description: Include cookies in logs
+      required:
+        - enabled
+      additionalProperties: false
+      description: Logging configuration
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the distribution pre-existed before this entity managed it
+    distribution_id:
+      type: string
+      description: CloudFront distribution ID
+    distribution_arn:
+      type: string
+      description: Distribution ARN
+    distribution_status:
+      type: string
+      description: Current distribution status
+    domain_name:
+      type: string
+      description: Distribution domain name
+    etag:
+      type: string
+      description: Distribution ETag (required for updates/deletes)
+    last_modified_time:
+      type: string
+      description: Last modified timestamp
+    creation_time:
+      type: string
+      description: Distribution creation timestamp
+    in_progress_invalidation_batches:
+      type: number
+      description: In progress invalidation ID (if any)
+    distribution_config_enabled:
+      type: boolean
+      description: Whether the distribution is enabled (extracted from DistributionConfig)
+    required:
+      - existing
+  lifecycle:
+    sync: <<< cloud-front-distribution-sync.js
+    get-distribution-info: ''
+    get-distribution-config: ''
+    create-invalidation: ''
+    list-invalidations: ''
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 30
+      attempts: 40
+  requires:
+    - aws-cloudfront/base
+    - monkec/base
+    - cli
+    - cloud/aws
+    - aws-cloudfront/common
