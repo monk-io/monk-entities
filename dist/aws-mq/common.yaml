@@ -1,0 +1,7 @@
+namespace: aws-mq
+
+common:
+  defines: module
+  metadata:
+    version-hash: dfb522bfc36b
+  source: <<< common.js

@@ -1,0 +1,152 @@
+name: "AWS MQ Entity Integration Test"
+description: "Complete integration test for AWS MQ entity including broker creation, custom actions, lifecycle management, and cleanup"
+timeout: 1800000  # 30 minutes for MQ broker deployment
+
+# Required secrets for MQ broker users
+secrets:
+  global:
+    test-mq-admin-password: "TestAdminPassword123!"  # 16+ characters required by AWS
+    test-mq-user-password: "TestUserPassword456!"    # 16+ characters required by AWS
+
+setup:
+  - name: "Load AWS MQ entity manifest"
+    action: "load"
+    target: "dist/input/aws-mq/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Test basic broker lifecycle
+  - name: "Create ActiveMQ broker"
+    action: "run"
+    target: "aws-mq-test/test-activemq-broker"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for broker readiness"
+    action: "wait"
+    target: "aws-mq-test/test-activemq-broker"
+    waitFor:
+      condition: "ready"
+      timeout: 900000  # 15 minutes for MQ broker deployment
+
+  - name: "Verify broker creation"
+    action: "describe"
+    target: "aws-mq-test/test-activemq-broker"
+    expect:
+      exitCode: 0
+
+  # Test custom actions
+  - name: "Test get-broker-info action"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/get-broker-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "=== MQ Broker Information ==="
+        - "Broker ID:"
+        - "Broker Name:"
+        - "State: RUNNING"
+        - "Engine: ActiveMQ"
+        - "Instance Type:"
+        - "Deployment Mode:"
+
+  - name: "Test get-connection-info action"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/get-connection-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "=== MQ Connection Information ==="
+        - "Broker Name:"
+        - "Engine Type:"
+        - "Connection Endpoints:"
+        - "Web Console:"
+
+  - name: "Test reboot-broker action"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/reboot-broker"
+    expect:
+      exitCode: 0
+      contains:
+        - "Broker reboot initiated successfully"
+        - "Broker ID:"
+
+  # Wait for broker to stabilize after reboot
+  - name: "Wait for broker stabilization after reboot"
+    action: "wait"
+    target: "aws-mq-test/test-activemq-broker"
+    waitFor:
+      condition: "ready"
+      timeout: 900000  # 15 minutes for reboot (AWS MQ reboots can take time)
+
+  # Verify broker is still functional after reboot (may be in REBOOT_IN_PROGRESS or RUNNING)
+  - name: "Verify broker info after reboot"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/get-broker-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Broker ID:"
+        # Note: State may be REBOOT_IN_PROGRESS or RUNNING depending on timing
+
+  # Test entity lifecycle operations
+  - name: "Test broker update operation"
+    action: "update"
+    target: "aws-mq-test/test-activemq-broker"
+    expect:
+      exitCode: 0
+
+
+  # Final verification
+  - name: "Final broker status check"
+    action: "describe"
+    target: "aws-mq-test/test-activemq-broker"
+    expect:
+      exitCode: 0
+
+  - name: "Final broker info verification"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/get-broker-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Broker ID:"
+        - "=== MQ Broker Information ==="
+        # Note: State may be RUNNING or REBOOT_IN_PROGRESS depending on timing
+
+  - name: "Final connection info verification"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/get-connection-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "=== MQ Connection Information ==="
+        - "ssl://"
+        - "amqp+ssl://"
+
+  # Test entity state management
+  - name: "Verify all entities are running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  # Test error handling
+  - name: "Test invalid action handling"
+    action: "do"
+    target: "aws-mq-test/test-activemq-broker/invalid-action"
+    expect:
+      exitCode: 1  # Should fail with invalid action
+
+cleanup:
+  - name: "Delete ActiveMQ broker"
+    action: "delete"
+    target: "aws-mq-test/test-activemq-broker"
+    expect:
+      exitCode: 0

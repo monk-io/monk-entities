@@ -1,0 +1,7 @@
+namespace: aws-mq
+
+base:
+  defines: module
+  metadata:
+    version-hash: dfb522bfc36b
+  source: <<< base.js

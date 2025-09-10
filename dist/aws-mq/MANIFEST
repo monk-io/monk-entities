@@ -1,0 +1,4 @@
+REPO aws-mq
+VERSION_HASH dfb522bfc36b
+LOAD base.yaml mq-broker.yaml common.yaml
+RESOURCES common.js mq-broker-sync.js base.js

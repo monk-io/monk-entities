@@ -1,0 +1,37 @@
+namespace: aws-mq-test
+
+# Test stack for AWS MQ entities
+aws-mq-test-stack:
+  defines: process-group
+  runnable-list:
+    - test-activemq-broker
+
+# Basic ActiveMQ test broker
+test-activemq-broker:
+  defines: aws-mq/mq-broker
+  region: us-east-1
+  broker_name: test-activemq-basic
+  engine_type: ACTIVEMQ
+  engine_version: "5.18"
+  host_instance_type: mq.t3.micro
+  deployment_mode: SINGLE_INSTANCE
+  publicly_accessible: true
+  auto_minor_version_upgrade: true
+  enable_general_logging: false
+  enable_audit_logging: false
+  users:
+    - username: testadmin
+      password_secret_ref: test-mq-admin-password
+      console_access: true
+      groups: ["admin"]
+    - username: testuser
+      password_secret_ref: test-mq-user-password
+      console_access: false
+      groups: ["users"]
+  tags:
+    Environment: test
+    Purpose: integration-testing
+    CreatedBy: monk-entity-test
+  permitted-secrets:
+    test-mq-admin-password: true
+    test-mq-user-password: true 

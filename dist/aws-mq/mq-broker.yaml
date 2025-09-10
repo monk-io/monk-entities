@@ -1,0 +1,193 @@
+namespace: aws-mq
+mq-broker:
+  defines: entity
+  metadata:
+    name: MQBroker
+    version-hash: dfb522bfc36b
+  schema:
+    region:
+      type: string
+      description: AWS region for the MQ broker
+    broker_name:
+      type: string
+      description: 'Broker name (1-50 chars, alphanumeric and hyphens only)'
+    engine_type:
+      type: string
+      enum:
+        - ACTIVEMQ
+        - RABBITMQ
+      description: The type of broker engine (ACTIVEMQ or RABBITMQ)
+    engine_version:
+      type: string
+      description: Engine version to use
+    host_instance_type:
+      type: string
+      description: 'The broker''s instance type (e.g., mq.t3.micro)'
+    deployment_mode:
+      type: string
+      enum:
+        - SINGLE_INSTANCE
+        - ACTIVE_STANDBY_MULTI_AZ
+        - CLUSTER_MULTI_AZ
+      description: >-
+        Deployment mode (SINGLE_INSTANCE, ACTIVE_STANDBY_MULTI_AZ,
+        CLUSTER_MULTI_AZ)
+    publicly_accessible:
+      type: boolean
+      description: Whether the broker should be publicly accessible
+    subnet_ids:
+      type: array
+      items:
+        type: string
+      description: List of subnet IDs for the broker
+    security_groups:
+      type: array
+      items:
+        type: string
+      description: List of security group IDs
+    auto_minor_version_upgrade:
+      type: boolean
+      description: Enable automatic minor version upgrades
+    maintenance_window_start_time:
+      type: string
+      description: 'Maintenance window for updates (ddd:hh24:mi-ddd:hh24:mi)'
+    storage_type:
+      type: string
+      enum:
+        - EBS
+        - EFS
+      description: Storage type for brokers that support it
+    enable_general_logging:
+      type: boolean
+      description: Whether to enable general logging
+    enable_audit_logging:
+      type: boolean
+      description: Whether to enable audit logging
+    users:
+      type: array
+      items:
+        type: object
+        properties:
+          username:
+            type: string
+          password_secret_ref:
+            type: string
+          console_access:
+            type: boolean
+          groups:
+            type: array
+            items:
+              type: string
+        required:
+          - username
+        additionalProperties: false
+      description: List of broker users
+    ldap_authentication:
+      type: object
+      properties:
+        host:
+          type: string
+        port:
+          type: number
+        user_base:
+          type: string
+        role_base:
+          type: string
+        service_account_username:
+          type: string
+        service_account_password_secret_ref:
+          type: string
+      required:
+        - host
+        - user_base
+      additionalProperties: false
+      description: LDAP authentication configuration
+    configuration:
+      type: object
+      properties:
+        id:
+          type: string
+        revision:
+          type: number
+        data:
+          type: string
+      additionalProperties: false
+      description: Configuration for the broker
+    encryption_options:
+      type: object
+      properties:
+        use_aws_owned_key:
+          type: boolean
+        kms_key_id:
+          type: string
+      additionalProperties: false
+      description: Encryption options
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+      - broker_name
+      - engine_type
+      - host_instance_type
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the broker pre-existed before this entity managed it
+    broker_id:
+      type: string
+      description: Broker ID assigned by AWS
+    broker_arn:
+      type: string
+      description: Broker ARN
+    broker_state:
+      type: string
+      description: >-
+        Current broker state (CREATION_IN_PROGRESS, RUNNING,
+        DELETION_IN_PROGRESS, etc.)
+    created:
+      type: string
+      description: Creation timestamp
+    last_modified:
+      type: string
+      description: Last modified timestamp
+    endpoints:
+      type: array
+      items:
+        type: object
+        properties:
+          protocol:
+            type: string
+          endpoint:
+            type: string
+          port:
+            type: number
+        required:
+          - protocol
+          - endpoint
+          - port
+        additionalProperties: false
+      description: Broker endpoints for connections
+    web_console_url:
+      type: string
+      description: Web console URL
+    required:
+      - existing
+  lifecycle:
+    sync: <<< mq-broker-sync.js
+    get-broker-info: ''
+    get-connection-info: ''
+    reboot-broker: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 15
+      attempts: 80
+  requires:
+    - aws-mq/base
+    - monkec/base
+    - cli
+    - aws-mq/common
