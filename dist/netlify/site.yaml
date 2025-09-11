@@ -3,7 +3,7 @@ site:
   defines: entity
   metadata:
     name: Site
-    version-hash: c5366b9218cb
+    version-hash: 7f6f1883a79e
   schema:
     secret_ref:
       type: string
@@ -22,6 +22,11 @@ site:
     custom_domain:
       type: string
       description: Custom domain for the site
+    domain_aliases:
+      type: array
+      items:
+        type: string
+      description: Additional custom domains that should resolve to this site
     password:
       type: string
       description: Password to protect the site
@@ -46,9 +51,17 @@ site:
     admin_url:
       type: string
       description: The admin URL for managing the site
+    default_domain:
+      type: string
+      description: 'The default Netlify-hosted domain (e.g., example-site.netlify.app)'
     custom_domain:
       type: string
       description: Custom domain configured for the site
+    domain_aliases:
+      type: array
+      items:
+        type: string
+      description: Additional custom domains configured for the site
     state:
       type: string
       description: Current state of the site

@@ -28,6 +28,12 @@ export interface SiteDefinition extends NetlifyEntityDefinition {
     custom_domain?: string;
 
     /**
+     * Domain aliases (optional)
+     * @description Additional custom domains that should resolve to this site
+     */
+    domain_aliases?: string[];
+
+    /**
      * Password protection (optional)
      * @description Password to protect the site
      */
@@ -71,10 +77,22 @@ export interface SiteState extends NetlifyEntityState {
     admin_url?: string;
 
     /**
+     * Default Netlify domain
+     * @description The default Netlify-hosted domain (e.g., example-site.netlify.app)
+     */
+    default_domain?: string;
+
+    /**
      * Custom domain
      * @description Custom domain configured for the site
      */
     custom_domain?: string;
+
+    /**
+     * Domain aliases
+     * @description Additional custom domains configured for the site
+     */
+    domain_aliases?: string[];
 
     /**
      * Site state
@@ -130,6 +148,7 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
                 url: existingSite.ssl_url || existingSite.url,
                 admin_url: existingSite.admin_url,
                 custom_domain: existingSite.custom_domain,
+                default_domain: existingSite.default_domain || existingSite.name + ".netlify.app",
                 state: existingSite.state,
                 created_at: existingSite.created_at,
                 updated_at: existingSite.updated_at,
@@ -145,6 +164,19 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
             name: this.definition.name,
             created_via: "monk.io"
         };
+
+        if (this.definition.custom_domain) {
+            body.custom_domain = this.definition.custom_domain;
+        }
+        if (this.definition.password) {
+            body.password = this.definition.password;
+        }
+        if (this.definition.force_ssl !== undefined) {
+            body.force_ssl = this.definition.force_ssl;
+        }
+        if (Array.isArray(this.definition.domain_aliases) && this.definition.domain_aliases.length > 0) {
+            body.domain_aliases = this.definition.domain_aliases;
+        }
 
         // Create the site
         let createObj;
@@ -178,6 +210,7 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
                                 url: site.ssl_url || site.url,
                                 admin_url: site.admin_url,
                                 custom_domain: site.custom_domain,
+                                default_domain: site.default_domain || site.name + ".netlify.app",
                                 state: site.state,
                                 created_at: site.created_at,
                                 updated_at: site.updated_at,
@@ -203,6 +236,8 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
             url: createObj.ssl_url || createObj.url,
             admin_url: createObj.admin_url,
             custom_domain: createObj.custom_domain,
+            default_domain: createObj.default_domain || createObj.name + ".netlify.app",
+            domain_aliases: createObj.domain_aliases,
             state: createObj.state,
             created_at: createObj.created_at,
             updated_at: createObj.updated_at,
@@ -210,6 +245,41 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
         };
         
         cli.output(`✅ Created Netlify site: ${createObj.name} (${createObj.ssl_url})`);
+
+        // Per Netlify guidance, most settings (including custom_domain) cannot be reliably set on create.
+        // Follow-up with an update call to apply custom domain and aliases if provided.
+        try {
+            const needsFollowUpUpdate = Boolean(
+                this.definition.custom_domain ||
+                (Array.isArray(this.definition.domain_aliases) && this.definition.domain_aliases.length > 0) ||
+                this.definition.force_ssl !== undefined ||
+                this.definition.password
+            );
+            if (needsFollowUpUpdate) {
+                const urlPrefix2 = this.definition.team_slug ? `/${this.definition.team_slug}` : "";
+                const updateBody: any = { name: this.definition.name };
+                if (this.definition.custom_domain) updateBody.custom_domain = this.definition.custom_domain;
+                if (Array.isArray(this.definition.domain_aliases) && this.definition.domain_aliases.length > 0) {
+                    updateBody.domain_aliases = this.definition.domain_aliases;
+                }
+                if (this.definition.force_ssl !== undefined) updateBody.force_ssl = this.definition.force_ssl;
+                if (this.definition.password) updateBody.password = this.definition.password;
+
+                const updatedSite = this.makeRequest("PUT", `${urlPrefix2}/sites/${this.state.id}`, updateBody);
+                this.state = {
+                    ...this.state,
+                    name: updatedSite.name,
+                    url: updatedSite.ssl_url || updatedSite.url,
+                    custom_domain: updatedSite.custom_domain,
+                    default_domain: updatedSite.default_domain || updatedSite.name + ".netlify.app",
+                    domain_aliases: updatedSite.domain_aliases,
+                    updated_at: updatedSite.updated_at
+                };
+                cli.output(`🔄 Applied post-create site settings (custom domain/aliases)`);
+            }
+        } catch (error) {
+            cli.output(`⚠️  Post-create update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     override update(): void {
@@ -231,6 +301,9 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
         if (this.definition.custom_domain) {
             body.custom_domain = this.definition.custom_domain;
         }
+        if (Array.isArray(this.definition.domain_aliases) && this.definition.domain_aliases.length > 0) {
+            body.domain_aliases = this.definition.domain_aliases;
+        }
         
         if (this.definition.password) {
             body.password = this.definition.password;
@@ -248,6 +321,8 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
             name: updatedSite.name,
             url: updatedSite.ssl_url || updatedSite.url,
             custom_domain: updatedSite.custom_domain,
+            default_domain: updatedSite.default_domain || updatedSite.name + ".netlify.app",
+            domain_aliases: updatedSite.domain_aliases,
             updated_at: updatedSite.updated_at
         };
 
