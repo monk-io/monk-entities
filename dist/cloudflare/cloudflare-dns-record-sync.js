@@ -79,7 +79,7 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
       type: this.definition.record_type,
       name: this.definition.name
     };
-    if (this.definition.content !== void 0) payload.content = this.definition.content;
+    if (this.definition.content != null && this.definition.content !== "") payload.content = this.definition.content;
     if (typeof this.definition.ttl === "number") payload.ttl = this.definition.ttl;
     if (typeof this.definition.proxied === "boolean") payload.proxied = this.definition.proxied;
     if (typeof this.definition.priority === "number") payload.priority = this.definition.priority;
@@ -110,7 +110,7 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
       type: this.definition.record_type,
       name: this.definition.name
     };
-    if (this.definition.content !== void 0) payload.content = this.definition.content;
+    if (this.definition.content != null && this.definition.content !== "") payload.content = this.definition.content;
     if (typeof this.definition.ttl === "number") payload.ttl = this.definition.ttl;
     if (typeof this.definition.proxied === "boolean") payload.proxied = this.definition.proxied;
     if (typeof this.definition.priority === "number") payload.priority = this.definition.priority;

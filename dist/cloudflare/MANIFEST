@@ -1,4 +1,4 @@
 REPO cloudflare
-VERSION_HASH 1f3d61bb7e51
-LOAD cloudflare-base.yaml cloudflare-dns-record.yaml cloudflare-dns-zone.yaml
+VERSION_HASH 63b0b29ea312
+LOAD cloudflare-dns-record.yaml cloudflare-base.yaml cloudflare-dns-zone.yaml
 RESOURCES cloudflare-base.js cloudflare-dns-record-sync.js cloudflare-dns-zone-sync.js
