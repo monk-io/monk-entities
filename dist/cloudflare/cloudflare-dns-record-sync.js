@@ -72,6 +72,7 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
       this.state.record_id = existing.id;
       this.state.zone_id = zoneId;
       this.state.existing = true;
+      this.state.applied_zone_name = this.definition.zone_name;
       return;
     }
     const payload = {
@@ -89,24 +90,22 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
       this.state.record_id = createdId;
       this.state.zone_id = zoneId;
       this.state.existing = false;
+      this.state.applied_zone_name = this.definition.zone_name;
     } else {
       const newRec = this.findRecord(zoneId, this.definition.record_type, this.definition.name);
       if (newRec) {
         this.state.record_id = newRec.id;
         this.state.zone_id = zoneId;
         this.state.existing = false;
+        this.state.applied_zone_name = this.definition.zone_name;
       }
     }
     return;
   }
   update() {
-    const zoneId = this.resolveZoneId();
-    if (!zoneId) return;
-    if (!this.state.record_id) {
-      const existing = this.findRecord(zoneId, this.definition.record_type, this.definition.name);
-      if (!existing) return void this.create();
-      this.state.record_id = existing.id;
-    }
+    const currentZoneId = this.state.zone_id;
+    const desiredZoneId = this.definition.zone_id ?? (this.definition.zone_name ? this.findZoneByName(this.definition.zone_name)?.id : currentZoneId);
+    if (!desiredZoneId) return;
     const payload = {
       type: this.definition.record_type,
       name: this.definition.name
@@ -116,7 +115,69 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
     if (typeof this.definition.proxied === "boolean") payload.proxied = this.definition.proxied;
     if (typeof this.definition.priority === "number") payload.priority = this.definition.priority;
     if (this.definition.data) payload.data = this.definition.data;
-    this.request("PUT", `/zones/${zoneId}/dns_records/${this.state.record_id}`, payload);
+    const nameChanged = this.definition.zone_name !== void 0 && this.state.applied_zone_name !== void 0 && this.definition.zone_name !== this.state.applied_zone_name;
+    const idChanged = Boolean(currentZoneId && currentZoneId !== desiredZoneId);
+    if (nameChanged || idChanged) {
+      const old = { zone: currentZoneId, id: this.state.record_id, owned: this.state.existing === false };
+      const existing = this.findRecord(desiredZoneId, this.definition.record_type, this.definition.name);
+      if (existing) {
+        this.state.record_id = existing.id;
+        this.state.zone_id = desiredZoneId;
+        this.state.existing = true;
+      } else {
+        const created = this.request("POST", `/zones/${desiredZoneId}/dns_records`, payload);
+        const newId = created?.result?.id;
+        if (newId) {
+          this.state.record_id = newId;
+          this.state.zone_id = desiredZoneId;
+          this.state.existing = false;
+        } else {
+          const newRec = this.findRecord(desiredZoneId, this.definition.record_type, this.definition.name);
+          if (newRec) {
+            this.state.record_id = newRec.id;
+            this.state.zone_id = desiredZoneId;
+            this.state.existing = true;
+          }
+        }
+      }
+      if (old.zone && old.id && old.owned) {
+        this.request("DELETE", `/zones/${old.zone}/dns_records/${old.id}`);
+      }
+      if (this.definition.zone_name !== void 0) {
+        this.state.applied_zone_name = this.definition.zone_name;
+      }
+      return;
+    }
+    if (!this.state.record_id) {
+      const existing = this.findRecord(desiredZoneId, this.definition.record_type, this.definition.name);
+      if (!existing) {
+        const created = this.request("POST", `/zones/${desiredZoneId}/dns_records`, payload);
+        const newId = created?.result?.id;
+        if (newId) {
+          this.state.record_id = newId;
+          this.state.zone_id = desiredZoneId;
+          this.state.existing = false;
+          if (this.definition.zone_name !== void 0) this.state.applied_zone_name = this.definition.zone_name;
+        } else {
+          const newRec = this.findRecord(desiredZoneId, this.definition.record_type, this.definition.name);
+          if (newRec) {
+            this.state.record_id = newRec.id;
+            this.state.zone_id = desiredZoneId;
+            this.state.existing = true;
+            if (this.definition.zone_name !== void 0) this.state.applied_zone_name = this.definition.zone_name;
+          }
+        }
+        return;
+      }
+      this.state.record_id = existing.id;
+      this.state.zone_id = desiredZoneId;
+      this.state.existing = true;
+    }
+    this.request("PUT", `/zones/${desiredZoneId}/dns_records/${this.state.record_id}`, payload);
+    this.state.zone_id = desiredZoneId;
+    if (this.definition.zone_name !== void 0) {
+      this.state.applied_zone_name = this.definition.zone_name;
+    }
   }
   delete() {
     if (!this.state.zone_id || !this.state.record_id) {

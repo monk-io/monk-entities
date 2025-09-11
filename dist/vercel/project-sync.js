@@ -177,6 +177,7 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       existing: false
     };
     cli.output(`\u2705 Created Vercel project: ${createObj.name}`);
+    this.syncDomains();
   }
   update() {
     if (!this.state.id) {
@@ -187,6 +188,7 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       ...this.getTeamBody()
     };
     let hasChanges = false;
+    const shouldSyncDomains = Array.isArray(this.definition.domains) && this.definition.domains.length > 0;
     if (this.definition.name !== this.state.name) {
       body.name = this.definition.name;
       hasChanges = true;
@@ -216,7 +218,11 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       hasChanges = true;
     }
     if (!hasChanges) {
-      cli.output(`\u2139\uFE0F  No changes detected for project: ${this.definition.name}`);
+      if (shouldSyncDomains) {
+        this.syncDomains();
+      } else {
+        cli.output(`\u2139\uFE0F  No changes detected for project: ${this.definition.name}`);
+      }
       return;
     }
     const updatedProject = this.makeRequest("PATCH", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}`, body);
@@ -236,6 +242,9 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       root_directory: updatedProject.rootDirectory
     };
     cli.output(`\u2705 Updated Vercel project: ${updatedProject.name}`);
+    if (shouldSyncDomains) {
+      this.syncDomains();
+    }
   }
   delete() {
     if (!this.state.id) {
@@ -269,6 +278,29 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       cli.output(`\u26A0\uFE0F  Could not check for existing projects: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
     return null;
+  }
+  /**
+   * Ensure desired domains from definition are associated with the project
+   * Adds missing domains; does not remove existing ones
+   */
+  syncDomains() {
+    if (!this.state.id) return;
+    const desired = Array.isArray(this.definition.domains) ? Array.from(new Set(this.definition.domains.filter((d) => typeof d === "string" && d.trim().length > 0))) : [];
+    if (desired.length === 0) return;
+    try {
+      const teamPath = this.getTeamPath();
+      const existing = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains${teamPath}`);
+      const existingNames = Array.isArray(existing) ? existing.map((d) => typeof d === "string" ? d : d?.name).filter((n) => typeof n === "string") : [];
+      const toAdd = desired.filter((d) => !existingNames.includes(d));
+      for (const domain of toAdd) {
+        const body = { name: domain, ...this.getTeamBody() };
+        this.makeRequest("POST", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains`, body);
+        cli.output(`\u{1F310} Added domain: ${domain}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      cli.output(`\u26A0\uFE0F  Failed to sync domains: ${msg}`);
+    }
   }
   getProject() {
     if (!this.state.id) {

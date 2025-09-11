@@ -3,7 +3,7 @@ cloudflare-dns-record:
   defines: entity
   metadata:
     name: CloudflareDNSRecord
-    version-hash: e0206fa9d712
+    version-hash: 1f3d61bb7e51
   schema:
     secret_ref:
       type: string
@@ -47,6 +47,9 @@ cloudflare-dns-record:
     zone_id:
       type: string
       description: Zone id resolved for this record
+    applied_zone_name:
+      type: string
+      description: Zone name applied on last successful operation (for change detection)
   lifecycle:
     sync: <<< cloudflare-dns-record-sync.js
     get-info: ''

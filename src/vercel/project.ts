@@ -67,6 +67,12 @@ export interface ProjectDefinition extends VercelEntityDefinition {
      * @description Environment variables for the project
      */
     env?: Record<string, string>;
+
+    /**
+     * Project domains (optional)
+     * @description List of custom domains to associate with the project
+     */
+    domains?: string[];
 }
 
 /**
@@ -314,6 +320,9 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         };
 
         cli.output(`✅ Created Vercel project: ${createObj.name}`);
+
+        // Sync custom domains after project creation
+        this.syncDomains();
     }
 
     override update(): void {
@@ -327,6 +336,7 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         };
 
         let hasChanges = false;
+        const shouldSyncDomains = Array.isArray(this.definition.domains) && this.definition.domains.length > 0;
 
         // Only include name if it's different from current state
         if (this.definition.name !== this.state.name) {
@@ -367,7 +377,12 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
 
         // Skip update if nothing has changed
         if (!hasChanges) {
-            cli.output(`ℹ️  No changes detected for project: ${this.definition.name}`);
+            // Even if no project field changes, we may still need to sync domains
+            if (shouldSyncDomains) {
+                this.syncDomains();
+            } else {
+                cli.output(`ℹ️  No changes detected for project: ${this.definition.name}`);
+            }
             return;
         }
 
@@ -391,6 +406,11 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         };
 
         cli.output(`✅ Updated Vercel project: ${updatedProject.name}`);
+
+        // Sync custom domains after project update
+        if (shouldSyncDomains) {
+            this.syncDomains();
+        }
     }
 
     override delete(): void {
@@ -433,6 +453,36 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
 
         return null;
+    }
+
+    /**
+     * Ensure desired domains from definition are associated with the project
+     * Adds missing domains; does not remove existing ones
+     */
+    private syncDomains(): void {
+        if (!this.state.id) return;
+        const desired = Array.isArray(this.definition.domains)
+            ? Array.from(new Set(this.definition.domains.filter((d) => typeof d === "string" && d.trim().length > 0)))
+            : [];
+        if (desired.length === 0) return;
+
+        try {
+            const teamPath = this.getTeamPath();
+            const existing = this.makeRequest("GET", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains${teamPath}`);
+            const existingNames: string[] = Array.isArray(existing)
+                ? existing.map((d: any) => (typeof d === "string" ? d : d?.name)).filter((n: any) => typeof n === "string")
+                : [];
+
+            const toAdd = desired.filter((d) => !existingNames.includes(d));
+            for (const domain of toAdd) {
+                const body = { name: domain, ...this.getTeamBody() };
+                this.makeRequest("POST", `${VERCEL_API_ENDPOINTS.PROJECTS}/${this.state.id}/domains`, body);
+                cli.output(`🌐 Added domain: ${domain}`);
+            }
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            cli.output(`⚠️  Failed to sync domains: ${msg}`);
+        }
     }
 
     // Custom actions using @action decorator

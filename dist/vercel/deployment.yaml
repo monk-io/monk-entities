@@ -3,7 +3,7 @@ deployment:
   defines: entity
   metadata:
     name: Deployment
-    version-hash: e52ddaa6cf33
+    version-hash: 3ace1cd1ed88
   schema:
     secret_ref:
       type: string

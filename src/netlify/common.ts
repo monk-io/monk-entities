@@ -24,6 +24,7 @@ export interface NetlifySite {
     ssl_url: string;
     admin_url: string;
     custom_domain?: string;
+    domain_aliases?: string[];
     state: string;
     created_at: string;
     updated_at: string;
