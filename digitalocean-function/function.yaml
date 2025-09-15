@@ -1,0 +1,51 @@
+namespace: do-function
+
+deploy:
+  defines: runnable
+  permitted-secrets:
+    default-do-api-token: true
+  containers:
+    deploy:
+      image: docker.io/imanachyn/do-function-build
+      image-tag: latest
+      restart: no
+      bash: /app/deploy.sh
+      # paths:
+      #   - <- `blobs://example:/functions`
+  variables:
+    function-name:
+      env: FUNCTION_NAME
+      type: string
+      value: hello-world
+    namespace-name:
+      env: NAMESPACE_NAME
+      type: string
+      value: default
+    region:
+      env: REGION
+      type: string
+      value: nyc1 # one of nyc1, nyc3, sfo3, ams3, sgp1, lon1, fra1, tor1, blr1
+    runtime:
+      env: RUNTIME
+      type: string
+      value: python:3.9 # one of python:3.9, python:3.8, go:default, nodejs:default, php:8.0
+    memory:
+      env: MEMORY
+      type: string
+      value: "128" # Memory limit in MB
+    timeout:
+      env: TIMEOUT
+      type: string
+      value: "30" # Timeout in seconds
+    api-token:
+      env: DO_API_TOKEN
+      type: string
+      value: <- secret("default-do-api-token")
+    environment-vars:
+      env: ENVIRONMENT_VARS
+      type: string
+      value: <- `{}` # JSON string of environment variables
+    post-deploy:
+      env: POST_DEPLOY
+      type: string
+      value: <- `echo "Post-deploy script completed"`
