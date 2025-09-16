@@ -27,8 +27,11 @@ __export(common_exports, {
   RATE_LIMIT: () => RATE_LIMIT,
   VALIDATION_PATTERNS: () => VALIDATION_PATTERNS,
   generateTimeRange: () => generateTimeRange,
+  validateAlertPolicyType: () => validateAlertPolicyType,
+  validateComparator: () => validateComparator,
   validateComparisonOperator: () => validateComparisonOperator,
   validateEmail: () => validateEmail,
+  validateEmails: () => validateEmails,
   validateMetricType: () => validateMetricType,
   validateSlackUrl: () => validateSlackUrl,
   validateWindow: () => validateWindow
@@ -36,21 +39,64 @@ __export(common_exports, {
 module.exports = __toCommonJS(common_exports);
 function validateMetricType(type) {
   const validTypes = [
+    // === DROPLET METRICS ===
+    // CPU and Load
     "v1/insights/droplet/cpu",
     "v1/insights/droplet/load_1",
     "v1/insights/droplet/load_5",
     "v1/insights/droplet/load_15",
+    // Memory
     "v1/insights/droplet/memory_utilization_percent",
+    "v1/insights/droplet/memory_available",
+    "v1/insights/droplet/memory_cached",
+    "v1/insights/droplet/memory_free",
+    "v1/insights/droplet/memory_total",
+    // Disk
     "v1/insights/droplet/disk_utilization_percent",
     "v1/insights/droplet/disk_read",
     "v1/insights/droplet/disk_write",
+    // Filesystem
+    "v1/insights/droplet/filesystem_free",
+    "v1/insights/droplet/filesystem_size",
+    // Network Bandwidth
     "v1/insights/droplet/public_outbound_bandwidth",
     "v1/insights/droplet/public_inbound_bandwidth",
     "v1/insights/droplet/private_outbound_bandwidth",
-    "v1/insights/droplet/private_inbound_bandwidth"
+    "v1/insights/droplet/private_inbound_bandwidth",
+    // Network Packets
+    "v1/insights/droplet/network_outbound_packets",
+    "v1/insights/droplet/network_inbound_packets",
+    "v1/insights/droplet/network_outbound_errors",
+    "v1/insights/droplet/network_inbound_errors",
+    // === LOAD BALANCER METRICS ===
+    "v1/insights/lbaas/avg_cpu_utilization_percent",
+    "v1/insights/lbaas/connection_utilization_percent",
+    "v1/insights/lbaas/droplet_health",
+    "v1/insights/lbaas/tls_connections_per_second_utilization_percent",
+    "v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx",
+    "v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx",
+    "v1/insights/lbaas/increase_in_http_error_rate_count_5xx",
+    "v1/insights/lbaas/increase_in_http_error_rate_count_4xx",
+    "v1/insights/lbaas/high_http_request_response_time",
+    "v1/insights/lbaas/high_http_request_response_time_50p",
+    "v1/insights/lbaas/high_http_request_response_time_95p",
+    "v1/insights/lbaas/high_http_request_response_time_99p",
+    // === DATABASE METRICS ===
+    "v1/dbaas/alerts/load_15_alerts",
+    "v1/dbaas/alerts/cpu_alerts",
+    "v1/dbaas/alerts/memory_utilization_alerts",
+    "v1/dbaas/alerts/disk_utilization_alerts",
+    // === VOLUME METRICS ===
+    "v1/insights/volumes/filesystem_free",
+    "v1/insights/volumes/filesystem_size",
+    "v1/insights/volumes/read_bytes",
+    "v1/insights/volumes/write_bytes",
+    // === APP METRICS ===
+    "v1/insights/apps/cpu_percentage",
+    "v1/insights/apps/memory_percentage"
   ];
   if (!validTypes.includes(type)) {
-    throw new Error(`Invalid metric type: ${type}. Supported types: ${validTypes.join(", ")}`);
+    throw new Error(`Invalid metric type: ${type}. Supported types: ${validTypes.slice(0, 10).join(", ")}... (${validTypes.length} total types)`);
   }
   return type;
 }
@@ -60,6 +106,8 @@ function validateComparisonOperator(operator) {
   }
   return operator;
 }
+var validateAlertPolicyType = validateMetricType;
+var validateComparator = validateComparisonOperator;
 function validateWindow(window) {
   const validWindows = ["5m", "10m", "30m", "1h"];
   if (!validWindows.includes(window)) {
@@ -70,6 +118,13 @@ function validateWindow(window) {
 function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
+}
+function validateEmails(emails) {
+  for (const email of emails) {
+    if (!validateEmail(email)) {
+      throw new Error(`Invalid email address: ${email}`);
+    }
+  }
 }
 function validateSlackUrl(url) {
   return url.startsWith("https://hooks.slack.com/services/");
@@ -112,10 +167,10 @@ var API_ENDPOINTS = {
   ACCOUNT: "/account",
   DROPLETS: "/droplets",
   METRICS_DROPLET: "/monitoring/metrics/droplet",
-  METRICS_VOLUME: "/monitoring/metrics/volume",
-  METRICS_APP: "/monitoring/metrics/app",
-  METRICS_LB: "/monitoring/metrics/load_balancer",
-  METRICS_DB: "/monitoring/metrics/database"
+  METRICS_VOLUMES: "/monitoring/metrics/volumes",
+  METRICS_APPS: "/monitoring/metrics/apps",
+  METRICS_LOAD_BALANCER: "/monitoring/metrics/load_balancer",
+  METRICS_DATABASES: "/monitoring/metrics/databases"
 };
 var HTTP_STATUS = {
   OK: 200,
@@ -144,8 +199,11 @@ var RATE_LIMIT = {
   RATE_LIMIT,
   VALIDATION_PATTERNS,
   generateTimeRange,
+  validateAlertPolicyType,
+  validateComparator,
   validateComparisonOperator,
   validateEmail,
+  validateEmails,
   validateMetricType,
   validateSlackUrl,
   validateWindow

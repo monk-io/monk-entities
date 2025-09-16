@@ -41,30 +41,82 @@ This entity provides comprehensive monitoring capabilities for DigitalOcean reso
 
 ## Supported Metric Types
 
-### CPU and Load Metrics
+### Droplet Metrics
+
+#### CPU and Load Metrics
 - `v1/insights/droplet/cpu` - CPU utilization percentage
 - `v1/insights/droplet/load_1` - 1-minute load average
-- `v1/insights/droplet/load_5` - 5-minute load average
+- `v1/insights/droplet/load_5` - 5-minute load average  
 - `v1/insights/droplet/load_15` - 15-minute load average
 
-### Memory and Disk Metrics
+#### Memory Metrics
 - `v1/insights/droplet/memory_utilization_percent` - Memory utilization percentage
+- `v1/insights/droplet/memory_available` - Available memory in bytes
+- `v1/insights/droplet/memory_cached` - Cached memory in bytes
+- `v1/insights/droplet/memory_free` - Free memory in bytes
+- `v1/insights/droplet/memory_total` - Total memory in bytes
+
+#### Disk and Filesystem Metrics
 - `v1/insights/droplet/disk_utilization_percent` - Disk utilization percentage
 - `v1/insights/droplet/disk_read` - Disk read operations
 - `v1/insights/droplet/disk_write` - Disk write operations
+- `v1/insights/droplet/filesystem_free` - Free filesystem space
+- `v1/insights/droplet/filesystem_size` - Total filesystem size
 
-### Network Metrics
+#### Network Bandwidth Metrics
 - `v1/insights/droplet/public_outbound_bandwidth` - Public outbound bandwidth
 - `v1/insights/droplet/public_inbound_bandwidth` - Public inbound bandwidth
 - `v1/insights/droplet/private_outbound_bandwidth` - Private outbound bandwidth
 - `v1/insights/droplet/private_inbound_bandwidth` - Private inbound bandwidth
+
+#### Network Packet Metrics
+- `v1/insights/droplet/network_outbound_packets` - Outbound network packets
+- `v1/insights/droplet/network_inbound_packets` - Inbound network packets
+- `v1/insights/droplet/network_outbound_errors` - Outbound network errors
+- `v1/insights/droplet/network_inbound_errors` - Inbound network errors
+
+### Load Balancer Metrics
+
+#### Performance Metrics
+- `v1/insights/lbaas/avg_cpu_utilization_percent` - Average CPU utilization
+- `v1/insights/lbaas/connection_utilization_percent` - Connection utilization
+- `v1/insights/lbaas/droplet_health` - Backend droplet health status
+- `v1/insights/lbaas/tls_connections_per_second_utilization_percent` - TLS connection rate
+
+#### HTTP Error Rate Metrics
+- `v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx` - 5xx error rate increase
+- `v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx` - 4xx error rate increase
+- `v1/insights/lbaas/increase_in_http_error_rate_count_5xx` - 5xx error count increase
+- `v1/insights/lbaas/increase_in_http_error_rate_count_4xx` - 4xx error count increase
+
+#### Response Time Metrics
+- `v1/insights/lbaas/high_http_request_response_time` - HTTP response time
+- `v1/insights/lbaas/high_http_request_response_time_50p` - 50th percentile response time
+- `v1/insights/lbaas/high_http_request_response_time_95p` - 95th percentile response time
+- `v1/insights/lbaas/high_http_request_response_time_99p` - 99th percentile response time
+
+### Database Metrics
+- `v1/dbaas/alerts/load_15_alerts` - Database 15-minute load alerts
+- `v1/dbaas/alerts/cpu_alerts` - Database CPU alerts
+- `v1/dbaas/alerts/memory_utilization_alerts` - Database memory alerts
+- `v1/dbaas/alerts/disk_utilization_alerts` - Database disk alerts
+
+### Volume Metrics
+- `v1/insights/volumes/filesystem_free` - Volume free space
+- `v1/insights/volumes/filesystem_size` - Volume total size  
+- `v1/insights/volumes/read_bytes` - Volume read bytes
+- `v1/insights/volumes/write_bytes` - Volume write bytes
+
+### App Metrics
+- `v1/insights/apps/cpu_percentage` - App CPU percentage
+- `v1/insights/apps/memory_percentage` - App memory percentage
 
 ## Usage Examples
 
 ### Basic CPU Monitoring (Auto Email Detection)
 ```yaml
 monk-cpu-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-cpu-high-alert
   metric_type: v1/insights/droplet/cpu
   compare: GreaterThan
@@ -80,7 +132,7 @@ monk-cpu-alert:
 ### Memory Monitoring with Slack
 ```yaml
 monk-memory-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-memory-high-alert
   metric_type: v1/insights/droplet/memory_utilization_percent
   compare: GreaterThan
@@ -115,7 +167,7 @@ All actions follow the pattern: `monk do templates/local/digitalocean-monitoring
 
 ```bash
 # Get account information
-monk do templates/local/digitalocean-monitoring-example/monk-cpu-alert/get-account-info
+monk do templates/local/digitalocean-monitoring-example/monk-cpu-alert/get-account-details
 
 
 # List all alert policies
@@ -154,7 +206,7 @@ curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash
 
 ## Complete Action List
 
-### Alert Policy Management (7 actions)
+### Alert Policy Management
 - `create-alert-policy` - Create new alert policy
 - `list-alert-policies` - List all alert policies  
 - `get-alert-policy` - Get policy details
@@ -163,37 +215,96 @@ curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash
 - `enable-alert-policy` - Enable alert policy
 - `disable-alert-policy` - Disable alert policy
 
-### Monitoring Sinks Management (2 actions)
+### Monitoring Sinks Management
 - `list-sinks` - List all monitoring sinks
 - `get-sink` - Get monitoring sink details
 
-### Account & Information (1 action)
-- `get-account-info` - Get account details and limits
+### Account & Information
+- `get-account-details` - Get account details and limits
 
-### Droplet Metrics (15 actions)
+### Droplet Metrics
+
+#### Basic Droplet Metrics
 - `get-droplet-metrics` - General droplet metrics
 - `get-droplet-cpu-metrics` - CPU metrics
 - `get-droplet-memory-metrics` - Memory metrics
 - `get-droplet-disk-metrics` - Disk metrics
 - `get-droplet-network-metrics` - Network metrics
-- `get-droplet-bandwidth-inbound` - Inbound bandwidth
-- `get-droplet-bandwidth-outbound` - Outbound bandwidth
+- `get-all-droplet-metrics` - All droplet metrics combined
+
+#### Advanced Memory Metrics
+- `get-droplet-memory-available` - Available memory metrics
+- `get-droplet-memory-cached` - Cached memory metrics
+- `get-droplet-memory-free` - Free memory metrics
+- `get-droplet-memory-total` - Total memory metrics
+
+#### Filesystem Metrics
+- `get-droplet-filesystem-free` - Free filesystem space
+- `get-droplet-filesystem-size` - Total filesystem size
+
+#### Network Bandwidth Metrics
+- `get-droplet-bandwidth-inbound` - Public inbound bandwidth
+- `get-droplet-bandwidth-outbound` - Public outbound bandwidth
 - `get-droplet-private-bandwidth-inbound` - Private inbound bandwidth
 - `get-droplet-private-bandwidth-outbound` - Private outbound bandwidth
+
+#### Network Packet & Error Metrics
+- `get-droplet-network-inbound-packets` - Inbound packet metrics
+- `get-droplet-network-outbound-packets` - Outbound packet metrics
+- `get-droplet-network-inbound-errors` - Inbound network errors
+- `get-droplet-network-outbound-errors` - Outbound network errors
+
+#### Disk I/O & Load Metrics
 - `get-droplet-disk-read` - Disk read operations
 - `get-droplet-disk-write` - Disk write operations
 - `get-droplet-load-average-1` - 1-minute load average
 - `get-droplet-load-average-5` - 5-minute load average  
 - `get-droplet-load-average-15` - 15-minute load average
-- `get-all-droplet-metrics` - All droplet metrics combined
 
-### Other Resource Metrics (4 actions)
-- `get-volume-metrics` - Volume metrics
-- `get-app-metrics` - DigitalOcean App metrics
-- `get-load-balancer-metrics` - Load Balancer metrics
-- `get-database-metrics` - Database metrics
+### Load Balancer Metrics
 
-**Total: 29 actions** covering complete DigitalOcean monitoring functionality.
+#### Basic LB Metrics
+- `get-load-balancer-metrics` - Basic LB connection metrics
+- `get-load-balancer-cpu-utilization` - LB CPU utilization
+- `get-load-balancer-connection-utilization` - Connection utilization
+- `get-load-balancer-droplet-health` - Backend droplet health
+
+#### Enhanced LB Metrics
+- `get-lb-cpu-utilization` - LB CPU utilization (alias)
+- `get-lb-connection-utilization` - Connection utilization (alias)
+- `get-lb-droplet-health` - Droplet health (alias)
+- `get-lb-tls-connections-utilization` - TLS connection utilization
+- `get-lb-http-error-5xx-rate` - HTTP 5xx error rate
+- `get-lb-http-error-4xx-rate` - HTTP 4xx error rate
+- `get-lb-http-response-time-50p` - 50th percentile response time
+- `get-lb-http-response-time-95p` - 95th percentile response time
+- `get-lb-http-response-time-99p` - 99th percentile response time
+
+### Database Metrics
+
+#### Basic Database Metrics
+- `get-database-metrics` - Basic database CPU metrics
+- `get-database-cpu-utilization` - Database CPU utilization
+- `get-database-memory-utilization` - Database memory utilization
+- `get-database-disk-utilization` - Database disk utilization
+
+#### Database Alert Metrics
+- `get-db-load-15` - Database 15-minute load alerts
+- `get-db-cpu-alerts` - Database CPU alerts
+- `get-db-memory-alerts` - Database memory alerts
+- `get-db-disk-alerts` - Database disk alerts
+
+### Volume Metrics
+- `get-volume-metrics` - Basic volume filesystem metrics
+- `get-volume-filesystem-free` - Volume free space metrics
+- `get-volume-filesystem-size` - Volume total size (alias)
+- `get-volume-read-bytes` - Volume read I/O metrics
+- `get-volume-write-bytes` - Volume write I/O metrics
+
+### App Metrics
+- `get-app-metrics` - Basic app CPU metrics
+- `get-app-cpu-percentage` - App CPU percentage metrics
+- `get-app-memory-percentage` - App memory percentage metrics
 
 ## API Reference
 

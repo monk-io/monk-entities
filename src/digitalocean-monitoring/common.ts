@@ -6,21 +6,65 @@
  * Supported metric types for DigitalOcean monitoring
  */
 export type MetricType = 
+    // === DROPLET METRICS ===
     // CPU and Load
     | "v1/insights/droplet/cpu"
     | "v1/insights/droplet/load_1"
     | "v1/insights/droplet/load_5"
     | "v1/insights/droplet/load_15"
-    // Memory and Disk
+    // Memory
     | "v1/insights/droplet/memory_utilization_percent"
+    | "v1/insights/droplet/memory_available"
+    | "v1/insights/droplet/memory_cached"
+    | "v1/insights/droplet/memory_free"
+    | "v1/insights/droplet/memory_total"
+    // Disk
     | "v1/insights/droplet/disk_utilization_percent"
     | "v1/insights/droplet/disk_read"
     | "v1/insights/droplet/disk_write"
-    // Network
+    // Filesystem
+    | "v1/insights/droplet/filesystem_free"
+    | "v1/insights/droplet/filesystem_size"
+    // Network Bandwidth
     | "v1/insights/droplet/public_outbound_bandwidth"
     | "v1/insights/droplet/public_inbound_bandwidth"
     | "v1/insights/droplet/private_outbound_bandwidth"
-    | "v1/insights/droplet/private_inbound_bandwidth";
+    | "v1/insights/droplet/private_inbound_bandwidth"
+    // Network Packets
+    | "v1/insights/droplet/network_outbound_packets"
+    | "v1/insights/droplet/network_inbound_packets"
+    | "v1/insights/droplet/network_outbound_errors"
+    | "v1/insights/droplet/network_inbound_errors"
+    
+    // === LOAD BALANCER METRICS ===
+    | "v1/insights/lbaas/avg_cpu_utilization_percent"
+    | "v1/insights/lbaas/connection_utilization_percent"
+    | "v1/insights/lbaas/droplet_health"
+    | "v1/insights/lbaas/tls_connections_per_second_utilization_percent"
+    | "v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx"
+    | "v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx"
+    | "v1/insights/lbaas/increase_in_http_error_rate_count_5xx"
+    | "v1/insights/lbaas/increase_in_http_error_rate_count_4xx"
+    | "v1/insights/lbaas/high_http_request_response_time"
+    | "v1/insights/lbaas/high_http_request_response_time_50p"
+    | "v1/insights/lbaas/high_http_request_response_time_95p"
+    | "v1/insights/lbaas/high_http_request_response_time_99p"
+    
+    // === DATABASE METRICS ===
+    | "v1/dbaas/alerts/load_15_alerts"
+    | "v1/dbaas/alerts/cpu_alerts"
+    | "v1/dbaas/alerts/memory_utilization_alerts"
+    | "v1/dbaas/alerts/disk_utilization_alerts"
+    
+    // === VOLUME METRICS ===
+    | "v1/insights/volumes/filesystem_free"
+    | "v1/insights/volumes/filesystem_size"
+    | "v1/insights/volumes/read_bytes"
+    | "v1/insights/volumes/write_bytes"
+    
+    // === APP METRICS ===
+    | "v1/insights/apps/cpu_percentage"
+    | "v1/insights/apps/memory_percentage";
 
 /**
  * Alert comparison operators
@@ -31,6 +75,11 @@ export type AlertComparisonOperator = "GreaterThan" | "LessThan";
  * Alert time windows
  */
 export type AlertWindow = "5m" | "10m" | "30m" | "1h";
+
+// Type aliases for MonkEC compatibility
+export type AlertPolicyType = MetricType;
+export type AlertPolicyComparator = AlertComparisonOperator;
+export type AlertPolicyWindow = AlertWindow;
 
 /**
  * Slack channel configuration for notifications
@@ -55,26 +104,97 @@ export interface Droplet {
 }
 
 /**
+ * Alert Policy from DigitalOcean API
+ */
+export interface AlertPolicy {
+    uuid: string;
+    type: MetricType;
+    description: string;
+    compare: AlertComparisonOperator;
+    value: number;
+    window: AlertWindow;
+    entities?: string[];
+    tags?: string[];
+    alerts?: {
+        email?: string[];
+        slack?: Array<{
+            type: string;
+            channel: string;
+            url: string;
+        }>;
+    };
+    enabled: boolean;
+    created_at?: string;
+}
+
+/**
  * Validate metric type
  */
 export function validateMetricType(type: string): MetricType {
     const validTypes: MetricType[] = [
+        // === DROPLET METRICS ===
+        // CPU and Load
         "v1/insights/droplet/cpu",
         "v1/insights/droplet/load_1",
         "v1/insights/droplet/load_5", 
         "v1/insights/droplet/load_15",
+        // Memory
         "v1/insights/droplet/memory_utilization_percent",
+        "v1/insights/droplet/memory_available",
+        "v1/insights/droplet/memory_cached",
+        "v1/insights/droplet/memory_free",
+        "v1/insights/droplet/memory_total",
+        // Disk
         "v1/insights/droplet/disk_utilization_percent",
         "v1/insights/droplet/disk_read",
         "v1/insights/droplet/disk_write",
+        // Filesystem
+        "v1/insights/droplet/filesystem_free",
+        "v1/insights/droplet/filesystem_size",
+        // Network Bandwidth
         "v1/insights/droplet/public_outbound_bandwidth",
         "v1/insights/droplet/public_inbound_bandwidth",
         "v1/insights/droplet/private_outbound_bandwidth",
-        "v1/insights/droplet/private_inbound_bandwidth"
+        "v1/insights/droplet/private_inbound_bandwidth",
+        // Network Packets
+        "v1/insights/droplet/network_outbound_packets",
+        "v1/insights/droplet/network_inbound_packets",
+        "v1/insights/droplet/network_outbound_errors",
+        "v1/insights/droplet/network_inbound_errors",
+        
+        // === LOAD BALANCER METRICS ===
+        "v1/insights/lbaas/avg_cpu_utilization_percent",
+        "v1/insights/lbaas/connection_utilization_percent",
+        "v1/insights/lbaas/droplet_health",
+        "v1/insights/lbaas/tls_connections_per_second_utilization_percent",
+        "v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx",
+        "v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx",
+        "v1/insights/lbaas/increase_in_http_error_rate_count_5xx",
+        "v1/insights/lbaas/increase_in_http_error_rate_count_4xx",
+        "v1/insights/lbaas/high_http_request_response_time",
+        "v1/insights/lbaas/high_http_request_response_time_50p",
+        "v1/insights/lbaas/high_http_request_response_time_95p",
+        "v1/insights/lbaas/high_http_request_response_time_99p",
+        
+        // === DATABASE METRICS ===
+        "v1/dbaas/alerts/load_15_alerts",
+        "v1/dbaas/alerts/cpu_alerts",
+        "v1/dbaas/alerts/memory_utilization_alerts",
+        "v1/dbaas/alerts/disk_utilization_alerts",
+        
+        // === VOLUME METRICS ===
+        "v1/insights/volumes/filesystem_free",
+        "v1/insights/volumes/filesystem_size",
+        "v1/insights/volumes/read_bytes",
+        "v1/insights/volumes/write_bytes",
+        
+        // === APP METRICS ===
+        "v1/insights/apps/cpu_percentage",
+        "v1/insights/apps/memory_percentage"
     ];
     
     if (!validTypes.includes(type as MetricType)) {
-        throw new Error(`Invalid metric type: ${type}. Supported types: ${validTypes.join(', ')}`);
+        throw new Error(`Invalid metric type: ${type}. Supported types: ${validTypes.slice(0, 10).join(', ')}... (${validTypes.length} total types)`);
     }
     
     return type as MetricType;
@@ -89,6 +209,10 @@ export function validateComparisonOperator(operator: string): AlertComparisonOpe
     }
     return operator as AlertComparisonOperator;
 }
+
+// Legacy function aliases for backward compatibility
+export const validateAlertPolicyType = validateMetricType;
+export const validateComparator = validateComparisonOperator;
 
 /**
  * Validate time window
@@ -109,6 +233,17 @@ export function validateWindow(window: string): AlertWindow {
 export function validateEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+}
+
+/**
+ * Validate array of email addresses
+ */
+export function validateEmails(emails: string[]): void {
+    for (const email of emails) {
+        if (!validateEmail(email)) {
+            throw new Error(`Invalid email address: ${email}`);
+        }
+    }
 }
 
 /**
@@ -184,10 +319,10 @@ export const API_ENDPOINTS = {
     ACCOUNT: "/account",
     DROPLETS: "/droplets",
     METRICS_DROPLET: "/monitoring/metrics/droplet",
-    METRICS_VOLUME: "/monitoring/metrics/volume",
-    METRICS_APP: "/monitoring/metrics/app",
-    METRICS_LB: "/monitoring/metrics/load_balancer",
-    METRICS_DB: "/monitoring/metrics/database"
+    METRICS_VOLUMES: "/monitoring/metrics/volumes",
+    METRICS_APPS: "/monitoring/metrics/apps", 
+    METRICS_LOAD_BALANCER: "/monitoring/metrics/load_balancer",
+    METRICS_DATABASES: "/monitoring/metrics/databases"
 };
 
 /**

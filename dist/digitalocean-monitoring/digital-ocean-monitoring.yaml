@@ -3,16 +3,18 @@ digital-ocean-monitoring:
   defines: entity
   metadata:
     name: DigitalOceanMonitoring
-    version-hash: 79c42885f803
+    version-hash: c8dc7e74fa1c
   schema:
     create_when_missing:
       type: boolean
-      description: >-
-        Controls whether to create resources when they don't exist (default:
-        true)
+      description: Whether to create resources when missing (for testing)
+      default: true
     name:
       type: string
-      description: Unique name for the alert policy
+      description: Name of the alert policy
+    alert_description:
+      type: string
+      description: Description of the alert policy
     metric_type:
       type: string
       enum:
@@ -21,23 +23,55 @@ digital-ocean-monitoring:
         - v1/insights/droplet/load_5
         - v1/insights/droplet/load_15
         - v1/insights/droplet/memory_utilization_percent
+        - v1/insights/droplet/memory_available
+        - v1/insights/droplet/memory_cached
+        - v1/insights/droplet/memory_free
+        - v1/insights/droplet/memory_total
         - v1/insights/droplet/disk_utilization_percent
         - v1/insights/droplet/disk_read
         - v1/insights/droplet/disk_write
+        - v1/insights/droplet/filesystem_free
+        - v1/insights/droplet/filesystem_size
         - v1/insights/droplet/public_outbound_bandwidth
         - v1/insights/droplet/public_inbound_bandwidth
         - v1/insights/droplet/private_outbound_bandwidth
         - v1/insights/droplet/private_inbound_bandwidth
-      description: 'Type of metric to monitor (e.g., v1/insights/droplet/cpu)'
+        - v1/insights/droplet/network_outbound_packets
+        - v1/insights/droplet/network_inbound_packets
+        - v1/insights/droplet/network_outbound_errors
+        - v1/insights/droplet/network_inbound_errors
+        - v1/insights/lbaas/avg_cpu_utilization_percent
+        - v1/insights/lbaas/connection_utilization_percent
+        - v1/insights/lbaas/droplet_health
+        - v1/insights/lbaas/tls_connections_per_second_utilization_percent
+        - v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx
+        - v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx
+        - v1/insights/lbaas/increase_in_http_error_rate_count_5xx
+        - v1/insights/lbaas/increase_in_http_error_rate_count_4xx
+        - v1/insights/lbaas/high_http_request_response_time
+        - v1/insights/lbaas/high_http_request_response_time_50p
+        - v1/insights/lbaas/high_http_request_response_time_95p
+        - v1/insights/lbaas/high_http_request_response_time_99p
+        - v1/dbaas/alerts/load_15_alerts
+        - v1/dbaas/alerts/cpu_alerts
+        - v1/dbaas/alerts/memory_utilization_alerts
+        - v1/dbaas/alerts/disk_utilization_alerts
+        - v1/insights/volumes/filesystem_free
+        - v1/insights/volumes/filesystem_size
+        - v1/insights/volumes/read_bytes
+        - v1/insights/volumes/write_bytes
+        - v1/insights/apps/cpu_percentage
+        - v1/insights/apps/memory_percentage
+      description: Type of metric to monitor
     compare:
       type: string
       enum:
         - GreaterThan
         - LessThan
-      description: How to compare the metric value (GreaterThan or LessThan)
+      description: Comparison operator for the threshold
     value:
       type: number
-      description: The threshold value for the alert
+      description: Threshold value for the alert
     window:
       type: string
       enum:
@@ -45,27 +79,22 @@ digital-ocean-monitoring:
         - 10m
         - 30m
         - 1h
-      description: 'Time window for metric evaluation (5m, 10m, 30m, 1h)'
-    alert_description:
-      type: string
-      description: >-
-        Optional description of the alert policy (auto-generated if not
-        provided)
-    emails:
-      type: array
-      items:
-        type: string
-      description: Array of email addresses (auto-detected from account if not provided)
+      description: Time window for evaluation
     entities:
       type: array
       items:
         type: string
-      description: Array of specific Droplet IDs to monitor
+      description: Array of Droplet IDs to monitor
     tags:
       type: array
       items:
         type: string
-      description: Array of tags to match Droplets for monitoring
+      description: Array of tags to match Droplets
+    emails:
+      type: array
+      items:
+        type: string
+      description: Array of email addresses for notifications
     slack_channels:
       type: array
       items:
@@ -73,16 +102,19 @@ digital-ocean-monitoring:
         properties:
           channel:
             type: string
+            description: Slack channel name
           url:
             type: string
+            description: Slack webhook URL
         required:
           - channel
           - url
         additionalProperties: false
-      description: Array of Slack webhook configurations for notifications
+      description: Slack webhook configurations for notifications
     enabled:
       type: boolean
-      description: 'Whether the alert policy is enabled (default: true)'
+      description: Whether the alert is enabled
+      default: true
     required:
       - name
       - metric_type
@@ -96,16 +128,69 @@ digital-ocean-monitoring:
       type: string
     name:
       type: string
-    type:
+    alert_description:
       type: string
-    description:
+    metric_type:
       type: string
+      enum:
+        - v1/insights/droplet/cpu
+        - v1/insights/droplet/load_1
+        - v1/insights/droplet/load_5
+        - v1/insights/droplet/load_15
+        - v1/insights/droplet/memory_utilization_percent
+        - v1/insights/droplet/memory_available
+        - v1/insights/droplet/memory_cached
+        - v1/insights/droplet/memory_free
+        - v1/insights/droplet/memory_total
+        - v1/insights/droplet/disk_utilization_percent
+        - v1/insights/droplet/disk_read
+        - v1/insights/droplet/disk_write
+        - v1/insights/droplet/filesystem_free
+        - v1/insights/droplet/filesystem_size
+        - v1/insights/droplet/public_outbound_bandwidth
+        - v1/insights/droplet/public_inbound_bandwidth
+        - v1/insights/droplet/private_outbound_bandwidth
+        - v1/insights/droplet/private_inbound_bandwidth
+        - v1/insights/droplet/network_outbound_packets
+        - v1/insights/droplet/network_inbound_packets
+        - v1/insights/droplet/network_outbound_errors
+        - v1/insights/droplet/network_inbound_errors
+        - v1/insights/lbaas/avg_cpu_utilization_percent
+        - v1/insights/lbaas/connection_utilization_percent
+        - v1/insights/lbaas/droplet_health
+        - v1/insights/lbaas/tls_connections_per_second_utilization_percent
+        - v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx
+        - v1/insights/lbaas/increase_in_http_error_rate_percentage_4xx
+        - v1/insights/lbaas/increase_in_http_error_rate_count_5xx
+        - v1/insights/lbaas/increase_in_http_error_rate_count_4xx
+        - v1/insights/lbaas/high_http_request_response_time
+        - v1/insights/lbaas/high_http_request_response_time_50p
+        - v1/insights/lbaas/high_http_request_response_time_95p
+        - v1/insights/lbaas/high_http_request_response_time_99p
+        - v1/dbaas/alerts/load_15_alerts
+        - v1/dbaas/alerts/cpu_alerts
+        - v1/dbaas/alerts/memory_utilization_alerts
+        - v1/dbaas/alerts/disk_utilization_alerts
+        - v1/insights/volumes/filesystem_free
+        - v1/insights/volumes/filesystem_size
+        - v1/insights/volumes/read_bytes
+        - v1/insights/volumes/write_bytes
+        - v1/insights/apps/cpu_percentage
+        - v1/insights/apps/memory_percentage
     compare:
       type: string
+      enum:
+        - GreaterThan
+        - LessThan
     value:
       type: number
     window:
       type: string
+      enum:
+        - 5m
+        - 10m
+        - 30m
+        - 1h
     entities:
       type: array
       items:
@@ -114,27 +199,23 @@ digital-ocean-monitoring:
       type: array
       items:
         type: string
-    alerts:
-      type: object
-      properties:
-        email:
-          type: array
-          items:
+    emails:
+      type: array
+      items:
+        type: string
+    slack_channels:
+      type: array
+      items:
+        type: object
+        properties:
+          channel:
             type: string
-        slack:
-          type: array
-          items:
-            type: object
-            properties:
-              channel:
-                type: string
-              url:
-                type: string
-            required:
-              - channel
-              - url
-            additionalProperties: false
-      additionalProperties: false
+          url:
+            type: string
+        required:
+          - channel
+          - url
+        additionalProperties: false
     enabled:
       type: boolean
     created_at:
@@ -143,30 +224,66 @@ digital-ocean-monitoring:
     sync: <<< digital-ocean-monitoring-sync.js
     list-alert-policies: ''
     get-alert-policy: ''
-    enable-alert-policy: ''
-    disable-alert-policy: ''
-    list-sinks: ''
-    get-sink: ''
-    get-account-info: ''
+    get-account-details: ''
     get-droplet-metrics: ''
     get-droplet-cpu-metrics: ''
     get-droplet-memory-metrics: ''
     get-droplet-disk-metrics: ''
     get-droplet-network-metrics: ''
+    get-app-metrics: ''
+    get-load-balancer-metrics: ''
+    get-database-metrics: ''
+    enable-alert-policy: ''
+    disable-alert-policy: ''
+    get-volume-metrics: ''
     get-droplet-bandwidth-inbound: ''
     get-droplet-bandwidth-outbound: ''
     get-droplet-private-bandwidth-inbound: ''
     get-droplet-private-bandwidth-outbound: ''
     get-droplet-disk-read: ''
     get-droplet-disk-write: ''
-    get-droplet-load-average-1: ''
-    get-droplet-load-average-5: ''
-    get-droplet-load-average-15: ''
+    get-droplet-load-average1: ''
+    get-droplet-load-average5: ''
+    get-droplet-load-average15: ''
+    delete-alert-policy: ''
+    list-sinks: ''
+    get-sink: ''
     get-all-droplet-metrics: ''
-    get-volume-metrics: ''
-    get-app-metrics: ''
-    get-load-balancer-metrics: ''
-    get-database-metrics: ''
+    get-droplet-memory-available: ''
+    get-droplet-memory-cached: ''
+    get-droplet-memory-free: ''
+    get-droplet-memory-total: ''
+    get-droplet-filesystem-free: ''
+    get-droplet-filesystem-size: ''
+    get-droplet-network-outbound-packets: ''
+    get-droplet-network-inbound-packets: ''
+    get-droplet-network-outbound-errors: ''
+    get-droplet-network-inbound-errors: ''
+    get-load-balancer-cpu-utilization: ''
+    get-load-balancer-connection-utilization: ''
+    get-load-balancer-droplet-health: ''
+    get-database-cpu-utilization: ''
+    get-database-memory-utilization: ''
+    get-database-disk-utilization: ''
+    get-volume-filesystem-free: ''
+    get-volume-read-bytes: ''
+    get-volume-write-bytes: ''
+    get-lbcpu-utilization: ''
+    get-lbconnection-utilization: ''
+    get-lbdroplet-health: ''
+    get-lbtls-connections-utilization: ''
+    get-lbhttp-error5xx-rate: ''
+    get-lbhttp-error4xx-rate: ''
+    get-lbhttp-response-time50p: ''
+    get-lbhttp-response-time95p: ''
+    get-lbhttp-response-time99p: ''
+    get-dbload15: ''
+    get-dbcpu-alerts: ''
+    get-dbmemory-alerts: ''
+    get-dbdisk-alerts: ''
+    get-app-cpu-percentage: ''
+    get-app-memory-percentage: ''
+    get-volume-filesystem-size: ''
   checks:
     readiness:
       period: 15

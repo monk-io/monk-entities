@@ -1,1322 +1,2110 @@
 import { action, Args } from "monkec/base";
-import { DOMonitoringEntity, DOMonitoringDefinitionBase, DOMonitoringStateBase } from "./do-provider-base.ts";
+import { DOMonitoringEntity, DOMonitoringDefinitionBase, DOMonitoringStateBase } from "./do-provider-base";
 import { 
+  AlertPolicy, 
     MetricType, 
     AlertComparisonOperator, 
     AlertWindow, 
-    SlackChannel,
     validateMetricType,
     validateComparisonOperator,
     validateWindow,
-    validateEmail,
-    validateSlackUrl,
-    generateTimeRange
-} from "./common.ts";
+  validateEmails
+} from "./common";
 import cli from "cli";
 
-/**
- * Defines the immutable configuration properties for a DigitalOcean Monitoring entity.
- */
 export interface DigitalOceanMonitoringDefinition extends DOMonitoringDefinitionBase {
     /**
-     * Alert policy name
-     * @description Unique name for the alert policy
+   * @description Name of the alert policy
+   * @example "high-cpu-alert"
      */
     name: string;
 
     /**
-     * Metric type to monitor
-     * @description Type of metric to monitor (e.g., v1/insights/droplet/cpu)
+   * @description Description of the alert policy
+   * @example "Alert when CPU usage exceeds 80%"
+   */
+  alert_description?: string;
+  
+  /**
+   * @description Type of metric to monitor
+   * @example "v1/insights/droplet/cpu"
      */
     metric_type: MetricType;
 
     /**
-     * Comparison operator
-     * @description How to compare the metric value (GreaterThan or LessThan)
+   * @description Comparison operator for the threshold
+   * @example "GreaterThan"
      */
     compare: AlertComparisonOperator;
 
     /**
-     * Threshold value
-     * @description The threshold value for the alert
+   * @description Threshold value for the alert
+   * @example 80
      */
     value: number;
 
     /**
-     * Time window for evaluation
-     * @description Time window for metric evaluation (5m, 10m, 30m, 1h)
+   * @description Time window for evaluation
+   * @example "10m"
      */
     window: AlertWindow;
 
     /**
-     * Alert description
-     * @description Optional description of the alert policy (auto-generated if not provided)
-     */
-    alert_description?: string;
-
-    /**
-     * Email addresses for notifications
-     * @description Array of email addresses (auto-detected from account if not provided)
-     */
-    emails?: string[];
-
-    /**
-     * Droplet IDs to monitor
-     * @description Array of specific Droplet IDs to monitor
+   * @description Array of Droplet IDs to monitor
+   * @example ["123456789", "987654321"]
      */
     entities?: string[];
 
     /**
-     * Tags to match Droplets
-     * @description Array of tags to match Droplets for monitoring
+   * @description Array of tags to match Droplets
+   * @example ["production", "web-server"]
      */
     tags?: string[];
 
     /**
-     * Slack channel configurations
-     * @description Array of Slack webhook configurations for notifications
+   * @description Array of email addresses for notifications
+   * @example ["admin@example.com", "alerts@example.com"]
      */
-    slack_channels?: SlackChannel[];
-
+  emails?: string[];
+  
+  /**
+   * @description Slack webhook configurations for notifications
+   */
+  slack_channels?: Array<{
     /**
-     * Whether the alert is enabled
-     * @description Whether the alert policy is enabled (default: true)
+     * @description Slack channel name
+     * @example "#alerts"
      */
-    enabled?: boolean;
+    channel: string;
+    /**
+     * @description Slack webhook URL
+     * @example "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+     */
+    url: string;
+  }>;
+  
+  /**
+   * @description Whether the alert is enabled
+   * @default true
+   */
+  enabled?: boolean;
+
+  /**
+   * @description Whether to create resources when missing (for testing)
+   * @default true
+   */
+  create_when_missing?: boolean;
 }
 
-/**
- * Represents the mutable runtime state of a DigitalOcean Monitoring entity.
- */
 export interface DigitalOceanMonitoringState extends DOMonitoringStateBase {
-    /**
-     * Alert policy UUID
-     */
-    uuid?: string;
-
-    /**
-     * Alert policy name
-     */
-    name?: string;
-
-    /**
-     * Metric type
-     */
-    type?: string;
-
-    /**
-     * Alert description
-     */
-    description?: string;
-
-    /**
-     * Comparison operator
-     */
-    compare?: string;
-
-    /**
-     * Threshold value
-     */
+  uuid?: string;
+  name?: string;
+  alert_description?: string;
+  metric_type?: MetricType;
+  compare?: AlertComparisonOperator;
     value?: number;
-
-    /**
-     * Time window
-     */
-    window?: string;
-
-    /**
-     * Entities being monitored
-     */
+  window?: AlertWindow;
     entities?: string[];
-
-    /**
-     * Tags being monitored
-     */
     tags?: string[];
-
-    /**
-     * Alert configuration
-     */
-    alerts?: {
-        email?: string[];
-        slack?: SlackChannel[];
-    };
-
-    /**
-     * Whether the alert is enabled
-     */
+  emails?: string[];
+  slack_channels?: Array<{
+    channel: string;
+    url: string;
+  }>;
     enabled?: boolean;
-
-    /**
-     * Creation timestamp
-     */
     created_at?: string;
 }
 
-/**
- * DigitalOcean Monitoring entity for managing monitoring and alert policies.
- * 
- * This entity provides comprehensive monitoring capabilities for DigitalOcean resources
- * including alert policy management, metrics collection, and account information access.
- */
-export class DigitalOceanMonitoring extends DOMonitoringEntity<
-    DigitalOceanMonitoringDefinition,
-    DigitalOceanMonitoringState
-> {
+export class DigitalOceanMonitoring extends DOMonitoringEntity<DigitalOceanMonitoringDefinition, DigitalOceanMonitoringState> {
+
+  static readonly readiness = { period: 15, initialDelay: 5, attempts: 40 };
 
     protected getEntityName(): string {
-        return `DigitalOcean Monitoring: ${this.definition.name}`;
-    }
+    return "DigitalOcean Monitoring Alert Policy";
+  }
 
-    create(): void {
-        cli.output(`🚀 Creating DigitalOcean monitoring alert policy: ${this.definition.name}`);
+  override create(): any {
+    try {
+      // Validate inputs
+      validateMetricType(this.definition.metric_type);
+      validateComparisonOperator(this.definition.compare);
+      validateWindow(this.definition.window);
 
-        // Check if we should create when missing
-        if (!this.shouldCreateWhenMissing()) {
-            cli.output(`🧪 Test mode: create_when_missing is false, setting ready state without creating`);
-            this.state.uuid = "test-mode-uuid";
+      // Check if we should create resources (for testing)
+      if (this.definition.create_when_missing === false) {
+        // Test mode - simulate successful creation
+        this.state.uuid = `test-uuid-${Date.now()}`;
             this.state.name = this.definition.name;
-            this.state.type = this.definition.metric_type;
-            this.state.enabled = true;
+        this.state.alert_description = `Test alert policy for ${this.definition.name}`;
+        this.state.metric_type = this.definition.metric_type;
+        this.state.compare = this.definition.compare;
+        this.state.value = this.definition.value;
+        this.state.window = this.definition.window;
+        this.state.entities = this.definition.entities ? [...this.definition.entities] : undefined;
+        this.state.tags = this.definition.tags ? [...this.definition.tags] : undefined;
+        this.state.emails = this.definition.emails ? [...this.definition.emails] : [];
+        this.state.enabled = this.definition.enabled !== false;
+        this.state.created_at = new Date().toISOString();
+        
+        cli.output(`Alert Policy Created (Test Mode): ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
             return;
         }
 
-        // Validate configuration
-        const validatedType = validateMetricType(this.definition.metric_type);
-        const validatedCompare = validateComparisonOperator(this.definition.compare);
-        const validatedWindow = validateWindow(this.definition.window);
+      // Determine emails to use
+      let emailsToUse = this.definition.emails || [];
+      
+      // If no emails provided, try to get account email from DigitalOcean API
+      if (emailsToUse.length === 0) {
+        try {
+          cli.output(`🔍 Attempting to get account email from DigitalOcean API...`);
+          const accountResponse = this.makeRequest('GET', '/account');
+          cli.output(`📋 Account API Response: ${JSON.stringify(accountResponse, null, 2)}`);
+          
+          let accountEmail = null;
+          let emailVerified = false;
+          
+          // Try different possible response structures
+          if (accountResponse.account) {
+            accountEmail = accountResponse.account.email;
+            emailVerified = accountResponse.account.email_verified;
+          } else if (accountResponse.email) {
+            accountEmail = accountResponse.email;
+            emailVerified = accountResponse.email_verified;
+          }
+          
+          if (accountEmail) {
+            if (emailVerified) {
+              cli.output(`📧 Using verified account email: ${accountEmail}`);
+              emailsToUse = [accountEmail];
+            } else {
+              cli.output(`⚠️ Account email ${accountEmail} is not verified in DigitalOcean`);
+              throw new Error(`Account email ${accountEmail} is not verified. Please verify it in DigitalOcean or provide verified emails in configuration.`);
+            }
+          } else {
+            cli.output(`❌ No email found in account response`);
+            throw new Error(`No email found in DigitalOcean account. Please provide emails in configuration.`);
+          }
+        } catch (error) {
+          cli.output(`❌ Failed to get account email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw new Error(`Failed to get account email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      if (emailsToUse.length > 0) {
+        validateEmails([...emailsToUse]);
+      }
+
+      // Test API access first
+      try {
+        const testResponse = this.makeRequest('GET', '/monitoring/alerts');
+        const alerts = testResponse.alerts || testResponse.policies || [];
+        cli.output(`✅ API access verified, found ${alerts.length} existing policies`);
+      } catch (error) {
+        throw new Error(`API access test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
 
         // Check if alert policy already exists
-        const existingPolicy = this.findExistingAlertPolicy();
+      const existingPolicy = this.findExistingPolicy();
         if (existingPolicy) {
-            cli.output(`✅ Alert policy ${this.definition.name} already exists`);
-            this.state.existing = true;
             this.updateStateFromPolicy(existingPolicy);
+        cli.output(`Alert Policy Found: ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}\nCreated: ${this.state.created_at}`);
             return;
         }
 
-        // Get emails for notifications
-        let notificationEmails = this.definition.emails || [];
-        if (notificationEmails.length === 0) {
-            const verifiedEmail = this.getVerifiedEmail();
-            if (verifiedEmail) {
-                notificationEmails = [verifiedEmail];
-                cli.output(`📧 Auto-detected verified email: ${verifiedEmail}`);
-            }
-        }
+      // Create new alert policy
+      const policyData = this.buildPolicyData([...emailsToUse]);
+      const response = this.makeRequest('POST', '/monitoring/alerts', policyData);
 
-        // Validate emails
-        notificationEmails.forEach(email => {
-            if (!validateEmail(email)) {
-                throw new Error(`Invalid email address: ${email}`);
-            }
-        });
-
-        // Validate Slack channels
-        if (this.definition.slack_channels) {
-            this.definition.slack_channels.forEach(slack => {
-                if (!validateSlackUrl(slack.url)) {
-                    throw new Error(`Invalid Slack webhook URL: ${slack.url}`);
-                }
-            });
-        }
-
-        // Prepare alert policy creation request
-        const createRequest = {
-            type: validatedType,
-            description: this.definition.alert_description || `Alert for ${this.definition.name}: ${validatedType} ${validatedCompare} ${this.definition.value}`,
-            compare: validatedCompare,
-            value: this.definition.value,
-            window: validatedWindow,
-            entities: this.definition.entities || [],
-            tags: this.definition.tags || [],
-            alerts: {
-                email: notificationEmails,
-                slack: this.definition.slack_channels || []
-            },
-            enabled: this.definition.enabled !== false
-        };
-
-        try {
-            const response = this.makeRequest("POST", "/monitoring/alerts", createRequest);
-            
-            if (response.policy) {
-                this.updateStateFromPolicy(response.policy);
-                cli.output(`✅ Alert policy created successfully: ${this.state.uuid}`);
-            } else {
-                throw new Error("Invalid response from DigitalOcean API - no policy object returned");
-            }
-        } catch (error) {
-            throw new Error(`Failed to create alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      cli.output(`📋 Create Response: ${JSON.stringify(response, null, 2)}`);
+      
+      if (response.policy) {
+        // DigitalOcean returns 'policy' in create response
+        this.updateStateFromPolicy(response.policy);
+        cli.output(`Alert Policy Created: ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
+      } else if (response.alert) {
+        this.updateStateFromPolicy(response.alert);
+        cli.output(`Alert Policy Created: ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
+      } else if (response.alerts && response.alerts.length > 0) {
+        // Try alternative response format
+        this.updateStateFromPolicy(response.alerts[0]);
+        cli.output(`Alert Policy Created: ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
+      } else {
+        cli.output(`❌ Unexpected response format: ${JSON.stringify(response, null, 2)}`);
+        throw new Error('Failed to create alert policy: No policy returned in response');
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to create alert policy: ${error.message}`);
     }
+    
+    return this.state;
+  }
 
-    update(): void {
+  override update(): any {
+    try {
+      // Check if we should create resources (for testing)
+      if (this.definition.create_when_missing === false) {
+        // Test mode - simulate successful update
         if (!this.state.uuid) {
-            throw new Error("Cannot update alert policy - no policy UUID in state");
+          // If no existing state, create it
+          this.create();
+          return;
         }
-
-        // Check if we should create when missing
-        if (!this.shouldCreateWhenMissing()) {
-            cli.output(`🧪 Test mode: create_when_missing is false, skipping update`);
-            return;
-        }
-
-        cli.output(`🔄 Updating DigitalOcean alert policy: ${this.state.uuid}`);
-
-        // Validate configuration
-        const validatedType = validateMetricType(this.definition.metric_type);
-        const validatedCompare = validateComparisonOperator(this.definition.compare);
-        const validatedWindow = validateWindow(this.definition.window);
-
-        // Get emails for notifications
-        let notificationEmails = this.definition.emails || [];
-        if (notificationEmails.length === 0) {
-            const verifiedEmail = this.getVerifiedEmail();
-            if (verifiedEmail) {
-                notificationEmails = [verifiedEmail];
-            }
-        }
-
-        // Validate emails
-        notificationEmails.forEach(email => {
-            if (!validateEmail(email)) {
-                throw new Error(`Invalid email address: ${email}`);
-            }
-        });
-
-        // Validate Slack channels
-        if (this.definition.slack_channels) {
-            this.definition.slack_channels.forEach(slack => {
-                if (!validateSlackUrl(slack.url)) {
-                    throw new Error(`Invalid Slack webhook URL: ${slack.url}`);
-                }
-            });
-        }
-
-        // Prepare update request
-        const updateRequest = {
-            type: validatedType,
-            description: this.definition.alert_description || `Alert for ${this.definition.name}: ${validatedType} ${validatedCompare} ${this.definition.value}`,
-            compare: validatedCompare,
-            value: this.definition.value,
-            window: validatedWindow,
-            entities: this.definition.entities || [],
-            tags: this.definition.tags || [],
-            alerts: {
-                email: notificationEmails,
-                slack: this.definition.slack_channels || []
-            },
-            enabled: this.definition.enabled !== false
-        };
-
-        try {
-            const response = this.makeRequest("PUT", `/monitoring/alerts/${this.state.uuid}`, updateRequest);
-            
-            if (response.policy) {
-                this.updateStateFromPolicy(response.policy);
-                cli.output(`✅ Alert policy updated successfully`);
-            } else {
-                cli.output(`✅ Alert policy updated (no response data)`);
-            }
-        } catch (error) {
-            throw new Error(`Failed to update alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    delete(): void {
-        if (!this.state.uuid) {
-            cli.output("⚪ No alert policy UUID in state, nothing to delete");
-            return;
-        }
-
-        // Check if we should create when missing
-        if (!this.shouldCreateWhenMissing()) {
-            cli.output(`🧪 Test mode: create_when_missing is false, clearing state without deleting`);
-            this.state.uuid = undefined;
-            this.state.name = undefined;
-            this.state.enabled = undefined;
-            return;
-        }
-
-        this.deleteResource(`/monitoring/alerts/${this.state.uuid}`, `alert policy ${this.state.name || this.state.uuid}`);
         
-        // Clear state after successful deletion
-        this.state.uuid = undefined;
-        this.state.name = undefined;
-        this.state.type = undefined;
-        this.state.description = undefined;
-        this.state.enabled = undefined;
-        this.state.alerts = undefined;
-    }
+        // Update existing test state
+        this.state.name = this.definition.name;
+        this.state.alert_description = `Test alert policy for ${this.definition.name}`;
+        this.state.metric_type = this.definition.metric_type;
+        this.state.compare = this.definition.compare;
+        this.state.value = this.definition.value;
+        this.state.window = this.definition.window;
+        this.state.entities = this.definition.entities ? [...this.definition.entities] : undefined;
+        this.state.tags = this.definition.tags ? [...this.definition.tags] : undefined;
+        this.state.emails = this.definition.emails ? [...this.definition.emails] : [];
+        this.state.enabled = this.definition.enabled !== false;
+        
+        cli.output(`Alert Policy Updated (Test Mode): ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
+        return;
+      }
 
-    checkReadiness(): boolean {
-        if (!this.state.uuid) {
-            return false;
-        }
+      // Check if policy exists
+      const existingPolicy = this.findExistingPolicy();
+      if (!existingPolicy) {
+        // Create new policy if it doesn't exist
+        this.create();
+        return;
+      }
 
-        // In test mode, always return ready
-        if (!this.shouldCreateWhenMissing()) {
-            return true;
-        }
-
+      // Update existing policy
+      let emailsToUse = this.definition.emails || [];
+      if (emailsToUse.length === 0) {
         try {
-            const response = this.makeRequest("GET", `/monitoring/alerts/${this.state.uuid}`);
-            
-            if (response.policy) {
-                this.updateStateFromPolicy(response.policy);
-                cli.output(`✅ Alert policy ${this.state.uuid} is ready`);
-                return true;
+          const accountResponse = this.makeRequest('GET', '/account');
+          const accountEmail = accountResponse.account?.email;
+          const emailVerified = accountResponse.account?.email_verified;
+          
+          if (accountEmail && emailVerified) {
+            emailsToUse = [accountEmail];
+            } else {
+            throw new Error('Account email not verified or not found. Please provide emails in configuration.');
             }
-            
-            return false;
         } catch (error) {
-            cli.output(`❌ Failed to check alert policy readiness: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return false;
+          throw new Error(`Failed to get account email: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+      }
+
+      const policyData = this.buildPolicyData([...emailsToUse]);
+      const response = this.makeRequest('PUT', `/monitoring/alerts/${existingPolicy.uuid}`, policyData);
+
+      // DigitalOcean API returns the updated policy under 'policy' key
+      const updatedPolicy = response.policy || response.alert || response;
+      this.updateStateFromPolicy(updatedPolicy);
+      cli.output(`Alert Policy Updated: ${this.state.name}\nUUID: ${this.state.uuid}\nType: ${this.state.metric_type}\nThreshold: ${this.state.compare} ${this.state.value}\nWindow: ${this.state.window}\nNotifications: ${this.state.emails?.join(', ')}\nStatus: ${this.state.enabled ? 'Enabled' : 'Disabled'}`);
+    } catch (error: any) {
+      throw new Error(`Failed to update alert policy: ${error.message}`);
     }
+    
+    return this.state;
+  }
 
-    // === Alert Policy Management Actions (7 actions) ===
+  override delete(): any {
+    try {
+        if (!this.state.uuid) {
+        cli.output('No alert policy to delete');
+        return;
+      }
 
-    /**
-     * Create a new alert policy manually
-     */
-    createAlertPolicy(args: Args): void {
-        const name = args.name;
-        const type = args.type;
+      const policyUuid = this.state.uuid;
+      const policyName = this.state.name || this.state.alert_description || 'Unknown';
+
+      // Check if we should create resources (for testing)
+      if (this.definition.create_when_missing === false) {
+        // Test mode - simulate successful deletion
+        cli.output(`Alert policy deleted successfully (Test Mode)\nName: ${policyName}\nUUID: ${policyUuid}`);
+        
+        // Clear all state
+        this.state = {
+          uuid: undefined,
+          name: undefined,
+          alert_description: undefined,
+          metric_type: undefined,
+          compare: undefined,
+          value: undefined,
+          window: undefined,
+          entities: undefined,
+          tags: undefined,
+          emails: undefined,
+          slack_channels: undefined,
+          enabled: undefined,
+          created_at: undefined
+        };
+            return;
+        }
+
+      // Make the actual DELETE request to DigitalOcean API
+      cli.output(`🗑️ Deleting alert policy from DigitalOcean: ${policyName} (${policyUuid})`);
+      this.makeRequest('DELETE', `/monitoring/alerts/${policyUuid}`);
+
+      // Clear all state after successful deletion
+              this.state = {
+        uuid: undefined,
+        name: undefined,
+        alert_description: undefined,
+        metric_type: undefined,
+        compare: undefined,
+        value: undefined,
+        window: undefined,
+        entities: undefined,
+        tags: undefined,
+        emails: undefined,
+        slack_channels: undefined,
+        enabled: undefined,
+        created_at: undefined
+      };
+
+      cli.output(`✅ Alert policy deleted successfully from DigitalOcean\nName: ${policyName}\nUUID: ${policyUuid}`);
+    } catch (error: any) {
+      cli.output(`❌ Failed to delete alert policy: ${error.message}`);
+      throw new Error(`Failed to delete alert policy: ${error.message}`);
+    }
+    
+    return this.state;
+  }
+
+  override checkReadiness(): boolean {
+    return !!this.state.uuid;
+  }
+
+  createAlertPolicy(args: Args): any {
+    try {
+      cli.output(`DEBUG: Received args: ${JSON.stringify(args)}`);
+      const name = args.name;
+      const type = args.type;
+      const compare = args.compare;
+      const value = args.value;
+      const window = args.window;
+      const emails = args.emails;
+      const entities = args.entities;
+      const tags = args.tags;
+      const description = args.description;
+      const slack_channels = args.slack_channels;
+
+      if (!name) throw new Error("Name is required (use name=your_alert_name)");
+      if (!type) throw new Error("Type is required (use type=v1/insights/droplet/cpu)");
+      if (!compare) throw new Error("Compare is required (use compare=GreaterThan)");
+      if (!value) throw new Error("Value is required (use value=80)");
+      if (!window) throw new Error("Window is required (use window=10m)");
+      if (!emails) throw new Error("Emails is required (use emails=admin@example.com)");
+
+      validateMetricType(type);
+      validateComparisonOperator(compare);
+      validateWindow(window);
+      
+      const emailArray = emails.split(',').map(e => e.trim());
+      validateEmails(emailArray);
+
+      const policyData: any = {
+        type: type,
+        description: description || `Alert policy for ${name}`,
+        compare,
+        value: Number(value),
+        window,
+        entities: entities ? entities.split(',').map(e => e.trim()) : [],
+        tags: tags ? tags.split(',').map(t => t.trim()) : [],
+            alerts: {
+          email: emailArray,
+          slack: slack_channels ? JSON.parse(slack_channels) : []
+        },
+        enabled: true
+      };
+
+      const response = this.makeRequest('POST', '/monitoring/alerts', policyData);
+
+      if (response.alert) {
+        const policy = response.alert;
+        cli.output(`Alert Policy Created: ${name}\nUUID: ${policy.uuid}\nType: ${type}\nThreshold: ${compare} ${value}\nWindow: ${window}\nEntities: ${policyData.entities.join(', ') || 'None'}\nTags: ${policyData.tags.join(', ') || 'None'}\nNotifications: ${emailArray.join(', ')}\nStatus: Enabled`);
+        return policy;
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to create alert policy: ${error.message}`);
+    }
+  }
+
+  @action()
+  listAlertPolicies(_args: Args): any {
+    try {
+      const response = this.makeRequest('GET', '/monitoring/alerts');
+      
+      // DigitalOcean API returns 'policies' not 'alerts' 
+      const alerts = response.alerts || response.policies || [];
+      
+      if (!alerts || alerts.length === 0) {
+        cli.output('No alert policies found');
+        return { count: 0, policies: [] };
+      }
+
+      let output = `Alert Policies (${alerts.length} total):\n\n`;
+      
+      const policies = alerts.map((policy: AlertPolicy, index: number) => {
+        const policyInfo = {
+          index: index + 1,
+          name: policy.description,
+          uuid: policy.uuid,
+          type: policy.type,
+          threshold: `${policy.compare} ${policy.value}`,
+          window: policy.window,
+          entities: policy.entities || [],
+          tags: policy.tags || [],
+          emails: policy.alerts?.email || [],
+          slack_channels: policy.alerts?.slack?.length || 0,
+          status: policy.enabled ? 'Enabled' : 'Disabled',
+          created_at: policy.created_at
+        };
+        
+        output += `${index + 1}. ${policy.description}\n`;
+        output += `   UUID: ${policy.uuid}\n`;
+        output += `   Type: ${policy.type}\n`;
+        output += `   Threshold: ${policy.compare} ${policy.value}\n`;
+        output += `   Window: ${policy.window}\n`;
+        output += `   Status: ${policy.enabled ? 'Enabled' : 'Disabled'}\n`;
+        
+        if (policy.entities && policy.entities.length > 0) {
+          output += `   Entities: ${policy.entities.join(', ')}\n`;
+        }
+        if (policy.tags && policy.tags.length > 0) {
+          output += `   Tags: ${policy.tags.join(', ')}\n`;
+        }
+        if (policy.alerts?.email && policy.alerts.email.length > 0) {
+          output += `   Email notifications: ${policy.alerts.email.join(', ')}\n`;
+        }
+        if (policy.alerts?.slack && policy.alerts.slack.length > 0) {
+          output += `   Slack notifications: ${policy.alerts.slack.length} channels\n`;
+        }
+        if (policy.created_at) {
+          output += `   Created: ${new Date(policy.created_at).toLocaleString()}\n`;
+        }
+        output += '\n';
+        
+        return policyInfo;
+      });
+
+      cli.output(output.trim());
+      return { count: alerts.length, policies: policies };
+    } catch (error: any) {
+      throw new Error(`Failed to list alert policies: ${error.message}`);
+    }
+  }
+
+  @action()
+  getAlertPolicy(_args: Args): any {
+    try {
+        if (!this.state.uuid) {
+        throw new Error('No alert policy UUID available');
+      }
+
+      const response = this.makeRequest('GET', `/monitoring/alerts/${this.state.uuid}`);
+      
+      cli.output(`📋 Raw API Response: ${JSON.stringify(response, null, 2)}`);
+      
+      // Try different response formats
+      let policy = response.alert || response.policy || response;
+      
+      if (!policy || !policy.uuid) {
+        throw new Error('No valid policy found in response');
+      }
+
+      let output = `Alert Policy Details:\n`;
+      output += `Name: ${policy.description}\n`;
+      output += `UUID: ${policy.uuid}\n`;
+      output += `Type: ${policy.type}\n`;
+      output += `Threshold: ${policy.compare} ${policy.value}\n`;
+      output += `Window: ${policy.window}\n`;
+      output += `Entities: ${policy.entities?.join(', ') || 'None'}\n`;
+      output += `Tags: ${policy.tags?.join(', ') || 'None'}\n`;
+      output += `Emails: ${policy.alerts?.email?.join(', ') || 'None'}\n`;
+      output += `Slack: ${policy.alerts?.slack?.length || 0} channels\n`;
+      output += `Status: ${policy.enabled ? 'Enabled' : 'Disabled'}`;
+      
+      cli.output(output);
+      return policy;
+    } catch (error: any) {
+      cli.output(`❌ Error getting alert policy: ${error.message}`);
+      throw new Error(`Failed to get alert policy: ${error.message}`);
+    }
+  }
+
+  updateAlertPolicy(args: Args): any {
+    try {
+      if (!this.state.uuid) {
+        throw new Error('No alert policy UUID available');
+      }
+
         const compare = args.compare;
         const value = args.value;
         const window = args.window;
         const emails = args.emails;
+      const entities = args.entities;
+      const tags = args.tags;
+      const enabled = args.enabled;
 
-        if (!name || !type || !compare || !value || !window) {
-            throw new Error("Required parameters: --name, --type, --compare, --value, --window");
+      const updateData: any = {};
+      
+      if (compare) {
+        validateComparisonOperator(compare);
+        updateData.compare = compare;
+      }
+      if (value !== undefined) updateData.value = Number(value);
+      if (window) {
+        validateWindow(window);
+        updateData.window = window;
+      }
+      if (emails) {
+        const emailArray = emails.split(',').map(e => e.trim());
+        validateEmails(emailArray);
+        updateData.alerts = { ...updateData.alerts, email: emailArray };
+      }
+      if (entities) updateData.entities = entities.split(',').map(e => e.trim());
+      if (tags) updateData.tags = tags.split(',').map(t => t.trim());
+      if (enabled !== undefined) updateData.enabled = enabled === 'true';
+
+      const response = this.makeRequest('PUT', `/monitoring/alerts/${this.state.uuid}`, updateData);
+      const policy = response.alert;
+
+      cli.output(`Alert Policy Updated: ${policy.description}\nUUID: ${policy.uuid}\nType: ${policy.type}\nThreshold: ${policy.compare} ${policy.value}\nWindow: ${policy.window}\nStatus: ${policy.enabled ? 'Enabled' : 'Disabled'}`);
+      return policy;
+    } catch (error: any) {
+      throw new Error(`Failed to update alert policy: ${error.message}`);
+    }
+  }
+
+  @action()
+  getAccountDetails(_args: Args): any {  
+    try {
+      const response = this.makeRequest('GET', '/account');
+      
+      const account = response.account;
+      if (account) {
+        let output = `Account Information:\n`;
+        output += `  Name: ${account.name}\n`;
+        output += `  Email: ${account.email} ${account.email_verified ? '(verified)' : '(not verified)'}\n`;
+        output += `  UUID: ${account.uuid}\n`;
+        output += `  Status: ${account.status}\n`;
+        if (account.team) {
+          output += `  Team: ${account.team.name} (${account.team.uuid})\n`;
         }
-
-        const validatedType = validateMetricType(type);
-        const validatedCompare = validateComparisonOperator(compare);
-        const validatedWindow = validateWindow(window);
-
-        // Get emails for notifications
-        let notificationEmails: string[] = [];
-        if (emails) {
-            notificationEmails = emails.split(',').map((email: string) => email.trim());
-        } else {
-            const verifiedEmail = this.getVerifiedEmail();
-            if (verifiedEmail) {
-                notificationEmails = [verifiedEmail];
-            }
-        }
-
-        // Validate emails
-        notificationEmails.forEach(email => {
-            if (!validateEmail(email)) {
-                throw new Error(`Invalid email address: ${email}`);
-            }
-        });
-
-        const createRequest = {
-            type: validatedType,
-            description: `Manual alert: ${name}`,
-            compare: validatedCompare,
-            value: parseFloat(value),
-            window: validatedWindow,
-            entities: args.entities ? args.entities.split(',') : [],
-            tags: args.tags ? args.tags.split(',') : [],
-            alerts: {
-                email: notificationEmails,
-                slack: []
-            },
-            enabled: true
+        output += `  Limits:\n`;
+        output += `    Droplets: ${account.droplet_limit}\n`;
+        output += `    Floating IPs: ${account.floating_ip_limit}\n`;
+        output += `    Volumes: ${account.volume_limit}`;
+        
+        cli.output(output);
+        
+        return {
+          email: account.email,
+          uuid: account.uuid,
+          name: account.name,
+          status: account.status,
+          email_verified: account.email_verified,
+          team: account.team,
+          limits: {
+            droplet_limit: account.droplet_limit,
+            floating_ip_limit: account.floating_ip_limit,
+            volume_limit: account.volume_limit
+          }
         };
-
-        try {
-            const response = this.makeRequest("POST", "/monitoring/alerts", createRequest);
-            
-            if (response.policy) {
-                cli.output(`✅ Successfully created alert policy: ${response.policy.uuid}\n   Type: ${response.policy.type}\n   Description: ${response.policy.description}\n   Compare: ${response.policy.compare} ${response.policy.value}\n   Window: ${response.policy.window}`);
-            }
-        } catch (error) {
-            throw new Error(`Failed to create alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      } else {
+        cli.output('No account info found in response');
+        return { error: 'No account info found in response', raw_response: response };
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to get account info: ${error.message}`);
     }
+  }
 
-    /**
-     * List all alert policies
-     */
-    @action("list-alert-policies")
-    listAlertPolicies(_args: Args): void {
-        try {
-            const response = this.makeRequest("GET", "/monitoring/alerts");
-            const policies = response.policies || [];
-            
-            let output = `📋 Alert Policies (${policies.length} total):`;
-            
-            if (policies.length === 0) {
-                output += "\n   No alert policies found";
-            } else {
-                policies.forEach((policy: any, index: number) => {
-                    const status = policy.enabled ? "✅ enabled" : "❌ disabled";
-                    output += `\n   ${index + 1}. ${policy.uuid} - ${policy.type} ${policy.compare} ${policy.value} (${status})`;
-                });
-            }
-            
-            cli.output(output);
-        } catch (error) {
-            throw new Error(`Failed to list alert policies: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
+  @action()
+  getDropletMetrics(args: Args): any {
+    try {
+      const droplet_id = args.droplet_id;
+      const type = args.type || 'v1/insights/droplet/cpu';
+      let start_time = args.start_time;
+      let end_time = args.end_time;
 
-    /**
-     * Get alert policy information
-     */
-    @action("get-alert-policy")
-    getAlertPolicy(args: Args): void {
-        const policyUuid = args.policy_uuid || this.state.uuid;
+      if (!droplet_id) {
+        throw new Error("Droplet ID is required (use droplet_id=YOUR-DROPLET-ID)");
+      }
+
+      validateMetricType(type);
+
+      // Set default time range if not provided (last 1 hour)
+      if (!end_time) {
+        end_time = new Date().toISOString();
+      }
+      if (!start_time) {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        start_time = oneHourAgo.toISOString();
+      }
+
+      // Build query string manually
+      let queryParams = `host_id=${droplet_id}&start=${start_time}&end=${end_time}`;
+
+      const metricPath = type.replace('v1/insights/droplet/', '');
+      const response = this.makeRequest('GET', `/monitoring/metrics/droplet/${metricPath}?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No metrics found for droplet ${droplet_id} and metric ${type}
+Time Range: ${start_time} to ${end_time}
+Note: Make sure the monitoring agent is installed on your droplet.`);
+        return { droplet_id, metric_type: type, data: [] };
+      }
+
+      let output = `Droplet Metrics for ${droplet_id}:\n`;
+      output += `Metric Type: ${type}\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        const firstValue = values[0];
         
-        if (!policyUuid) {
-            throw new Error("No alert policy UUID available (use --policy_uuid=UUID or ensure entity has a UUID)");
-        }
-
-        try {
-            const response = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
-            
-            if (response.policy) {
-                if (policyUuid === this.state.uuid) {
-                    this.updateStateFromPolicy(response.policy);
-                }
-                
-                const policy = response.policy;
-                let output = `📊 Alert Policy Information:\n   UUID: ${policy.uuid}\n   Type: ${policy.type}\n   Description: ${policy.description}\n   Compare: ${policy.compare}\n   Value: ${policy.value}\n   Window: ${policy.window}\n   Enabled: ${policy.enabled}\n   Created: ${policy.created_at}`;
-                
-                if (policy.entities && policy.entities.length > 0) {
-                    output += `\n   Entities: ${policy.entities.join(', ')}`;
-                }
-                
-                if (policy.tags && policy.tags.length > 0) {
-                    output += `\n   Tags: ${policy.tags.join(', ')}`;
-                }
-                
-                if (policy.alerts) {
-                    if (policy.alerts.email && policy.alerts.email.length > 0) {
-                        output += `\n   Email notifications: ${policy.alerts.email.join(', ')}`;
-                    }
-                    if (policy.alerts.slack && policy.alerts.slack.length > 0) {
-                        output += `\n   Slack channels: ${policy.alerts.slack.length} configured`;
-                    }
-                }
-                
-                cli.output(output);
-            } else {
-                throw new Error("Alert policy not found");
-            }
-        } catch (error) {
-            throw new Error(`Failed to get alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Update an alert policy
-     */
-    updateAlertPolicy(args: Args): void {
-        const policyUuid = args.policy_uuid;
+        output += `Metric Series:\n`;
+        output += `  Latest Value: ${latestValue[1]} (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  First Value: ${firstValue[1]} (${new Date(firstValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Total Data Points: ${values.length}\n`;
         
-        if (!policyUuid) {
-            throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
+        // Calculate average if numeric values
+        const numericValues = values.map((v: any) => parseFloat(v[1])).filter((v: number) => !isNaN(v));
+        if (numericValues.length > 0) {
+          const avg = numericValues.reduce((a: number, b: number) => a + b, 0) / numericValues.length;
+          const max = Math.max(...numericValues);
+          const min = Math.min(...numericValues);
+          output += `  Average: ${avg.toFixed(2)}\n`;
+          output += `  Maximum: ${max}\n`;
+          output += `  Minimum: ${min}\n`;
         }
+        output += '\n';
 
-        // Get current policy
-        const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
-        if (!currentResponse.policy) {
-            throw new Error("Alert policy not found");
-        }
-
-        const currentPolicy = currentResponse.policy;
-
-        // Build update request with only specified changes
-        const updateRequest: any = {
-            type: args.type || currentPolicy.type,
-            description: args.description || currentPolicy.description,
-            compare: args.compare || currentPolicy.compare,
-            value: args.value ? parseFloat(args.value) : currentPolicy.value,
-            window: args.window || currentPolicy.window,
-            entities: args.entities ? args.entities.split(',') : (currentPolicy.entities || []),
-            tags: args.tags ? args.tags.split(',') : (currentPolicy.tags || []),
-            alerts: currentPolicy.alerts || { email: [], slack: [] },
-            enabled: args.enabled !== undefined ? (args.enabled === 'true') : currentPolicy.enabled
+        return {
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          first: { value: firstValue[1], timestamp: firstValue[0] },
+          count: values.length,
+          stats: numericValues.length > 0 ? {
+            average: numericValues.reduce((a: number, b: number) => a + b, 0) / numericValues.length,
+            maximum: Math.max(...numericValues),
+            minimum: Math.min(...numericValues)
+          } : null
         };
+      }).filter(Boolean);
 
-        // Update emails if specified
-        if (args.emails) {
-            const notificationEmails = args.emails.split(',').map((email: string) => email.trim());
-            notificationEmails.forEach(email => {
-                if (!validateEmail(email)) {
-                    throw new Error(`Invalid email address: ${email}`);
-                }
-            });
-            updateRequest.alerts.email = notificationEmails;
-        }
-
-        try {
-            const response = this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
-            
-            let output = `✅ Successfully updated alert policy: ${policyUuid}`;
-            if (response.policy) {
-                output += `\n   Type: ${response.policy.type}\n   Compare: ${response.policy.compare} ${response.policy.value}\n   Enabled: ${response.policy.enabled}`;
-            }
-            cli.output(output);
-        } catch (error) {
-            throw new Error(`Failed to update alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      cli.output(output.trim());
+      return { 
+        droplet_id, 
+        metric_type: type, 
+        data: processedResults,
+        query_params: { start_time, end_time }
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get droplet metrics: ${error.message}`);
     }
+  }
 
-    /**
-     * Delete an alert policy
-     */
-    deleteAlertPolicy(args: Args): void {
-        const policyUuid = args.policy_uuid;
-        
-        if (!policyUuid) {
-            throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
-        }
+  @action()
+  getDropletCpuMetrics(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/cpu' });
+  }
 
-        try {
-            this.makeRequest("DELETE", `/monitoring/alerts/${policyUuid}`);
-            cli.output(`✅ Successfully deleted alert policy: ${policyUuid}`);
-        } catch (error) {
-            throw new Error(`Failed to delete alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+  @action()
+  getDropletMemoryMetrics(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/memory_utilization_percent' });
+  }
+
+  @action()
+  getDropletDiskMetrics(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/disk_utilization_percent' });
+  }
+
+  @action()
+  getDropletNetworkMetrics(args: Args): any {
+    const direction = args.direction || 'inbound';
+    const interface_type = args.interface || 'public';
+    
+    // Route to appropriate specialized method based on interface and direction
+    if (interface_type === 'public') {
+      if (direction === 'inbound') {
+        return this.getDropletBandwidthInbound(args);
+            } else {
+        return this.getDropletBandwidthOutbound(args);
+      }
+    } else {
+      if (direction === 'inbound') {
+        return this.getDropletPrivateBandwidthInbound(args);
+      } else {
+        return this.getDropletPrivateBandwidthOutbound(args);
+      }
     }
+  }
 
-    /**
-     * Enable an alert policy
-     */
-    @action("enable-alert-policy")
-    enableAlertPolicy(args: Args): void {
-        const policyUuid = args.policy_uuid;
-        
-        if (!policyUuid) {
-            throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
-        }
+  @action()
+  getAppMetrics(args: Args): any {
+    try {
+      const app_id = args.app_id;
+      const component = args.component;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
 
-        // Get current policy and update with enabled=true
-        try {
-            const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
-            if (!currentResponse.policy) {
-                throw new Error("Alert policy not found");
-            }
+      if (!app_id) {
+        throw new Error("App ID is required (use app_id=YOUR-APP-ID component=web)");
+      }
+      if (!component) {
+        throw new Error("Component is required (use component=web)");
+      }
 
-            const updateRequest = {
-                ...currentResponse.policy,
+      let queryParams = `app_id=${app_id}&app_component=${component}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/apps/cpu_percentage?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No metrics found for app ${app_id}, component ${component}`);
+        return { app_id, component, data: [] };
+      }
+
+      let output = `App Metrics for ${app_id}:\n`;
+      output += `Component: ${component}\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `CPU Usage:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'cpu_percentage',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { app_id, component, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get app metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLoadBalancerMetrics(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!lb_id) {
+        throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+      }
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/connections?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No metrics found for load balancer ${lb_id}`);
+        return { lb_id, data: [] };
+      }
+
+      let output = `Load Balancer Metrics for ${lb_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `Connections:\n`;
+        output += `  Latest: ${latestValue[1]} (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'connections',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { lb_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get load balancer metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDatabaseMetrics(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!db_id) {
+        throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+      }
+
+      let queryParams = `db_id=${db_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/cpu?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No metrics found for database ${db_id}`);
+        return { db_id, data: [] };
+      }
+
+      let output = `Database Metrics for ${db_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `CPU Usage:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'cpu',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { db_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get database metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  enableAlertPolicy(args: Args): any {
+    try {
+      const uuid = args.uuid || this.state.uuid;
+      if (!uuid) throw new Error("Alert policy UUID is required (use uuid=policy-uuid)");
+
+      // Get current policy data first
+      const currentResponse = this.makeRequest('GET', `/monitoring/alerts/${uuid}`);
+      const currentPolicy = currentResponse.policy || currentResponse.alert || currentResponse;
+      
+      // Update with all required fields but change enabled to true
+      const updateData = {
+        type: currentPolicy.type,
+        description: currentPolicy.description,
+        compare: currentPolicy.compare,
+        value: currentPolicy.value,
+        window: currentPolicy.window,
+        entities: currentPolicy.entities || [],
+        tags: currentPolicy.tags || [],
+        alerts: currentPolicy.alerts || { email: [], slack: [] },
                 enabled: true
             };
 
-            this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
-            cli.output(`✅ Successfully enabled alert policy: ${policyUuid}`);
-        } catch (error) {
-            throw new Error(`Failed to enable alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      const response = this.makeRequest('PUT', `/monitoring/alerts/${uuid}`, updateData);
+      const policy = response.policy || response.alert || response;
+      
+      cli.output(`Alert policy ${uuid} enabled successfully`);
+      return { uuid, enabled: true, policy: policy };
+    } catch (error: any) {
+      throw new Error(`Failed to enable alert policy: ${error.message}`);
     }
+  }
 
-    /**
-     * Disable an alert policy
-     */
-    @action("disable-alert-policy")
-    disableAlertPolicy(args: Args): void {
-        const policyUuid = args.policy_uuid;
-        
-        if (!policyUuid) {
-            throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
-        }
+  @action()
+  disableAlertPolicy(args: Args): any {
+    try {
+      const uuid = args.uuid || this.state.uuid;
+      if (!uuid) throw new Error("Alert policy UUID is required (use uuid=policy-uuid)");
 
-        // Get current policy and update with enabled=false
-        try {
-            const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
-            if (!currentResponse.policy) {
-                throw new Error("Alert policy not found");
-            }
+      // Get current policy data first
+      const currentResponse = this.makeRequest('GET', `/monitoring/alerts/${uuid}`);
+      const currentPolicy = currentResponse.policy || currentResponse.alert || currentResponse;
+      
+      // Update with all required fields but change enabled to false
+      const updateData = {
+        type: currentPolicy.type,
+        description: currentPolicy.description,
+        compare: currentPolicy.compare,
+        value: currentPolicy.value,
+        window: currentPolicy.window,
+        entities: currentPolicy.entities || [],
+        tags: currentPolicy.tags || [],
+        alerts: currentPolicy.alerts || { email: [], slack: [] },
+        enabled: false
+      };
 
-            const updateRequest = {
-                ...currentResponse.policy,
-                enabled: false
-            };
-
-            this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
-            cli.output(`✅ Successfully disabled alert policy: ${policyUuid}`);
-        } catch (error) {
-            throw new Error(`Failed to disable alert policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      const response = this.makeRequest('PUT', `/monitoring/alerts/${uuid}`, updateData);
+      const policy = response.policy || response.alert || response;
+      
+      cli.output(`Alert policy ${uuid} disabled successfully`);
+      return { uuid, enabled: false, policy: policy };
+    } catch (error: any) {
+      throw new Error(`Failed to disable alert policy: ${error.message}`);
     }
+  }
 
-    // === Monitoring Sinks Management (2 actions) ===
+  @action()
+  getVolumeMetrics(args: Args): any {
+    try {
+      const volume_id = args.volume_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
 
-    /**
-     * List all monitoring sinks
-     */
-    @action("list-sinks")
-    listSinks(_args: Args): void {
+      if (!volume_id) {
+        throw new Error("Volume ID is required (use volume_id=YOUR-VOLUME-ID)");
+      }
+
+      let queryParams = ``;
+      if (start_time) queryParams += `start=${start_time}&`;
+      if (end_time) queryParams += `end=${end_time}&`;
+      queryParams = queryParams.replace(/&$/, ''); // Remove trailing &
+
+      const endpoint = `/monitoring/metrics/volumes/filesystem_size${queryParams ? '?' + queryParams : ''}`;
+      const response = this.makeRequest('GET', endpoint);
+      
+      if (!response.data?.result?.length) {
+        cli.output(`No volume metrics found for volume ${volume_id}`);
+        return { volume_id, metrics: [] };
+      }
+
+      let output = `Volume Metrics for ${volume_id}:\n\n`;
+      
+      response.data.result.forEach((metric: any, index: number) => {
+        output += `Metric ${index + 1}:\n`;
+        output += `  Volume: ${metric.metric?.volume_id || 'Unknown'}\n`;
+        output += `  Values: ${metric.values?.length || 0} data points\n`;
+        if (metric.values?.length > 0) {
+          const latestValue = metric.values[metric.values.length - 1];
+          output += `  Latest: ${latestValue[1]} bytes at ${new Date(latestValue[0] * 1000).toISOString()}\n`;
+        }
+        output += `\n`;
+      });
+
+      cli.output(output.trim());
+      return { volume_id, metrics: response.data.result };
+    } catch (error: any) {
+      throw new Error(`Failed to get volume metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDropletBandwidthInbound(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/public_inbound_bandwidth' 
+    });
+  }
+
+  @action()
+  getDropletBandwidthOutbound(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/public_outbound_bandwidth' 
+    });
+  }
+
+  @action()
+  getDropletPrivateBandwidthInbound(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/private_inbound_bandwidth' 
+    });
+  }
+
+  @action()
+  getDropletPrivateBandwidthOutbound(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/private_outbound_bandwidth' 
+    });
+  }
+
+  @action()
+  getDropletDiskRead(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/disk_read' 
+    });
+  }
+
+  @action()
+  getDropletDiskWrite(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/disk_write' 
+    });
+  }
+
+  @action()
+  getDropletLoadAverage1(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/load_1' 
+    });
+  }
+
+  @action()
+  getDropletLoadAverage5(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/load_5' 
+    });
+  }
+
+  @action()
+  getDropletLoadAverage15(args: Args): any {
+    return this.getDropletMetrics({ 
+      ...args, 
+      type: 'v1/insights/droplet/load_15' 
+    });
+  }
+
+
+  @action()
+  deleteAlertPolicy(args: Args): any {
+    try {
+      const policy_uuid = args.policy_uuid || this.state.uuid;
+      
+      if (!policy_uuid) {
+        throw new Error("Policy UUID is required (use policy_uuid=YOUR-POLICY-UUID)");
+      }
+      
+      this.makeRequest('DELETE', `/monitoring/alerts/${policy_uuid}`);
+      cli.output(`Alert policy ${policy_uuid} deleted successfully`);
+      
+      return true;
+    } catch (error: any) {
+      throw new Error(`Failed to delete alert policy: ${error.message}`);
+    }
+  }
+
+  @action()
+  listSinks(_args: Args): any {
+    try {
+      const response = this.makeRequest('GET', '/monitoring/sinks');
+      const sinks = response.sinks || [];
+      
+      if (sinks.length === 0) {
+        cli.output("No monitoring sinks found");
+        return { sinks: [] };
+      }
+
+      cli.output(`Monitoring Sinks (${sinks.length} total):\n`);
+      sinks.forEach((sink: any, index: number) => {
+        cli.output(`${index + 1}. ${sink.name}
+   ID: ${sink.id}
+   Type: ${sink.type}
+   Endpoint: ${sink.endpoint || 'N/A'}
+   Status: ${sink.status || 'active'}
+   Created: ${sink.created_at || 'N/A'}
+`);
+      });
+      
+      return { sinks };
+    } catch (error: any) {
+      throw new Error(`Failed to list monitoring sinks: ${error.message}`);
+    }
+  }
+
+  @action()
+  getSink(args: Args): any {
+    try {
+      const sink_id = args.sink_id;
+      
+      if (!sink_id) {
+        throw new Error("Sink ID is required (use sink_id=YOUR-SINK-ID)");
+      }
+      
+      const response = this.makeRequest('GET', `/monitoring/sinks/${sink_id}`);
+      const sink = response.sink || response;
+      
+      cli.output(`Monitoring Sink Details:
+Name: ${sink.name}
+ID: ${sink.id}
+Type: ${sink.type}
+Endpoint: ${sink.endpoint || 'N/A'}
+Status: ${sink.status || 'active'}
+Created: ${sink.created_at || 'N/A'}`);
+      
+      return sink;
+    } catch (error: any) {
+      throw new Error(`Failed to get monitoring sink: ${error.message}`);
+    }
+  }
+
+  @action()
+  getAllDropletMetrics(args: Args): any {
+    try {
+      const droplet_id = args.droplet_id;
+      if (!droplet_id) {
+        throw new Error("Droplet ID is required (use droplet_id=YOUR-DROPLET-ID)");
+      }
+
+      const metrics = [
+        'v1/insights/droplet/cpu',
+        'v1/insights/droplet/memory_utilization_percent',
+        'v1/insights/droplet/disk_utilization_percent',
+        'v1/insights/droplet/load_1',
+        'v1/insights/droplet/load_5',
+        'v1/insights/droplet/load_15'
+      ];
+
+      let output = `All Metrics for Droplet ${droplet_id}:\n\n`;
+      const results: { [key: string]: any } = {};
+      let hasData = false;
+
+      // Try to get metrics silently
+      metrics.forEach(metric => {
         try {
-            const response = this.makeRequest("GET", "/monitoring/sinks");
-            const sinks = response.sinks || [];
-            
-            let output = `📋 Monitoring Sinks (${sinks.length} total):`;
-            
-            if (sinks.length === 0) {
-                output += "\n   No monitoring sinks found";
+          // Call getDropletMetrics without outputting to CLI
+          const metricResult = this.getDropletMetricsInternal({ ...args, type: metric });
+          if (metricResult && metricResult.data?.result?.length > 0) {
+            results[metric] = metricResult;
+            const values = metricResult.data.result[0]?.values;
+            if (values && values.length > 0) {
+              const latestValue = values[values.length - 1][1];
+              output += `${metric}: ${latestValue} (${values.length} data points)\n`;
+              hasData = true;
             } else {
-                sinks.forEach((sink: any, index: number) => {
-                    output += `\n   ${index + 1}. ${sink.name} (${sink.type})`;
-                });
+              output += `${metric}: No data available\n`;
             }
-            
-            cli.output(output);
-        } catch (error) {
-            throw new Error(`Failed to list monitoring sinks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          } else {
+            output += `${metric}: No data available\n`;
+          }
+        } catch (error: any) {
+          output += `${metric}: Unavailable (${error.message.split(':')[0]})\n`;
         }
-    }
+      });
 
-    /**
-     * Get monitoring sink details
-     */
-    @action("get-sink")
-    getSink(args: Args): void {
-        const sinkId = args.sink_id;
-        
-        if (!sinkId) {
-            throw new Error("Sink ID is required (use --sink_id=SINK_ID)");
-        }
-
-        try {
-            const response = this.makeRequest("GET", `/monitoring/sinks/${sinkId}`);
-            
-            if (response.sink) {
-                const sink = response.sink;
-                cli.output(`📊 Monitoring Sink Information:\n   ID: ${sink.id}\n   Name: ${sink.name}\n   Type: ${sink.type}\n   Configuration: ${JSON.stringify(sink.config, null, 2)}`);
+      if (!hasData) {
+        cli.output(`No metrics data available for Droplet ${droplet_id}
+Note: Make sure the monitoring agent is installed on your droplet:
+curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash`);
             } else {
-                throw new Error("Monitoring sink not found");
-            }
-        } catch (error) {
-            throw new Error(`Failed to get monitoring sink: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        cli.output(output.trim());
+      }
+      
+      return { droplet_id, all_metrics: results };
+    } catch (error: any) {
+      throw new Error(`Failed to get all droplet metrics: ${error.message}`);
+    }
+  }
+
+  // === ADDITIONAL DROPLET MEMORY METRICS ===
+  @action()
+  getDropletMemoryAvailable(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/memory_available' });
+  }
+
+  @action()
+  getDropletMemoryCached(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/memory_cached' });
+  }
+
+  @action()
+  getDropletMemoryFree(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/memory_free' });
+  }
+
+  @action()
+  getDropletMemoryTotal(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/memory_total' });
+  }
+
+  // Additional Droplet Filesystem Metrics
+  @action()
+  getDropletFilesystemFree(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/filesystem_free' });
+  }
+
+  @action()
+  getDropletFilesystemSize(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/filesystem_size' });
+  }
+
+  // Additional Droplet Network Metrics
+  @action()
+  getDropletNetworkOutboundPackets(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/network_outbound_packets' });
+  }
+
+  @action()
+  getDropletNetworkInboundPackets(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/network_inbound_packets' });
+  }
+
+  @action()
+  getDropletNetworkOutboundErrors(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/network_outbound_errors' });
+  }
+
+  @action()
+  getDropletNetworkInboundErrors(args: Args): any {
+    return this.getDropletMetrics({ ...args, type: 'v1/insights/droplet/network_inbound_errors' });
+  }
+
+  // Load Balancer Metrics
+  @action()
+  getLoadBalancerCpuUtilization(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!lb_id) {
+        throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+      }
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/avg_cpu_utilization_percent?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No CPU utilization metrics found for load balancer ${lb_id}`);
+        return { lb_id, data: [] };
+      }
+
+      let output = `Load Balancer CPU Utilization for ${lb_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `CPU Utilization:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'avg_cpu_utilization_percent',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { lb_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get load balancer CPU utilization: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLoadBalancerConnectionUtilization(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!lb_id) {
+        throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+      }
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/connection_utilization_percent?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No connection utilization metrics found for load balancer ${lb_id}`);
+        return { lb_id, data: [] };
+      }
+
+      let output = `Load Balancer Connection Utilization for ${lb_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `Connection Utilization:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'connection_utilization_percent',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { lb_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get load balancer connection utilization: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLoadBalancerDropletHealth(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!lb_id) {
+        throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+      }
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/droplet_health?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No droplet health metrics found for load balancer ${lb_id}`);
+        return { lb_id, data: [] };
+      }
+
+      let output = `Load Balancer Droplet Health for ${lb_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `Droplet Health:\n`;
+        output += `  Latest: ${latestValue[1]} (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'droplet_health',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { lb_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get load balancer droplet health: ${error.message}`);
+    }
+  }
+
+  // Database Metrics
+  @action()
+  getDatabaseCpuUtilization(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!db_id) {
+        throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+      }
+
+      let queryParams = `db_id=${db_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/cpu_utilization_percent?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No CPU utilization metrics found for database ${db_id}`);
+        return { db_id, data: [] };
+      }
+
+      let output = `Database CPU Utilization for ${db_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `CPU Utilization:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'cpu_utilization_percent',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { db_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get database CPU utilization: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDatabaseMemoryUtilization(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!db_id) {
+        throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+      }
+
+      let queryParams = `db_id=${db_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/memory_utilization_percent?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No memory utilization metrics found for database ${db_id}`);
+        return { db_id, data: [] };
+      }
+
+      let output = `Database Memory Utilization for ${db_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `Memory Utilization:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'memory_utilization_percent',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { db_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get database memory utilization: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDatabaseDiskUtilization(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!db_id) {
+        throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+      }
+
+      let queryParams = `db_id=${db_id}`;
+      if (start_time) queryParams += `&start=${start_time}`;
+      if (end_time) queryParams += `&end=${end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/disk_utilization_percent?${queryParams}`);
+      
+      if (!response.data?.result || response.data.result.length === 0) {
+        cli.output(`No disk utilization metrics found for database ${db_id}`);
+        return { db_id, data: [] };
+      }
+
+      let output = `Database Disk Utilization for ${db_id}:\n\n`;
+
+      const processedResults = response.data.result.map((result: any) => {
+        const values = result.values || [];
+        if (values.length === 0) return null;
+
+        const latestValue = values[values.length - 1];
+        output += `Disk Utilization:\n`;
+        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1000).toLocaleString()})\n`;
+        output += `  Data Points: ${values.length}\n\n`;
+
+        return {
+          metric: 'disk_utilization_percent',
+          values: values,
+          latest: { value: latestValue[1], timestamp: latestValue[0] },
+          count: values.length
+        };
+      }).filter(Boolean);
+
+      cli.output(output.trim());
+      return { db_id, data: processedResults };
+    } catch (error: any) {
+      throw new Error(`Failed to get database disk utilization: ${error.message}`);
+    }
+  }
+
+  // Volume Metrics
+  @action()
+  getVolumeFilesystemFree(args: Args): any {
+    try {
+      const volume_id = args.volume_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!volume_id) {
+        throw new Error("Volume ID is required (use volume_id=YOUR-VOLUME-ID)");
+      }
+
+      let queryParams = ``;
+      if (start_time) queryParams += `start=${start_time}&`;
+      if (end_time) queryParams += `end=${end_time}&`;
+      queryParams = queryParams.replace(/&$/, '');
+
+      const endpoint = `/monitoring/metrics/volumes/filesystem_free${queryParams ? '?' + queryParams : ''}`;
+      const response = this.makeRequest('GET', endpoint);
+      
+      if (!response.data?.result?.length) {
+        cli.output(`No filesystem free metrics found for volume ${volume_id}`);
+        return { volume_id, metrics: [] };
+      }
+
+      let output = `Volume Filesystem Free for ${volume_id}:\n\n`;
+      
+      response.data.result.forEach((metric: any, index: number) => {
+        output += `Metric ${index + 1}:\n`;
+        output += `  Volume: ${metric.metric?.volume_id || 'Unknown'}\n`;
+        output += `  Values: ${metric.values?.length || 0} data points\n`;
+        if (metric.values?.length > 0) {
+          const latestValue = metric.values[metric.values.length - 1];
+          output += `  Latest: ${latestValue[1]} bytes free at ${new Date(latestValue[0] * 1000).toISOString()}\n`;
         }
+        output += `\n`;
+      });
+
+      cli.output(output.trim());
+      return { volume_id, metrics: response.data.result };
+    } catch (error: any) {
+      throw new Error(`Failed to get volume filesystem free metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  getVolumeReadBytes(args: Args): any {
+    try {
+      const volume_id = args.volume_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!volume_id) {
+        throw new Error("Volume ID is required (use volume_id=YOUR-VOLUME-ID)");
+      }
+
+      let queryParams = ``;
+      if (start_time) queryParams += `start=${start_time}&`;
+      if (end_time) queryParams += `end=${end_time}&`;
+      queryParams = queryParams.replace(/&$/, '');
+
+      const endpoint = `/monitoring/metrics/volumes/read_bytes${queryParams ? '?' + queryParams : ''}`;
+      const response = this.makeRequest('GET', endpoint);
+      
+      if (!response.data?.result?.length) {
+        cli.output(`No read bytes metrics found for volume ${volume_id}`);
+        return { volume_id, metrics: [] };
+      }
+
+      let output = `Volume Read Bytes for ${volume_id}:\n\n`;
+      
+      response.data.result.forEach((metric: any, index: number) => {
+        output += `Metric ${index + 1}:\n`;
+        output += `  Volume: ${metric.metric?.volume_id || 'Unknown'}\n`;
+        output += `  Values: ${metric.values?.length || 0} data points\n`;
+        if (metric.values?.length > 0) {
+          const latestValue = metric.values[metric.values.length - 1];
+          output += `  Latest: ${latestValue[1]} bytes read at ${new Date(latestValue[0] * 1000).toISOString()}\n`;
+        }
+        output += `\n`;
+      });
+
+      cli.output(output.trim());
+      return { volume_id, metrics: response.data.result };
+    } catch (error: any) {
+      throw new Error(`Failed to get volume read bytes metrics: ${error.message}`);
+    }
+  }
+
+  @action()
+  getVolumeWriteBytes(args: Args): any {
+    try {
+      const volume_id = args.volume_id;
+      const start_time = args.start_time;
+      const end_time = args.end_time;
+
+      if (!volume_id) {
+        throw new Error("Volume ID is required (use volume_id=YOUR-VOLUME-ID)");
+      }
+
+      let queryParams = ``;
+      if (start_time) queryParams += `start=${start_time}&`;
+      if (end_time) queryParams += `end=${end_time}&`;
+      queryParams = queryParams.replace(/&$/, '');
+
+      const endpoint = `/monitoring/metrics/volumes/write_bytes${queryParams ? '?' + queryParams : ''}`;
+      const response = this.makeRequest('GET', endpoint);
+      
+      if (!response.data?.result?.length) {
+        cli.output(`No write bytes metrics found for volume ${volume_id}`);
+        return { volume_id, metrics: [] };
+      }
+
+      let output = `Volume Write Bytes for ${volume_id}:\n\n`;
+      
+      response.data.result.forEach((metric: any, index: number) => {
+        output += `Metric ${index + 1}:\n`;
+        output += `  Volume: ${metric.metric?.volume_id || 'Unknown'}\n`;
+        output += `  Values: ${metric.values?.length || 0} data points\n`;
+        if (metric.values?.length > 0) {
+          const latestValue = metric.values[metric.values.length - 1];
+          output += `  Latest: ${latestValue[1]} bytes written at ${new Date(latestValue[0] * 1000).toISOString()}\n`;
+        }
+        output += `\n`;
+      });
+
+      cli.output(output.trim());
+      return { volume_id, metrics: response.data.result };
+    } catch (error: any) {
+      throw new Error(`Failed to get volume write bytes metrics: ${error.message}`);
+    }
+  }
+
+  // === LOAD BALANCER ALERT METRICS ===
+  @action()
+  getLBCpuUtilization(args: Args): any {
+    return this.getLoadBalancerCpuUtilization(args);
+  }
+
+  @action()
+  getLBConnectionUtilization(args: Args): any {
+    return this.getLoadBalancerConnectionUtilization(args);
+  }
+
+  @action()
+  getLBDropletHealth(args: Args): any {
+    return this.getLoadBalancerDropletHealth(args);
+  }
+
+  @action()
+  getLBTlsConnectionsUtilization(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/tls_connections_per_second_utilization_percent?${queryParams}`);
+      
+      cli.output(`Load Balancer TLS Connections Utilization for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}% at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'tls_connections_utilization', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB TLS connections utilization: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLBHttpError5xxRate(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/increase_in_http_error_rate_percentage_5xx?${queryParams}`);
+      
+      cli.output(`Load Balancer HTTP 5xx Error Rate for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}% at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'http_error_5xx_rate', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB HTTP 5xx error rate: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLBHttpError4xxRate(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/increase_in_http_error_rate_percentage_4xx?${queryParams}`);
+      
+      cli.output(`Load Balancer HTTP 4xx Error Rate for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}% at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'http_error_4xx_rate', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB HTTP 4xx error rate: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLBHttpResponseTime50p(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/high_http_request_response_time_50p?${queryParams}`);
+      
+      cli.output(`Load Balancer HTTP Response Time (50th percentile) for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}ms at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'response_time_50p', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB response time 50p: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLBHttpResponseTime95p(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/high_http_request_response_time_95p?${queryParams}`);
+      
+      cli.output(`Load Balancer HTTP Response Time (95th percentile) for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}ms at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'response_time_95p', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB response time 95p: ${error.message}`);
+    }
+  }
+
+  @action()
+  getLBHttpResponseTime99p(args: Args): any {
+    try {
+      const lb_id = args.lb_id;
+      if (!lb_id) throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
+
+      let queryParams = `lb_id=${lb_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/load_balancer/high_http_request_response_time_99p?${queryParams}`);
+      
+      cli.output(`Load Balancer HTTP Response Time (99th percentile) for ${lb_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}ms at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { lb_id, metric: 'response_time_99p', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get LB response time 99p: ${error.message}`);
+    }
+  }
+
+  // === DATABASE ALERT METRICS ===
+  @action()
+  getDBLoad15(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      if (!db_id) throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+
+      let queryParams = `db_id=${db_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/load_15?${queryParams}`);
+      
+      cli.output(`Database Load 15-minute average for ${db_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]} at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { db_id, metric: 'load_15', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get database load 15: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDBCpuAlerts(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      if (!db_id) throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+
+      let queryParams = `db_id=${db_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/cpu_alerts?${queryParams}`);
+      
+      cli.output(`Database CPU Alerts for ${db_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]} alerts at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { db_id, metric: 'cpu_alerts', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get database CPU alerts: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDBMemoryAlerts(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      if (!db_id) throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+
+      let queryParams = `db_id=${db_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/memory_utilization_alerts?${queryParams}`);
+      
+      cli.output(`Database Memory Utilization Alerts for ${db_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]} alerts at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { db_id, metric: 'memory_alerts', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get database memory alerts: ${error.message}`);
+    }
+  }
+
+  @action()
+  getDBDiskAlerts(args: Args): any {
+    try {
+      const db_id = args.db_id;
+      if (!db_id) throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
+
+      let queryParams = `db_id=${db_id}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/databases/disk_utilization_alerts?${queryParams}`);
+      
+      cli.output(`Database Disk Utilization Alerts for ${db_id}:`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]} alerts at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { db_id, metric: 'disk_alerts', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get database disk alerts: ${error.message}`);
+    }
+  }
+
+  // === APP METRICS ===
+  @action()
+  getAppCpuPercentage(args: Args): any {
+    try {
+      const app_id = args.app_id;
+      const component = args.component;
+      if (!app_id) throw new Error("App ID is required (use app_id=YOUR-APP-ID)");
+      if (!component) throw new Error("Component is required (use component=web)");
+
+      let queryParams = `app_id=${app_id}&app_component=${component}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/apps/cpu_percentage?${queryParams}`);
+      
+      cli.output(`App CPU Percentage for ${app_id} (${component}):`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}% at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { app_id, component, metric: 'cpu_percentage', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get app CPU percentage: ${error.message}`);
+    }
+  }
+
+  @action()
+  getAppMemoryPercentage(args: Args): any {
+    try {
+      const app_id = args.app_id;
+      const component = args.component;
+      if (!app_id) throw new Error("App ID is required (use app_id=YOUR-APP-ID)");
+      if (!component) throw new Error("Component is required (use component=web)");
+
+      let queryParams = `app_id=${app_id}&app_component=${component}`;
+      if (args.start_time) queryParams += `&start=${args.start_time}`;
+      if (args.end_time) queryParams += `&end=${args.end_time}`;
+
+      const response = this.makeRequest('GET', `/monitoring/metrics/apps/memory_percentage?${queryParams}`);
+      
+      cli.output(`App Memory Percentage for ${app_id} (${component}):`);
+      if (response.data?.result?.length > 0) {
+        const latestValue = response.data.result[0].values?.[response.data.result[0].values.length - 1];
+        if (latestValue) cli.output(`Latest: ${latestValue[1]}% at ${new Date(latestValue[0] * 1000).toLocaleString()}`);
+      }
+      
+      return { app_id, component, metric: 'memory_percentage', data: response.data?.result || [] };
+    } catch (error: any) {
+      throw new Error(`Failed to get app memory percentage: ${error.message}`);
+    }
+  }
+
+  // === VOLUME METRICS (enhanced) ===
+  @action()
+  getVolumeFilesystemSize(args: Args): any {
+    return this.getVolumeMetrics(args);
+  }
+
+  // Internal method that doesn't output to CLI
+  private getDropletMetricsInternal(args: Args): any {
+    const droplet_id = args.droplet_id;
+    const type = args.type || 'v1/insights/droplet/cpu';
+    let start_time = args.start_time;
+    let end_time = args.end_time;
+
+    if (!droplet_id) {
+      throw new Error("Droplet ID is required");
     }
 
-    // === Account & Information (2 actions) ===
+    validateMetricType(type);
 
-    /**
-     * Get DigitalOcean account information and limits
-     */
-    @action("get-account-info")
-    getAccountInfoAction(_args: Args): void {
-        try {
-            const response = this.getAccountInfo();
-            
-            if (response.account) {
-                const account = response.account;
-                let output = `📊 DigitalOcean Account Information:\n   Email: ${account.email}\n   Email Verified: ${account.email_verified ? '✅ Yes' : '❌ No'}\n   UUID: ${account.uuid}\n   Status: ${account.status}\n   Droplet Limit: ${account.droplet_limit}\n   Floating IP Limit: ${account.floating_ip_limit}`;
-                
-                if (account.status_message) {
-                    output += `\n   Status Message: ${account.status_message}`;
-                }
-                
-                cli.output(output);
-            } else {
-                throw new Error("Account information not found");
-            }
-        } catch (error) {
-            throw new Error(`Failed to get account info: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+    // Set default time range if not provided (last 1 hour)
+    if (!end_time) {
+      end_time = new Date().toISOString();
+    }
+    if (!start_time) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      start_time = oneHourAgo.toISOString();
     }
 
+    // Build query string manually
+    let queryParams = `host_id=${droplet_id}&start=${start_time}&end=${end_time}`;
 
-    // === Droplet Metrics (15 actions) ===
+    const metricPath = type.replace('v1/insights/droplet/', '');
+    const response = this.makeRequest('GET', `/monitoring/metrics/droplet/${metricPath}?${queryParams}`);
+    
+    return response;
+  }
 
-    /**
-     * Get general droplet metrics
-     */
-    @action("get-droplet-metrics")
-    getDropletMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        const metricType = args.metric_type;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-        
-        if (!metricType) {
-            throw new Error("Metric type is required (use --metric_type=METRIC_TYPE)");
-        }
-
-        const validatedType = validateMetricType(metricType);
-        
-        // Use provided time range or auto-generate
-        let startTime = args.start_time;
-        let endTime = args.end_time;
-        
-        if (!startTime || !endTime) {
-            const timeRange = generateTimeRange();
-            startTime = timeRange.start_time;
-            endTime = timeRange.end_time;
-            cli.output(`📅 Using auto time range: ${startTime} to ${endTime}`);
-        }
-
-        try {
-            const queryParams = `type=${encodeURIComponent(validatedType)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-            
-            cli.output(`📊 Droplet Metrics (${dropletId}):\n   Metric Type: ${validatedType}\n   Time Range: ${startTime} to ${endTime}`);
-            
-            if (response.data && response.data.result) {
-                const results = response.data.result;
-                let dataOutput = `   Data Points: ${results.length}`;
-                
-                results.forEach((result: any, index: number) => {
-                    if (result.values && result.values.length > 0) {
-                        const latestValue = result.values[result.values.length - 1];
-                        dataOutput += `\n   ${index + 1}. Latest Value: ${latestValue[1]} at ${new Date(latestValue[0] * 1000).toISOString()}`;
-                    }
-                });
-                
-                cli.output(dataOutput);
-            } else {
-                cli.output("   No data available for this time range");
-            }
-        } catch (error) {
-            throw new Error(`Failed to get droplet metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+  private findExistingPolicy(): AlertPolicy | null {
+    // In test mode, don't make API calls
+    if (this.definition.create_when_missing === false) {
+      return null;
     }
+    
+    try {
+      const response = this.makeRequest('GET', '/monitoring/alerts');
+      
+      // DigitalOcean API returns 'policies' not 'alerts'
+      const alerts = response.alerts || response.policies || [];
+      
+      if (!alerts) {
+        return null;
+      }
 
-    /**
-     * Get CPU metrics for a droplet
-     */
-    @action("get-droplet-cpu-metrics")
-    getDropletCpuMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
+      // Find policy by name (description field)
+      const existingPolicy = alerts.find((policy: AlertPolicy) => 
+        policy.description === this.definition.name ||
+        policy.description === `Alert policy for ${this.definition.name}`
+      );
 
-        const timeRange = generateTimeRange();
-        
-        try {
-            const queryParams = `type=${encodeURIComponent("v1/insights/droplet/cpu")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-            
-            cli.output(`🖥️ Droplet CPU Metrics (${dropletId}):\n   Time Range: Last 1 hour`);
-            
-            this.displayMetricsResponse(response, "CPU Utilization %");
-        } catch (error) {
-            throw new Error(`Failed to get droplet CPU metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
 
-    /**
-     * Get memory metrics for a droplet
-     */
-    @action("get-droplet-memory-metrics")
-    getDropletMemoryMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
 
-        const timeRange = generateTimeRange();
-        
-        try {
-            const queryParams = `type=${encodeURIComponent("v1/insights/droplet/memory_utilization_percent")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-            
-            cli.output(`💾 Droplet Memory Metrics (${dropletId}):\n   Time Range: Last 1 hour`);
-            
-            this.displayMetricsResponse(response, "Memory Utilization %");
-        } catch (error) {
-            throw new Error(`Failed to get droplet memory metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get disk metrics for a droplet
-     */
-    @action("get-droplet-disk-metrics")
-    getDropletDiskMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        const timeRange = generateTimeRange();
-        
-        try {
-            const queryParams = `type=${encodeURIComponent("v1/insights/droplet/disk_utilization_percent")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-            
-            cli.output(`💽 Droplet Disk Metrics (${dropletId}):\n   Time Range: Last 1 hour`);
-            
-            this.displayMetricsResponse(response, "Disk Utilization %");
-        } catch (error) {
-            throw new Error(`Failed to get droplet disk metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get network metrics for a droplet
-     */
-    @action("get-droplet-network-metrics")
-    getDropletNetworkMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        const timeRange = generateTimeRange();
-        
-        const metrics = [
-            { type: "v1/insights/droplet/public_inbound_bandwidth", name: "Public Inbound Bandwidth" },
-            { type: "v1/insights/droplet/public_outbound_bandwidth", name: "Public Outbound Bandwidth" },
-            { type: "v1/insights/droplet/private_inbound_bandwidth", name: "Private Inbound Bandwidth" },
-            { type: "v1/insights/droplet/private_outbound_bandwidth", name: "Private Outbound Bandwidth" }
-        ];
-
-        cli.output(`🌐 Droplet Network Metrics (${dropletId}):\n   Time Range: Last 1 hour`);
-
-        try {
-            let output = "";
-            for (const metric of metrics) {
-                const queryParams = `type=${encodeURIComponent(metric.type)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-                
-                const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-                
-                output += `\n\n📊 ${metric.name}:`;
-                output += this.formatMetricsResponse(response, "Bytes");
-            }
-            
-            if (output) {
-                cli.output(output);
-            }
-        } catch (error) {
-            throw new Error(`Failed to get droplet network metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get inbound bandwidth metrics
-     */
-    @action("get-droplet-bandwidth-inbound")
-    getDropletBandwidthInbound(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/public_inbound_bandwidth", "📥 Public Inbound Bandwidth");
-    }
-
-    /**
-     * Get outbound bandwidth metrics
-     */
-    @action("get-droplet-bandwidth-outbound")
-    getDropletBandwidthOutbound(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/public_outbound_bandwidth", "📤 Public Outbound Bandwidth");
-    }
-
-    /**
-     * Get private inbound bandwidth metrics
-     */
-    @action("get-droplet-private-bandwidth-inbound")
-    getDropletPrivateBandwidthInbound(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/private_inbound_bandwidth", "📥 Private Inbound Bandwidth");
-    }
-
-    /**
-     * Get private outbound bandwidth metrics
-     */
-    @action("get-droplet-private-bandwidth-outbound")
-    getDropletPrivateBandwidthOutbound(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/private_outbound_bandwidth", "📤 Private Outbound Bandwidth");
-    }
-
-    /**
-     * Get disk read metrics
-     */
-    @action("get-droplet-disk-read")
-    getDropletDiskRead(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/disk_read", "📖 Disk Read Operations");
-    }
-
-    /**
-     * Get disk write metrics
-     */
-    @action("get-droplet-disk-write")
-    getDropletDiskWrite(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/disk_write", "📝 Disk Write Operations");
-    }
-
-    /**
-     * Get 1-minute load average
-     */
-    @action("get-droplet-load-average-1")
-    getDropletLoadAverage1(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_1", "⚖️ 1-Minute Load Average");
-    }
-
-    /**
-     * Get 5-minute load average
-     */
-    @action("get-droplet-load-average-5")
-    getDropletLoadAverage5(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_5", "⚖️ 5-Minute Load Average");
-    }
-
-    /**
-     * Get 15-minute load average
-     */
-    @action("get-droplet-load-average-15")
-    getDropletLoadAverage15(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_15", "⚖️ 15-Minute Load Average");
-    }
-
-    /**
-     * Get all droplet metrics combined
-     */
-    @action("get-all-droplet-metrics")
-    getAllDropletMetrics(args: Args): void {
-        const dropletId = args.droplet_id;
-        
-        if (!dropletId) {
-            throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
-        }
-
-        const timeRange = generateTimeRange();
-        
-        const metrics = [
-            { type: "v1/insights/droplet/cpu", name: "🖥️ CPU Utilization" },
-            { type: "v1/insights/droplet/memory_utilization_percent", name: "💾 Memory Utilization" },
-            { type: "v1/insights/droplet/disk_utilization_percent", name: "💽 Disk Utilization" },
-            { type: "v1/insights/droplet/load_1", name: "⚖️ 1-Min Load Average" },
-            { type: "v1/insights/droplet/load_5", name: "⚖️ 5-Min Load Average" },
-            { type: "v1/insights/droplet/load_15", name: "⚖️ 15-Min Load Average" },
-            { type: "v1/insights/droplet/public_inbound_bandwidth", name: "📥 Public Inbound Bandwidth" },
-            { type: "v1/insights/droplet/public_outbound_bandwidth", name: "📤 Public Outbound Bandwidth" },
-            { type: "v1/insights/droplet/disk_read", name: "📖 Disk Read" },
-            { type: "v1/insights/droplet/disk_write", name: "📝 Disk Write" }
-        ];
-
-        let output = `📊 All Droplet Metrics (${dropletId}):\n   Time Range: Last 1 hour`;
-
-        try {
-            for (const metric of metrics) {
-                const queryParams = `type=${encodeURIComponent(metric.type)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-                
-                const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-                
-                output += `\n\n${metric.name}:`;
-                output += this.formatMetricsResponse(response);
-            }
-            
-            cli.output(output);
-        } catch (error) {
-            throw new Error(`Failed to get all droplet metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    // === Other Resource Metrics (4 actions) ===
-
-    /**
-     * Get volume metrics
-     */
-    @action("get-volume-metrics")
-    getVolumeMetrics(args: Args): void {
-        const volumeId = args.volume_id;
-        
-        if (!volumeId) {
-            throw new Error("Volume ID is required (use --volume_id=VOLUME_ID)");
-        }
-
-        // Use provided time range or auto-generate
-        let startTime = args.start_time;
-        let endTime = args.end_time;
-        
-        if (!startTime || !endTime) {
-            const timeRange = generateTimeRange();
-            startTime = timeRange.start_time;
-            endTime = timeRange.end_time;
-        }
-
-        try {
-            const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/volume/${volumeId}?${queryParams}`);
-            
-            cli.output(`💾 Volume Metrics (${volumeId}):\n   Time Range: ${startTime} to ${endTime}`);
-            
-            this.displayMetricsResponse(response);
-        } catch (error) {
-            throw new Error(`Failed to get volume metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get app metrics
-     */
-    @action("get-app-metrics")
-    getAppMetrics(args: Args): void {
-        const appId = args.app_id;
-        const component = args.component || "web";
-        
-        if (!appId) {
-            throw new Error("App ID is required (use --app_id=APP_ID)");
-        }
-
-        // Use provided time range or auto-generate
-        let startTime = args.start_time;
-        let endTime = args.end_time;
-        
-        if (!startTime || !endTime) {
-            const timeRange = generateTimeRange();
-            startTime = timeRange.start_time;
-            endTime = timeRange.end_time;
-        }
-
-        try {
-            const queryParams = `component=${encodeURIComponent(component)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/app/${appId}?${queryParams}`);
-            
-            cli.output(`📱 App Metrics (${appId}):\n   Component: ${component}\n   Time Range: ${startTime} to ${endTime}`);
-            
-            this.displayMetricsResponse(response);
-        } catch (error) {
-            throw new Error(`Failed to get app metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get load balancer metrics
-     */
-    @action("get-load-balancer-metrics")
-    getLoadBalancerMetrics(args: Args): void {
-        const lbId = args.lb_id;
-        
-        if (!lbId) {
-            throw new Error("Load Balancer ID is required (use --lb_id=LB_ID)");
-        }
-
-        // Use provided time range or auto-generate
-        let startTime = args.start_time;
-        let endTime = args.end_time;
-        
-        if (!startTime || !endTime) {
-            const timeRange = generateTimeRange();
-            startTime = timeRange.start_time;
-            endTime = timeRange.end_time;
-        }
-
-        try {
-            const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/load_balancer/${lbId}?${queryParams}`);
-            
-            cli.output(`⚖️ Load Balancer Metrics (${lbId}):\n   Time Range: ${startTime} to ${endTime}`);
-            
-            this.displayMetricsResponse(response);
-        } catch (error) {
-            throw new Error(`Failed to get load balancer metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Get database metrics
-     */
-    @action("get-database-metrics")
-    getDatabaseMetrics(args: Args): void {
-        const dbId = args.db_id;
-        
-        if (!dbId) {
-            throw new Error("Database ID is required (use --db_id=DB_ID)");
-        }
-
-        // Use provided time range or auto-generate
-        let startTime = args.start_time;
-        let endTime = args.end_time;
-        
-        if (!startTime || !endTime) {
-            const timeRange = generateTimeRange();
-            startTime = timeRange.start_time;
-            endTime = timeRange.end_time;
-        }
-
-        try {
-            const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/database/${dbId}?${queryParams}`);
-            
-            cli.output(`🗄️ Database Metrics (${dbId}):\n   Time Range: ${startTime} to ${endTime}`);
-            
-            this.displayMetricsResponse(response);
-        } catch (error) {
-            throw new Error(`Failed to get database metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    // === Helper Methods ===
-
-    /**
-     * Get specific droplet metric
-     */
-    private getSpecificDropletMetric(dropletId: string, metricType: string, metricName: string): void {
-        const timeRange = generateTimeRange();
-        
-        try {
-            const queryParams = `type=${encodeURIComponent(metricType)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
-            
-            const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
-            
-            cli.output(`${metricName} (${dropletId}):\n   Time Range: Last 1 hour`);
-            
-            this.displayMetricsResponse(response);
-        } catch (error) {
-            throw new Error(`Failed to get ${metricName.toLowerCase()}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-     * Display metrics response in a formatted way
-     */
-    private displayMetricsResponse(response: any, unit?: string): void {
-        cli.output(this.formatMetricsResponse(response, unit));
-    }
-
-    /**
-     * Format metrics response as a string
-     */
-    private formatMetricsResponse(response: any, unit?: string): string {
-        if (response.data && response.data.result) {
-            const results = response.data.result;
-            
-            if (results.length === 0) {
-                return "\n   No data available for this time range";
-            }
-            
-            let output = "";
-            results.forEach((result: any, index: number) => {
-                if (result.values && result.values.length > 0) {
-                    const latestValue = result.values[result.values.length - 1];
-                    const value = unit ? `${latestValue[1]} ${unit}` : latestValue[1];
-                    const timestamp = new Date(latestValue[0] * 1000).toISOString();
-                    output += `\n   ${index + 1}. Latest: ${value} at ${timestamp}\n      Data points: ${result.values.length}`;
-                } else {
-                    output += `\n   ${index + 1}. No values available`;
-                }
-            });
-            return output;
-        } else {
-            return "\n   No data available for this time range";
-        }
-    }
-
-    /**
-     * Find existing alert policy by checking description for name
-     */
-    private findExistingAlertPolicy(): any | null {
-        try {
-            const response = this.makeRequest("GET", "/monitoring/alerts");
-            
-            if (response.policies && Array.isArray(response.policies)) {
-                // Try to find by name in description first
-                const byName = response.policies.find(
-                    (policy: any) => policy.description && policy.description.includes(this.definition.name)
-                );
-                
-                if (byName) return byName;
-                
-                // Try to find by exact metric type and value match
-                return response.policies.find(
-                    (policy: any) => 
-                        policy.type === this.definition.metric_type &&
-                        policy.compare === this.definition.compare &&
-                        policy.value === this.definition.value &&
-                        policy.window === this.definition.window
-                );
-            }
-            
+      return existingPolicy || null;
+    } catch (error: any) {
             return null;
-        } catch (error) {
-            // If we can't list policies, assume it doesn't exist
-            return null;
         }
     }
 
-    /**
-     * Update internal state from policy object
-     */
-    private updateStateFromPolicy(policy: any): void {
+  private buildPolicyData(emails?: string[]): any {
+    const emailsToUse = emails || this.definition.emails || [];
+    
+    // Ensure we have at least one action (email or slack)
+    if (emailsToUse.length === 0 && (!this.definition.slack_channels || this.definition.slack_channels.length === 0)) {
+      throw new Error('Alert policy must have at least one action (email or slack). Please provide emails or slack_channels.');
+    }
+
+    return {
+      type: this.definition.metric_type,
+      description: this.definition.alert_description || `Alert policy for ${this.definition.name}`,
+      compare: this.definition.compare,
+      value: this.definition.value,
+      window: this.definition.window,
+      entities: this.definition.entities || [],
+      tags: this.definition.tags || [],
+      alerts: {
+        email: emailsToUse,
+        slack: this.definition.slack_channels?.map(ch => ({
+          type: 'slack',
+          channel: ch.channel,
+          url: ch.url
+        })) || []
+      },
+      enabled: this.definition.enabled !== false
+    };
+  }
+
+  private updateStateFromPolicy(policy: AlertPolicy): void {
         this.state.uuid = policy.uuid;
-        this.state.name = this.definition.name; // Keep our name
-        this.state.type = policy.type;
-        this.state.description = policy.description;
+    this.state.name = this.definition.name;
+    this.state.alert_description = policy.description;
+    this.state.metric_type = policy.type;
         this.state.compare = policy.compare;
         this.state.value = policy.value;
         this.state.window = policy.window;
         this.state.entities = policy.entities;
         this.state.tags = policy.tags;
-        this.state.alerts = policy.alerts;
+    this.state.emails = policy.alerts?.email;
+    this.state.slack_channels = policy.alerts?.slack?.map(ch => ({
+      channel: ch.channel,
+      url: ch.url
+    }));
         this.state.enabled = policy.enabled;
-        this.state.created_at = policy.created_at;
     }
 }
+
+// Export as default for Monk entity system
+export default DigitalOceanMonitoring;

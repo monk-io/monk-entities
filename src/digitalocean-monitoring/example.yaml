@@ -78,3 +78,108 @@ monk-disk-io-alert:
     - high-io
   enabled: true
   create_when_missing: true
+
+# === NEW METRIC TYPES EXAMPLES ===
+
+# Advanced Memory Monitoring
+monk-memory-available-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-memory-low-available-alert
+  metric_type: v1/insights/droplet/memory_available
+  compare: LessThan
+  value: 1000000000  # 1GB in bytes
+  window: 5m
+  tags:
+    - production
+  enabled: true
+  create_when_missing: true
+
+# Filesystem monitoring
+monk-filesystem-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-filesystem-full-alert
+  metric_type: v1/insights/droplet/filesystem_free
+  compare: LessThan
+  value: 5000000000  # 5GB in bytes
+  window: 30m
+  enabled: true
+  create_when_missing: true
+
+# Network packet errors
+monk-network-errors-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-network-errors-alert
+  metric_type: v1/insights/droplet/network_inbound_errors
+  compare: GreaterThan
+  value: 100  # 100 errors
+  window: 10m
+  tags:
+    - network
+    - critical
+  enabled: true
+  create_when_missing: true
+
+# Load Balancer monitoring
+monk-lb-cpu-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-lb-cpu-high-alert
+  metric_type: v1/insights/lbaas/avg_cpu_utilization_percent
+  compare: GreaterThan
+  value: 80
+  window: 10m
+  entities:
+    - "your-lb-id"  # Replace with actual LB ID
+  enabled: true
+  create_when_missing: true
+
+# Load Balancer HTTP errors
+monk-lb-5xx-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-lb-5xx-errors-alert
+  metric_type: v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx
+  compare: GreaterThan
+  value: 5  # 5% error rate increase
+  window: 5m
+  entities:
+    - "your-lb-id"
+  enabled: true
+  create_when_missing: true
+
+# Database monitoring
+monk-db-cpu-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-db-cpu-alerts
+  metric_type: v1/dbaas/alerts/cpu_alerts
+  compare: GreaterThan
+  value: 5  # 5 CPU alerts
+  window: 10m
+  entities:
+    - "your-db-id"  # Replace with actual DB ID
+  enabled: true
+  create_when_missing: true
+
+# Volume monitoring
+monk-volume-space-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-volume-space-low-alert
+  metric_type: v1/insights/volumes/filesystem_free
+  compare: LessThan
+  value: 10000000000  # 10GB free space
+  window: 1h
+  entities:
+    - "your-volume-id"  # Replace with actual Volume ID
+  enabled: true
+  create_when_missing: true
+
+# App monitoring  
+monk-app-cpu-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-app-cpu-high-alert
+  metric_type: v1/insights/apps/cpu_percentage
+  compare: GreaterThan
+  value: 80
+  window: 10m
+  entities:
+    - "your-app-id"  # Replace with actual App ID
+  enabled: true
+  create_when_missing: true
