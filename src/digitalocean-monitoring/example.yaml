@@ -2,7 +2,7 @@ namespace: digitalocean-monitoring-example
 
 # Basic CPU monitoring alert for high CPU usage
 monk-cpu-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-cpu-high-alert
   metric_type: v1/insights/droplet/cpu
   compare: GreaterThan
@@ -15,7 +15,7 @@ monk-cpu-alert:
   create_when_missing: true
 
 monk-memory-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-memory-high-alert
   metric_type: v1/insights/droplet/memory_utilization_percent
   compare: GreaterThan
@@ -32,7 +32,7 @@ monk-memory-alert:
 
 # Disk utilization monitoring
 monk-disk-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-disk-full-alert
   metric_type: v1/insights/droplet/disk_utilization_percent
   compare: GreaterThan
@@ -43,7 +43,7 @@ monk-disk-alert:
 
 # Load average monitoring
 monk-load-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-load-high-alert
   metric_type: v1/insights/droplet/load_5
   compare: GreaterThan
@@ -56,7 +56,7 @@ monk-load-alert:
 
 # Network bandwidth monitoring
 monk-bandwidth-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-bandwidth-high-alert
   metric_type: v1/insights/droplet/public_outbound_bandwidth
   compare: GreaterThan
@@ -67,7 +67,7 @@ monk-bandwidth-alert:
 
 # Disk I/O monitoring
 monk-disk-io-alert:
-  defines: digitalocean-monitoring/monitoring
+  defines: digitalocean-monitoring/digital-ocean-monitoring
   name: monk-disk-write-alert
   metric_type: v1/insights/droplet/disk_write
   compare: GreaterThan

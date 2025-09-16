@@ -1,40 +1,43 @@
 namespace: digitalocean-monitoring
-monitoring:
+digital-ocean-monitoring:
   defines: entity
   metadata:
     name: DigitalOceanMonitoring
+    version-hash: 79c42885f803
   schema:
+    create_when_missing:
+      type: boolean
+      description: >-
+        Controls whether to create resources when they don't exist (default:
+        true)
     name:
       type: string
-      description: Name of the alert policy
-    alert_description:
-      type: string
-      description: Description of the alert policy
+      description: Unique name for the alert policy
     metric_type:
       type: string
       enum:
+        - v1/insights/droplet/cpu
         - v1/insights/droplet/load_1
         - v1/insights/droplet/load_5
         - v1/insights/droplet/load_15
         - v1/insights/droplet/memory_utilization_percent
         - v1/insights/droplet/disk_utilization_percent
-        - v1/insights/droplet/cpu
         - v1/insights/droplet/disk_read
         - v1/insights/droplet/disk_write
         - v1/insights/droplet/public_outbound_bandwidth
         - v1/insights/droplet/public_inbound_bandwidth
         - v1/insights/droplet/private_outbound_bandwidth
         - v1/insights/droplet/private_inbound_bandwidth
-      description: Type of metric to monitor
+      description: 'Type of metric to monitor (e.g., v1/insights/droplet/cpu)'
     compare:
       type: string
       enum:
         - GreaterThan
         - LessThan
-      description: Comparison operator for the threshold
+      description: How to compare the metric value (GreaterThan or LessThan)
     value:
       type: number
-      description: Threshold value for the alert
+      description: The threshold value for the alert
     window:
       type: string
       enum:
@@ -42,22 +45,27 @@ monitoring:
         - 10m
         - 30m
         - 1h
-      description: Time window for evaluation
-    entities:
-      type: array
-      items:
-        type: string
-      description: Array of Droplet IDs to monitor
-    tags:
-      type: array
-      items:
-        type: string
-      description: Array of tags to match Droplets
+      description: 'Time window for metric evaluation (5m, 10m, 30m, 1h)'
+    alert_description:
+      type: string
+      description: >-
+        Optional description of the alert policy (auto-generated if not
+        provided)
     emails:
       type: array
       items:
         type: string
-      description: Array of email addresses for notifications
+      description: Array of email addresses (auto-detected from account if not provided)
+    entities:
+      type: array
+      items:
+        type: string
+      description: Array of specific Droplet IDs to monitor
+    tags:
+      type: array
+      items:
+        type: string
+      description: Array of tags to match Droplets for monitoring
     slack_channels:
       type: array
       items:
@@ -65,23 +73,16 @@ monitoring:
         properties:
           channel:
             type: string
-            description: Slack channel name
           url:
             type: string
-            description: Slack webhook URL
         required:
           - channel
           - url
         additionalProperties: false
-      description: Slack webhook configurations for notifications
+      description: Array of Slack webhook configurations for notifications
     enabled:
       type: boolean
-      description: Whether the alert is enabled
-      default: true
-    create_when_missing:
-      type: boolean
-      description: Whether to create resources when missing (for testing)
-      default: true
+      description: 'Whether the alert policy is enabled (default: true)'
     required:
       - name
       - metric_type
@@ -95,37 +96,16 @@ monitoring:
       type: string
     name:
       type: string
-    alert_description:
+    type:
       type: string
-    metric_type:
+    description:
       type: string
-      enum:
-        - v1/insights/droplet/load_1
-        - v1/insights/droplet/load_5
-        - v1/insights/droplet/load_15
-        - v1/insights/droplet/memory_utilization_percent
-        - v1/insights/droplet/disk_utilization_percent
-        - v1/insights/droplet/cpu
-        - v1/insights/droplet/disk_read
-        - v1/insights/droplet/disk_write
-        - v1/insights/droplet/public_outbound_bandwidth
-        - v1/insights/droplet/public_inbound_bandwidth
-        - v1/insights/droplet/private_outbound_bandwidth
-        - v1/insights/droplet/private_inbound_bandwidth
     compare:
       type: string
-      enum:
-        - GreaterThan
-        - LessThan
     value:
       type: number
     window:
       type: string
-      enum:
-        - 5m
-        - 10m
-        - 30m
-        - 1h
     entities:
       type: array
       items:
@@ -134,59 +114,59 @@ monitoring:
       type: array
       items:
         type: string
-    emails:
-      type: array
-      items:
-        type: string
-    slack_channels:
-      type: array
-      items:
-        type: object
-        properties:
-          channel:
+    alerts:
+      type: object
+      properties:
+        email:
+          type: array
+          items:
             type: string
-          url:
-            type: string
-        required:
-          - channel
-          - url
-        additionalProperties: false
+        slack:
+          type: array
+          items:
+            type: object
+            properties:
+              channel:
+                type: string
+              url:
+                type: string
+            required:
+              - channel
+              - url
+            additionalProperties: false
+      additionalProperties: false
     enabled:
       type: boolean
     created_at:
       type: string
   lifecycle:
     sync: <<< digital-ocean-monitoring-sync.js
-    create-alert-policy: ''
     list-alert-policies: ''
     get-alert-policy: ''
-    update-alert-policy: ''
+    enable-alert-policy: ''
+    disable-alert-policy: ''
+    list-sinks: ''
+    get-sink: ''
     get-account-info: ''
     get-droplet-metrics: ''
     get-droplet-cpu-metrics: ''
     get-droplet-memory-metrics: ''
     get-droplet-disk-metrics: ''
     get-droplet-network-metrics: ''
-    get-app-metrics: ''
-    get-load-balancer-metrics: ''
-    get-database-metrics: ''
-    enable-alert-policy: ''
-    disable-alert-policy: ''
-    get-volume-metrics: ''
     get-droplet-bandwidth-inbound: ''
     get-droplet-bandwidth-outbound: ''
     get-droplet-private-bandwidth-inbound: ''
     get-droplet-private-bandwidth-outbound: ''
     get-droplet-disk-read: ''
     get-droplet-disk-write: ''
-    get-droplet-load-average1: ''
-    get-droplet-load-average5: ''
-    get-droplet-load-average15: ''
-    list-droplets: ''
-    delete-alert-policy: ''
-    list-sinks: ''
-    get-sink: ''
+    get-droplet-load-average-1: ''
+    get-droplet-load-average-5: ''
+    get-droplet-load-average-15: ''
     get-all-droplet-metrics: ''
+    get-volume-metrics: ''
+    get-app-metrics: ''
+    get-load-balancer-metrics: ''
+    get-database-metrics: ''
   checks:
     readiness:
       period: 15

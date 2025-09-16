@@ -32,26 +32,26 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 // input/digitalocean-monitoring/doProviderBase.ts
 var do_provider_base_exports = {};
 __export(do_provider_base_exports, {
-  DOProviderEntity: () => DOProviderEntity
+  DOMonitoringEntity: () => DOMonitoringEntity
 });
 module.exports = __toCommonJS(do_provider_base_exports);
 var import_base = require("monkec/base");
 var import_cli = __toESM(require("cli"));
 var digitalocean = require("cloud/digitalocean");
-var DOProviderEntity = class extends import_base.MonkEntity {
+var DOMonitoringEntity = class extends import_base.MonkEntity {
   before() {
   }
   /**
    * Standard start implementation for DigitalOcean entities
    */
   start() {
-    import_cli.default.output(`Starting DigitalOcean operations for: ${this.getEntityName()}`);
+    import_cli.default.output(`Starting DigitalOcean Monitoring operations for: ${this.getEntityName()}`);
   }
   /**
    * Standard stop implementation for DigitalOcean entities
    */
   stop() {
-    import_cli.default.output(`Stopping DigitalOcean operations for: ${this.getEntityName()}`);
+    import_cli.default.output(`Stopping DigitalOcean Monitoring operations for: ${this.getEntityName()}`);
   }
   /**
    * Helper method to make authenticated HTTP requests using DigitalOcean provider
@@ -81,9 +81,6 @@ var DOProviderEntity = class extends import_base.MonkEntity {
           break;
         case "DELETE":
           response = digitalocean.delete(apiPath, requestOptions);
-          break;
-        case "PATCH":
-          response = digitalocean.patch(apiPath, requestOptions);
           break;
         default:
           throw new Error(`Unsupported HTTP method: ${method}`);
@@ -134,12 +131,68 @@ var DOProviderEntity = class extends import_base.MonkEntity {
       throw error;
     }
   }
+  /**
+   * Helper method to handle resource deletion with proper existing resource checks
+   */
+  deleteResource(path, resourceName) {
+    if (this.state.existing) {
+      return;
+    }
+    try {
+      this.makeRequest("DELETE", path);
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes("404") || error.message.includes("not found") || error.message.includes("not_found"))) {
+        return;
+      }
+      throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Helper method to get account information and verified email
+   */
+  getAccountInfo() {
+    try {
+      return this.makeRequest("GET", "/account");
+    } catch (error) {
+      throw new Error(`Failed to get account info: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Helper method to auto-detect verified email from account
+   */
+  getVerifiedEmail() {
+    try {
+      const accountResponse = this.getAccountInfo();
+      if (accountResponse.account && accountResponse.account.email_verified && accountResponse.account.email) {
+        return accountResponse.account.email;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+  /**
+   * Helper method to list all droplets
+   */
+  listDroplets() {
+    try {
+      return this.makeRequest("GET", "/droplets");
+    } catch (error) {
+      throw new Error(`Failed to list droplets: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Check if create_when_missing is enabled (default: true)
+   */
+  shouldCreateWhenMissing() {
+    return this.definition.create_when_missing !== false;
+  }
 };
 /**
  * Readiness check configuration
  */
-__publicField(DOProviderEntity, "readiness", { period: 15, initialDelay: 5, attempts: 40 });
+__publicField(DOMonitoringEntity, "readiness", { period: 15, initialDelay: 5, attempts: 40 });
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  DOProviderEntity
+  DOMonitoringEntity
 });

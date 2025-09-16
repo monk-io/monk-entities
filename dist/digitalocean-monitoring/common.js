@@ -20,21 +20,28 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // input/digitalocean-monitoring/common.ts
 var common_exports = {};
 __export(common_exports, {
-  validateAlertPolicyType: () => validateAlertPolicyType,
-  validateComparator: () => validateComparator,
+  API_ENDPOINTS: () => API_ENDPOINTS,
+  DEFAULTS: () => DEFAULTS,
+  ERROR_MESSAGES: () => ERROR_MESSAGES,
+  HTTP_STATUS: () => HTTP_STATUS,
+  RATE_LIMIT: () => RATE_LIMIT,
+  VALIDATION_PATTERNS: () => VALIDATION_PATTERNS,
+  generateTimeRange: () => generateTimeRange,
+  validateComparisonOperator: () => validateComparisonOperator,
   validateEmail: () => validateEmail,
-  validateEmails: () => validateEmails,
+  validateMetricType: () => validateMetricType,
+  validateSlackUrl: () => validateSlackUrl,
   validateWindow: () => validateWindow
 });
 module.exports = __toCommonJS(common_exports);
-function validateAlertPolicyType(type) {
+function validateMetricType(type) {
   const validTypes = [
+    "v1/insights/droplet/cpu",
     "v1/insights/droplet/load_1",
     "v1/insights/droplet/load_5",
     "v1/insights/droplet/load_15",
     "v1/insights/droplet/memory_utilization_percent",
     "v1/insights/droplet/disk_utilization_percent",
-    "v1/insights/droplet/cpu",
     "v1/insights/droplet/disk_read",
     "v1/insights/droplet/disk_write",
     "v1/insights/droplet/public_outbound_bandwidth",
@@ -43,21 +50,20 @@ function validateAlertPolicyType(type) {
     "v1/insights/droplet/private_inbound_bandwidth"
   ];
   if (!validTypes.includes(type)) {
-    throw new Error(`Invalid alert policy type: ${type}. Valid types: ${validTypes.join(", ")}`);
+    throw new Error(`Invalid metric type: ${type}. Supported types: ${validTypes.join(", ")}`);
   }
   return type;
 }
-function validateComparator(comparator) {
-  const validComparators = ["GreaterThan", "LessThan"];
-  if (!validComparators.includes(comparator)) {
-    throw new Error(`Invalid comparator: ${comparator}. Valid comparators: ${validComparators.join(", ")}`);
+function validateComparisonOperator(operator) {
+  if (operator !== "GreaterThan" && operator !== "LessThan") {
+    throw new Error(`Invalid comparison operator: ${operator}. Must be 'GreaterThan' or 'LessThan'`);
   }
-  return comparator;
+  return operator;
 }
 function validateWindow(window) {
   const validWindows = ["5m", "10m", "30m", "1h"];
   if (!validWindows.includes(window)) {
-    throw new Error(`Invalid window: ${window}. Valid windows: ${validWindows.join(", ")}`);
+    throw new Error(`Invalid time window: ${window}. Supported windows: ${validWindows.join(", ")}`);
   }
   return window;
 }
@@ -65,18 +71,82 @@ function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
-function validateEmails(emails) {
-  for (const email of emails) {
-    if (!validateEmail(email)) {
-      throw new Error(`Invalid email address: ${email}`);
-    }
-  }
+function validateSlackUrl(url) {
+  return url.startsWith("https://hooks.slack.com/services/");
 }
+function generateTimeRange(hours = 1) {
+  const endTime = /* @__PURE__ */ new Date();
+  const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1e3);
+  return {
+    start_time: startTime.toISOString(),
+    end_time: endTime.toISOString()
+  };
+}
+var VALIDATION_PATTERNS = {
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  SLACK_WEBHOOK: /^https:\/\/hooks\.slack\.com\/services\//,
+  DROPLET_ID: /^\d+$/,
+  UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+};
+var DEFAULTS = {
+  TIME_WINDOW: "1h",
+  METRICS_HOURS: 1,
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1e3
+};
+var ERROR_MESSAGES = {
+  INVALID_METRIC_TYPE: "Invalid metric type provided",
+  INVALID_COMPARISON: "Invalid comparison operator - must be GreaterThan or LessThan",
+  INVALID_WINDOW: "Invalid time window - must be 5m, 10m, 30m, or 1h",
+  INVALID_EMAIL: "Invalid email address format",
+  INVALID_SLACK_URL: "Invalid Slack webhook URL format",
+  MISSING_DROPLET_ID: "Droplet ID is required",
+  MISSING_POLICY_UUID: "Alert policy UUID is required",
+  API_ERROR: "DigitalOcean API request failed",
+  NETWORK_ERROR: "Network request failed",
+  TIMEOUT_ERROR: "Request timeout"
+};
+var API_ENDPOINTS = {
+  ALERTS: "/monitoring/alerts",
+  SINKS: "/monitoring/sinks",
+  ACCOUNT: "/account",
+  DROPLETS: "/droplets",
+  METRICS_DROPLET: "/monitoring/metrics/droplet",
+  METRICS_VOLUME: "/monitoring/metrics/volume",
+  METRICS_APP: "/monitoring/metrics/app",
+  METRICS_LB: "/monitoring/metrics/load_balancer",
+  METRICS_DB: "/monitoring/metrics/database"
+};
+var HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  RATE_LIMITED: 429,
+  INTERNAL_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503
+};
+var RATE_LIMIT = {
+  MAX_REQUESTS_PER_SECOND: 10,
+  RETRY_AFTER_SECONDS: 60,
+  BACKOFF_MULTIPLIER: 2
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  validateAlertPolicyType,
-  validateComparator,
+  API_ENDPOINTS,
+  DEFAULTS,
+  ERROR_MESSAGES,
+  HTTP_STATUS,
+  RATE_LIMIT,
+  VALIDATION_PATTERNS,
+  generateTimeRange,
+  validateComparisonOperator,
   validateEmail,
-  validateEmails,
+  validateMetricType,
+  validateSlackUrl,
   validateWindow
 });

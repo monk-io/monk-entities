@@ -2,4 +2,6 @@ namespace: digitalocean-monitoring
 
 common:
   defines: module
+  metadata:
+    version-hash: 79c42885f803
   source: <<< common.js

@@ -42,1139 +42,895 @@ var __decorateElement = (array, flags, name, decorators, target, extra) => {
   }
   return k || __decoratorMetadata(array, target), desc && __defProp(target, name, desc), p ? k ^ 4 ? extra : desc : target;
 };
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
 var __privateIn = (member, obj) => Object(obj) !== obj ? __typeError('Cannot use the "in" operator on this value') : member.has(obj);
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// input/digitalocean-monitoring/alertPolicy.ts
+// input/digitalocean-monitoring/digitalOceanMonitoring.ts
 const base = require("monkec/base");
 const action = base.action;
 const doProviderBase = require("digitalocean-monitoring/do-provider-base");
-const DOProviderEntity = doProviderBase.DOProviderEntity;
+const DOMonitoringEntity = doProviderBase.DOMonitoringEntity;
 const common = require("digitalocean-monitoring/common");
-const validateAlertPolicyType = common.validateAlertPolicyType;
-const validateComparator = common.validateComparator;
+const validateMetricType = common.validateMetricType;
+const validateComparisonOperator = common.validateComparisonOperator;
 const validateWindow = common.validateWindow;
-const validateEmails = common.validateEmails;
+const validateEmail = common.validateEmail;
+const validateSlackUrl = common.validateSlackUrl;
+const generateTimeRange = common.generateTimeRange;
 const cli = require("cli");
-var _getAllDropletMetrics_dec, _getSink_dec, _listSinks_dec, _deleteAlertPolicy_dec, _listDroplets_dec, _getDropletLoadAverage15_dec, _getDropletLoadAverage5_dec, _getDropletLoadAverage1_dec, _getDropletDiskWrite_dec, _getDropletDiskRead_dec, _getDropletPrivateBandwidthOutbound_dec, _getDropletPrivateBandwidthInbound_dec, _getDropletBandwidthOutbound_dec, _getDropletBandwidthInbound_dec, _getVolumeMetrics_dec, _disableAlertPolicy_dec, _enableAlertPolicy_dec, _getDatabaseMetrics_dec, _getLoadBalancerMetrics_dec, _getAppMetrics_dec, _getDropletNetworkMetrics_dec, _getDropletDiskMetrics_dec, _getDropletMemoryMetrics_dec, _getDropletCpuMetrics_dec, _getDropletMetrics_dec, _getAccountInfo_dec, _updateAlertPolicy_dec, _getAlertPolicy_dec, _listAlertPolicies_dec, _createAlertPolicy_dec, _a, _init;
-var _DigitalOceanMonitoring = class _DigitalOceanMonitoring extends (_a = DOProviderEntity, _createAlertPolicy_dec = [action()], _listAlertPolicies_dec = [action()], _getAlertPolicy_dec = [action()], _updateAlertPolicy_dec = [action()], _getAccountInfo_dec = [action()], _getDropletMetrics_dec = [action()], _getDropletCpuMetrics_dec = [action()], _getDropletMemoryMetrics_dec = [action()], _getDropletDiskMetrics_dec = [action()], _getDropletNetworkMetrics_dec = [action()], _getAppMetrics_dec = [action()], _getLoadBalancerMetrics_dec = [action()], _getDatabaseMetrics_dec = [action()], _enableAlertPolicy_dec = [action()], _disableAlertPolicy_dec = [action()], _getVolumeMetrics_dec = [action()], _getDropletBandwidthInbound_dec = [action()], _getDropletBandwidthOutbound_dec = [action()], _getDropletPrivateBandwidthInbound_dec = [action()], _getDropletPrivateBandwidthOutbound_dec = [action()], _getDropletDiskRead_dec = [action()], _getDropletDiskWrite_dec = [action()], _getDropletLoadAverage1_dec = [action()], _getDropletLoadAverage5_dec = [action()], _getDropletLoadAverage15_dec = [action()], _listDroplets_dec = [action()], _deleteAlertPolicy_dec = [action()], _listSinks_dec = [action()], _getSink_dec = [action()], _getAllDropletMetrics_dec = [action()], _a) {
+var _getDatabaseMetrics_dec, _getLoadBalancerMetrics_dec, _getAppMetrics_dec, _getVolumeMetrics_dec, _getAllDropletMetrics_dec, _getDropletLoadAverage15_dec, _getDropletLoadAverage5_dec, _getDropletLoadAverage1_dec, _getDropletDiskWrite_dec, _getDropletDiskRead_dec, _getDropletPrivateBandwidthOutbound_dec, _getDropletPrivateBandwidthInbound_dec, _getDropletBandwidthOutbound_dec, _getDropletBandwidthInbound_dec, _getDropletNetworkMetrics_dec, _getDropletDiskMetrics_dec, _getDropletMemoryMetrics_dec, _getDropletCpuMetrics_dec, _getDropletMetrics_dec, _getAccountInfoAction_dec, _getSink_dec, _listSinks_dec, _disableAlertPolicy_dec, _enableAlertPolicy_dec, _getAlertPolicy_dec, _listAlertPolicies_dec, _a, _init;
+var _DigitalOceanMonitoring = class _DigitalOceanMonitoring extends (_a = DOMonitoringEntity, _listAlertPolicies_dec = [action("list-alert-policies")], _getAlertPolicy_dec = [action("get-alert-policy")], _enableAlertPolicy_dec = [action("enable-alert-policy")], _disableAlertPolicy_dec = [action("disable-alert-policy")], _listSinks_dec = [action("list-sinks")], _getSink_dec = [action("get-sink")], _getAccountInfoAction_dec = [action("get-account-info")], _getDropletMetrics_dec = [action("get-droplet-metrics")], _getDropletCpuMetrics_dec = [action("get-droplet-cpu-metrics")], _getDropletMemoryMetrics_dec = [action("get-droplet-memory-metrics")], _getDropletDiskMetrics_dec = [action("get-droplet-disk-metrics")], _getDropletNetworkMetrics_dec = [action("get-droplet-network-metrics")], _getDropletBandwidthInbound_dec = [action("get-droplet-bandwidth-inbound")], _getDropletBandwidthOutbound_dec = [action("get-droplet-bandwidth-outbound")], _getDropletPrivateBandwidthInbound_dec = [action("get-droplet-private-bandwidth-inbound")], _getDropletPrivateBandwidthOutbound_dec = [action("get-droplet-private-bandwidth-outbound")], _getDropletDiskRead_dec = [action("get-droplet-disk-read")], _getDropletDiskWrite_dec = [action("get-droplet-disk-write")], _getDropletLoadAverage1_dec = [action("get-droplet-load-average-1")], _getDropletLoadAverage5_dec = [action("get-droplet-load-average-5")], _getDropletLoadAverage15_dec = [action("get-droplet-load-average-15")], _getAllDropletMetrics_dec = [action("get-all-droplet-metrics")], _getVolumeMetrics_dec = [action("get-volume-metrics")], _getAppMetrics_dec = [action("get-app-metrics")], _getLoadBalancerMetrics_dec = [action("get-load-balancer-metrics")], _getDatabaseMetrics_dec = [action("get-database-metrics")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
   }
   getEntityName() {
-    return "DigitalOcean Monitoring Alert Policy";
+    return `DigitalOcean Monitoring: ${this.definition.name}`;
   }
   create() {
-    try {
-      validateAlertPolicyType(this.definition.metric_type);
-      validateComparator(this.definition.compare);
-      validateWindow(this.definition.window);
-      if (this.definition.create_when_missing === false) {
-        this.state.uuid = `test-uuid-${Date.now()}`;
-        this.state.name = this.definition.name;
-        this.state.alert_description = `Test alert policy for ${this.definition.name}`;
-        this.state.metric_type = this.definition.metric_type;
-        this.state.compare = this.definition.compare;
-        this.state.value = this.definition.value;
-        this.state.window = this.definition.window;
-        this.state.entities = this.definition.entities ? [...this.definition.entities] : void 0;
-        this.state.tags = this.definition.tags ? [...this.definition.tags] : void 0;
-        this.state.emails = this.definition.emails ? [...this.definition.emails] : [];
-        this.state.enabled = this.definition.enabled !== false;
-        this.state.created_at = (/* @__PURE__ */ new Date()).toISOString();
-        cli.output(`Alert Policy Created (Test Mode): ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
-        return;
+    cli.output(`\u{1F680} Creating DigitalOcean monitoring alert policy: ${this.definition.name}`);
+    if (!this.shouldCreateWhenMissing()) {
+      cli.output(`\u{1F9EA} Test mode: create_when_missing is false, setting ready state without creating`);
+      this.state.uuid = "test-mode-uuid";
+      this.state.name = this.definition.name;
+      this.state.type = this.definition.metric_type;
+      this.state.enabled = true;
+      return;
+    }
+    const validatedType = validateMetricType(this.definition.metric_type);
+    const validatedCompare = validateComparisonOperator(this.definition.compare);
+    const validatedWindow = validateWindow(this.definition.window);
+    const existingPolicy = this.findExistingAlertPolicy();
+    if (existingPolicy) {
+      cli.output(`\u2705 Alert policy ${this.definition.name} already exists`);
+      this.state.existing = true;
+      this.updateStateFromPolicy(existingPolicy);
+      return;
+    }
+    let notificationEmails = this.definition.emails || [];
+    if (notificationEmails.length === 0) {
+      const verifiedEmail = this.getVerifiedEmail();
+      if (verifiedEmail) {
+        notificationEmails = [verifiedEmail];
+        cli.output(`\u{1F4E7} Auto-detected verified email: ${verifiedEmail}`);
       }
-      let emailsToUse = this.definition.emails || [];
-      if (emailsToUse.length === 0) {
-        try {
-          cli.output(`\u{1F50D} Attempting to get account email from DigitalOcean API...`);
-          const accountResponse = this.makeRequest("GET", "/account");
-          cli.output(`\u{1F4CB} Account API Response: ${JSON.stringify(accountResponse, null, 2)}`);
-          let accountEmail = null;
-          let emailVerified = false;
-          if (accountResponse.account) {
-            accountEmail = accountResponse.account.email;
-            emailVerified = accountResponse.account.email_verified;
-          } else if (accountResponse.email) {
-            accountEmail = accountResponse.email;
-            emailVerified = accountResponse.email_verified;
-          }
-          if (accountEmail) {
-            if (emailVerified) {
-              cli.output(`\u{1F4E7} Using verified account email: ${accountEmail}`);
-              emailsToUse = [accountEmail];
-            } else {
-              cli.output(`\u26A0\uFE0F Account email ${accountEmail} is not verified in DigitalOcean`);
-              throw new Error(`Account email ${accountEmail} is not verified. Please verify it in DigitalOcean or provide verified emails in configuration.`);
-            }
-          } else {
-            cli.output(`\u274C No email found in account response`);
-            throw new Error(`No email found in DigitalOcean account. Please provide emails in configuration.`);
-          }
-        } catch (error) {
-          cli.output(`\u274C Failed to get account email: ${error instanceof Error ? error.message : "Unknown error"}`);
-          throw new Error(`Failed to get account email: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+    notificationEmails.forEach((email) => {
+      if (!validateEmail(email)) {
+        throw new Error(`Invalid email address: ${email}`);
+      }
+    });
+    if (this.definition.slack_channels) {
+      this.definition.slack_channels.forEach((slack) => {
+        if (!validateSlackUrl(slack.url)) {
+          throw new Error(`Invalid Slack webhook URL: ${slack.url}`);
         }
-      }
-      if (emailsToUse.length > 0) {
-        validateEmails([...emailsToUse]);
-      }
-      try {
-        const testResponse = this.makeRequest("GET", "/monitoring/alerts");
-        const alerts = testResponse.alerts || testResponse.policies || [];
-        cli.output(`\u2705 API access verified, found ${alerts.length} existing policies`);
-      } catch (error) {
-        throw new Error(`API access test failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
-      const existingPolicy = this.findExistingPolicy();
-      if (existingPolicy) {
-        this.updateStateFromPolicy(existingPolicy);
-        cli.output(`Alert Policy Found: ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}
-Created: ${this.state.created_at}`);
-        return;
-      }
-      const policyData = this.buildPolicyData([...emailsToUse]);
-      const response = this.makeRequest("POST", "/monitoring/alerts", policyData);
-      cli.output(`\u{1F4CB} Create Response: ${JSON.stringify(response, null, 2)}`);
+      });
+    }
+    const createRequest = {
+      type: validatedType,
+      description: this.definition.alert_description || `Alert for ${this.definition.name}: ${validatedType} ${validatedCompare} ${this.definition.value}`,
+      compare: validatedCompare,
+      value: this.definition.value,
+      window: validatedWindow,
+      entities: this.definition.entities || [],
+      tags: this.definition.tags || [],
+      alerts: {
+        email: notificationEmails,
+        slack: this.definition.slack_channels || []
+      },
+      enabled: this.definition.enabled !== false
+    };
+    try {
+      const response = this.makeRequest("POST", "/monitoring/alerts", createRequest);
       if (response.policy) {
         this.updateStateFromPolicy(response.policy);
-        cli.output(`Alert Policy Created: ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
-      } else if (response.alert) {
-        this.updateStateFromPolicy(response.alert);
-        cli.output(`Alert Policy Created: ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
-      } else if (response.alerts && response.alerts.length > 0) {
-        this.updateStateFromPolicy(response.alerts[0]);
-        cli.output(`Alert Policy Created: ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
+        cli.output(`\u2705 Alert policy created successfully: ${this.state.uuid}`);
       } else {
-        cli.output(`\u274C Unexpected response format: ${JSON.stringify(response, null, 2)}`);
-        throw new Error("Failed to create alert policy: No policy returned in response");
+        throw new Error("Invalid response from DigitalOcean API - no policy object returned");
       }
     } catch (error) {
-      throw new Error(`Failed to create alert policy: ${error.message}`);
+      throw new Error(`Failed to create alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-    return this.state;
   }
   update() {
-    try {
-      if (this.definition.create_when_missing === false) {
-        if (!this.state.uuid) {
-          this.create();
-          return;
-        }
-        this.state.name = this.definition.name;
-        this.state.alert_description = `Test alert policy for ${this.definition.name}`;
-        this.state.metric_type = this.definition.metric_type;
-        this.state.compare = this.definition.compare;
-        this.state.value = this.definition.value;
-        this.state.window = this.definition.window;
-        this.state.entities = this.definition.entities ? [...this.definition.entities] : void 0;
-        this.state.tags = this.definition.tags ? [...this.definition.tags] : void 0;
-        this.state.emails = this.definition.emails ? [...this.definition.emails] : [];
-        this.state.enabled = this.definition.enabled !== false;
-        cli.output(`Alert Policy Updated (Test Mode): ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
-        return;
-      }
-      const existingPolicy = this.findExistingPolicy();
-      if (!existingPolicy) {
-        this.create();
-        return;
-      }
-      let emailsToUse = this.definition.emails || [];
-      if (emailsToUse.length === 0) {
-        try {
-          const accountResponse = this.makeRequest("GET", "/account");
-          const accountEmail = accountResponse.account?.email;
-          const emailVerified = accountResponse.account?.email_verified;
-          if (accountEmail && emailVerified) {
-            emailsToUse = [accountEmail];
-          } else {
-            throw new Error("Account email not verified or not found. Please provide emails in configuration.");
-          }
-        } catch (error) {
-          throw new Error(`Failed to get account email: ${error instanceof Error ? error.message : "Unknown error"}`);
-        }
-      }
-      const policyData = this.buildPolicyData([...emailsToUse]);
-      const response = this.makeRequest("PUT", `/monitoring/alerts/${existingPolicy.uuid}`, policyData);
-      const updatedPolicy = response.policy || response.alert || response;
-      this.updateStateFromPolicy(updatedPolicy);
-      cli.output(`Alert Policy Updated: ${this.state.name}
-UUID: ${this.state.uuid}
-Type: ${this.state.metric_type}
-Threshold: ${this.state.compare} ${this.state.value}
-Window: ${this.state.window}
-Notifications: ${this.state.emails?.join(", ")}
-Status: ${this.state.enabled ? "Enabled" : "Disabled"}`);
-    } catch (error) {
-      throw new Error(`Failed to update alert policy: ${error.message}`);
+    if (!this.state.uuid) {
+      throw new Error("Cannot update alert policy - no policy UUID in state");
     }
-    return this.state;
+    if (!this.shouldCreateWhenMissing()) {
+      cli.output(`\u{1F9EA} Test mode: create_when_missing is false, skipping update`);
+      return;
+    }
+    cli.output(`\u{1F504} Updating DigitalOcean alert policy: ${this.state.uuid}`);
+    const validatedType = validateMetricType(this.definition.metric_type);
+    const validatedCompare = validateComparisonOperator(this.definition.compare);
+    const validatedWindow = validateWindow(this.definition.window);
+    let notificationEmails = this.definition.emails || [];
+    if (notificationEmails.length === 0) {
+      const verifiedEmail = this.getVerifiedEmail();
+      if (verifiedEmail) {
+        notificationEmails = [verifiedEmail];
+      }
+    }
+    notificationEmails.forEach((email) => {
+      if (!validateEmail(email)) {
+        throw new Error(`Invalid email address: ${email}`);
+      }
+    });
+    if (this.definition.slack_channels) {
+      this.definition.slack_channels.forEach((slack) => {
+        if (!validateSlackUrl(slack.url)) {
+          throw new Error(`Invalid Slack webhook URL: ${slack.url}`);
+        }
+      });
+    }
+    const updateRequest = {
+      type: validatedType,
+      description: this.definition.alert_description || `Alert for ${this.definition.name}: ${validatedType} ${validatedCompare} ${this.definition.value}`,
+      compare: validatedCompare,
+      value: this.definition.value,
+      window: validatedWindow,
+      entities: this.definition.entities || [],
+      tags: this.definition.tags || [],
+      alerts: {
+        email: notificationEmails,
+        slack: this.definition.slack_channels || []
+      },
+      enabled: this.definition.enabled !== false
+    };
+    try {
+      const response = this.makeRequest("PUT", `/monitoring/alerts/${this.state.uuid}`, updateRequest);
+      if (response.policy) {
+        this.updateStateFromPolicy(response.policy);
+        cli.output(`\u2705 Alert policy updated successfully`);
+      } else {
+        cli.output(`\u2705 Alert policy updated (no response data)`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to update alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
   delete() {
-    try {
-      if (!this.state.uuid) {
-        cli.output("No alert policy to delete");
-        return;
-      }
-      const policyUuid = this.state.uuid;
-      const policyName = this.state.name || this.state.alert_description || "Unknown";
-      if (this.definition.create_when_missing === false) {
-        cli.output(`Alert policy deleted successfully (Test Mode)
-Name: ${policyName}
-UUID: ${policyUuid}`);
-        this.state = {
-          uuid: void 0,
-          name: void 0,
-          alert_description: void 0,
-          metric_type: void 0,
-          compare: void 0,
-          value: void 0,
-          window: void 0,
-          entities: void 0,
-          tags: void 0,
-          emails: void 0,
-          slack_channels: void 0,
-          enabled: void 0,
-          created_at: void 0
-        };
-        return;
-      }
-      cli.output(`\u{1F5D1}\uFE0F Deleting alert policy from DigitalOcean: ${policyName} (${policyUuid})`);
-      this.makeRequest("DELETE", `/monitoring/alerts/${policyUuid}`);
-      this.state = {
-        uuid: void 0,
-        name: void 0,
-        alert_description: void 0,
-        metric_type: void 0,
-        compare: void 0,
-        value: void 0,
-        window: void 0,
-        entities: void 0,
-        tags: void 0,
-        emails: void 0,
-        slack_channels: void 0,
-        enabled: void 0,
-        created_at: void 0
-      };
-      cli.output(`\u2705 Alert policy deleted successfully from DigitalOcean
-Name: ${policyName}
-UUID: ${policyUuid}`);
-    } catch (error) {
-      cli.output(`\u274C Failed to delete alert policy: ${error.message}`);
-      throw new Error(`Failed to delete alert policy: ${error.message}`);
+    if (!this.state.uuid) {
+      cli.output("\u26AA No alert policy UUID in state, nothing to delete");
+      return;
     }
-    return this.state;
+    if (!this.shouldCreateWhenMissing()) {
+      cli.output(`\u{1F9EA} Test mode: create_when_missing is false, clearing state without deleting`);
+      this.state.uuid = void 0;
+      this.state.name = void 0;
+      this.state.enabled = void 0;
+      return;
+    }
+    this.deleteResource(`/monitoring/alerts/${this.state.uuid}`, `alert policy ${this.state.name || this.state.uuid}`);
+    this.state.uuid = void 0;
+    this.state.name = void 0;
+    this.state.type = void 0;
+    this.state.description = void 0;
+    this.state.enabled = void 0;
+    this.state.alerts = void 0;
   }
   checkReadiness() {
-    return !!this.state.uuid;
-  }
-  createAlertPolicy(args) {
+    if (!this.state.uuid) {
+      return false;
+    }
+    if (!this.shouldCreateWhenMissing()) {
+      return true;
+    }
     try {
-      cli.output(`DEBUG: Received args: ${JSON.stringify(args)}`);
-      const name = args.name;
-      const type = args.type;
-      const compare = args.compare;
-      const value = args.value;
-      const window = args.window;
-      const emails = args.emails;
-      const entities = args.entities;
-      const tags = args.tags;
-      const description = args.description;
-      const slack_channels = args.slack_channels;
-      if (!name) throw new Error("Name is required (use name=your_alert_name)");
-      if (!type) throw new Error("Type is required (use type=v1/insights/droplet/cpu)");
-      if (!compare) throw new Error("Compare is required (use compare=GreaterThan)");
-      if (!value) throw new Error("Value is required (use value=80)");
-      if (!window) throw new Error("Window is required (use window=10m)");
-      if (!emails) throw new Error("Emails is required (use emails=admin@example.com)");
-      validateAlertPolicyType(type);
-      validateComparator(compare);
-      validateWindow(window);
-      const emailArray = emails.split(",").map((e) => e.trim());
-      validateEmails(emailArray);
-      const policyData = {
-        type,
-        description: description || `Alert policy for ${name}`,
-        compare,
-        value: Number(value),
-        window,
-        entities: entities ? entities.split(",").map((e) => e.trim()) : [],
-        tags: tags ? tags.split(",").map((t) => t.trim()) : [],
-        alerts: {
-          email: emailArray,
-          slack: slack_channels ? JSON.parse(slack_channels) : []
-        },
-        enabled: true
-      };
-      const response = this.makeRequest("POST", "/monitoring/alerts", policyData);
-      if (response.alert) {
-        const policy = response.alert;
-        cli.output(`Alert Policy Created: ${name}
-UUID: ${policy.uuid}
-Type: ${type}
-Threshold: ${compare} ${value}
-Window: ${window}
-Entities: ${policyData.entities.join(", ") || "None"}
-Tags: ${policyData.tags.join(", ") || "None"}
-Notifications: ${emailArray.join(", ")}
-Status: Enabled`);
-        return policy;
+      const response = this.makeRequest("GET", `/monitoring/alerts/${this.state.uuid}`);
+      if (response.policy) {
+        this.updateStateFromPolicy(response.policy);
+        cli.output(`\u2705 Alert policy ${this.state.uuid} is ready`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      cli.output(`\u274C Failed to check alert policy readiness: ${error instanceof Error ? error.message : "Unknown error"}`);
+      return false;
+    }
+  }
+  // === Alert Policy Management Actions (7 actions) ===
+  /**
+   * Create a new alert policy manually
+   */
+  createAlertPolicy(args) {
+    const name = args.name;
+    const type = args.type;
+    const compare = args.compare;
+    const value = args.value;
+    const window = args.window;
+    const emails = args.emails;
+    if (!name || !type || !compare || !value || !window) {
+      throw new Error("Required parameters: --name, --type, --compare, --value, --window");
+    }
+    const validatedType = validateMetricType(type);
+    const validatedCompare = validateComparisonOperator(compare);
+    const validatedWindow = validateWindow(window);
+    let notificationEmails = [];
+    if (emails) {
+      notificationEmails = emails.split(",").map((email) => email.trim());
+    } else {
+      const verifiedEmail = this.getVerifiedEmail();
+      if (verifiedEmail) {
+        notificationEmails = [verifiedEmail];
+      }
+    }
+    notificationEmails.forEach((email) => {
+      if (!validateEmail(email)) {
+        throw new Error(`Invalid email address: ${email}`);
+      }
+    });
+    const createRequest = {
+      type: validatedType,
+      description: `Manual alert: ${name}`,
+      compare: validatedCompare,
+      value: parseFloat(value),
+      window: validatedWindow,
+      entities: args.entities ? args.entities.split(",") : [],
+      tags: args.tags ? args.tags.split(",") : [],
+      alerts: {
+        email: notificationEmails,
+        slack: []
+      },
+      enabled: true
+    };
+    try {
+      const response = this.makeRequest("POST", "/monitoring/alerts", createRequest);
+      if (response.policy) {
+        cli.output(`\u2705 Successfully created alert policy: ${response.policy.uuid}
+   Type: ${response.policy.type}
+   Description: ${response.policy.description}
+   Compare: ${response.policy.compare} ${response.policy.value}
+   Window: ${response.policy.window}`);
       }
     } catch (error) {
-      throw new Error(`Failed to create alert policy: ${error.message}`);
+      throw new Error(`Failed to create alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   listAlertPolicies(_args) {
     try {
       const response = this.makeRequest("GET", "/monitoring/alerts");
-      const alerts = response.alerts || response.policies || [];
-      if (!alerts || alerts.length === 0) {
-        cli.output("No alert policies found");
-        return { count: 0, policies: [] };
+      const policies = response.policies || [];
+      let output = `\u{1F4CB} Alert Policies (${policies.length} total):`;
+      if (policies.length === 0) {
+        output += "\n   No alert policies found";
+      } else {
+        policies.forEach((policy, index) => {
+          const status = policy.enabled ? "\u2705 enabled" : "\u274C disabled";
+          output += `
+   ${index + 1}. ${policy.uuid} - ${policy.type} ${policy.compare} ${policy.value} (${status})`;
+        });
       }
-      let output = `Alert Policies (${alerts.length} total):
-
-`;
-      const policies = alerts.map((policy, index) => {
-        const policyInfo = {
-          index: index + 1,
-          name: policy.description,
-          uuid: policy.uuid,
-          type: policy.type,
-          threshold: `${policy.compare} ${policy.value}`,
-          window: policy.window,
-          entities: policy.entities || [],
-          tags: policy.tags || [],
-          emails: policy.alerts?.email || [],
-          slack_channels: policy.alerts?.slack?.length || 0,
-          status: policy.enabled ? "Enabled" : "Disabled",
-          created_at: policy.created_at
-        };
-        output += `${index + 1}. ${policy.description}
-`;
-        output += `   UUID: ${policy.uuid}
-`;
-        output += `   Type: ${policy.type}
-`;
-        output += `   Threshold: ${policy.compare} ${policy.value}
-`;
-        output += `   Window: ${policy.window}
-`;
-        output += `   Status: ${policy.enabled ? "Enabled" : "Disabled"}
-`;
+      cli.output(output);
+    } catch (error) {
+      throw new Error(`Failed to list alert policies: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getAlertPolicy(args) {
+    const policyUuid = args.policy_uuid || this.state.uuid;
+    if (!policyUuid) {
+      throw new Error("No alert policy UUID available (use --policy_uuid=UUID or ensure entity has a UUID)");
+    }
+    try {
+      const response = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
+      if (response.policy) {
+        if (policyUuid === this.state.uuid) {
+          this.updateStateFromPolicy(response.policy);
+        }
+        const policy = response.policy;
+        let output = `\u{1F4CA} Alert Policy Information:
+   UUID: ${policy.uuid}
+   Type: ${policy.type}
+   Description: ${policy.description}
+   Compare: ${policy.compare}
+   Value: ${policy.value}
+   Window: ${policy.window}
+   Enabled: ${policy.enabled}
+   Created: ${policy.created_at}`;
         if (policy.entities && policy.entities.length > 0) {
-          output += `   Entities: ${policy.entities.join(", ")}
-`;
+          output += `
+   Entities: ${policy.entities.join(", ")}`;
         }
         if (policy.tags && policy.tags.length > 0) {
-          output += `   Tags: ${policy.tags.join(", ")}
-`;
+          output += `
+   Tags: ${policy.tags.join(", ")}`;
         }
-        if (policy.alerts?.email && policy.alerts.email.length > 0) {
-          output += `   Email notifications: ${policy.alerts.email.join(", ")}
-`;
-        }
-        if (policy.alerts?.slack && policy.alerts.slack.length > 0) {
-          output += `   Slack notifications: ${policy.alerts.slack.length} channels
-`;
-        }
-        if (policy.created_at) {
-          output += `   Created: ${new Date(policy.created_at).toLocaleString()}
-`;
-        }
-        output += "\n";
-        return policyInfo;
-      });
-      cli.output(output.trim());
-      return { count: alerts.length, policies };
-    } catch (error) {
-      throw new Error(`Failed to list alert policies: ${error.message}`);
-    }
-  }
-  getAlertPolicy(_args) {
-    try {
-      if (!this.state.uuid) {
-        throw new Error("No alert policy UUID available");
-      }
-      const response = this.makeRequest("GET", `/monitoring/alerts/${this.state.uuid}`);
-      cli.output(`\u{1F4CB} Raw API Response: ${JSON.stringify(response, null, 2)}`);
-      let policy = response.alert || response.policy || response;
-      if (!policy || !policy.uuid) {
-        throw new Error("No valid policy found in response");
-      }
-      let output = `Alert Policy Details:
-`;
-      output += `Name: ${policy.description}
-`;
-      output += `UUID: ${policy.uuid}
-`;
-      output += `Type: ${policy.type}
-`;
-      output += `Threshold: ${policy.compare} ${policy.value}
-`;
-      output += `Window: ${policy.window}
-`;
-      output += `Entities: ${policy.entities?.join(", ") || "None"}
-`;
-      output += `Tags: ${policy.tags?.join(", ") || "None"}
-`;
-      output += `Emails: ${policy.alerts?.email?.join(", ") || "None"}
-`;
-      output += `Slack: ${policy.alerts?.slack?.length || 0} channels
-`;
-      output += `Status: ${policy.enabled ? "Enabled" : "Disabled"}`;
-      cli.output(output);
-      return policy;
-    } catch (error) {
-      cli.output(`\u274C Error getting alert policy: ${error.message}`);
-      throw new Error(`Failed to get alert policy: ${error.message}`);
-    }
-  }
-  updateAlertPolicy(args) {
-    try {
-      if (!this.state.uuid) {
-        throw new Error("No alert policy UUID available");
-      }
-      const compare = args.compare;
-      const value = args.value;
-      const window = args.window;
-      const emails = args.emails;
-      const entities = args.entities;
-      const tags = args.tags;
-      const enabled = args.enabled;
-      const updateData = {};
-      if (compare) {
-        validateComparator(compare);
-        updateData.compare = compare;
-      }
-      if (value !== void 0) updateData.value = Number(value);
-      if (window) {
-        validateWindow(window);
-        updateData.window = window;
-      }
-      if (emails) {
-        const emailArray = emails.split(",").map((e) => e.trim());
-        validateEmails(emailArray);
-        updateData.alerts = { ...updateData.alerts, email: emailArray };
-      }
-      if (entities) updateData.entities = entities.split(",").map((e) => e.trim());
-      if (tags) updateData.tags = tags.split(",").map((t) => t.trim());
-      if (enabled !== void 0) updateData.enabled = enabled === "true";
-      const response = this.makeRequest("PUT", `/monitoring/alerts/${this.state.uuid}`, updateData);
-      const policy = response.alert;
-      cli.output(`Alert Policy Updated: ${policy.description}
-UUID: ${policy.uuid}
-Type: ${policy.type}
-Threshold: ${policy.compare} ${policy.value}
-Window: ${policy.window}
-Status: ${policy.enabled ? "Enabled" : "Disabled"}`);
-      return policy;
-    } catch (error) {
-      throw new Error(`Failed to update alert policy: ${error.message}`);
-    }
-  }
-  getAccountInfo(_args) {
-    try {
-      const response = this.makeRequest("GET", "/account");
-      const account = response.account;
-      if (account) {
-        let output = `Account Information:
-`;
-        output += `  Name: ${account.name}
-`;
-        output += `  Email: ${account.email} ${account.email_verified ? "(verified)" : "(not verified)"}
-`;
-        output += `  UUID: ${account.uuid}
-`;
-        output += `  Status: ${account.status}
-`;
-        if (account.team) {
-          output += `  Team: ${account.team.name} (${account.team.uuid})
-`;
-        }
-        output += `  Limits:
-`;
-        output += `    Droplets: ${account.droplet_limit}
-`;
-        output += `    Floating IPs: ${account.floating_ip_limit}
-`;
-        output += `    Volumes: ${account.volume_limit}`;
-        cli.output(output);
-        return {
-          email: account.email,
-          uuid: account.uuid,
-          name: account.name,
-          status: account.status,
-          email_verified: account.email_verified,
-          team: account.team,
-          limits: {
-            droplet_limit: account.droplet_limit,
-            floating_ip_limit: account.floating_ip_limit,
-            volume_limit: account.volume_limit
+        if (policy.alerts) {
+          if (policy.alerts.email && policy.alerts.email.length > 0) {
+            output += `
+   Email notifications: ${policy.alerts.email.join(", ")}`;
           }
-        };
-      } else {
-        cli.output("No account info found in response");
-        return { error: "No account info found in response", raw_response: response };
-      }
-    } catch (error) {
-      throw new Error(`Failed to get account info: ${error.message}`);
-    }
-  }
-  getDropletMetrics(args) {
-    try {
-      const droplet_id = args.droplet_id;
-      const type = args.type || "v1/insights/droplet/cpu";
-      let start_time = args.start_time;
-      let end_time = args.end_time;
-      if (!droplet_id) {
-        throw new Error("Droplet ID is required (use droplet_id=YOUR-DROPLET-ID)");
-      }
-      validateAlertPolicyType(type);
-      if (!end_time) {
-        end_time = (/* @__PURE__ */ new Date()).toISOString();
-      }
-      if (!start_time) {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1e3);
-        start_time = oneHourAgo.toISOString();
-      }
-      let queryParams = `host_id=${droplet_id}&start=${start_time}&end=${end_time}`;
-      const metricPath = type.replace("v1/insights/droplet/", "");
-      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${metricPath}?${queryParams}`);
-      if (!response.data?.result || response.data.result.length === 0) {
-        cli.output(`No metrics found for droplet ${droplet_id} and metric ${type}
-Time Range: ${start_time} to ${end_time}
-Note: Make sure the monitoring agent is installed on your droplet.`);
-        return { droplet_id, metric_type: type, data: [] };
-      }
-      let output = `Droplet Metrics for ${droplet_id}:
-`;
-      output += `Metric Type: ${type}
-
-`;
-      const processedResults = response.data.result.map((result) => {
-        const values = result.values || [];
-        if (values.length === 0) return null;
-        const latestValue = values[values.length - 1];
-        const firstValue = values[0];
-        output += `Metric Series:
-`;
-        output += `  Latest Value: ${latestValue[1]} (${new Date(latestValue[0] * 1e3).toLocaleString()})
-`;
-        output += `  First Value: ${firstValue[1]} (${new Date(firstValue[0] * 1e3).toLocaleString()})
-`;
-        output += `  Total Data Points: ${values.length}
-`;
-        const numericValues = values.map((v) => parseFloat(v[1])).filter((v) => !isNaN(v));
-        if (numericValues.length > 0) {
-          const avg = numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
-          const max = Math.max(...numericValues);
-          const min = Math.min(...numericValues);
-          output += `  Average: ${avg.toFixed(2)}
-`;
-          output += `  Maximum: ${max}
-`;
-          output += `  Minimum: ${min}
-`;
+          if (policy.alerts.slack && policy.alerts.slack.length > 0) {
+            output += `
+   Slack channels: ${policy.alerts.slack.length} configured`;
+          }
         }
-        output += "\n";
-        return {
-          values,
-          latest: { value: latestValue[1], timestamp: latestValue[0] },
-          first: { value: firstValue[1], timestamp: firstValue[0] },
-          count: values.length,
-          stats: numericValues.length > 0 ? {
-            average: numericValues.reduce((a, b) => a + b, 0) / numericValues.length,
-            maximum: Math.max(...numericValues),
-            minimum: Math.min(...numericValues)
-          } : null
-        };
-      }).filter(Boolean);
-      cli.output(output.trim());
-      return {
-        droplet_id,
-        metric_type: type,
-        data: processedResults,
-        query_params: { start_time, end_time }
-      };
+        cli.output(output);
+      } else {
+        throw new Error("Alert policy not found");
+      }
     } catch (error) {
-      throw new Error(`Failed to get droplet metrics: ${error.message}`);
+      throw new Error(`Failed to get alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  getDropletCpuMetrics(args) {
-    return this.getDropletMetrics({ ...args, type: "v1/insights/droplet/cpu" });
-  }
-  getDropletMemoryMetrics(args) {
-    return this.getDropletMetrics({ ...args, type: "v1/insights/droplet/memory_utilization_percent" });
-  }
-  getDropletDiskMetrics(args) {
-    return this.getDropletMetrics({ ...args, type: "v1/insights/droplet/disk_utilization_percent" });
-  }
-  getDropletNetworkMetrics(args) {
-    const direction = args.direction || "inbound";
-    const interface_type = args.interface || "public";
-    return this.getDropletMetrics({
-      ...args,
-      type: `v1/insights/droplet/bandwidth_utilization_percent_${direction}_${interface_type}`
-    });
-  }
-  getAppMetrics(args) {
+  /**
+   * Update an alert policy
+   */
+  updateAlertPolicy(args) {
+    const policyUuid = args.policy_uuid;
+    if (!policyUuid) {
+      throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
+    }
+    const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
+    if (!currentResponse.policy) {
+      throw new Error("Alert policy not found");
+    }
+    const currentPolicy = currentResponse.policy;
+    const updateRequest = {
+      type: args.type || currentPolicy.type,
+      description: args.description || currentPolicy.description,
+      compare: args.compare || currentPolicy.compare,
+      value: args.value ? parseFloat(args.value) : currentPolicy.value,
+      window: args.window || currentPolicy.window,
+      entities: args.entities ? args.entities.split(",") : currentPolicy.entities || [],
+      tags: args.tags ? args.tags.split(",") : currentPolicy.tags || [],
+      alerts: currentPolicy.alerts || { email: [], slack: [] },
+      enabled: args.enabled !== void 0 ? args.enabled === "true" : currentPolicy.enabled
+    };
+    if (args.emails) {
+      const notificationEmails = args.emails.split(",").map((email) => email.trim());
+      notificationEmails.forEach((email) => {
+        if (!validateEmail(email)) {
+          throw new Error(`Invalid email address: ${email}`);
+        }
+      });
+      updateRequest.alerts.email = notificationEmails;
+    }
     try {
-      const app_id = args.app_id;
-      const component = args.component;
-      const start_time = args.start_time;
-      const end_time = args.end_time;
-      if (!app_id) {
-        throw new Error("App ID is required (use app_id=YOUR-APP-ID component=web)");
+      const response = this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
+      let output = `\u2705 Successfully updated alert policy: ${policyUuid}`;
+      if (response.policy) {
+        output += `
+   Type: ${response.policy.type}
+   Compare: ${response.policy.compare} ${response.policy.value}
+   Enabled: ${response.policy.enabled}`;
       }
-      if (!component) {
-        throw new Error("Component is required (use component=web)");
-      }
-      let queryParams = `app_id=${app_id}&app_component=${component}`;
-      if (start_time) queryParams += `&start=${start_time}`;
-      if (end_time) queryParams += `&end=${end_time}`;
-      const response = this.makeRequest("GET", `/monitoring/metrics/apps/cpu_percentage?${queryParams}`);
-      if (!response.data?.result || response.data.result.length === 0) {
-        cli.output(`No metrics found for app ${app_id}, component ${component}`);
-        return { app_id, component, data: [] };
-      }
-      let output = `App Metrics for ${app_id}:
-`;
-      output += `Component: ${component}
-
-`;
-      const processedResults = response.data.result.map((result) => {
-        const values = result.values || [];
-        if (values.length === 0) return null;
-        const latestValue = values[values.length - 1];
-        output += `CPU Usage:
-`;
-        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1e3).toLocaleString()})
-`;
-        output += `  Data Points: ${values.length}
-
-`;
-        return {
-          metric: "cpu_percentage",
-          values,
-          latest: { value: latestValue[1], timestamp: latestValue[0] },
-          count: values.length
-        };
-      }).filter(Boolean);
-      cli.output(output.trim());
-      return { app_id, component, data: processedResults };
+      cli.output(output);
     } catch (error) {
-      throw new Error(`Failed to get app metrics: ${error.message}`);
+      throw new Error(`Failed to update alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  getLoadBalancerMetrics(args) {
-    try {
-      const lb_id = args.lb_id;
-      const start_time = args.start_time;
-      const end_time = args.end_time;
-      if (!lb_id) {
-        throw new Error("Load Balancer ID is required (use lb_id=YOUR-LB-ID)");
-      }
-      let queryParams = `lb_id=${lb_id}`;
-      if (start_time) queryParams += `&start=${start_time}`;
-      if (end_time) queryParams += `&end=${end_time}`;
-      const response = this.makeRequest("GET", `/monitoring/metrics/load_balancer/connections?${queryParams}`);
-      if (!response.data?.result || response.data.result.length === 0) {
-        cli.output(`No metrics found for load balancer ${lb_id}`);
-        return { lb_id, data: [] };
-      }
-      let output = `Load Balancer Metrics for ${lb_id}:
-
-`;
-      const processedResults = response.data.result.map((result) => {
-        const values = result.values || [];
-        if (values.length === 0) return null;
-        const latestValue = values[values.length - 1];
-        output += `Connections:
-`;
-        output += `  Latest: ${latestValue[1]} (${new Date(latestValue[0] * 1e3).toLocaleString()})
-`;
-        output += `  Data Points: ${values.length}
-
-`;
-        return {
-          metric: "connections",
-          values,
-          latest: { value: latestValue[1], timestamp: latestValue[0] },
-          count: values.length
-        };
-      }).filter(Boolean);
-      cli.output(output.trim());
-      return { lb_id, data: processedResults };
-    } catch (error) {
-      throw new Error(`Failed to get load balancer metrics: ${error.message}`);
+  /**
+   * Delete an alert policy
+   */
+  deleteAlertPolicy(args) {
+    const policyUuid = args.policy_uuid;
+    if (!policyUuid) {
+      throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
     }
-  }
-  getDatabaseMetrics(args) {
     try {
-      const db_id = args.db_id;
-      const start_time = args.start_time;
-      const end_time = args.end_time;
-      if (!db_id) {
-        throw new Error("Database ID is required (use db_id=YOUR-DB-ID)");
-      }
-      let queryParams = `db_id=${db_id}`;
-      if (start_time) queryParams += `&start=${start_time}`;
-      if (end_time) queryParams += `&end=${end_time}`;
-      const response = this.makeRequest("GET", `/monitoring/metrics/databases/cpu?${queryParams}`);
-      if (!response.data?.result || response.data.result.length === 0) {
-        cli.output(`No metrics found for database ${db_id}`);
-        return { db_id, data: [] };
-      }
-      let output = `Database Metrics for ${db_id}:
-
-`;
-      const processedResults = response.data.result.map((result) => {
-        const values = result.values || [];
-        if (values.length === 0) return null;
-        const latestValue = values[values.length - 1];
-        output += `CPU Usage:
-`;
-        output += `  Latest: ${latestValue[1]}% (${new Date(latestValue[0] * 1e3).toLocaleString()})
-`;
-        output += `  Data Points: ${values.length}
-
-`;
-        return {
-          metric: "cpu",
-          values,
-          latest: { value: latestValue[1], timestamp: latestValue[0] },
-          count: values.length
-        };
-      }).filter(Boolean);
-      cli.output(output.trim());
-      return { db_id, data: processedResults };
+      this.makeRequest("DELETE", `/monitoring/alerts/${policyUuid}`);
+      cli.output(`\u2705 Successfully deleted alert policy: ${policyUuid}`);
     } catch (error) {
-      throw new Error(`Failed to get database metrics: ${error.message}`);
+      throw new Error(`Failed to delete alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   enableAlertPolicy(args) {
+    const policyUuid = args.policy_uuid;
+    if (!policyUuid) {
+      throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
+    }
     try {
-      const uuid = args.uuid || this.state.uuid;
-      if (!uuid) throw new Error("Alert policy UUID is required (use uuid=policy-uuid)");
-      const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${uuid}`);
-      const currentPolicy = currentResponse.policy || currentResponse.alert || currentResponse;
-      const updateData = {
-        type: currentPolicy.type,
-        description: currentPolicy.description,
-        compare: currentPolicy.compare,
-        value: currentPolicy.value,
-        window: currentPolicy.window,
-        entities: currentPolicy.entities || [],
-        tags: currentPolicy.tags || [],
-        alerts: currentPolicy.alerts || { email: [], slack: [] },
+      const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
+      if (!currentResponse.policy) {
+        throw new Error("Alert policy not found");
+      }
+      const updateRequest = {
+        ...currentResponse.policy,
         enabled: true
       };
-      const response = this.makeRequest("PUT", `/monitoring/alerts/${uuid}`, updateData);
-      const policy = response.policy || response.alert || response;
-      cli.output(`Alert policy ${uuid} enabled successfully`);
-      return { uuid, enabled: true, policy };
+      this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
+      cli.output(`\u2705 Successfully enabled alert policy: ${policyUuid}`);
     } catch (error) {
-      throw new Error(`Failed to enable alert policy: ${error.message}`);
+      throw new Error(`Failed to enable alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   disableAlertPolicy(args) {
+    const policyUuid = args.policy_uuid;
+    if (!policyUuid) {
+      throw new Error("Alert policy UUID is required (use --policy_uuid=UUID)");
+    }
     try {
-      const uuid = args.uuid || this.state.uuid;
-      if (!uuid) throw new Error("Alert policy UUID is required (use uuid=policy-uuid)");
-      const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${uuid}`);
-      const currentPolicy = currentResponse.policy || currentResponse.alert || currentResponse;
-      const updateData = {
-        type: currentPolicy.type,
-        description: currentPolicy.description,
-        compare: currentPolicy.compare,
-        value: currentPolicy.value,
-        window: currentPolicy.window,
-        entities: currentPolicy.entities || [],
-        tags: currentPolicy.tags || [],
-        alerts: currentPolicy.alerts || { email: [], slack: [] },
+      const currentResponse = this.makeRequest("GET", `/monitoring/alerts/${policyUuid}`);
+      if (!currentResponse.policy) {
+        throw new Error("Alert policy not found");
+      }
+      const updateRequest = {
+        ...currentResponse.policy,
         enabled: false
       };
-      const response = this.makeRequest("PUT", `/monitoring/alerts/${uuid}`, updateData);
-      const policy = response.policy || response.alert || response;
-      cli.output(`Alert policy ${uuid} disabled successfully`);
-      return { uuid, enabled: false, policy };
+      this.makeRequest("PUT", `/monitoring/alerts/${policyUuid}`, updateRequest);
+      cli.output(`\u2705 Successfully disabled alert policy: ${policyUuid}`);
     } catch (error) {
-      throw new Error(`Failed to disable alert policy: ${error.message}`);
-    }
-  }
-  getVolumeMetrics(args) {
-    try {
-      const volume_id = args.volume_id;
-      const start_time = args.start_time;
-      const end_time = args.end_time;
-      if (!volume_id) {
-        throw new Error("Volume ID is required (use volume_id=YOUR-VOLUME-ID)");
-      }
-      let queryParams = ``;
-      if (start_time) queryParams += `start=${start_time}&`;
-      if (end_time) queryParams += `end=${end_time}&`;
-      queryParams = queryParams.replace(/&$/, "");
-      const endpoint = `/monitoring/metrics/volumes/filesystem_size${queryParams ? "?" + queryParams : ""}`;
-      const response = this.makeRequest("GET", endpoint);
-      if (!response.data?.result?.length) {
-        cli.output(`No volume metrics found for volume ${volume_id}`);
-        return { volume_id, metrics: [] };
-      }
-      let output = `Volume Metrics for ${volume_id}:
-
-`;
-      response.data.result.forEach((metric, index) => {
-        output += `Metric ${index + 1}:
-`;
-        output += `  Volume: ${metric.metric?.volume_id || "Unknown"}
-`;
-        output += `  Values: ${metric.values?.length || 0} data points
-`;
-        if (metric.values?.length > 0) {
-          const latestValue = metric.values[metric.values.length - 1];
-          output += `  Latest: ${latestValue[1]} bytes at ${new Date(latestValue[0] * 1e3).toISOString()}
-`;
-        }
-        output += `
-`;
-      });
-      cli.output(output.trim());
-      return { volume_id, metrics: response.data.result };
-    } catch (error) {
-      throw new Error(`Failed to get volume metrics: ${error.message}`);
-    }
-  }
-  getDropletBandwidthInbound(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/public_inbound_bandwidth"
-    });
-  }
-  getDropletBandwidthOutbound(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/public_outbound_bandwidth"
-    });
-  }
-  getDropletPrivateBandwidthInbound(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/private_inbound_bandwidth"
-    });
-  }
-  getDropletPrivateBandwidthOutbound(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/private_outbound_bandwidth"
-    });
-  }
-  getDropletDiskRead(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/disk_read"
-    });
-  }
-  getDropletDiskWrite(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/disk_write"
-    });
-  }
-  getDropletLoadAverage1(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/load_1"
-    });
-  }
-  getDropletLoadAverage5(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/load_5"
-    });
-  }
-  getDropletLoadAverage15(args) {
-    return this.getDropletMetrics({
-      ...args,
-      type: "v1/insights/droplet/load_15"
-    });
-  }
-  listDroplets(_args) {
-    try {
-      const response = this.makeRequest("GET", "/droplets");
-      const droplets = response.droplets || [];
-      if (droplets.length === 0) {
-        cli.output("No droplets found in your account");
-        return { droplets: [] };
-      }
-      cli.output(`Droplets (${droplets.length} total):
-`);
-      droplets.forEach((droplet, index) => {
-        cli.output(`${index + 1}. ${droplet.name}
-   ID: ${droplet.id}
-   Status: ${droplet.status}
-   Region: ${droplet.region?.name || droplet.region}
-   Size: ${droplet.size_slug}
-   IPv4: ${droplet.networks?.v4?.[0]?.ip_address || "N/A"}
-   Tags: ${droplet.tags?.join(", ") || "None"}
-   Created: ${droplet.created_at}
-`);
-      });
-      return { droplets };
-    } catch (error) {
-      throw new Error(`Failed to list droplets: ${error.message}`);
-    }
-  }
-  deleteAlertPolicy(args) {
-    try {
-      const policy_uuid = args.policy_uuid || this.state.uuid;
-      if (!policy_uuid) {
-        throw new Error("Policy UUID is required (use policy_uuid=YOUR-POLICY-UUID)");
-      }
-      this.makeRequest("DELETE", `/monitoring/alerts/${policy_uuid}`);
-      cli.output(`Alert policy ${policy_uuid} deleted successfully`);
-      return true;
-    } catch (error) {
-      throw new Error(`Failed to delete alert policy: ${error.message}`);
+      throw new Error(`Failed to disable alert policy: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   listSinks(_args) {
     try {
       const response = this.makeRequest("GET", "/monitoring/sinks");
       const sinks = response.sinks || [];
+      let output = `\u{1F4CB} Monitoring Sinks (${sinks.length} total):`;
       if (sinks.length === 0) {
-        cli.output("No monitoring sinks found");
-        return { sinks: [] };
+        output += "\n   No monitoring sinks found";
+      } else {
+        sinks.forEach((sink, index) => {
+          output += `
+   ${index + 1}. ${sink.name} (${sink.type})`;
+        });
       }
-      cli.output(`Monitoring Sinks (${sinks.length} total):
-`);
-      sinks.forEach((sink, index) => {
-        cli.output(`${index + 1}. ${sink.name}
-   ID: ${sink.id}
-   Type: ${sink.type}
-   Endpoint: ${sink.endpoint || "N/A"}
-   Status: ${sink.status || "active"}
-   Created: ${sink.created_at || "N/A"}
-`);
-      });
-      return { sinks };
+      cli.output(output);
     } catch (error) {
-      throw new Error(`Failed to list monitoring sinks: ${error.message}`);
+      throw new Error(`Failed to list monitoring sinks: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   getSink(args) {
-    try {
-      const sink_id = args.sink_id;
-      if (!sink_id) {
-        throw new Error("Sink ID is required (use sink_id=YOUR-SINK-ID)");
-      }
-      const response = this.makeRequest("GET", `/monitoring/sinks/${sink_id}`);
-      const sink = response.sink || response;
-      cli.output(`Monitoring Sink Details:
-Name: ${sink.name}
-ID: ${sink.id}
-Type: ${sink.type}
-Endpoint: ${sink.endpoint || "N/A"}
-Status: ${sink.status || "active"}
-Created: ${sink.created_at || "N/A"}`);
-      return sink;
-    } catch (error) {
-      throw new Error(`Failed to get monitoring sink: ${error.message}`);
+    const sinkId = args.sink_id;
+    if (!sinkId) {
+      throw new Error("Sink ID is required (use --sink_id=SINK_ID)");
     }
+    try {
+      const response = this.makeRequest("GET", `/monitoring/sinks/${sinkId}`);
+      if (response.sink) {
+        const sink = response.sink;
+        cli.output(`\u{1F4CA} Monitoring Sink Information:
+   ID: ${sink.id}
+   Name: ${sink.name}
+   Type: ${sink.type}
+   Configuration: ${JSON.stringify(sink.config, null, 2)}`);
+      } else {
+        throw new Error("Monitoring sink not found");
+      }
+    } catch (error) {
+      throw new Error(`Failed to get monitoring sink: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getAccountInfoAction(_args) {
+    try {
+      const response = this.getAccountInfo();
+      if (response.account) {
+        const account = response.account;
+        let output = `\u{1F4CA} DigitalOcean Account Information:
+   Email: ${account.email}
+   Email Verified: ${account.email_verified ? "\u2705 Yes" : "\u274C No"}
+   UUID: ${account.uuid}
+   Status: ${account.status}
+   Droplet Limit: ${account.droplet_limit}
+   Floating IP Limit: ${account.floating_ip_limit}`;
+        if (account.status_message) {
+          output += `
+   Status Message: ${account.status_message}`;
+        }
+        cli.output(output);
+      } else {
+        throw new Error("Account information not found");
+      }
+    } catch (error) {
+      throw new Error(`Failed to get account info: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletMetrics(args) {
+    const dropletId = args.droplet_id;
+    const metricType = args.metric_type;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    if (!metricType) {
+      throw new Error("Metric type is required (use --metric_type=METRIC_TYPE)");
+    }
+    const validatedType = validateMetricType(metricType);
+    let startTime = args.start_time;
+    let endTime = args.end_time;
+    if (!startTime || !endTime) {
+      const timeRange = generateTimeRange();
+      startTime = timeRange.start_time;
+      endTime = timeRange.end_time;
+      cli.output(`\u{1F4C5} Using auto time range: ${startTime} to ${endTime}`);
+    }
+    try {
+      const queryParams = `type=${encodeURIComponent(validatedType)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+      cli.output(`\u{1F4CA} Droplet Metrics (${dropletId}):
+   Metric Type: ${validatedType}
+   Time Range: ${startTime} to ${endTime}`);
+      if (response.data && response.data.result) {
+        const results = response.data.result;
+        let dataOutput = `   Data Points: ${results.length}`;
+        results.forEach((result, index) => {
+          if (result.values && result.values.length > 0) {
+            const latestValue = result.values[result.values.length - 1];
+            dataOutput += `
+   ${index + 1}. Latest Value: ${latestValue[1]} at ${new Date(latestValue[0] * 1e3).toISOString()}`;
+          }
+        });
+        cli.output(dataOutput);
+      } else {
+        cli.output("   No data available for this time range");
+      }
+    } catch (error) {
+      throw new Error(`Failed to get droplet metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletCpuMetrics(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    const timeRange = generateTimeRange();
+    try {
+      const queryParams = `type=${encodeURIComponent("v1/insights/droplet/cpu")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+      cli.output(`\u{1F5A5}\uFE0F Droplet CPU Metrics (${dropletId}):
+   Time Range: Last 1 hour`);
+      this.displayMetricsResponse(response, "CPU Utilization %");
+    } catch (error) {
+      throw new Error(`Failed to get droplet CPU metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletMemoryMetrics(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    const timeRange = generateTimeRange();
+    try {
+      const queryParams = `type=${encodeURIComponent("v1/insights/droplet/memory_utilization_percent")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+      cli.output(`\u{1F4BE} Droplet Memory Metrics (${dropletId}):
+   Time Range: Last 1 hour`);
+      this.displayMetricsResponse(response, "Memory Utilization %");
+    } catch (error) {
+      throw new Error(`Failed to get droplet memory metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletDiskMetrics(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    const timeRange = generateTimeRange();
+    try {
+      const queryParams = `type=${encodeURIComponent("v1/insights/droplet/disk_utilization_percent")}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+      cli.output(`\u{1F4BD} Droplet Disk Metrics (${dropletId}):
+   Time Range: Last 1 hour`);
+      this.displayMetricsResponse(response, "Disk Utilization %");
+    } catch (error) {
+      throw new Error(`Failed to get droplet disk metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletNetworkMetrics(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    const timeRange = generateTimeRange();
+    const metrics = [
+      { type: "v1/insights/droplet/public_inbound_bandwidth", name: "Public Inbound Bandwidth" },
+      { type: "v1/insights/droplet/public_outbound_bandwidth", name: "Public Outbound Bandwidth" },
+      { type: "v1/insights/droplet/private_inbound_bandwidth", name: "Private Inbound Bandwidth" },
+      { type: "v1/insights/droplet/private_outbound_bandwidth", name: "Private Outbound Bandwidth" }
+    ];
+    cli.output(`\u{1F310} Droplet Network Metrics (${dropletId}):
+   Time Range: Last 1 hour`);
+    try {
+      let output = "";
+      for (const metric of metrics) {
+        const queryParams = `type=${encodeURIComponent(metric.type)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+        const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+        output += `
+
+\u{1F4CA} ${metric.name}:`;
+        output += this.formatMetricsResponse(response, "Bytes");
+      }
+      if (output) {
+        cli.output(output);
+      }
+    } catch (error) {
+      throw new Error(`Failed to get droplet network metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDropletBandwidthInbound(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/public_inbound_bandwidth", "\u{1F4E5} Public Inbound Bandwidth");
+  }
+  getDropletBandwidthOutbound(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/public_outbound_bandwidth", "\u{1F4E4} Public Outbound Bandwidth");
+  }
+  getDropletPrivateBandwidthInbound(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/private_inbound_bandwidth", "\u{1F4E5} Private Inbound Bandwidth");
+  }
+  getDropletPrivateBandwidthOutbound(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/private_outbound_bandwidth", "\u{1F4E4} Private Outbound Bandwidth");
+  }
+  getDropletDiskRead(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/disk_read", "\u{1F4D6} Disk Read Operations");
+  }
+  getDropletDiskWrite(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/disk_write", "\u{1F4DD} Disk Write Operations");
+  }
+  getDropletLoadAverage1(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_1", "\u2696\uFE0F 1-Minute Load Average");
+  }
+  getDropletLoadAverage5(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_5", "\u2696\uFE0F 5-Minute Load Average");
+  }
+  getDropletLoadAverage15(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    this.getSpecificDropletMetric(dropletId, "v1/insights/droplet/load_15", "\u2696\uFE0F 15-Minute Load Average");
   }
   getAllDropletMetrics(args) {
+    const dropletId = args.droplet_id;
+    if (!dropletId) {
+      throw new Error("Droplet ID is required (use --droplet_id=DROPLET_ID)");
+    }
+    const timeRange = generateTimeRange();
+    const metrics = [
+      { type: "v1/insights/droplet/cpu", name: "\u{1F5A5}\uFE0F CPU Utilization" },
+      { type: "v1/insights/droplet/memory_utilization_percent", name: "\u{1F4BE} Memory Utilization" },
+      { type: "v1/insights/droplet/disk_utilization_percent", name: "\u{1F4BD} Disk Utilization" },
+      { type: "v1/insights/droplet/load_1", name: "\u2696\uFE0F 1-Min Load Average" },
+      { type: "v1/insights/droplet/load_5", name: "\u2696\uFE0F 5-Min Load Average" },
+      { type: "v1/insights/droplet/load_15", name: "\u2696\uFE0F 15-Min Load Average" },
+      { type: "v1/insights/droplet/public_inbound_bandwidth", name: "\u{1F4E5} Public Inbound Bandwidth" },
+      { type: "v1/insights/droplet/public_outbound_bandwidth", name: "\u{1F4E4} Public Outbound Bandwidth" },
+      { type: "v1/insights/droplet/disk_read", name: "\u{1F4D6} Disk Read" },
+      { type: "v1/insights/droplet/disk_write", name: "\u{1F4DD} Disk Write" }
+    ];
+    let output = `\u{1F4CA} All Droplet Metrics (${dropletId}):
+   Time Range: Last 1 hour`;
     try {
-      const droplet_id = args.droplet_id;
-      if (!droplet_id) {
-        throw new Error("Droplet ID is required (use droplet_id=YOUR-DROPLET-ID)");
-      }
-      const metrics = [
-        "v1/insights/droplet/cpu",
-        "v1/insights/droplet/memory_utilization_percent",
-        "v1/insights/droplet/disk_utilization_percent",
-        "v1/insights/droplet/load_1",
-        "v1/insights/droplet/load_5",
-        "v1/insights/droplet/load_15"
-      ];
-      let output = `All Metrics for Droplet ${droplet_id}:
+      for (const metric of metrics) {
+        const queryParams = `type=${encodeURIComponent(metric.type)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+        const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+        output += `
 
-`;
-      const results = {};
-      let hasData = false;
-      metrics.forEach((metric) => {
-        try {
-          const metricResult = this.getDropletMetricsInternal({ ...args, type: metric });
-          if (metricResult && metricResult.data?.result?.length > 0) {
-            results[metric] = metricResult;
-            const values = metricResult.data.result[0]?.values;
-            if (values && values.length > 0) {
-              const latestValue = values[values.length - 1][1];
-              output += `${metric}: ${latestValue} (${values.length} data points)
-`;
-              hasData = true;
-            } else {
-              output += `${metric}: No data available
-`;
-            }
-          } else {
-            output += `${metric}: No data available
-`;
-          }
-        } catch (error) {
-          output += `${metric}: Unavailable (${error.message.split(":")[0]})
-`;
+${metric.name}:`;
+        output += this.formatMetricsResponse(response);
+      }
+      cli.output(output);
+    } catch (error) {
+      throw new Error(`Failed to get all droplet metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getVolumeMetrics(args) {
+    const volumeId = args.volume_id;
+    if (!volumeId) {
+      throw new Error("Volume ID is required (use --volume_id=VOLUME_ID)");
+    }
+    let startTime = args.start_time;
+    let endTime = args.end_time;
+    if (!startTime || !endTime) {
+      const timeRange = generateTimeRange();
+      startTime = timeRange.start_time;
+      endTime = timeRange.end_time;
+    }
+    try {
+      const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/volume/${volumeId}?${queryParams}`);
+      cli.output(`\u{1F4BE} Volume Metrics (${volumeId}):
+   Time Range: ${startTime} to ${endTime}`);
+      this.displayMetricsResponse(response);
+    } catch (error) {
+      throw new Error(`Failed to get volume metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getAppMetrics(args) {
+    const appId = args.app_id;
+    const component = args.component || "web";
+    if (!appId) {
+      throw new Error("App ID is required (use --app_id=APP_ID)");
+    }
+    let startTime = args.start_time;
+    let endTime = args.end_time;
+    if (!startTime || !endTime) {
+      const timeRange = generateTimeRange();
+      startTime = timeRange.start_time;
+      endTime = timeRange.end_time;
+    }
+    try {
+      const queryParams = `component=${encodeURIComponent(component)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/app/${appId}?${queryParams}`);
+      cli.output(`\u{1F4F1} App Metrics (${appId}):
+   Component: ${component}
+   Time Range: ${startTime} to ${endTime}`);
+      this.displayMetricsResponse(response);
+    } catch (error) {
+      throw new Error(`Failed to get app metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getLoadBalancerMetrics(args) {
+    const lbId = args.lb_id;
+    if (!lbId) {
+      throw new Error("Load Balancer ID is required (use --lb_id=LB_ID)");
+    }
+    let startTime = args.start_time;
+    let endTime = args.end_time;
+    if (!startTime || !endTime) {
+      const timeRange = generateTimeRange();
+      startTime = timeRange.start_time;
+      endTime = timeRange.end_time;
+    }
+    try {
+      const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/load_balancer/${lbId}?${queryParams}`);
+      cli.output(`\u2696\uFE0F Load Balancer Metrics (${lbId}):
+   Time Range: ${startTime} to ${endTime}`);
+      this.displayMetricsResponse(response);
+    } catch (error) {
+      throw new Error(`Failed to get load balancer metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getDatabaseMetrics(args) {
+    const dbId = args.db_id;
+    if (!dbId) {
+      throw new Error("Database ID is required (use --db_id=DB_ID)");
+    }
+    let startTime = args.start_time;
+    let endTime = args.end_time;
+    if (!startTime || !endTime) {
+      const timeRange = generateTimeRange();
+      startTime = timeRange.start_time;
+      endTime = timeRange.end_time;
+    }
+    try {
+      const queryParams = `start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/database/${dbId}?${queryParams}`);
+      cli.output(`\u{1F5C4}\uFE0F Database Metrics (${dbId}):
+   Time Range: ${startTime} to ${endTime}`);
+      this.displayMetricsResponse(response);
+    } catch (error) {
+      throw new Error(`Failed to get database metrics: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  // === Helper Methods ===
+  /**
+   * Get specific droplet metric
+   */
+  getSpecificDropletMetric(dropletId, metricType, metricName) {
+    const timeRange = generateTimeRange();
+    try {
+      const queryParams = `type=${encodeURIComponent(metricType)}&start=${encodeURIComponent(timeRange.start_time)}&end=${encodeURIComponent(timeRange.end_time)}`;
+      const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${dropletId}?${queryParams}`);
+      cli.output(`${metricName} (${dropletId}):
+   Time Range: Last 1 hour`);
+      this.displayMetricsResponse(response);
+    } catch (error) {
+      throw new Error(`Failed to get ${metricName.toLowerCase()}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Display metrics response in a formatted way
+   */
+  displayMetricsResponse(response, unit) {
+    cli.output(this.formatMetricsResponse(response, unit));
+  }
+  /**
+   * Format metrics response as a string
+   */
+  formatMetricsResponse(response, unit) {
+    if (response.data && response.data.result) {
+      const results = response.data.result;
+      if (results.length === 0) {
+        return "\n   No data available for this time range";
+      }
+      let output = "";
+      results.forEach((result, index) => {
+        if (result.values && result.values.length > 0) {
+          const latestValue = result.values[result.values.length - 1];
+          const value = unit ? `${latestValue[1]} ${unit}` : latestValue[1];
+          const timestamp = new Date(latestValue[0] * 1e3).toISOString();
+          output += `
+   ${index + 1}. Latest: ${value} at ${timestamp}
+      Data points: ${result.values.length}`;
+        } else {
+          output += `
+   ${index + 1}. No values available`;
         }
       });
-      if (!hasData) {
-        cli.output(`No metrics data available for Droplet ${droplet_id}
-Note: Make sure the monitoring agent is installed on your droplet:
-curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash`);
-      } else {
-        cli.output(output.trim());
-      }
-      return { droplet_id, all_metrics: results };
-    } catch (error) {
-      throw new Error(`Failed to get all droplet metrics: ${error.message}`);
+      return output;
+    } else {
+      return "\n   No data available for this time range";
     }
   }
-  // Internal method that doesn't output to CLI
-  getDropletMetricsInternal(args) {
-    const droplet_id = args.droplet_id;
-    const type = args.type || "v1/insights/droplet/cpu";
-    let start_time = args.start_time;
-    let end_time = args.end_time;
-    if (!droplet_id) {
-      throw new Error("Droplet ID is required");
-    }
-    validateAlertPolicyType(type);
-    if (!end_time) {
-      end_time = (/* @__PURE__ */ new Date()).toISOString();
-    }
-    if (!start_time) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1e3);
-      start_time = oneHourAgo.toISOString();
-    }
-    let queryParams = `host_id=${droplet_id}&start=${start_time}&end=${end_time}`;
-    const metricPath = type.replace("v1/insights/droplet/", "");
-    const response = this.makeRequest("GET", `/monitoring/metrics/droplet/${metricPath}?${queryParams}`);
-    return response;
-  }
-  findExistingPolicy() {
-    if (this.definition.create_when_missing === false) {
-      return null;
-    }
+  /**
+   * Find existing alert policy by checking description for name
+   */
+  findExistingAlertPolicy() {
     try {
       const response = this.makeRequest("GET", "/monitoring/alerts");
-      const alerts = response.alerts || response.policies || [];
-      if (!alerts) {
-        return null;
+      if (response.policies && Array.isArray(response.policies)) {
+        const byName = response.policies.find(
+          (policy) => policy.description && policy.description.includes(this.definition.name)
+        );
+        if (byName) return byName;
+        return response.policies.find(
+          (policy) => policy.type === this.definition.metric_type && policy.compare === this.definition.compare && policy.value === this.definition.value && policy.window === this.definition.window
+        );
       }
-      const existingPolicy = alerts.find(
-        (policy) => policy.description === this.definition.name || policy.description === `Alert policy for ${this.definition.name}`
-      );
-      return existingPolicy || null;
+      return null;
     } catch (error) {
       return null;
     }
   }
-  buildPolicyData(emails) {
-    const emailsToUse = emails || this.definition.emails || [];
-    if (emailsToUse.length === 0 && (!this.definition.slack_channels || this.definition.slack_channels.length === 0)) {
-      throw new Error("Alert policy must have at least one action (email or slack). Please provide emails or slack_channels.");
-    }
-    return {
-      type: this.definition.metric_type,
-      description: this.definition.alert_description || `Alert policy for ${this.definition.name}`,
-      compare: this.definition.compare,
-      value: this.definition.value,
-      window: this.definition.window,
-      entities: this.definition.entities || [],
-      tags: this.definition.tags || [],
-      alerts: {
-        email: emailsToUse,
-        slack: this.definition.slack_channels?.map((ch) => ({
-          type: "slack",
-          channel: ch.channel,
-          url: ch.url
-        })) || []
-      },
-      enabled: this.definition.enabled !== false
-    };
-  }
+  /**
+   * Update internal state from policy object
+   */
   updateStateFromPolicy(policy) {
     this.state.uuid = policy.uuid;
     this.state.name = this.definition.name;
-    this.state.alert_description = policy.description;
-    this.state.metric_type = policy.type;
+    this.state.type = policy.type;
+    this.state.description = policy.description;
     this.state.compare = policy.compare;
     this.state.value = policy.value;
     this.state.window = policy.window;
     this.state.entities = policy.entities;
     this.state.tags = policy.tags;
-    this.state.emails = policy.alerts?.email;
-    this.state.slack_channels = policy.alerts?.slack?.map((ch) => ({
-      channel: ch.channel,
-      url: ch.url
-    }));
+    this.state.alerts = policy.alerts;
     this.state.enabled = policy.enabled;
+    this.state.created_at = policy.created_at;
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "createAlertPolicy", _createAlertPolicy_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "listAlertPolicies", _listAlertPolicies_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getAlertPolicy", _getAlertPolicy_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "updateAlertPolicy", _updateAlertPolicy_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getAccountInfo", _getAccountInfo_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "enableAlertPolicy", _enableAlertPolicy_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "disableAlertPolicy", _disableAlertPolicy_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "listSinks", _listSinks_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getSink", _getSink_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getAccountInfoAction", _getAccountInfoAction_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletMetrics", _getDropletMetrics_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletCpuMetrics", _getDropletCpuMetrics_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletMemoryMetrics", _getDropletMemoryMetrics_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletDiskMetrics", _getDropletDiskMetrics_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletNetworkMetrics", _getDropletNetworkMetrics_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getAppMetrics", _getAppMetrics_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getLoadBalancerMetrics", _getLoadBalancerMetrics_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getDatabaseMetrics", _getDatabaseMetrics_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "enableAlertPolicy", _enableAlertPolicy_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "disableAlertPolicy", _disableAlertPolicy_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getVolumeMetrics", _getVolumeMetrics_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletBandwidthInbound", _getDropletBandwidthInbound_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletBandwidthOutbound", _getDropletBandwidthOutbound_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletPrivateBandwidthInbound", _getDropletPrivateBandwidthInbound_dec, _DigitalOceanMonitoring);
@@ -1184,16 +940,14 @@ __decorateElement(_init, 1, "getDropletDiskWrite", _getDropletDiskWrite_dec, _Di
 __decorateElement(_init, 1, "getDropletLoadAverage1", _getDropletLoadAverage1_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletLoadAverage5", _getDropletLoadAverage5_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getDropletLoadAverage15", _getDropletLoadAverage15_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "listDroplets", _listDroplets_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "deleteAlertPolicy", _deleteAlertPolicy_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "listSinks", _listSinks_dec, _DigitalOceanMonitoring);
-__decorateElement(_init, 1, "getSink", _getSink_dec, _DigitalOceanMonitoring);
 __decorateElement(_init, 1, "getAllDropletMetrics", _getAllDropletMetrics_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getVolumeMetrics", _getVolumeMetrics_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getAppMetrics", _getAppMetrics_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getLoadBalancerMetrics", _getLoadBalancerMetrics_dec, _DigitalOceanMonitoring);
+__decorateElement(_init, 1, "getDatabaseMetrics", _getDatabaseMetrics_dec, _DigitalOceanMonitoring);
 __decoratorMetadata(_init, _DigitalOceanMonitoring);
 __name(_DigitalOceanMonitoring, "DigitalOceanMonitoring");
-__publicField(_DigitalOceanMonitoring, "readiness", { period: 15, initialDelay: 5, attempts: 40 });
 var DigitalOceanMonitoring = _DigitalOceanMonitoring;
-var alert_policy_default = DigitalOceanMonitoring;
 
 
 

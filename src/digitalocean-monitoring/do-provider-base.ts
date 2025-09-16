@@ -5,17 +5,21 @@ declare const require: any;
 const digitalocean = require("cloud/digitalocean");
 import cli from "cli";
 
-export interface DOProviderDefinitionBase {
-    // No additional properties needed - provider handles authentication automatically
+export interface DOMonitoringDefinitionBase {
+    /**
+     * Whether to create resources when missing - set to false for testing
+     * @description Controls whether to create resources when they don't exist (default: true)
+     */
+    create_when_missing?: boolean;
 }
 
-export interface DOProviderStateBase {
+export interface DOMonitoringStateBase {
     existing?: boolean;
 }
 
-export abstract class DOProviderEntity<
-    D extends DOProviderDefinitionBase,
-    S extends DOProviderStateBase
+export abstract class DOMonitoringEntity<
+    D extends DOMonitoringDefinitionBase,
+    S extends DOMonitoringStateBase
 > extends MonkEntity<D, S> {
     
     /**
@@ -24,8 +28,7 @@ export abstract class DOProviderEntity<
     static readonly readiness = { period: 15, initialDelay: 5, attempts: 40 };
 
     protected override before(): void {
-        // Silenced for cleaner output
-        // cli.output(`🔑 Using DigitalOcean provider for authentication`);
+        // Authentication is handled automatically by DigitalOcean provider
     }
 
     protected abstract getEntityName(): string;
@@ -34,16 +37,14 @@ export abstract class DOProviderEntity<
      * Standard start implementation for DigitalOcean entities
      */
     override start(): void {
-        cli.output(`Starting DigitalOcean operations for: ${this.getEntityName()}`);
+        cli.output(`Starting DigitalOcean Monitoring operations for: ${this.getEntityName()}`);
     }
 
     /**
      * Standard stop implementation for DigitalOcean entities
      */
     override stop(): void {
-        cli.output(`Stopping DigitalOcean operations for: ${this.getEntityName()}`);
-        // DigitalOcean resources don't need explicit stopping - they remain active
-        // This is just a lifecycle hook for cleanup or logging
+        cli.output(`Stopping DigitalOcean Monitoring operations for: ${this.getEntityName()}`);
     }
 
     /**
@@ -54,12 +55,7 @@ export abstract class DOProviderEntity<
         const apiPath = path.startsWith('/v2/') ? path : `/v2${path}`;
         
         try {
-            // Silenced for cleaner output
-            // cli.output(`🔧 Making ${method} request to: ${apiPath}`);
-            
-            // if (body) {
-            //     cli.output(`📦 Request body: ${JSON.stringify(body, null, 2)}`);
-            // }
+            // Make HTTP request without debug output
 
             const requestOptions: any = {
                 headers: {
@@ -86,15 +82,9 @@ export abstract class DOProviderEntity<
                 case 'DELETE':
                     response = digitalocean.delete(apiPath, requestOptions);
                     break;
-                case 'PATCH':
-                    response = digitalocean.patch(apiPath, requestOptions);
-                    break;
                 default:
                     throw new Error(`Unsupported HTTP method: ${method}`);
             }
-            
-            // Silenced for cleaner output
-            // cli.output(`📡 Response status: ${response.statusCode}`);
             
             if (response.statusCode < 200 || response.statusCode >= 300) {
                 let errorMessage = `DigitalOcean API error: ${response.statusCode} ${response.status}`;
@@ -113,7 +103,6 @@ export abstract class DOProviderEntity<
                     errorMessage += ` - Raw: ${response.body || ''}`;
                 }
                 
-                // Error will be thrown, no need for extra logging
                 throw new Error(errorMessage);
             }
             
@@ -155,5 +144,76 @@ export abstract class DOProviderEntity<
             }
             throw error;
         }
+    }
+
+    /**
+     * Helper method to handle resource deletion with proper existing resource checks
+     */
+    protected deleteResource(path: string, resourceName: string): void {
+        if (this.state.existing) {
+            // Resource wasn't created by this entity, skip deletion
+            return;
+        }
+
+        try {
+            this.makeRequest("DELETE", path);
+            // Resource deleted successfully
+        } catch (error) {
+            // If resource doesn't exist, that's fine
+            if (error instanceof Error && (
+                error.message.includes("404") || 
+                error.message.includes("not found") ||
+                error.message.includes("not_found")
+            )) {
+                // Resource was already deleted
+                return;
+            }
+            throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Helper method to get account information and verified email
+     */
+    protected getAccountInfo(): any {
+        try {
+            return this.makeRequest("GET", "/account");
+        } catch (error) {
+            throw new Error(`Failed to get account info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Helper method to auto-detect verified email from account
+     */
+    protected getVerifiedEmail(): string | null {
+        try {
+            const accountResponse = this.getAccountInfo();
+            if (accountResponse.account && accountResponse.account.email_verified && accountResponse.account.email) {
+                return accountResponse.account.email;
+            }
+            return null;
+        } catch (error) {
+            // Could not auto-detect verified email, return null silently
+            return null;
+        }
+    }
+
+    /**
+     * Helper method to list all droplets
+     */
+    protected listDroplets(): any {
+        try {
+            return this.makeRequest("GET", "/droplets");
+        } catch (error) {
+            throw new Error(`Failed to list droplets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Check if create_when_missing is enabled (default: true)
+     */
+    protected shouldCreateWhenMissing(): boolean {
+        return this.definition.create_when_missing !== false;
     }
 }

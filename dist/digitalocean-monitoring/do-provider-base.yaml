@@ -2,4 +2,6 @@ namespace: digitalocean-monitoring
 
 do-provider-base:
   defines: module
+  metadata:
+    version-hash: 79c42885f803
   source: <<< do-provider-base.js
