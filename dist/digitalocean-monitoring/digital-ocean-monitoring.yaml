@@ -1,17 +1,17 @@
 namespace: digitalocean-monitoring
-digital-ocean-monitoring:
+monitoring:
   defines: entity
   metadata:
     name: DigitalOceanMonitoring
-    version-hash: c8dc7e74fa1c
+    version-hash: f3893f88d990
   schema:
-    create_when_missing:
-      type: boolean
-      description: Whether to create resources when missing (for testing)
-      default: true
     name:
       type: string
       description: Name of the alert policy
+    create_when_missing:
+      type: boolean
+      description: Whether to create resources when missing - set to false for testing
+      default: true
     alert_description:
       type: string
       description: Description of the alert policy
@@ -23,23 +23,13 @@ digital-ocean-monitoring:
         - v1/insights/droplet/load_5
         - v1/insights/droplet/load_15
         - v1/insights/droplet/memory_utilization_percent
-        - v1/insights/droplet/memory_available
-        - v1/insights/droplet/memory_cached
-        - v1/insights/droplet/memory_free
-        - v1/insights/droplet/memory_total
         - v1/insights/droplet/disk_utilization_percent
         - v1/insights/droplet/disk_read
         - v1/insights/droplet/disk_write
-        - v1/insights/droplet/filesystem_free
-        - v1/insights/droplet/filesystem_size
         - v1/insights/droplet/public_outbound_bandwidth
         - v1/insights/droplet/public_inbound_bandwidth
         - v1/insights/droplet/private_outbound_bandwidth
         - v1/insights/droplet/private_inbound_bandwidth
-        - v1/insights/droplet/network_outbound_packets
-        - v1/insights/droplet/network_inbound_packets
-        - v1/insights/droplet/network_outbound_errors
-        - v1/insights/droplet/network_inbound_errors
         - v1/insights/lbaas/avg_cpu_utilization_percent
         - v1/insights/lbaas/connection_utilization_percent
         - v1/insights/lbaas/droplet_health
@@ -56,12 +46,14 @@ digital-ocean-monitoring:
         - v1/dbaas/alerts/cpu_alerts
         - v1/dbaas/alerts/memory_utilization_alerts
         - v1/dbaas/alerts/disk_utilization_alerts
-        - v1/insights/volumes/filesystem_free
-        - v1/insights/volumes/filesystem_size
-        - v1/insights/volumes/read_bytes
-        - v1/insights/volumes/write_bytes
-        - v1/insights/apps/cpu_percentage
-        - v1/insights/apps/memory_percentage
+        - v1/droplet/autoscale_alerts/current_instances
+        - v1/droplet/autoscale_alerts/target_instances
+        - v1/droplet/autoscale_alerts/current_cpu_utilization
+        - v1/droplet/autoscale_alerts/target_cpu_utilization
+        - v1/droplet/autoscale_alerts/current_memory_utilization
+        - v1/droplet/autoscale_alerts/target_memory_utilization
+        - v1/droplet/autoscale_alerts/scale_up
+        - v1/droplet/autoscale_alerts/scale_down
       description: Type of metric to monitor
     compare:
       type: string
@@ -138,23 +130,13 @@ digital-ocean-monitoring:
         - v1/insights/droplet/load_5
         - v1/insights/droplet/load_15
         - v1/insights/droplet/memory_utilization_percent
-        - v1/insights/droplet/memory_available
-        - v1/insights/droplet/memory_cached
-        - v1/insights/droplet/memory_free
-        - v1/insights/droplet/memory_total
         - v1/insights/droplet/disk_utilization_percent
         - v1/insights/droplet/disk_read
         - v1/insights/droplet/disk_write
-        - v1/insights/droplet/filesystem_free
-        - v1/insights/droplet/filesystem_size
         - v1/insights/droplet/public_outbound_bandwidth
         - v1/insights/droplet/public_inbound_bandwidth
         - v1/insights/droplet/private_outbound_bandwidth
         - v1/insights/droplet/private_inbound_bandwidth
-        - v1/insights/droplet/network_outbound_packets
-        - v1/insights/droplet/network_inbound_packets
-        - v1/insights/droplet/network_outbound_errors
-        - v1/insights/droplet/network_inbound_errors
         - v1/insights/lbaas/avg_cpu_utilization_percent
         - v1/insights/lbaas/connection_utilization_percent
         - v1/insights/lbaas/droplet_health
@@ -171,12 +153,14 @@ digital-ocean-monitoring:
         - v1/dbaas/alerts/cpu_alerts
         - v1/dbaas/alerts/memory_utilization_alerts
         - v1/dbaas/alerts/disk_utilization_alerts
-        - v1/insights/volumes/filesystem_free
-        - v1/insights/volumes/filesystem_size
-        - v1/insights/volumes/read_bytes
-        - v1/insights/volumes/write_bytes
-        - v1/insights/apps/cpu_percentage
-        - v1/insights/apps/memory_percentage
+        - v1/droplet/autoscale_alerts/current_instances
+        - v1/droplet/autoscale_alerts/target_instances
+        - v1/droplet/autoscale_alerts/current_cpu_utilization
+        - v1/droplet/autoscale_alerts/target_cpu_utilization
+        - v1/droplet/autoscale_alerts/current_memory_utilization
+        - v1/droplet/autoscale_alerts/target_memory_utilization
+        - v1/droplet/autoscale_alerts/scale_up
+        - v1/droplet/autoscale_alerts/scale_down
     compare:
       type: string
       enum:

@@ -6,8 +6,8 @@ This entity provides comprehensive monitoring capabilities for DigitalOcean reso
 
 - **Alert Policy Management**: Create, update, delete, enable/disable, and list alert policies
 - **Monitoring Sinks Management**: List and manage monitoring sinks for data collection
-- **Comprehensive Metrics Access**: Get detailed metrics for Droplets, Volumes, Apps, Load Balancers, and Databases
-- **Multiple Metric Types**: Support for CPU, memory, disk, load, network bandwidth, and I/O metrics
+- **Comprehensive Metrics Access**: Get detailed metrics for Droplets, Load Balancers, Databases, and Autoscale alerts
+- **Multiple Metric Types**: Support for CPU, memory, disk, load, network bandwidth, autoscale, and database alert metrics
 - **Flexible Notifications**: Email and Slack notifications with auto-detection of verified account email
 - **Entity and Tag Targeting**: Target specific Droplets by ID or tags
 - **Account Management**: Access DigitalOcean account information and limits
@@ -51,29 +51,17 @@ This entity provides comprehensive monitoring capabilities for DigitalOcean reso
 
 #### Memory Metrics
 - `v1/insights/droplet/memory_utilization_percent` - Memory utilization percentage
-- `v1/insights/droplet/memory_available` - Available memory in bytes
-- `v1/insights/droplet/memory_cached` - Cached memory in bytes
-- `v1/insights/droplet/memory_free` - Free memory in bytes
-- `v1/insights/droplet/memory_total` - Total memory in bytes
 
-#### Disk and Filesystem Metrics
+#### Disk Metrics
 - `v1/insights/droplet/disk_utilization_percent` - Disk utilization percentage
 - `v1/insights/droplet/disk_read` - Disk read operations
 - `v1/insights/droplet/disk_write` - Disk write operations
-- `v1/insights/droplet/filesystem_free` - Free filesystem space
-- `v1/insights/droplet/filesystem_size` - Total filesystem size
 
 #### Network Bandwidth Metrics
 - `v1/insights/droplet/public_outbound_bandwidth` - Public outbound bandwidth
 - `v1/insights/droplet/public_inbound_bandwidth` - Public inbound bandwidth
 - `v1/insights/droplet/private_outbound_bandwidth` - Private outbound bandwidth
 - `v1/insights/droplet/private_inbound_bandwidth` - Private inbound bandwidth
-
-#### Network Packet Metrics
-- `v1/insights/droplet/network_outbound_packets` - Outbound network packets
-- `v1/insights/droplet/network_inbound_packets` - Inbound network packets
-- `v1/insights/droplet/network_outbound_errors` - Outbound network errors
-- `v1/insights/droplet/network_inbound_errors` - Inbound network errors
 
 ### Load Balancer Metrics
 
@@ -101,15 +89,15 @@ This entity provides comprehensive monitoring capabilities for DigitalOcean reso
 - `v1/dbaas/alerts/memory_utilization_alerts` - Database memory alerts
 - `v1/dbaas/alerts/disk_utilization_alerts` - Database disk alerts
 
-### Volume Metrics
-- `v1/insights/volumes/filesystem_free` - Volume free space
-- `v1/insights/volumes/filesystem_size` - Volume total size  
-- `v1/insights/volumes/read_bytes` - Volume read bytes
-- `v1/insights/volumes/write_bytes` - Volume write bytes
-
-### App Metrics
-- `v1/insights/apps/cpu_percentage` - App CPU percentage
-- `v1/insights/apps/memory_percentage` - App memory percentage
+### Droplet Autoscale Metrics
+- `v1/droplet/autoscale_alerts/current_instances` - Current number of instances
+- `v1/droplet/autoscale_alerts/target_instances` - Target number of instances
+- `v1/droplet/autoscale_alerts/current_cpu_utilization` - Current CPU utilization for autoscaling
+- `v1/droplet/autoscale_alerts/target_cpu_utilization` - Target CPU utilization for autoscaling
+- `v1/droplet/autoscale_alerts/current_memory_utilization` - Current memory utilization for autoscaling
+- `v1/droplet/autoscale_alerts/target_memory_utilization` - Target memory utilization for autoscaling
+- `v1/droplet/autoscale_alerts/scale_up` - Scale up events
+- `v1/droplet/autoscale_alerts/scale_down` - Scale down events
 
 ## Usage Examples
 
@@ -144,6 +132,22 @@ monk-memory-alert:
   slack_channels:
     - channel: "#alerts"
       url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  enabled: true
+  create_when_missing: true
+```
+
+### Autoscale Instance Monitoring
+```yaml
+monk-autoscale-instances-alert:
+  defines: digitalocean-monitoring/digital-ocean-monitoring
+  name: monk-autoscale-instances-alert
+  metric_type: v1/droplet/autoscale_alerts/current_instances
+  compare: GreaterThan
+  value: 10
+  window: 5m
+  tags:
+    - autoscale
+    - production
   enabled: true
   create_when_missing: true
 ```
@@ -232,27 +236,11 @@ curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash
 - `get-droplet-network-metrics` - Network metrics
 - `get-all-droplet-metrics` - All droplet metrics combined
 
-#### Advanced Memory Metrics
-- `get-droplet-memory-available` - Available memory metrics
-- `get-droplet-memory-cached` - Cached memory metrics
-- `get-droplet-memory-free` - Free memory metrics
-- `get-droplet-memory-total` - Total memory metrics
-
-#### Filesystem Metrics
-- `get-droplet-filesystem-free` - Free filesystem space
-- `get-droplet-filesystem-size` - Total filesystem size
-
 #### Network Bandwidth Metrics
 - `get-droplet-bandwidth-inbound` - Public inbound bandwidth
 - `get-droplet-bandwidth-outbound` - Public outbound bandwidth
 - `get-droplet-private-bandwidth-inbound` - Private inbound bandwidth
 - `get-droplet-private-bandwidth-outbound` - Private outbound bandwidth
-
-#### Network Packet & Error Metrics
-- `get-droplet-network-inbound-packets` - Inbound packet metrics
-- `get-droplet-network-outbound-packets` - Outbound packet metrics
-- `get-droplet-network-inbound-errors` - Inbound network errors
-- `get-droplet-network-outbound-errors` - Outbound network errors
 
 #### Disk I/O & Load Metrics
 - `get-droplet-disk-read` - Disk read operations
@@ -294,17 +282,15 @@ curl -sSL https://repos.insights.digitalocean.com/install.sh | sudo bash
 - `get-db-memory-alerts` - Database memory alerts
 - `get-db-disk-alerts` - Database disk alerts
 
-### Volume Metrics
-- `get-volume-metrics` - Basic volume filesystem metrics
-- `get-volume-filesystem-free` - Volume free space metrics
-- `get-volume-filesystem-size` - Volume total size (alias)
-- `get-volume-read-bytes` - Volume read I/O metrics
-- `get-volume-write-bytes` - Volume write I/O metrics
-
-### App Metrics
-- `get-app-metrics` - Basic app CPU metrics
-- `get-app-cpu-percentage` - App CPU percentage metrics
-- `get-app-memory-percentage` - App memory percentage metrics
+### Droplet Autoscale Metrics
+- `get-autoscale-current-instances` - Current instance count metrics
+- `get-autoscale-target-instances` - Target instance count metrics
+- `get-autoscale-current-cpu` - Current CPU utilization for autoscaling
+- `get-autoscale-target-cpu` - Target CPU utilization for autoscaling
+- `get-autoscale-current-memory` - Current memory utilization for autoscaling
+- `get-autoscale-target-memory` - Target memory utilization for autoscaling
+- `get-autoscale-scale-up` - Scale up event metrics
+- `get-autoscale-scale-down` - Scale down event metrics
 
 ## API Reference
 

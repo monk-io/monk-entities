@@ -14,27 +14,15 @@ export type MetricType =
     | "v1/insights/droplet/load_15"
     // Memory
     | "v1/insights/droplet/memory_utilization_percent"
-    | "v1/insights/droplet/memory_available"
-    | "v1/insights/droplet/memory_cached"
-    | "v1/insights/droplet/memory_free"
-    | "v1/insights/droplet/memory_total"
     // Disk
     | "v1/insights/droplet/disk_utilization_percent"
     | "v1/insights/droplet/disk_read"
     | "v1/insights/droplet/disk_write"
-    // Filesystem
-    | "v1/insights/droplet/filesystem_free"
-    | "v1/insights/droplet/filesystem_size"
     // Network Bandwidth
     | "v1/insights/droplet/public_outbound_bandwidth"
     | "v1/insights/droplet/public_inbound_bandwidth"
     | "v1/insights/droplet/private_outbound_bandwidth"
     | "v1/insights/droplet/private_inbound_bandwidth"
-    // Network Packets
-    | "v1/insights/droplet/network_outbound_packets"
-    | "v1/insights/droplet/network_inbound_packets"
-    | "v1/insights/droplet/network_outbound_errors"
-    | "v1/insights/droplet/network_inbound_errors"
     
     // === LOAD BALANCER METRICS ===
     | "v1/insights/lbaas/avg_cpu_utilization_percent"
@@ -56,15 +44,15 @@ export type MetricType =
     | "v1/dbaas/alerts/memory_utilization_alerts"
     | "v1/dbaas/alerts/disk_utilization_alerts"
     
-    // === VOLUME METRICS ===
-    | "v1/insights/volumes/filesystem_free"
-    | "v1/insights/volumes/filesystem_size"
-    | "v1/insights/volumes/read_bytes"
-    | "v1/insights/volumes/write_bytes"
-    
-    // === APP METRICS ===
-    | "v1/insights/apps/cpu_percentage"
-    | "v1/insights/apps/memory_percentage";
+    // === DROPLET AUTOSCALE METRICS ===
+    | "v1/droplet/autoscale_alerts/current_instances"
+    | "v1/droplet/autoscale_alerts/target_instances"
+    | "v1/droplet/autoscale_alerts/current_cpu_utilization"
+    | "v1/droplet/autoscale_alerts/target_cpu_utilization"
+    | "v1/droplet/autoscale_alerts/current_memory_utilization"
+    | "v1/droplet/autoscale_alerts/target_memory_utilization"
+    | "v1/droplet/autoscale_alerts/scale_up"
+    | "v1/droplet/autoscale_alerts/scale_down";
 
 /**
  * Alert comparison operators
@@ -140,27 +128,15 @@ export function validateMetricType(type: string): MetricType {
         "v1/insights/droplet/load_15",
         // Memory
         "v1/insights/droplet/memory_utilization_percent",
-        "v1/insights/droplet/memory_available",
-        "v1/insights/droplet/memory_cached",
-        "v1/insights/droplet/memory_free",
-        "v1/insights/droplet/memory_total",
         // Disk
         "v1/insights/droplet/disk_utilization_percent",
         "v1/insights/droplet/disk_read",
         "v1/insights/droplet/disk_write",
-        // Filesystem
-        "v1/insights/droplet/filesystem_free",
-        "v1/insights/droplet/filesystem_size",
         // Network Bandwidth
         "v1/insights/droplet/public_outbound_bandwidth",
         "v1/insights/droplet/public_inbound_bandwidth",
         "v1/insights/droplet/private_outbound_bandwidth",
         "v1/insights/droplet/private_inbound_bandwidth",
-        // Network Packets
-        "v1/insights/droplet/network_outbound_packets",
-        "v1/insights/droplet/network_inbound_packets",
-        "v1/insights/droplet/network_outbound_errors",
-        "v1/insights/droplet/network_inbound_errors",
         
         // === LOAD BALANCER METRICS ===
         "v1/insights/lbaas/avg_cpu_utilization_percent",
@@ -182,15 +158,15 @@ export function validateMetricType(type: string): MetricType {
         "v1/dbaas/alerts/memory_utilization_alerts",
         "v1/dbaas/alerts/disk_utilization_alerts",
         
-        // === VOLUME METRICS ===
-        "v1/insights/volumes/filesystem_free",
-        "v1/insights/volumes/filesystem_size",
-        "v1/insights/volumes/read_bytes",
-        "v1/insights/volumes/write_bytes",
-        
-        // === APP METRICS ===
-        "v1/insights/apps/cpu_percentage",
-        "v1/insights/apps/memory_percentage"
+        // === DROPLET AUTOSCALE METRICS ===
+        "v1/droplet/autoscale_alerts/current_instances",
+        "v1/droplet/autoscale_alerts/target_instances",
+        "v1/droplet/autoscale_alerts/current_cpu_utilization",
+        "v1/droplet/autoscale_alerts/target_cpu_utilization",
+        "v1/droplet/autoscale_alerts/current_memory_utilization",
+        "v1/droplet/autoscale_alerts/target_memory_utilization",
+        "v1/droplet/autoscale_alerts/scale_up",
+        "v1/droplet/autoscale_alerts/scale_down"
     ];
     
     if (!validTypes.includes(type as MetricType)) {
@@ -213,6 +189,11 @@ export function validateComparisonOperator(operator: string): AlertComparisonOpe
 // Legacy function aliases for backward compatibility
 export const validateAlertPolicyType = validateMetricType;
 export const validateComparator = validateComparisonOperator;
+
+/**
+ * Validate AlertPolicyWindow (alias for validateWindow)
+ */
+export const validateAlertPolicyWindow = validateWindow;
 
 /**
  * Validate time window

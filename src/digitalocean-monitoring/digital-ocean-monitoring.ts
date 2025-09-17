@@ -20,12 +20,18 @@ export interface DigitalOceanMonitoringDefinition extends DOMonitoringDefinition
     name: string;
 
     /**
+     * @description Whether to create resources when missing - set to false for testing
+     * @default true
+     */
+    create_when_missing?: boolean;
+
+    /**
    * @description Description of the alert policy
    * @example "Alert when CPU usage exceeds 80%"
    */
   alert_description?: string;
   
-  /**
+    /**
    * @description Type of metric to monitor
    * @example "v1/insights/droplet/cpu"
      */
@@ -88,12 +94,6 @@ export interface DigitalOceanMonitoringDefinition extends DOMonitoringDefinition
    * @default true
    */
   enabled?: boolean;
-
-  /**
-   * @description Whether to create resources when missing (for testing)
-   * @default true
-   */
-  create_when_missing?: boolean;
 }
 
 export interface DigitalOceanMonitoringState extends DOMonitoringStateBase {

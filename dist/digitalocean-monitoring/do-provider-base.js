@@ -181,12 +181,6 @@ var DOMonitoringEntity = class extends import_base.MonkEntity {
       throw new Error(`Failed to list droplets: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
-  /**
-   * Check if create_when_missing is enabled (default: true)
-   */
-  shouldCreateWhenMissing() {
-    return this.definition.create_when_missing !== false;
-  }
 };
 /**
  * Readiness check configuration

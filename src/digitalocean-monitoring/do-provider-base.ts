@@ -6,11 +6,7 @@ const digitalocean = require("cloud/digitalocean");
 import cli from "cli";
 
 export interface DOMonitoringDefinitionBase {
-    /**
-     * Whether to create resources when missing - set to false for testing
-     * @description Controls whether to create resources when they don't exist (default: true)
-     */
-    create_when_missing?: boolean;
+    // No additional properties needed - provider handles authentication automatically
 }
 
 export interface DOMonitoringStateBase {
@@ -210,10 +206,4 @@ export abstract class DOMonitoringEntity<
         }
     }
 
-    /**
-     * Check if create_when_missing is enabled (default: true)
-     */
-    protected shouldCreateWhenMissing(): boolean {
-        return this.definition.create_when_missing !== false;
-    }
 }
