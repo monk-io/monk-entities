@@ -1,3 +1,4 @@
 REPO digitalocean-monitoring
-LOAD digital-ocean-monitoring.yaml common.yaml do-provider-base.yaml
-RESOURCES do-provider-base.js common.js digital-ocean-monitoring-sync.js
+VERSION_HASH f3893f88d990
+LOAD do-provider-base.yaml common.yaml digital-ocean-monitoring.yaml
+RESOURCES common.js digital-ocean-monitoring-sync.js do-provider-base.js
