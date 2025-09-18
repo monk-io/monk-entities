@@ -1,0 +1,62 @@
+namespace: monk-bridge
+runnable:
+  defines: entity
+  metadata:
+    name: Runnable
+    version-hash: 280717edf59d
+  schema:
+    monkcode_secret_ref:
+      type: string
+    allowed_methods:
+      type: array
+      items:
+        type: string
+    runnable:
+      type: string
+    required:
+      - monkcode_secret_ref
+      - runnable
+  state-schema:
+    last_synced_at:
+      type: number
+    runnable:
+      type: string
+    template:
+      type: string
+    instance_ids:
+      type: array
+      items:
+        type: string
+    is_run:
+      type: boolean
+    endpoints:
+      type: array
+      items:
+        type: object
+        properties:
+          source:
+            type: string
+            enum:
+              - balancer
+              - container
+          name:
+            type: string
+          address:
+            type: string
+          port:
+            type: string
+          healthy:
+            type: boolean
+          raw: {}
+        required:
+          - source
+          - name
+        additionalProperties: false
+  lifecycle:
+    sync: <<< runnable-sync.js
+    refresh: ''
+    describe: ''
+  requires:
+    - monkec/base
+    - cli
+    - monk-bridge/monk-bridge-base

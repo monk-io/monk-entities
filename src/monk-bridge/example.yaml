@@ -1,0 +1,136 @@
+namespace: monk-bridge-example
+
+cluster-sample:
+  defines: monk-bridge/cluster
+  monkcode_secret_ref: my-remote-monkcode
+  permitted-secrets:
+    my-remote-monkcode: true
+  services:
+    data:
+      protocol: custom
+
+runnable-sample:
+  defines: monk-bridge/runnable
+  monkcode_secret_ref: my-remote-monkcode
+  runnable: platform/nginx
+  permitted-secrets:
+    my-remote-monkcode: true
+  services:
+    data:
+      protocol: custom
+
+postgres-sample:
+  defines: monk-bridge/runnable
+  monkcode_secret_ref: my-remote-monkcode
+  runnable: platform/postgres
+  permitted-secrets:
+    my-remote-monkcode: true
+  services:
+    data:
+      protocol: custom
+
+group-sample:
+  defines: monk-bridge/runnable
+  monkcode_secret_ref: my-remote-monkcode
+  runnable: platform/nginx-group
+  permitted-secrets:
+    my-remote-monkcode: true
+  services:
+    data:
+      protocol: custom
+
+curl-runnable-endpoint:
+  defines: runnable
+  depends:
+    wait-for:
+      runnables:
+        - monk-bridge-example/runnable-sample
+  connections:
+    data:
+      runnable: monk-bridge-example/runnable-sample
+      service: data
+  variables:
+    ENDPOINT_ADDR:
+      type: string
+      env: ENDPOINT_ADDR
+      value: <- connection-target("data") entity-state get-member("endpoints") first get-member("address")
+    ENDPOINT_PORT:
+      type: string
+      env: ENDPOINT_PORT
+      value: <- connection-target("data") entity-state get-member("endpoints") first get-member("port")
+  containers:
+    curl:
+      image: curlimages/curl:8.10.1
+      restart: "no"
+      bash: |
+        env;
+        echo "Curling http://${ENDPOINT_ADDR}:${ENDPOINT_PORT}";
+        curl -sv --max-time 5 "http://${ENDPOINT_ADDR}:${ENDPOINT_PORT}" || true
+
+curl-cluster-balancer:
+  defines: runnable
+  depends:
+    wait-for:
+      runnables:
+        - monk-bridge-example/cluster-sample
+  connections:
+    balancer:
+      runnable: monk-bridge-example/cluster-sample
+      service: data
+  variables:
+    BALANCER_ADDR:
+      type: string
+      env: BALANCER_ADDR
+      value: <- connection-target("balancer") entity-state get-member("balancers_list") first get-member("address")
+    BALANCER_PORT:
+      type: string
+      env: BALANCER_PORT
+      value: <- connection-target("balancer") entity-state get-member("balancers_list") first get-member("port")
+  containers:
+    curl:
+      image: curlimages/curl:8.10.1
+      restart: "no"
+      bash: |
+        env;
+        echo "Curling http://${BALANCER_ADDR}:${BALANCER_PORT}";
+        curl -sv --max-time 5 "http://${BALANCER_ADDR}:${BALANCER_PORT}" || true
+
+curl-group-balancer:
+  defines: runnable
+  depends:
+    wait-for:
+      runnables:
+        - monk-bridge-example/group-sample
+  connections:
+    group:
+      runnable: monk-bridge-example/group-sample
+      service: data
+  variables:
+    GROUP_ADDR:
+      type: string
+      env: GROUP_ADDR
+      value: <- connection-target("group") entity-state get-member("endpoints") first get-member("address")
+    GROUP_PORT:
+      type: string
+      env: GROUP_PORT
+      value: <- connection-target("group") entity-state get-member("endpoints") first get-member("port")
+  containers:
+    curl:
+      image: curlimages/curl:8.10.1
+      restart: "no"
+      bash: |
+        env;
+        echo "Curling http://${GROUP_ADDR}:${GROUP_PORT}";
+        curl -sv --max-time 5 "http://${GROUP_ADDR}:${GROUP_PORT}" || true
+
+stack-sample:
+  defines: process-group
+  runnable-list:
+    - monk-bridge-example/cluster-sample
+    - monk-bridge-example/runnable-sample
+    - monk-bridge-example/group-sample
+    - monk-bridge-example/curl-runnable-endpoint
+    - monk-bridge-example/curl-cluster-balancer
+    - monk-bridge-example/curl-group-balancer
+
+
