@@ -1,0 +1,97 @@
+namespace: monk-bridge
+cluster:
+  defines: entity
+  metadata:
+    name: Cluster
+    version-hash: 280717edf59d
+  schema:
+    monkcode_secret_ref:
+      type: string
+    allowed_methods:
+      type: array
+      items:
+        type: string
+    expose_balancers:
+      type: boolean
+    filters:
+      type: object
+      properties:
+        path_filter:
+          type: string
+        tags_filter:
+          type: array
+          items:
+            type: string
+        names_filter:
+          type: array
+          items:
+            type: string
+        local:
+          type: boolean
+      additionalProperties: false
+    fetch_templates_info:
+      type: boolean
+    required:
+      - monkcode_secret_ref
+  state-schema:
+    existing:
+      type: boolean
+    last_synced_at:
+      type: number
+    version:
+      type: string
+    balancers_list:
+      type: array
+      items:
+        type: object
+        properties:
+          address:
+            type: string
+          port:
+            type: string
+          protocol:
+            type: string
+          publish:
+            type: boolean
+        required:
+          - address
+          - port
+          - protocol
+          - publish
+        additionalProperties: false
+    cluster_summary_id:
+      type: string
+    cluster_summary_name:
+      type: string
+    cluster_summary_open_ports:
+      type:
+        - string
+        - number
+    templates_info: {}
+    peers:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          public_ip:
+            type: string
+          name:
+            type: string
+          region:
+            type: string
+          provider:
+            type: string
+          version:
+            type: string
+        required:
+          - id
+        additionalProperties: false
+  lifecycle:
+    sync: <<< cluster-sync.js
+    refresh: ''
+  requires:
+    - monkec/base
+    - cli
+    - monk-bridge/monk-bridge-base
