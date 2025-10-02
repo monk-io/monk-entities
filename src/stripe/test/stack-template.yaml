@@ -1,0 +1,141 @@
+namespace: stripe-test
+
+creds:
+  defines: stripe/credentials
+  secret_ref: stripe-secret-key
+  permitted-secrets:
+    stripe-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+webhook:
+  defines: stripe/webhook-endpoint
+  secret_ref: stripe-secret-key
+  destination_url: https://example.org/stripe/webhook
+  event_types:
+    - charge.succeeded
+  signing_secret_ref: stripe-webhook-secret
+  permitted-secrets:
+    stripe-secret-key: true
+    stripe-webhook-secret: true
+  services:
+    data:
+      protocol: custom
+
+product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key
+  name: monk-test-product
+  product_description: Created by integration test
+  permitted-secrets:
+    stripe-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+price:
+  defines: stripe/price
+  secret_ref: stripe-secret-key
+  connections:
+    product:
+      runnable: stripe-test/product
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - stripe-test/product
+      timeout: 120
+  product_id: <- connection-target("product") entity-state get-member("product_id")
+  lookup_key: monk_test_price_basic
+  currency: usd
+  unit_amount: 700
+  recurring_interval: month
+  permitted-secrets:
+    stripe-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+
+consumer:
+  defines: runnable
+  permitted-secrets:
+    stripe-secret-key: true
+    stripe-webhook-secret: true
+  connections:
+    creds:
+      runnable: stripe-test/creds
+      service: data
+    webhook:
+      runnable: stripe-test/webhook
+      service: data
+    product:
+      runnable: stripe-test/product
+      service: data
+    price:
+      runnable: stripe-test/price
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - stripe-test/creds
+        - stripe-test/webhook
+        - stripe-test/product
+        - stripe-test/price
+      timeout: 120
+  variables:
+    stripe_secret_ref:
+      value: <- connection-target("creds") entity get-member("secret_ref")
+      type: string
+    stripe_webhook_secret_ref:
+      value: <- connection-target("webhook") entity-state get-member("webhook_signing_secret_secret")
+      type: string
+    STRIPE_SECRET_KEY:
+      env: STRIPE_SECRET_KEY
+      type: string
+      value: <- secret($stripe_secret_ref)
+    STRIPE_ACCOUNT_ID:
+      env: STRIPE_ACCOUNT_ID
+      type: string
+      value: <- connection-target("creds") entity-state get-member("account_id")
+    STRIPE_MODE:
+      env: STRIPE_MODE
+      type: string
+      value: <- connection-target("creds") entity-state get-member("mode")
+    STRIPE_WEBHOOK_SECRET:
+      env: STRIPE_WEBHOOK_SECRET
+      type: string
+      value: <- secret($stripe_webhook_secret_ref)
+    STRIPE_PRODUCT_ID:
+      env: STRIPE_PRODUCT_ID
+      type: string
+      value: <- connection-target("product") entity-state get-member("product_id")
+    STRIPE_PRICE_ID:
+      env: STRIPE_PRICE_ID
+      type: string
+      value: <- connection-target("price") entity-state get-member("price_id")
+  containers:
+    validate:
+      image: curlimages/curl:8.10.1
+      restart: no
+      bash: |
+        echo "ACCOUNT=$STRIPE_ACCOUNT_ID MODE=$STRIPE_MODE"
+        test -n "$STRIPE_SECRET_KEY" || (echo "missing secret key" && exit 1)
+        test -n "$STRIPE_ACCOUNT_ID" || (echo "missing account id" && exit 1)
+        test -n "$STRIPE_MODE" || (echo "missing mode" && exit 1)
+        test -n "$STRIPE_WEBHOOK_SECRET" || (echo "missing webhook secret" && exit 1)
+        test -n "$STRIPE_PRODUCT_ID" || (echo "missing product id" && exit 1)
+        test -n "$STRIPE_PRICE_ID" || (echo "missing price id" && exit 1)
+        echo "Stripe product and price resolved"
+        echo "Stripe envs resolved"
+
+stack:
+  defines: process-group
+  runnable-list:
+    - stripe-test/creds
+    - stripe-test/webhook
+    - stripe-test/product
+    - stripe-test/price
+    - stripe-test/consumer
+

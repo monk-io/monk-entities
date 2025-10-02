@@ -1,0 +1,51 @@
+namespace: stripe
+webhook-endpoint:
+  defines: entity
+  metadata:
+    name: WebhookEndpoint
+    version-hash: 795b1e23a55d
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Stripe secret API key (sk_test_... or sk_live_...)
+    destination_url:
+      type: string
+    event_types:
+      type: array
+      items:
+        type: string
+    endpoint_description:
+      type: string
+    signing_secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: >-
+        Secret name to store the signing secret; defaults to
+        stripe-webhook-secret
+    required:
+      - secret_ref
+      - destination_url
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    webhook_endpoint_id:
+      type: string
+    webhook_url:
+      type: string
+    webhook_signing_secret_secret:
+      type: string
+  lifecycle:
+    sync: <<< webhook-endpoint-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - stripe/stripe-base
+    - cli
+    - secret

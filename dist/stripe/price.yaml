@@ -1,0 +1,49 @@
+namespace: stripe
+price:
+  defines: entity
+  metadata:
+    name: Price
+    version-hash: 795b1e23a55d
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Stripe secret API key (sk_test_... or sk_live_...)
+    lookup_key:
+      type: string
+    currency:
+      type: string
+    unit_amount:
+      type: number
+    recurring_interval:
+      type: string
+      enum:
+        - day
+        - week
+        - month
+        - year
+    product_id:
+      type: string
+    price_id:
+      type: string
+    required:
+      - secret_ref
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    price_id:
+      type: string
+    lookup_key:
+      type: string
+  lifecycle:
+    sync: <<< price-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - stripe/stripe-base
+    - cli
