@@ -1,4 +1,4 @@
 REPO aws-s3
 VERSION_HASH 47bda6b50e2a
-LOAD base.yaml common.yaml s3-bucket.yaml
-RESOURCES common.js s3-bucket-sync.js base.js
+LOAD common.yaml s3-bucket.yaml base.yaml
+RESOURCES s3-bucket-sync.js base.js common.js

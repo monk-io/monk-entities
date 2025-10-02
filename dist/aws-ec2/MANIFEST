@@ -1,4 +1,4 @@
 REPO aws-ec2
 VERSION_HASH 05cc25cf3f5d
-LOAD subnet.yaml base.yaml security-group.yaml vpc.yaml
-RESOURCES security-group-sync.js subnet-sync.js base.js vpc-sync.js
+LOAD vpc.yaml subnet.yaml base.yaml security-group.yaml
+RESOURCES vpc-sync.js security-group-sync.js base.js subnet-sync.js

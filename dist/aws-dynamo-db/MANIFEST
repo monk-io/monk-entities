@@ -1,4 +1,4 @@
 REPO aws-dynamo-db
 VERSION_HASH fec481553b25
-LOAD base.yaml common.yaml dynamo-db-table.yaml
-RESOURCES common.js base.js dynamo-db-table-sync.js
+LOAD common.yaml base.yaml dynamo-db-table.yaml
+RESOURCES base.js common.js dynamo-db-table-sync.js

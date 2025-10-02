@@ -1,4 +1,4 @@
 REPO digitalocean-domains
 VERSION_HASH e783d82bcfc2
 LOAD common.yaml domain.yaml
-RESOURCES common.js domain-sync.js
+RESOURCES domain-sync.js common.js

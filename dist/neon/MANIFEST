@@ -1,4 +1,4 @@
 REPO neon
 VERSION_HASH 188a99a3ae63
-LOAD branch.yaml compute.yaml database.yaml neon-base.yaml role.yaml common.yaml project.yaml
-RESOURCES common.js neon-base.js project-sync.js role-sync.js compute-sync.js database-sync.js branch-sync.js
+LOAD database.yaml branch.yaml common.yaml role.yaml project.yaml neon-base.yaml compute.yaml
+RESOURCES compute-sync.js project-sync.js database-sync.js neon-base.js branch-sync.js common.js role-sync.js

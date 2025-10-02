@@ -1,4 +1,4 @@
 REPO stripe
 VERSION_HASH 795b1e23a55d
-LOAD credentials.yaml webhook-endpoint.yaml stripe-base.yaml product.yaml price.yaml
-RESOURCES credentials-sync.js webhook-endpoint-sync.js stripe-base.js product-sync.js price-sync.js
+LOAD webhook-endpoint.yaml price.yaml product.yaml stripe-base.yaml credentials.yaml
+RESOURCES product-sync.js price-sync.js webhook-endpoint-sync.js credentials-sync.js stripe-base.js
