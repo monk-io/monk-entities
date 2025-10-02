@@ -1,0 +1,67 @@
+name: Stripe Minimal Integration Test
+description: Validate credentials and webhook endpoint creation, env wiring to consumer
+
+secrets:
+  global:
+    stripe-secret-key: "$STRIPE_SECRET_KEY"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/stripe/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load test stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Run stack
+    action: run
+    target: stripe-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Describe product
+    action: describe
+    target: stripe-test/product
+    expect:
+      exitCode: 0
+      output:
+        - "product_id"
+
+  - name: Describe price
+    action: describe
+    target: stripe-test/price
+    expect:
+      exitCode: 0
+      output:
+        - "price_id"
+
+  - name: Wait for consumer to exit
+    action: wait
+    target: stripe-test/consumer
+    waitFor:
+      condition: exited
+      timeout: 60000
+
+  - name: Check consumer logs
+    action: logs
+    target: stripe-test/consumer
+    expect:
+      output:
+        - "Stripe product and price resolved"
+        - "Stripe envs resolved"
+      exitCode: 0
+
+cleanup:
+  - name: Delete stack
+    action: delete
+    target: stripe-test/stack
+    expect:
+      exitCode: 0
+
+

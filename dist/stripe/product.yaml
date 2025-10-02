@@ -1,0 +1,43 @@
+namespace: stripe
+product:
+  defines: entity
+  metadata:
+    name: Product
+    version-hash: 795b1e23a55d
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Stripe secret API key (sk_test_... or sk_live_...)
+    name:
+      type: string
+    product_id:
+      type: string
+    product_description:
+      type: string
+    metadata:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - secret_ref
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    product_id:
+      type: string
+    name:
+      type: string
+  lifecycle:
+    sync: <<< product-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - stripe/stripe-base
+    - cli
