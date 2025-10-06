@@ -1,0 +1,39 @@
+---
+title: DigitalOcean Monitoring
+description: Alerts for droplets, load balancers, and databases.
+website_url: https://docs.digitalocean.com/products/monitoring/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Monitoring
+primary_category: analytics-monitoring
+tags: [digitalocean, monitoring, alerts]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Configure monitoring alerts across DigitalOcean resources.
+
+## What Monk manages
+- Monitoring alert policies
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Define an alert (save as do-monitoring.yaml):
+```yaml
+namespace: digitalocean-monitoring-example
+
+monk-cpu-alert:
+  defines: digitalocean-monitoring/monitoring
+  name: monk-cpu-high-alert
+  metric_type: v1/insights/droplet/cpu
+  compare: GreaterThan
+  value: 80
+  window: 10m
+  enabled: true
+  create_when_missing: true
+```
+
+3) Create/update:
+```bash
+monk update digitalocean-monitoring-example/monk-cpu-alert
+```

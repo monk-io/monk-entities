@@ -1,0 +1,60 @@
+---
+title: Netlify
+description: Managed hosting, deploys, and forms for static sites.
+website_url: https://www.netlify.com/
+docs_url: https://docs.netlify.com/api/get-started/
+primary_category: hosting-cicd
+tags: [netlify, hosting, deploy, forms]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Manage Netlify sites, deploys, and forms via API.
+
+## What Monk manages
+- Site, Deploy, Form
+
+## Auth
+- Uses a Monk secret (e.g., netlify-api-token)
+
+## Getting Started
+
+1) Set secret:
+```bash
+monk secrets add -g netlify-api-token="netlify_api_token"
+```
+
+2) Define a site and deploy (save as netlify.yaml):
+```yaml
+namespace: netlify-example
+
+my-site:
+  defines: netlify/site
+  secret_ref: netlify-api-token
+  name: my-awesome-site
+  custom_domain: mydomain.com
+  permitted-secrets:
+    netlify-api-token: true
+
+prod-deploy:
+  defines: netlify/deploy
+  secret_ref: netlify-api-token
+  site_id: \<- connection-target("site") entity-state get-member("id")
+  dir: ./dist
+  prod: true
+  connections:
+    site:
+      runnable: netlify-example/my-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - netlify-example/my-site
+      timeout: 120
+```
+
+3) Create/update:
+```bash
+monk update netlify-example/my-site
+monk update netlify-example/prod-deploy
+```

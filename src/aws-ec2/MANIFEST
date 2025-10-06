@@ -1,3 +1,4 @@
 REPO aws-ec2
-
-
+DESCRIPTION Compute capacity and networking primitives (VPC, subnets, security groups).
+HOSTING managed
+TAGS aws,compute,ec2,vpc,subnet,security-group

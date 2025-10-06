@@ -1,0 +1,5 @@
+REPO digitalocean-database
+DESCRIPTION Managed databases on DigitalOcean.
+HOSTING managed
+TAGS digitalocean,database,postgres,mysql,redis,mongodb
+

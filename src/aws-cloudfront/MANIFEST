@@ -1,5 +1,4 @@
 REPO aws-cloudfront
-DESCRIPTION AWS CloudFront CDN entity for Monk orchestrator
-VERSION 1.0.0
-AUTHOR monk-io
-TAGS aws,cloudfront,cdn,distribution
+DESCRIPTION Global CDN and edge delivery.
+HOSTING managed
+TAGS aws,cloudfront,cdn,edge

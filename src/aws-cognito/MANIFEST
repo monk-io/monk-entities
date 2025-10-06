@@ -4,3 +4,6 @@ LOAD identity-pool.yaml
 LOAD user-pool-client.yaml
 LOAD identity-provider.yaml
 LOAD user-pool-domain.yaml
+DESCRIPTION Identity and access management on AWS.
+HOSTING managed
+TAGS aws,identity,auth,oidc,oauth,cognito

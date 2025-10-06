@@ -1,0 +1,38 @@
+---
+title: DigitalOcean Databases
+description: Managed Postgres, MySQL, MongoDB, Redis (Valkey).
+website_url: https://docs.digitalocean.com/products/databases/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Databases
+primary_category: database
+tags: [digitalocean, database, postgres, mysql, redis, mongodb]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Provision and manage DigitalOcean managed databases.
+
+## What Monk manages
+- Database clusters and configuration
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Define a PostgreSQL cluster (save as do-db.yaml):
+```yaml
+namespace: digitalocean-database-example
+
+my-postgres-db:
+  defines: digitalocean-database/database
+  name: my-postgres-cluster
+  engine: pg
+  version: "16"
+  num_nodes: 1
+  region: nyc1
+  size: db-s-1vcpu-1gb
+```
+
+3) Create/update:
+```bash
+monk update digitalocean-database-example/my-postgres-db
+```

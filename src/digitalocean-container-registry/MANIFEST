@@ -1,1 +1,5 @@
+REPO digitalocean-container-registry
+DESCRIPTION Private container registries.
+HOSTING managed
+TAGS digitalocean,registry,docker
 digital-ocean-container-registry: registry.ts

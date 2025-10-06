@@ -1,0 +1,5 @@
+REPO cloudflare
+DESCRIPTION Managed DNS and CDN.
+HOSTING managed
+TAGS cloudflare,dns,cdn
+

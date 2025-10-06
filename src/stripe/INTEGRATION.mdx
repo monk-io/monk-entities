@@ -1,0 +1,383 @@
+---
+title: Stripe
+description: Complete payment processing, subscription management, and webhook handling for modern applications.
+website_url: https://stripe.com/
+docs_url: https://docs.stripe.com/api
+primary_category: payments-billing
+tags: [stripe, payments, billing, subscriptions, webhooks, saas]
+hosting_models: [managed]
+---
+
+# Stripe Integration
+
+Build complete payment flows, subscription systems, and revenue management with Stripe and Monk.
+
+## Why Stripe?
+
+**Stripe** is the complete payments platform for internet business, offering:
+
+- **Global payments** - Accept cards, digital wallets, bank transfers in 135+ currencies
+- **Subscription management** - Handle recurring billing, trials, coupons, and churn
+- **No-code integrations** - Pre-built checkout flows and customer portals
+- **Enterprise security** - PCI DSS Level 1 compliance and advanced fraud protection
+- **Developer experience** - Excellent APIs, SDKs, and webhook handling
+
+**Perfect for:**
+- SaaS applications with subscription billing
+- E-commerce platforms and marketplaces
+- Mobile apps with in-app purchases
+- B2B software with complex pricing models
+- Platforms handling payments at scale
+
+## What Monk Manages
+
+Monk handles your entire Stripe infrastructure:
+
+- **Credentials & API keys**: Secure secret management for test and live environments
+- **Products & pricing**: Create and manage your product catalog and pricing tiers
+- **Webhook endpoints**: Configure secure webhook handlers for payment events
+- **Customer management**: Handle customer data and subscription lifecycle
+- **Invoice & billing**: Automate invoice generation and payment collection
+- **Subscription operations**: Manage trials, cancellations, and plan changes
+
+## Step-by-Step Integration Guide
+
+### Step 1: Set Up Stripe Account
+
+1. **Create a Stripe account** at [stripe.com](https://stripe.com)
+2. **Get your API keys** from the dashboard (Publishable key and Secret key)
+3. **Configure webhooks** in your Stripe dashboard for payment events
+
+### Step 2: Configure Monk Secrets
+
+Add your Stripe credentials as Monk secrets:
+
+```bash
+# Test environment
+monk secrets add -g stripe-secret-key-test "sk_test_..."
+monk secrets add -g stripe-publishable-key-test "pk_test_..."
+
+# Live environment (when ready for production)
+monk secrets add -g stripe-secret-key-live "sk_live_..."
+monk secrets add -g stripe-publishable-key-live "pk_live_..."
+
+# Webhook signing secret (get this from Stripe dashboard)
+monk secrets add -g stripe-webhook-secret "whsec_..."
+```
+
+### Step 3: Create Your Stripe Configuration
+
+Create a file named `payment-system.yaml`:
+
+```yaml
+namespace: my-saas-payments
+
+# Stripe credentials for different environments
+stripe-creds-test:
+  defines: stripe/credentials
+  secret_ref: stripe-secret-key-test
+  publishable_key_ref: stripe-publishable-key-test
+  environment: test
+
+stripe-creds-live:
+  defines: stripe/credentials
+  secret_ref: stripe-secret-key-live
+  publishable_key_ref: stripe-publishable-key-live
+  environment: live
+
+# SaaS product with multiple pricing tiers
+saas-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "My SaaS Platform"
+  product_description: "Complete business management platform"
+  images: ["https://myapp.com/product-image.jpg"]
+  metadata:
+    category: "productivity"
+    tier: "enterprise"
+
+# Monthly subscription price
+monthly-price:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("saas-product") entity-state get-member("product_id")
+  lookup_key: "monthly_basic"
+  currency: usd
+  unit_amount: 2900  # $29.00
+  recurring_interval: month
+  recurring_interval_count: 1
+  trial_period_days: 14
+
+# Annual subscription price (with discount)
+annual-price:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("saas-product") entity-state get-member("product_id")
+  lookup_key: "annual_basic"
+  currency: usd
+  unit_amount: 29000  # $290.00 (2 months free)
+  recurring_interval: year
+  recurring_interval_count: 1
+  metadata:
+    discount: "20_percent"
+
+# Webhook endpoint for payment events
+payment-webhook:
+  defines: stripe/webhook-endpoint
+  secret_ref: stripe-secret-key-live
+  destination_url: "https://myapp.com/api/stripe/webhook"
+  event_types:
+    - "customer.subscription.created"
+    - "customer.subscription.updated"
+    - "customer.subscription.deleted"
+    - "invoice.payment_succeeded"
+    - "invoice.payment_failed"
+    - "checkout.session.completed"
+  signing_secret_ref: stripe-webhook-secret
+
+  # Connect to credentials for proper API access
+  connections:
+    credentials:
+      runnable: my-saas-payments/stripe-creds-live
+      service: data
+```
+
+### Step 4: Deploy and Test
+
+Deploy your payment infrastructure:
+
+```bash
+# Deploy in test mode first
+monk update my-saas-payments/stripe-creds-test
+monk update my-saas-payments/saas-product
+monk update my-saas-payments/monthly-price
+monk update my-saas-payments/annual-price
+monk update my-saas-payments/payment-webhook
+
+# Verify everything is working
+monk describe my-saas-payments/saas-product
+monk describe my-saas-payments/monthly-price
+
+# Test webhook endpoint
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+## Advanced Configuration Examples
+
+### Multi-Product SaaS Platform
+
+```yaml
+namespace: enterprise-saas
+
+# Multiple products with different features
+starter-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "Starter Plan"
+  product_description: "Perfect for small teams getting started"
+
+professional-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "Professional Plan"
+  product_description: "Advanced features for growing businesses"
+
+enterprise-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "Enterprise Plan"
+  product_description: "Complete solution for large organizations"
+
+# Corresponding prices
+starter-monthly:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("starter-product") entity-state get-member("product_id")
+  lookup_key: "starter_monthly"
+  currency: usd
+  unit_amount: 0  # Free tier
+  recurring_interval: month
+
+pro-monthly:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("professional-product") entity-state get-member("product_id")
+  lookup_key: "pro_monthly"
+  currency: usd
+  unit_amount: 4900  # $49/month
+  recurring_interval: month
+
+enterprise-monthly:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("enterprise-product") entity-state get-member("product_id")
+  lookup_key: "enterprise_monthly"
+  currency: usd
+  unit_amount: 19900  # $199/month
+  recurring_interval: month
+  metadata:
+    seats_included: 50
+    custom_features: true
+```
+
+### E-commerce Integration
+
+```yaml
+namespace: online-store
+
+# Store products
+tshirt-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "Premium Cotton T-Shirt"
+  product_description: "Comfortable, high-quality cotton t-shirt"
+  images: ["https://store.com/tshirt-image.jpg"]
+
+hoodie-product:
+  defines: stripe/product
+  secret_ref: stripe-secret-key-live
+  name: "Zip Hoodie"
+  product_description: "Warm and stylish hoodie for any occasion"
+
+# One-time purchase prices
+tshirt-price-small:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("tshirt-product") entity-state get-member("product_id")
+  lookup_key: "tshirt_small"
+  currency: usd
+  unit_amount: 2500  # $25.00
+  # No recurring fields for one-time purchases
+
+hoodie-price-large:
+  defines: stripe/price
+  secret_ref: stripe-secret-key-live
+  product_id: \<- connection-target("hoodie-product") entity-state get-member("product_id")
+  lookup_key: "hoodie_large"
+  currency: usd
+  unit_amount: 6500  # $65.00
+```
+
+## Webhook Event Handling
+
+Monk helps you handle Stripe webhook events automatically:
+
+```yaml
+# Advanced webhook configuration with event filtering
+advanced-webhook:
+  defines: stripe/webhook-endpoint
+  secret_ref: stripe-secret-key-live
+  destination_url: "https://myapp.com/api/webhooks/stripe"
+  event_types:
+    - "payment_intent.succeeded"
+    - "payment_intent.payment_failed"
+    - "customer.subscription.trial_will_end"
+    - "invoice.payment_action_required"
+  signing_secret_ref: stripe-webhook-secret
+
+  # Custom headers for webhook verification
+  custom_headers:
+    "X-Stripe-Signature": true
+```
+
+## Subscription Management
+
+### Handling Subscription Lifecycle
+
+```yaml
+# Customer portal for self-service subscription management
+customer-portal:
+  defines: runnable
+  script: |
+    #!/bin/bash
+    # Create Stripe customer portal session
+    stripe customer portal create \
+      --customer $STRIPE_CUSTOMER_ID \
+      --return-url https://myapp.com/dashboard
+```
+
+### Trial and Onboarding
+
+```yaml
+# Automated trial extension for users
+trial-extension:
+  defines: runnable
+  script: |
+    #!/bin/bash
+    # Extend trial period for customers who need more time
+    stripe subscriptions update $SUBSCRIPTION_ID \
+      --trial-end $(date -d '+14 days' +%s)
+```
+
+## Troubleshooting & Best Practices
+
+### Common Issues
+
+**Webhook signature verification failing:**
+```bash
+# Ensure webhook secret is correctly configured
+monk secrets list | grep stripe-webhook
+# Verify the webhook endpoint URL is accessible
+curl -X POST https://yourapp.com/api/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -d '{"test": "webhook"}'
+```
+
+**Test mode vs Live mode confusion:**
+- Always test with test API keys and toggle to live only when ready
+- Use separate namespaces for test and live environments
+- Never use live credentials in development
+
+**Subscription state synchronization:**
+```bash
+# Check subscription status in Stripe dashboard
+# Verify customer portal configuration
+monk describe my-saas-payments/customer-portal
+```
+
+### Best Practices
+
+1. **Environment Separation**: Use separate Stripe accounts or clear test/live toggles
+2. **Webhook Security**: Always verify webhook signatures in production
+3. **Error Handling**: Implement proper retry logic for failed payments
+4. **Monitoring**: Track payment success rates and failed payment reasons
+5. **Compliance**: Handle tax calculation and invoice generation properly
+
+### Security Considerations
+
+- Store API keys as encrypted secrets, never in code
+- Use restricted API keys with minimal required permissions
+- Implement webhook signature verification
+- Regularly rotate API keys
+- Monitor for suspicious payment activity
+
+## Real-World Use Cases
+
+### SaaS Platform
+Complete subscription billing with trial periods, multiple pricing tiers, and customer self-service portals.
+
+### E-commerce Store
+Process one-time payments, handle inventory, manage coupons, and integrate with shipping providers.
+
+### Marketplace
+Handle multi-party payments, platform fees, and automated payouts to sellers.
+
+### Mobile App
+Implement in-app purchases, subscription renewals, and cross-platform payment processing.
+
+## Integration with Other Services
+
+Stripe works seamlessly with:
+
+- **Monk Databases**: Store customer and subscription data
+- **Email Services**: Send payment confirmations and receipts
+- **Analytics**: Track payment metrics and conversion funnels
+- **CRM Systems**: Sync customer data and payment history
+- **Tax Services**: Calculate and collect appropriate taxes
+
+## Support & Resources
+
+- **Stripe Documentation**: [Complete API Reference](https://docs.stripe.com/api)
+- **Webhook Guide**: [Testing Webhooks](https://docs.stripe.com/webhooks/test)
+- **Recipes & Examples**: [Stripe Samples](https://github.com/stripe-samples)
+- **Community Support**: [Stripe Developer Forum](https://community.stripe.dev/)

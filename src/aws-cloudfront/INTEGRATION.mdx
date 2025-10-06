@@ -1,0 +1,68 @@
+---
+title: Amazon CloudFront
+description: Global CDN and edge delivery for static and dynamic content.
+website_url: https://aws.amazon.com/cloudfront/
+docs_url: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+primary_category: cdn-dns
+tags: [aws, cdn, cloudfront, edge]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon CloudFront is a content delivery network that accelerates delivery of your content through edge locations.
+
+## What Monk manages
+- Distribution and related configuration
+
+## What the Agent can do and how to use it
+- **Distribution Management**: Create, update, and delete CloudFront distributions
+- **Origin Configuration**: Configure S3 buckets, HTTP servers, or custom origins as content sources
+- **Cache Behaviors**: Set up caching rules, compression, and content optimization
+- **Security**: Configure SSL/TLS certificates, geographic restrictions, and access controls
+- **Invalidations**: Clear cached content and force fresh delivery
+- **Monitoring**: Enable CloudFront access logging and real-time metrics
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Links
+- Provider docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define a distribution (save as cloudfront.yaml):
+```yaml
+namespace: aws-cloudfront-examples
+
+basic-s3-distribution:
+  defines: aws-cloudfront/distribution
+  region: us-east-1
+  enabled: true
+  default_root_object: index.html
+  origins:
+    - id: s3-origin
+      domain_name: my-website-bucket.s3.amazonaws.com
+      s3_origin_config:
+        origin_access_identity: ""
+  default_cache_behavior:
+    target_origin_id: s3-origin
+    viewer_protocol_policy: redirect-to-https
+    allowed_methods: [GET, HEAD]
+    cached_methods: [GET, HEAD]
+```
+
+3) Create/update:
+```bash
+monk update aws-cloudfront-examples/basic-s3-distribution
+monk describe aws-cloudfront-examples/basic-s3-distribution
+```
+

@@ -1,0 +1,5 @@
+REPO aws-s3
+DESCRIPTION Object storage on AWS.
+HOSTING managed
+TAGS aws,storage,s3,object-storage
+

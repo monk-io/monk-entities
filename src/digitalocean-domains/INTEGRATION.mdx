@@ -1,0 +1,35 @@
+---
+title: DigitalOcean Domains
+description: Managed DNS zones and records via DigitalOcean.
+website_url: https://docs.digitalocean.com/products/networking/dns/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Domains
+primary_category: cdn-dns
+tags: [digitalocean, dns, domains]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Manage DNS zones and basic records through DigitalOcean.
+
+## What Monk manages
+- Domain and A/CNAME records
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Define a domain (save as do-domains.yaml):
+```yaml
+namespace: do-domains-example
+
+domain-with-ip:
+  defines: digitalocean-domains/domain
+  name: example.com
+  ip_address: 192.168.1.1
+  ttl: 3600
+```
+
+3) Create/update:
+```bash
+monk update do-domains-example/domain-with-ip
+```

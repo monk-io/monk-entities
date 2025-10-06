@@ -1,2 +1,6 @@
 REPO digitalocean-agent
+DESCRIPTION Manage DigitalOcean GenAI Agents, deployments, and keys.
+HOSTING managed
+TAGS digitalocean,ai,agent,genai
+ 
 

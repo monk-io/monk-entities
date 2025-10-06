@@ -1,0 +1,57 @@
+---
+title: DigitalOcean GenAI Agent
+description: Create and manage GenAI agents, deployments, and API keys.
+website_url: https://docs.digitalocean.com/products/genai/agents/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/GenAI-Agents
+primary_category: devtools
+tags: [digitalocean, ai, agent, genai]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Manage DigitalOcean GenAI Agents and related resources (deployments, keys).
+
+## What Monk manages
+- Agent, API Keys, Deployment
+
+## What the Agent can do and how to use it
+- **Agent Creation**: Create and configure GenAI agents with custom models and settings
+- **Model Selection**: Choose from various AI models (GPT, Claude, etc.) and configure parameters
+- **API Key Management**: Generate and manage API keys for agent access
+- **Deployment Configuration**: Set up agent deployments with scaling and resource allocation
+- **Environment Variables**: Configure agent environment variables and secrets
+- **Monitoring**: Enable logging and performance monitoring for agents
+- **Version Management**: Track and manage agent versions and updates
+
+Steps:
+1) Ensure DigitalOcean provider is added (PAT)
+2) Define and update namespace/name
+
+## Auth
+- Uses DigitalOcean provider credentials
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Define an agent (save as do-agent.yaml):
+```yaml
+namespace: do-agent-example
+
+agent:
+  defines: digitalocean-agent/agent
+  name: api-create
+  instruction: "be a weather reporter"
+  model_id: "openai-gpt-oss-120b"
+  region: "tor1"
+  publish: true
+  services:
+    data:
+      protocol: custom
+```
+
+3) Create/update and check state:
+```bash
+monk update do-agent-example/agent
+monk describe do-agent-example/agent
+```

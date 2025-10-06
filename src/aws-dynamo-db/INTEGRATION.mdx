@@ -1,0 +1,65 @@
+---
+title: Amazon DynamoDB
+description: Fully managed NoSQL key-value and document database.
+website_url: https://aws.amazon.com/dynamodb/
+docs_url: https://docs.aws.amazon.com/amazondynamodb/
+primary_category: database
+tags: [aws, database, nosql, dynamodb, key-value]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon DynamoDB is a fast, flexible NoSQL database service for any scale.
+
+## What Monk manages
+- Table: create, update, delete
+
+## What the Agent can do and how to use it
+- **Table Management**: Create, update, and delete DynamoDB tables with custom schemas
+- **Global Tables**: Configure multi-region replication for global applications
+- **Backup & Restore**: Enable point-in-time recovery and on-demand backups
+- **Scaling**: Configure auto-scaling for read/write capacity (provisioned mode)
+- **Streams**: Enable DynamoDB Streams for change data capture
+- **TTL**: Configure time-to-live settings for automatic item expiration
+- **Indexes**: Create and manage global secondary indexes (GSI) and local secondary indexes (LSI)
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Links
+- Provider docs: https://docs.aws.amazon.com/amazondynamodb/
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define a table (save as dynamodb.yaml):
+```yaml
+namespace: aws-dynamo-db-example
+
+simple-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: simple-example-table
+  attribute_definitions:
+    - AttributeName: id
+      AttributeType: S
+  key_schema:
+    - AttributeName: id
+      KeyType: HASH
+  billing_mode: PAY_PER_REQUEST
+```
+
+3) Create/update:
+```bash
+monk update aws-dynamo-db-example/simple-table
+monk describe aws-dynamo-db-example/simple-table
+```
+

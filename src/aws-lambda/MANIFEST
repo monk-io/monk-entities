@@ -1,0 +1,5 @@
+REPO aws-lambda
+DESCRIPTION Serverless compute functions on AWS.
+HOSTING managed
+TAGS aws,serverless,lambda,functions
+

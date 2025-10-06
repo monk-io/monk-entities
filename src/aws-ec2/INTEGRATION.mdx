@@ -1,0 +1,70 @@
+---
+title: Amazon EC2
+description: Compute capacity in the AWS cloud.
+website_url: https://aws.amazon.com/ec2/
+docs_url: https://docs.aws.amazon.com/ec2/
+primary_category: compute
+tags: [aws, compute, ec2, vpc, subnet, security-group]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon EC2 provides secure, resizable compute capacity.
+
+## What Monk manages
+- VPC, Subnet, Security Group
+
+## What the Agent can do and how to use it
+- **VPC Management**: Create, configure, and delete Virtual Private Clouds
+- **Subnet Configuration**: Set up public, private, and isolated subnets across availability zones
+- **Security Groups**: Define inbound/outbound traffic rules and network access controls
+- **Internet Gateways**: Configure internet connectivity and routing
+- **Route Tables**: Manage routing between subnets and external networks
+- **Network ACLs**: Set up stateless network access control lists
+- **NAT Gateways**: Enable private subnet internet access for updates and external APIs
+- **VPC Endpoints**: Create private connections to AWS services without internet gateways
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define networking primitives (save as ec2.yaml):
+```yaml
+namespace: aws-ec2-examples
+
+vpc:
+  defines: aws-ec2/vpc
+  region: us-east-1
+  cidr_block: 10.1.0.0/16
+
+subnet:
+  defines: aws-ec2/subnet
+  region: us-east-1
+  vpc_id: \<- connection-target("vpc") entity-state get-member("vpc_id")
+  cidr_block: 10.1.1.0/24
+
+sg:
+  defines: aws-ec2/security-group
+  region: us-east-1
+  vpc_id: \<- connection-target("vpc") entity-state get-member("vpc_id")
+  group_name: demo-sg
+  description: Demo security group
+```
+
+3) Create/update:
+```bash
+monk update aws-ec2-examples/vpc
+monk update aws-ec2-examples/subnet
+monk update aws-ec2-examples/sg
+```
+

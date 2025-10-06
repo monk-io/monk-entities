@@ -1,0 +1,5 @@
+REPO stripe
+DESCRIPTION Payments, products, prices, and webhooks.
+HOSTING managed
+TAGS stripe,payments,billing
+

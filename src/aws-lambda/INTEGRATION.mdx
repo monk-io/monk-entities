@@ -1,0 +1,60 @@
+---
+title: AWS Lambda
+description: Serverless compute to run code without provisioning servers.
+website_url: https://aws.amazon.com/lambda/
+docs_url: https://docs.aws.amazon.com/lambda/
+primary_category: serverless
+tags: [aws, serverless, lambda, functions]
+hosting_models: [managed]
+---
+
+## What is this integration?
+AWS Lambda lets you run code without provisioning or managing servers.
+
+## What Monk manages
+- Lambda Function and related configuration
+
+## What the Agent can do and how to use it
+- **Function Management**: Create, update, and delete Lambda functions
+- **Runtime Configuration**: Set runtime environments (Node.js, Python, Java, Go, etc.)
+- **Memory & CPU**: Configure memory allocation and CPU settings
+- **Environment Variables**: Manage function environment variables and secrets
+- **Triggers**: Configure event source mappings (S3, SNS, SQS, DynamoDB streams)
+- **Permissions**: Set up IAM roles and execution policies
+- **Versions & Aliases**: Manage function versions and create aliases for deployment
+- **Concurrency**: Configure reserved and provisioned concurrency settings
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define a Lambda function (save as lambda.yaml):
+```yaml
+namespace: aws-lambda-examples
+
+hello-world:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: hello-world-code
+  function_name: hello-world-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::123456789012:role/lambda-execution-role
+  handler: index.handler
+```
+
+3) Create/update:
+```bash
+monk update aws-lambda-examples/hello-world
+monk describe aws-lambda-examples/hello-world
+```
+
