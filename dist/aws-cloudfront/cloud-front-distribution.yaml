@@ -3,8 +3,7 @@ cloud-front-distribution:
   defines: entity
   metadata:
     name: CloudFrontDistribution
-    version: 1.0.0
-    version-hash: 7ac9dd5c976b
+    version-hash: 27944340f50e
   schema:
     region:
       type: string

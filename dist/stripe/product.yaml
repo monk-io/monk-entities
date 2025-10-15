@@ -3,7 +3,7 @@ product:
   defines: entity
   metadata:
     name: Product
-    version-hash: 795b1e23a55d
+    version-hash: '586179988275'
   schema:
     secret_ref:
       type: string

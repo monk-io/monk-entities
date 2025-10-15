@@ -3,7 +3,7 @@ form:
   defines: entity
   metadata:
     name: Form
-    version-hash: 7f6f1883a79e
+    version-hash: 42a2ccb4a6c8
   schema:
     secret_ref:
       type: string

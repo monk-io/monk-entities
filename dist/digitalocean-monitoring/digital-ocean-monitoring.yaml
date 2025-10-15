@@ -3,7 +3,7 @@ digital-ocean-monitoring:
   defines: entity
   metadata:
     name: DigitalOceanMonitoring
-    version-hash: f3893f88d990
+    version-hash: 0cb66394a8f6
   schema:
     name:
       type: string

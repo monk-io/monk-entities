@@ -3,7 +3,7 @@ vpc:
   defines: entity
   metadata:
     name: VPC
-    version-hash: 05cc25cf3f5d
+    version-hash: d81b7171ff75
   schema:
     region:
       type: string

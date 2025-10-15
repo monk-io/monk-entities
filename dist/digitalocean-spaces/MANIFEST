@@ -1,4 +1,8 @@
 REPO digitalocean-spaces
-VERSION_HASH 6fa7f290077e
+VERSION_HASH de41bdd8dd09
+DESCRIPTION S3-compatible object storage.
+HOSTING managed
+TAGS digitalocean,storage,spaces,object-storage
+ 
 LOAD do-s3-base.yaml spaces-keys.yaml spaces-bucket.yaml
 RESOURCES do-s3-base.js spaces-keys-sync.js spaces-bucket-sync.js

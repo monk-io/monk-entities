@@ -3,5 +3,5 @@ namespace: aws-ec2
 base:
   defines: module
   metadata:
-    version-hash: 05cc25cf3f5d
+    version-hash: d81b7171ff75
   source: <<< base.js

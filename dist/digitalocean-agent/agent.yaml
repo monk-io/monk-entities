@@ -3,7 +3,7 @@ agent:
   defines: entity
   metadata:
     name: Agent
-    version-hash: 6a8eb96d7eb7
+    version-hash: a6a67c6c8ae1
   schema:
     name:
       type: string

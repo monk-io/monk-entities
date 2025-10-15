@@ -1,4 +1,7 @@
 REPO aws-lambda
-VERSION_HASH c96cf1ec7121
+VERSION_HASH 68739f9355b7
+DESCRIPTION Serverless compute functions on AWS.
+HOSTING managed
+TAGS aws,serverless,lambda,functions
 LOAD lambda-function.yaml common.yaml base.yaml
 RESOURCES lambda-function-sync.js base.js common.js

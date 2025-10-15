@@ -1,4 +1,7 @@
 REPO cloudflare
-VERSION_HASH 63b0b29ea312
+VERSION_HASH d4e541db8736
+DESCRIPTION Managed DNS and CDN.
+HOSTING managed
+TAGS cloudflare,dns,cdn
 LOAD cloudflare-dns-zone.yaml cloudflare-base.yaml cloudflare-dns-record.yaml
 RESOURCES cloudflare-dns-record-sync.js cloudflare-base.js cloudflare-dns-zone-sync.js

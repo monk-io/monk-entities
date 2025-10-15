@@ -3,7 +3,7 @@ cluster:
   defines: entity
   metadata:
     name: Cluster
-    version-hash: 4d03df7a14e9
+    version-hash: ca16ce1f5582
   schema:
     secret_ref:
       type: string

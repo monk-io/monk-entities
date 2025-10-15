@@ -3,7 +3,7 @@ s3-bucket:
   defines: entity
   metadata:
     name: S3Bucket
-    version-hash: 47bda6b50e2a
+    version-hash: 5c77c1d4bfcd
   schema:
     region:
       type: string

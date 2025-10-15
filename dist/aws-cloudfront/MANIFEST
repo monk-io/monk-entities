@@ -1,8 +1,7 @@
 REPO aws-cloudfront
-VERSION_HASH 7ac9dd5c976b
-DESCRIPTION AWS CloudFront CDN entity for Monk orchestrator
-VERSION 1.0.0
-AUTHOR monk-io
-TAGS aws,cloudfront,cdn,distribution
+VERSION_HASH 27944340f50e
+DESCRIPTION Global CDN and edge delivery.
+HOSTING managed
+TAGS aws,cloudfront,cdn,edge
 LOAD common.yaml base.yaml cloud-front-distribution.yaml
 RESOURCES cloud-front-distribution-sync.js base.js common.js

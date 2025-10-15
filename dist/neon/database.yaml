@@ -3,7 +3,7 @@ database:
   defines: entity
   metadata:
     name: Database
-    version-hash: 188a99a3ae63
+    version-hash: 95d84bc7ca50
   schema:
     secret_ref:
       type: string

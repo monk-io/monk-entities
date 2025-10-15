@@ -3,5 +3,5 @@ namespace: aws-api-gateway
 base:
   defines: module
   metadata:
-    version-hash: 10a5fe14b53d
+    version-hash: bb0ae1e78148
   source: <<< base.js
