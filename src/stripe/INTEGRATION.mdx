@@ -31,14 +31,12 @@ Build complete payment flows, subscription systems, and revenue management with 
 
 ## What Monk Manages
 
-Monk handles your entire Stripe infrastructure:
+This integration ships the following Stripe entities:
 
-- **Credentials & API keys**: Secure secret management for test and live environments
-- **Products & pricing**: Create and manage your product catalog and pricing tiers
-- **Webhook endpoints**: Configure secure webhook handlers for payment events
-- **Customer management**: Handle customer data and subscription lifecycle
-- **Invoice & billing**: Automate invoice generation and payment collection
-- **Subscription operations**: Manage trials, cancellations, and plan changes
+- **Credentials (stripe/credentials)**: Validates API key, derives mode (test/live), exposes `account_id` and optional `publishable_key`.
+- **Product (stripe/product)**: Creates or adopts a product by `product_id` or name; supports `product_description` and `metadata`.
+- **Price (stripe/price)**: Resolves by `lookup_key` or creates a price with `currency`, `unit_amount`, optional `recurring_interval`, and `product_id`.
+- **Webhook endpoint (stripe/webhook-endpoint)**: Creates an endpoint at `destination_url`, subscribes to `event_types`, stores signing secret in `signing_secret_ref` (default `stripe-webhook-secret`).
 
 ## Step-by-Step Integration Guide
 
@@ -55,13 +53,11 @@ Add your Stripe credentials as Monk secrets:
 ```bash
 # Test environment
 monk secrets add -g stripe-secret-key-test "sk_test_..."
-monk secrets add -g stripe-publishable-key-test "pk_test_..."
 
 # Live environment (when ready for production)
 monk secrets add -g stripe-secret-key-live "sk_live_..."
-monk secrets add -g stripe-publishable-key-live "pk_live_..."
 
-# Webhook signing secret (get this from Stripe dashboard)
+# Webhook signing secret (stored by entity on create, or set manually)
 monk secrets add -g stripe-webhook-secret "whsec_..."
 ```
 
@@ -76,14 +72,12 @@ namespace: my-saas-payments
 stripe-creds-test:
   defines: stripe/credentials
   secret_ref: stripe-secret-key-test
-  publishable_key_ref: stripe-publishable-key-test
-  environment: test
+  publishable_key: "pk_test_..."  # optional, convenience only
 
 stripe-creds-live:
   defines: stripe/credentials
   secret_ref: stripe-secret-key-live
-  publishable_key_ref: stripe-publishable-key-live
-  environment: live
+  publishable_key: "pk_live_..."  # optional, convenience only
 
 # SaaS product with multiple pricing tiers
 saas-product:
@@ -100,24 +94,22 @@ saas-product:
 monthly-price:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("saas-product") entity-state get-member("product_id")
+  product_id: <- connection-target("saas-product") entity-state get-member("product_id")
   lookup_key: "monthly_basic"
   currency: usd
   unit_amount: 2900  # $29.00
   recurring_interval: month
-  recurring_interval_count: 1
-  trial_period_days: 14
+  # trial periods can be configured at checkout/session level
 
 # Annual subscription price (with discount)
 annual-price:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("saas-product") entity-state get-member("product_id")
+  product_id: <- connection-target("saas-product") entity-state get-member("product_id")
   lookup_key: "annual_basic"
   currency: usd
   unit_amount: 29000  # $290.00 (2 months free)
   recurring_interval: year
-  recurring_interval_count: 1
   metadata:
     discount: "20_percent"
 
@@ -192,7 +184,7 @@ enterprise-product:
 starter-monthly:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("starter-product") entity-state get-member("product_id")
+  product_id: <- connection-target("starter-product") entity-state get-member("product_id")
   lookup_key: "starter_monthly"
   currency: usd
   unit_amount: 0  # Free tier
@@ -201,7 +193,7 @@ starter-monthly:
 pro-monthly:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("professional-product") entity-state get-member("product_id")
+  product_id: <- connection-target("professional-product") entity-state get-member("product_id")
   lookup_key: "pro_monthly"
   currency: usd
   unit_amount: 4900  # $49/month
@@ -210,7 +202,7 @@ pro-monthly:
 enterprise-monthly:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("enterprise-product") entity-state get-member("product_id")
+  product_id: <- connection-target("enterprise-product") entity-state get-member("product_id")
   lookup_key: "enterprise_monthly"
   currency: usd
   unit_amount: 19900  # $199/month
@@ -243,7 +235,7 @@ hoodie-product:
 tshirt-price-small:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("tshirt-product") entity-state get-member("product_id")
+  product_id: <- connection-target("tshirt-product") entity-state get-member("product_id")
   lookup_key: "tshirt_small"
   currency: usd
   unit_amount: 2500  # $25.00
@@ -252,7 +244,7 @@ tshirt-price-small:
 hoodie-price-large:
   defines: stripe/price
   secret_ref: stripe-secret-key-live
-  product_id: \<- connection-target("hoodie-product") entity-state get-member("product_id")
+  product_id: <- connection-target("hoodie-product") entity-state get-member("product_id")
   lookup_key: "hoodie_large"
   currency: usd
   unit_amount: 6500  # $65.00
