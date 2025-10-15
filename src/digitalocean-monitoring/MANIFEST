@@ -1,2 +1,6 @@
 REPO digitalocean-monitoring
+DESCRIPTION Monitoring and alert policies.
+HOSTING managed
+TAGS digitalocean,monitoring,alerts
+ 
 

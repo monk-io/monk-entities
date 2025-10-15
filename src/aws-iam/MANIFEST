@@ -1,0 +1,5 @@
+REPO aws-iam
+DESCRIPTION AWS identity and access management (users, roles, policies).
+HOSTING managed
+TAGS aws,iam,identity,policy,role,user
+

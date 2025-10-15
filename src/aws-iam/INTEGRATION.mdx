@@ -1,0 +1,66 @@
+---
+title: AWS IAM
+description: Identity and access management for AWS accounts and services.
+website_url: https://aws.amazon.com/iam/
+docs_url: https://docs.aws.amazon.com/IAM/latest/APIReference/
+primary_category: identity-auth
+tags: [aws, identity, iam, policy, role, user]
+hosting_models: [managed]
+---
+
+## What is this integration?
+AWS Identity and Access Management (IAM) enables you to manage access to AWS services and resources securely.
+
+## What Monk manages
+- IAM Policy, IAM Role, IAM User
+
+## What the Agent can do and how to use it
+- **User Management**: Create, update, and delete IAM users with access keys and passwords
+- **Role Creation**: Define IAM roles with trust policies and managed policies
+- **Policy Management**: Create custom policies with JSON policy documents and attach to users/roles
+- **Group Administration**: Organize users into groups and manage group permissions
+- **Access Key Rotation**: Generate and manage access keys with rotation capabilities
+- **Policy Validation**: Validate policy syntax and check for overly permissive permissions
+- **Service Accounts**: Create service accounts for application authentication
+- **Cross-Account Access**: Configure roles for cross-account resource access
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define a simple policy (save as iam.yaml):
+```yaml
+namespace: iam-examples
+
+s3-readonly-policy:
+  defines: aws/iam/iam-policy
+  region: us-east-1
+  policy_name: S3ReadOnlyAccess
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:ListBucket
+        Resource:
+          - "arn:aws:s3:::my-application-bucket/*"
+          - "arn:aws:s3:::my-application-bucket"
+```
+
+3) Create/update:
+```bash
+monk update iam-examples/s3-readonly-policy
+monk describe iam-examples/s3-readonly-policy
+```
+

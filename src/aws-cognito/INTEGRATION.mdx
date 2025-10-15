@@ -1,0 +1,35 @@
+---
+title: Amazon Cognito
+description: Identity and access management for web and mobile apps.
+website_url: https://aws.amazon.com/cognito/
+docs_url: https://docs.aws.amazon.com/cognito/
+primary_category: identity-auth
+tags: [aws, identity, auth, oidc, oauth, cognito]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon Cognito simplifies adding authentication, authorization, and user management to applications.
+
+## What Monk manages
+- User Pool, Identity Provider, Identity Pool, User Pool Client, User Pool Domain
+
+## What the Agent can do and how to use it
+- **User Pool Management**: Create and configure user pools for authentication
+- **Identity Providers**: Set up social sign-in (Google, Facebook, etc.) and SAML/OIDC providers
+- **Identity Pools**: Configure federated identities for temporary AWS credentials
+- **User Pool Clients**: Create applications and configure OAuth flows
+- **User Management**: Enable self-service sign-up, password policies, and account recovery
+- **Custom Domains**: Set up custom authentication domains with SSL certificates
+- **User Groups**: Create and manage user groups with role-based permissions
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Links
+- Provider docs: https://docs.aws.amazon.com/cognito/
+

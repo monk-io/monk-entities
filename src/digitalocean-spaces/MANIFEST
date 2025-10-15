@@ -1,2 +1,6 @@
 REPO digitalocean-spaces
+DESCRIPTION S3-compatible object storage.
+HOSTING managed
+TAGS digitalocean,storage,spaces,object-storage
+ 
 

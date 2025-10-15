@@ -1,0 +1,56 @@
+---
+title: Amazon SQS
+description: Fully managed message queuing service.
+website_url: https://aws.amazon.com/sqs/
+docs_url: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+primary_category: messaging
+tags: [aws, messaging, queue, sqs]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon SQS offers a reliable, scalable message queue for decoupling microservices.
+
+## What Monk manages
+- Queue: create, update, delete
+
+## What the Agent can do and how to use it
+- **Queue Management**: Create, configure, and delete message queues
+- **Message Operations**: Send, receive, and delete messages with visibility timeouts
+- **Queue Types**: Standard queues (at-least-once delivery) and FIFO queues (exactly-once, ordered)
+- **Dead Letter Queues**: Configure DLQs for failed message handling
+- **Batching**: Send and receive messages in batches for efficiency
+- **Attributes**: Set message attributes, timers, and priority levels
+- **Polling**: Configure long/short polling for message retrieval
+- **Redrive Policies**: Set up automatic redrive from DLQ back to source queue
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define a queue (save as sqs.yaml):
+```yaml
+namespace: aws-sqs-examples
+
+standard-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: standard-example-queue
+```
+
+3) Create/update:
+```bash
+monk update aws-sqs-examples/standard-queue
+monk describe aws-sqs-examples/standard-queue
+```
+

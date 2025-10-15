@@ -1,0 +1,285 @@
+---
+title: Amazon S3
+description: Scalable object storage for any amount of data with built-in security, compliance, and performance features.
+website_url: https://aws.amazon.com/s3/
+docs_url: https://docs.aws.amazon.com/s3/
+primary_category: storage
+tags: [aws, storage, s3, object-storage, files, media, backups]
+hosting_models: [managed]
+---
+
+# Amazon S3 Integration
+
+Seamlessly manage AWS S3 buckets, objects, and storage configurations directly through Monk.
+
+## Why Amazon S3?
+
+**Amazon S3** is the gold standard for cloud object storage, offering:
+
+- **Virtually unlimited scalability** - Store anything from a few files to exabytes of data
+- **99.999999999% durability** - Your data is safe with 11 9's of durability
+- **Global accessibility** - Serve content worldwide with edge locations
+- **Built-in security** - Encryption at rest and in transit, access controls, and compliance features
+- **Cost-effective** - Pay only for what you use with multiple storage tiers
+
+**Perfect for:**
+- File storage and media hosting
+- Data lakes and analytics
+- Backup and disaster recovery
+- Static website hosting
+- Application data storage
+
+## What Monk Manages
+
+Monk handles the complete lifecycle of your S3 resources:
+
+- **Buckets**: Create, configure, update, and delete storage buckets
+- **Bucket policies**: Manage access permissions and security policies
+- **Versioning**: Enable/disable object versioning for data protection
+- **Lifecycle rules**: Automate data transitions between storage classes
+- **CORS configuration**: Set up cross-origin resource sharing
+- **Encryption**: Configure server-side encryption settings
+- **Public access**: Control public read/write permissions
+
+## Step-by-Step Integration Guide
+
+### Step 1: Set Up AWS Provider
+
+First, ensure your AWS credentials are configured:
+
+```bash
+# Add AWS as a provider (Monk will prompt for credentials)
+monk cluster provider add -p aws
+
+# Verify the provider is configured
+monk cluster providers
+```
+
+### Step 2: Create Your First S3 Bucket
+
+Create a file named `s3-storage.yaml`:
+
+```yaml
+namespace: my-app-storage
+
+# Production-ready bucket with security best practices
+app-data-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-app-production-data-2024
+  versioning: true
+  block_public_access: true
+
+  # Lifecycle rules for cost optimization
+  lifecycle_rules:
+    - id: transition-to-ia
+      status: enabled
+      filter:
+        prefix: "archives/"
+      transitions:
+        - days: 30
+          storage_class: STANDARD_IA
+        - days: 90
+          storage_class: GLACIER
+
+  # Server-side encryption
+  server_side_encryption:
+    enabled: true
+    kms_key_id: null  # Use S3-managed keys
+
+# Static assets bucket for a website
+website-assets:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-app-static-assets
+  block_public_access: false
+
+  # CORS configuration for web access
+  cors_configuration:
+    cors_rules:
+      - allowed_headers: ["*"]
+        allowed_methods: ["GET", "HEAD"]
+        allowed_origins: ["https://myapp.com", "https://www.myapp.com"]
+        max_age_seconds: 3600
+
+  # Website hosting configuration
+  website_configuration:
+    index_document: "index.html"
+    error_document: "error.html"
+```
+
+### Step 3: Deploy and Manage
+
+Deploy your S3 resources:
+
+```bash
+# Create/update the buckets
+monk update my-app-storage/app-data-bucket
+monk update my-app-storage/website-assets
+
+# Check the status
+monk describe my-app-storage/app-data-bucket
+
+# List all S3 resources
+monk ps -a | grep s3
+```
+
+### Step 4: Upload and Access Files
+
+Once deployed, you can interact with your S3 buckets:
+
+```bash
+# Upload files to your bucket
+aws s3 cp myfile.txt s3://my-app-production-data-2024/
+
+# List objects
+aws s3 ls s3://my-app-production-data-2024/
+
+# Enable public read access for website assets
+aws s3 cp index.html s3://my-app-static-assets/ --acl public-read
+```
+
+## Advanced Configuration Examples
+
+### Multi-Region Setup
+
+```yaml
+namespace: global-storage
+
+us-east-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-app-east-data
+
+us-west-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-west-2
+  bucket_name: my-app-west-data
+  replication_configuration:
+    role_arn: "arn:aws:iam::ACCOUNT:role/s3-replication-role"
+    rules:
+      - id: replicate-everything
+        status: enabled
+        destination:
+          bucket: "arn:aws:s3:::my-app-west-data"
+```
+
+### Data Lake Configuration
+
+```yaml
+namespace: data-lake
+
+analytics-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-company-data-lake
+
+  # Partitioning for analytics
+  tags:
+    Environment: "production"
+    Purpose: "data-lake"
+    DataClassification: "internal"
+
+  # Access logging for compliance
+  logging:
+    destination_bucket_name: my-company-logs
+    log_file_prefix: "s3-access-logs/"
+
+  # Intelligent tiering for cost optimization
+  intelligent_tiering:
+    configurations:
+      - id: auto-tiering
+        status: enabled
+        tierings:
+          - days: 0
+            access_tier: INTELLIGENT_TIERING
+```
+
+## Troubleshooting & Tips
+
+### Common Issues
+
+**Bucket already exists error:**
+```bash
+# Check if bucket exists and import it instead
+monk describe my-bucket  # If it exists, use import instead of create
+```
+
+**Access denied errors:**
+```bash
+# Verify AWS credentials and permissions
+aws sts get-caller-identity
+monk cluster providers  # Check provider status
+```
+
+**High costs:**
+- Enable lifecycle rules to move old data to cheaper storage classes
+- Use S3 Analytics to identify infrequently accessed data
+- Consider S3 Intelligent-Tiering for automatic cost optimization
+
+### Best Practices
+
+1. **Security First**: Always enable encryption and block public access by default
+2. **Naming Convention**: Use consistent, descriptive bucket names
+3. **Lifecycle Management**: Set up automatic data transitions to save costs
+4. **Cross-Region Replication**: For global applications, replicate critical data
+5. **Monitoring**: Enable S3 access logging and CloudTrail for audit trails
+
+### Cost Optimization
+
+```yaml
+# Example of cost-optimized bucket configuration
+cost-effective-bucket:
+  defines: aws-s3/s3-bucket
+  region: us-east-1
+  bucket_name: my-app-cost-optimized
+
+  lifecycle_rules:
+    - id: move-to-ia-after-30-days
+      status: enabled
+      transitions:
+        - days: 30
+          storage_class: STANDARD_IA
+    - id: move-to-glacier-after-90-days
+      status: enabled
+      transitions:
+        - days: 90
+          storage_class: GLACIER
+    - id: delete-after-7-years
+      status: enabled
+      expiration:
+        days: 2555  # 7 years
+```
+
+## Real-World Use Cases
+
+### E-commerce Platform
+Store product images, user uploads, and order data with automatic lifecycle management for old orders.
+
+### Media & Entertainment
+Host videos, images, and streaming content with CloudFront integration for global delivery.
+
+### SaaS Application
+Store user files, application data, and backups with encryption and compliance features.
+
+### Data Analytics
+Build data lakes with partitioned storage and analytics integration for business intelligence.
+
+## Integration with Other Services
+
+S3 works seamlessly with other AWS services:
+
+- **CloudFront**: Global content delivery network
+- **Lambda**: Serverless compute for data processing
+- **Athena**: Query data directly in S3
+- **Redshift**: Data warehousing with S3 as the data lake
+- **EC2**: Mount S3 buckets as file systems
+
+## Support & Resources
+
+- **AWS Documentation**: [S3 Developer Guide](https://docs.aws.amazon.com/s3/)
+- **Pricing Calculator**: [AWS S3 Pricing](https://calculator.aws/)
+- **Best Practices**: [S3 Performance Optimization](https://aws.amazon.com/blogs/aws/amazon-s3-performance-tips-tricks/)
+
+Need help? Check the [Monk Community](https://community.monk.io) or [AWS Support](https://aws.amazon.com/support).
+

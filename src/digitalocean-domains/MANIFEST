@@ -1,1 +1,5 @@
 REPO digitalocean-domains
+DESCRIPTION Managed DNS via DigitalOcean.
+HOSTING managed
+TAGS digitalocean,dns,domains
+ 

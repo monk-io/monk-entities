@@ -1,0 +1,89 @@
+---
+title: Amazon API Gateway
+description: API management service for building and securing APIs.
+website_url: https://aws.amazon.com/api-gateway/
+docs_url: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+primary_category: networking
+tags: [aws, api, gateway]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon API Gateway lets you create, publish, maintain, monitor, and secure APIs at scale.
+
+## What Monk manages
+- API Gateway resources as provided by the entity definitions
+
+## What the Agent can do and how to use it
+- **API Creation**: Build REST APIs, HTTP APIs, and WebSocket APIs
+- **Route Management**: Define routes, methods, and integration targets (Lambda, HTTP, etc.)
+- **Authentication & Authorization**: Configure API keys, JWT authorizers, and Lambda authorizers
+- **CORS Support**: Set up cross-origin resource sharing for web applications
+- **Stage Management**: Deploy APIs to different stages (dev, staging, production)
+- **Usage Plans**: Create and manage API usage plans with throttling and quotas
+- **Custom Domains**: Configure custom domain names with SSL certificates
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Links
+- Provider docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define an HTTP API with a Lambda integration (save as api-gateway.yaml):
+```yaml
+namespace: aws-api-gateway-examples
+
+hello-function:
+  defines: aws-lambda/lambda-function
+  region: us-east-1
+  blob_name: hello-world-code
+  function_name: api-gw-hello-function
+  runtime: nodejs20.x
+  role: arn:aws:iam::123456789012:role/lambda-execution-role
+  handler: index.handler
+  services:
+    function:
+      protocol: custom
+
+minimal-api:
+  defines: aws-api-gateway/api-gateway
+  region: us-east-1
+  name: minimal-http-api
+  protocol_type: HTTP
+  routes:
+    - path: /hello
+      method: ANY
+      integration:
+        type: lambda
+        function: \<- connection-target("lambda") entity-state get-member("function_arn")
+  services:
+    api:
+      protocol: custom
+  connections:
+    lambda:
+      runnable: aws-api-gateway-examples/hello-function
+      service: function
+  depends:
+    wait-for:
+      runnables:
+        - aws-api-gateway-examples/hello-function
+      timeout: 120
+```
+
+3) Create/update:
+```bash
+monk update aws-api-gateway-examples/minimal-api
+monk describe aws-api-gateway-examples/minimal-api
+```
+

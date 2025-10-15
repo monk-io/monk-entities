@@ -1,0 +1,5 @@
+REPO aws-rds
+DESCRIPTION Managed relational databases (MySQL, Postgres, etc.).
+HOSTING managed
+TAGS aws,database,rds,mysql,postgres
+

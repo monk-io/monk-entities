@@ -1,0 +1,44 @@
+---
+title: DigitalOcean Spaces
+description: S3-compatible object storage on DigitalOcean.
+website_url: https://docs.digitalocean.com/products/spaces/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Spaces
+primary_category: storage
+tags: [digitalocean, storage, spaces, object-storage]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Spaces provides S3-compatible object storage.
+
+## What Monk manages
+- Spaces access keys and buckets
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Create keys and a bucket (save as do-spaces.yaml):
+```yaml
+namespace: do-spaces-example
+
+spaces-keys:
+  defines: digitalocean-spaces/spaces-keys
+  permitted-secrets:
+    do-spaces-access-key: true
+    do-spaces-secret-key: true
+
+space:
+  defines: digitalocean-spaces/spaces-bucket
+  region: nyc3
+  bucket_name: my-unique-bucket
+  permitted-secrets:
+    do-spaces-access-key: true
+    do-spaces-secret-key: true
+```
+
+3) Create/update:
+```bash
+monk update do-spaces-example/spaces-keys
+monk update do-spaces-example/space
+```

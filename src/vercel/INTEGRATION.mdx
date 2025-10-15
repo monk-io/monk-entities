@@ -1,0 +1,427 @@
+---
+title: Vercel
+description: Lightning-fast frontend hosting, serverless functions, and global deployment platform.
+website_url: https://vercel.com/
+docs_url: https://vercel.com/docs/rest-api
+primary_category: hosting-cicd
+tags: [vercel, hosting, deploy, frontend, serverless, cdn]
+hosting_models: [managed]
+---
+
+# Vercel Integration
+
+Deploy modern web applications with automatic scaling, global CDN, and serverless functions through Monk.
+
+## Why Vercel?
+
+**Vercel** is the platform for frontend developers, offering:
+
+- **Instant deployments** - Deploy from Git with zero configuration
+- **Global edge network** - 99.99% uptime with 150+ edge locations worldwide
+- **Serverless functions** - Run API routes and serverless functions at the edge
+- **Advanced caching** - Automatic static asset optimization and caching
+- **Preview deployments** - Every pull request gets its own deployment URL
+- **Analytics & monitoring** - Built-in performance monitoring and analytics
+
+**Perfect for:**
+- React, Next.js, Vue, Nuxt, Svelte applications
+- Static sites and JAMstack applications
+- Serverless API routes and functions
+- Progressive Web Apps (PWAs)
+- E-commerce frontends and marketing sites
+
+## What Monk Manages
+
+Monk handles your complete Vercel deployment pipeline:
+
+- **Projects**: Create and configure Vercel projects and teams
+- **Deployments**: Automated deployments from your codebase
+- **Environment variables**: Secure secret and config management
+- **Domains**: Custom domain configuration and SSL certificates
+- **Serverless functions**: Deploy and manage edge functions
+- **Preview deployments**: Automatic branch and PR deployments
+- **Analytics integration**: Performance monitoring and insights
+
+## Step-by-Step Integration Guide
+
+### Step 1: Set Up Vercel Account
+
+1. **Create a Vercel account** at [vercel.com](https://vercel.com)
+2. **Install Vercel CLI** for local development and deployment
+3. **Get your API token** from Vercel dashboard settings
+
+```bash
+# Install Vercel CLI globally
+npm install -g vercel
+
+# Login to Vercel (will open browser)
+vercel login
+
+# Get your token from dashboard or CLI
+vercel token
+```
+
+### Step 2: Configure Monk Secrets
+
+Add your Vercel credentials as Monk secrets:
+
+```bash
+# Vercel API token
+monk secrets add -g vercel-api-token "your_vercel_token_here"
+
+# Optional: Team ID if using Vercel teams
+monk secrets add -g vercel-team-id "your_team_id"
+
+# Optional: GitHub token for automatic deployments
+monk secrets add -g github-token "your_github_token"
+```
+
+### Step 3: Create Your Deployment Configuration
+
+Create a file named `frontend-deployment.yaml`:
+
+```yaml
+namespace: my-web-app
+
+# Vercel project configuration
+nextjs-app:
+  defines: vercel/project
+  name: "my-awesome-nextjs-app"
+  framework: "nextjs"
+  root_directory: "./"
+  permitted-secrets:
+    vercel-api-token: true
+    github-token: true
+
+  # Project settings
+  settings:
+    build_command: "npm run build"
+    output_directory: ".next"
+    install_command: "npm install"
+    dev_command: "npm run dev"
+
+  # Environment variables for all deployments
+  environment_variables:
+    NODE_ENV: "production"
+    NEXT_PUBLIC_API_URL: "https://api.myapp.com"
+    DATABASE_URL: \<- connection-target("database") entity-state get-member("connection_string")
+
+  # GitHub integration for automatic deployments
+  git_repository:
+    type: "github"
+    repo: "myorg/my-awesome-nextjs-app"
+    production_branch: "main"
+    pr_deployment_enabled: true
+
+# Production deployment
+production-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: my-web-app/nextjs-app
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "production"
+    source_path: "./"
+    auto_deploy: true
+
+# Staging deployment for testing
+staging-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: my-web-app/nextjs-app
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "staging"
+    source_path: "./"
+    auto_deploy: true
+
+# Serverless API functions
+api-functions:
+  defines: vercel/deployment
+  project_name: \<- connection-target("project") entity-state get-member("name")
+  source_path: "./api"
+  functions:
+    - "api/contact.js"
+    - "api/webhook.js"
+    - "api/auth.js"
+  environment_variables:
+    STRIPE_WEBHOOK_SECRET: \<- connection-target("stripe-webhook") entity-state get-member("secret")
+```
+
+### Step 4: Deploy and Monitor
+
+Deploy your application:
+
+```bash
+# Deploy the project configuration
+monk update my-web-app/nextjs-app
+
+# Deploy to production
+monk update my-web-app/production-deployment
+
+# Deploy to staging
+monk update my-web-app/staging-deployment
+
+# Check deployment status
+monk describe my-web-app/production-deployment
+
+# Monitor deployments
+monk ps -a | grep vercel
+```
+
+## Advanced Configuration Examples
+
+### Next.js Application with Database
+
+```yaml
+namespace: fullstack-app
+
+# Database connection (example with Neon)
+database:
+  defines: neon/database
+  name: "my-app-production-db"
+  region: "us-east-1"
+
+# Next.js app with database integration
+nextjs-with-db:
+  defines: vercel/project
+  name: "my-fullstack-nextjs-app"
+  framework: "nextjs"
+  permitted-secrets:
+    vercel-api-token: true
+    database-url: true
+
+  environment_variables:
+    DATABASE_URL: \<- connection-target("database") entity-state get-member("connection_string")
+    NEXTAUTH_SECRET: \<- connection-target("auth-secret") entity-state get-member("value")
+    NEXTAUTH_URL: "https://my-fullstack-nextjs-app.vercel.app"
+
+  functions:
+    - "api/auth/[...nextauth].js"
+    - "api/users.js"
+    - "api/posts.js"
+```
+
+### Static Site with CMS
+
+```yaml
+namespace: blog-site
+
+# Strapi CMS backend
+strapi-cms:
+  defines: runnable
+  script: |
+    #!/bin/bash
+    cd /app/cms && npm start
+
+# Gatsby static site generator
+gatsby-blog:
+  defines: vercel/project
+  name: "my-gatsby-blog"
+  framework: "gatsby"
+  build_command: "npm run build"
+  output_directory: "public"
+  permitted-secrets:
+    vercel-api-token: true
+    strapi-url: true
+
+  environment_variables:
+    GATSBY_STRAPI_URL: \<- connection-target("strapi-cms") entity-state get-member("url")
+    GATSBY_ACTIVE_ENV: "production"
+
+# Deploy static site
+static-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: blog-site/gatsby-blog
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "production"
+    source_path: "./public"
+```
+
+### E-commerce Frontend
+
+```yaml
+namespace: online-store-frontend
+
+# E-commerce Next.js application
+store-frontend:
+  defines: vercel/project
+  name: "my-online-store"
+  framework: "nextjs"
+  permitted-secrets:
+    vercel-api-token: true
+    stripe-keys: true
+
+  environment_variables:
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: \<- connection-target("stripe-keys") entity-state get-member("publishable_key")
+    NEXT_PUBLIC_API_URL: "https://api.mystore.com"
+    NEXT_PUBLIC_CDN_URL: "https://cdn.mystore.com"
+
+  # Custom domains
+  domains:
+    - "store.mydomain.com"
+    - "www.store.mydomain.com"
+
+# Deploy with preview environments
+store-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: online-store-frontend/store-frontend
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "production"
+    auto_deploy: true
+    preview_deployment: true
+```
+
+## Preview Deployments
+
+Monk supports automatic preview deployments for every branch and pull request:
+
+```yaml
+# Preview deployment configuration
+preview-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: my-web-app/nextjs-app
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "preview"
+    source_path: "./"
+    auto_deploy: true
+    preview_deployment: true
+    branch_name: \<- env("GIT_BRANCH", "main")
+```
+
+## Environment Management
+
+### Environment-Specific Configurations
+
+```yaml
+# Development environment
+dev-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: my-web-app/nextjs-app
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "development"
+    environment_variables:
+      NODE_ENV: "development"
+      API_URL: "https://dev-api.myapp.com"
+      DEBUG: "true"
+
+# Production environment
+prod-deployment:
+  defines: runnable
+  inherits: vercel/deploy
+  connections:
+    project:
+      runnable: my-web-app/nextjs-app
+      service: data
+  variables:
+    project: \<- connection-target("project") entity-state get-member("name")
+    environment: "production"
+    environment_variables:
+      NODE_ENV: "production"
+      API_URL: "https://api.myapp.com"
+      SENTRY_DSN: \<- connection-target("sentry") entity-state get-member("dsn")
+```
+
+## Troubleshooting & Best Practices
+
+### Common Issues
+
+**Deployment failures:**
+```bash
+# Check build logs
+vercel logs --follow
+
+# Verify environment variables
+monk describe my-web-app/nextjs-app
+
+# Check project settings in Vercel dashboard
+```
+
+**Domain issues:**
+```bash
+# Verify DNS configuration
+nslookup store.mydomain.com
+
+# Check SSL certificate status
+curl -I https://store.mydomain.com
+```
+
+**Performance issues:**
+- Enable Vercel's edge caching for static assets
+- Use Vercel Analytics to identify slow pages
+- Optimize images and fonts for web delivery
+
+### Best Practices
+
+1. **Environment Variables**: Use separate secrets for each environment (dev, staging, prod)
+2. **Branch Protection**: Enable branch protection rules for production branch
+3. **Preview Deployments**: Always test changes in preview before merging to production
+4. **Monitoring**: Set up uptime monitoring and error tracking (e.g., Sentry)
+5. **CDN Optimization**: Use Vercel's edge locations for global performance
+
+### Security Considerations
+
+- Store API tokens as encrypted secrets
+- Use restricted tokens with minimal permissions
+- Enable 2FA on your Vercel account
+- Regularly rotate deployment tokens
+- Monitor for unauthorized deployments
+
+## Real-World Use Cases
+
+### SaaS Application
+Deploy a full-stack Next.js application with authentication, database integration, and global CDN distribution.
+
+### E-commerce Platform
+Static storefront with dynamic product catalog, shopping cart, and integrated payment processing.
+
+### Blog/Content Site
+Gatsby or Next.js blog with CMS integration, SEO optimization, and fast global loading.
+
+### Developer Portfolio
+Showcase site with project galleries, contact forms, and performance analytics.
+
+## Integration with Other Services
+
+Vercel integrates seamlessly with:
+
+- **Git Providers**: GitHub, GitLab, Bitbucket for automatic deployments
+- **Databases**: MongoDB, PostgreSQL, MySQL for data storage
+- **Authentication**: NextAuth.js, Auth0, Clerk for user management
+- **Payments**: Stripe for e-commerce functionality
+- **Monitoring**: Sentry, LogRocket for error tracking and analytics
+- **CMS**: Strapi, Sanity, Contentful for content management
+
+## Support & Resources
+
+- **Vercel Documentation**: [Complete Guide](https://vercel.com/docs)
+- **API Reference**: [REST API Docs](https://vercel.com/docs/rest-api)
+- **Community**: [Vercel Community](https://vercel.community/)
+- **Templates**: [Next.js Examples](https://nextjs.org/examples)
+- **Learning**: [Vercel Learn](https://nextjs.org/learn)

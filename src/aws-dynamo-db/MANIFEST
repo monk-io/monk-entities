@@ -1,1 +1,4 @@
-REPO aws-dynamo-db 
+REPO aws-dynamo-db
+DESCRIPTION Fully managed NoSQL database.
+HOSTING managed
+TAGS aws,dynamodb,nosql,database,key-value

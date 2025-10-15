@@ -1,1 +1,4 @@
-REPO aws-sqs 
+REPO aws-sqs
+DESCRIPTION Fully managed message queuing.
+HOSTING managed
+TAGS aws,messaging,queue,sqs

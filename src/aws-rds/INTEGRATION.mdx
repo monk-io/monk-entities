@@ -1,0 +1,60 @@
+---
+title: Amazon RDS
+description: Managed relational databases (MySQL, Postgres, and more).
+website_url: https://aws.amazon.com/rds/
+docs_url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+primary_category: database
+tags: [aws, database, rds, mysql, postgres]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Amazon RDS makes it easy to set up, operate, and scale relational databases in the cloud.
+
+## What Monk manages
+- DB instance, subnet group, security group
+
+## What the Agent can do and how to use it
+- **Database Creation**: Provision MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server instances
+- **Backup & Recovery**: Configure automated backups, point-in-time recovery, and manual snapshots
+- **Scaling**: Modify instance types, storage, and enable read replicas for scaling
+- **High Availability**: Set up Multi-AZ deployments for automatic failover
+- **Security**: Configure VPC isolation, security groups, and encryption at rest
+- **Maintenance**: Schedule and manage automated maintenance windows
+- **Monitoring**: Enable Enhanced Monitoring and Performance Insights
+- **Parameter Groups**: Customize database engine parameters and configurations
+
+Steps:
+1) Ensure AWS provider is added: monk cluster provider add -p aws
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses AWS provider credentials configured via monk cluster provider add -p aws
+
+## Getting Started
+
+1) Ensure AWS provider is added:
+```bash
+monk cluster provider add -p aws
+```
+
+2) Define an RDS instance (save as rds.yaml):
+```yaml
+namespace: my-app
+
+my-mysql-db:
+  defines: aws-rds/rds-instance
+  region: us-east-1
+  db_instance_identifier: my-mysql-instance
+  db_instance_class: db.t3.micro
+  engine: mysql
+  master_username: admin
+  password_secret_ref: my-mysql-db-password
+```
+
+3) Create/update:
+```bash
+monk update my-app/my-mysql-db
+monk describe my-app/my-mysql-db
+```
+

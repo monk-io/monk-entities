@@ -1,2 +1,5 @@
 REPO aws-api-gateway
+DESCRIPTION API management for building and securing APIs.
+HOSTING managed
+TAGS aws,api,gateway
 

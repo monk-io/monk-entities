@@ -1,0 +1,83 @@
+---
+title: Neon
+description: Serverless Postgres with branching and autoscaling.
+website_url: https://neon.tech/
+docs_url: https://api-docs.neon.tech/
+primary_category: database
+tags: [neon, postgres, database]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Provision Neon projects, branches, computes, and roles.
+
+## What Monk manages
+- Project, Branch, Compute, Role
+
+## Auth
+- Uses a Monk secret (e.g., neon-api-key)
+
+## Getting Started
+
+1) Set secret:
+```bash
+monk secrets add -g neon-api-key="neon_secret_key"
+```
+
+2) Define Neon resources (save as neon.yaml):
+```yaml
+namespace: examples
+
+my-neon-project:
+  defines: neon/project
+  secret_ref: neon-api-key
+  name: my-neon-project
+  region_id: aws-us-east-2
+  pg_version: 17
+  permitted-secrets:
+    neon-api-key: true
+
+dev-branch:
+  defines: neon/branch
+  secret_ref: neon-api-key
+  projectId: \<- connection-target("project") entity-state get-member("id")
+  name: dev
+  connections:
+    project:
+      runnable: examples/my-neon-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/my-neon-project
+      timeout: 60
+
+dev-compute:
+  defines: neon/compute
+  secret_ref: neon-api-key
+  projectId: \<- connection-target("project") entity-state get-member("id")
+  branchId: \<- connection-target("branch") entity-state get-member("id")
+  computeType: read_write
+  minCu: 1
+  maxCu: 2
+  connections:
+    project:
+      runnable: examples/my-neon-project
+      service: data
+    branch:
+      runnable: examples/dev-branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - examples/my-neon-project
+        - examples/dev-branch
+      timeout: 60
+```
+
+3) Create/update:
+```bash
+monk update examples/my-neon-project
+monk update examples/dev-branch
+monk update examples/dev-compute
+```

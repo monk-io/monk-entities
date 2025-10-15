@@ -1,0 +1,35 @@
+---
+title: DigitalOcean Container Registry
+description: Private Docker registries on DigitalOcean.
+website_url: https://docs.digitalocean.com/products/container-registry/
+docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Container-Registry
+primary_category: devtools
+tags: [digitalocean, registry, docker]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Host private container registries with regional options and tiers.
+
+## What Monk manages
+- Registry lifecycle and configuration
+
+## Getting Started
+
+1) Add DO provider (PAT configured in provider)
+
+2) Define a registry (save as do-registry.yaml):
+```yaml
+namespace: digitalocean-container-registry-example
+
+my-basic-registry:
+  defines: digitalocean-container-registry/registry
+  name: monk-docker-registry-fra
+  region: fra1
+  subscription_tier: basic
+```
+
+3) Create/update:
+```bash
+monk update digitalocean-container-registry-example/my-basic-registry
+```

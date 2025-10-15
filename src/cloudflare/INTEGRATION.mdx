@@ -1,0 +1,213 @@
+---
+title: Cloudflare DNS
+description: Managed DNS and CDN with edge network.
+website_url: https://www.cloudflare.com/
+docs_url: https://developers.cloudflare.com/dns/
+primary_category: cdn-dns
+tags: [cloudflare, dns, cdn]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Cloudflare provides globally distributed DNS, CDN, and edge services.
+
+## What Monk manages
+- DNS Zone and DNS Record
+
+## What the Agent can do and how to use it
+- **DNS Management**: Create, update, and delete DNS zones and records (A, CNAME, MX, TXT, etc.)
+- **CDN Configuration**: Set up page rules, caching, and content optimization
+- **SSL/TLS**: Configure SSL certificates and security settings
+- **Firewall**: Manage firewall rules and DDoS protection settings
+- **Load Balancing**: Configure load balancers and health checks
+- **Workers**: Deploy and manage serverless functions at the edge
+- **Analytics**: Enable traffic analytics and performance monitoring
+
+## Auth
+- Set cloudflare-api-token secret
+
+## Links
+- Provider docs: https://developers.cloudflare.com/dns/
+
+## Getting Started
+
+1) Set Cloudflare API token as secret:
+```bash
+monk secrets add -g cloudflare-api-token "your_api_token_here"
+```
+
+2) Define a DNS record (save as cloudflare.yaml):
+```yaml
+namespace: cloudflare-examples
+
+nginx:
+  defines: runnable
+  inherits: nginx/node-proxy
+
+example-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_name: example.com
+  name: www
+  record_type: CNAME
+  content: \<- connection-domain-name("nginx")
+  ttl: 1
+  proxied: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    nginx:
+      runnable: cloudflare-examples/nginx
+      service: nginx
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-examples/nginx
+      timeout: 60
+```
+
+3) Create/update:
+```bash
+monk update cloudflare-examples/nginx
+monk update cloudflare-examples/example-record
+```
+
+## Advanced Configuration Examples
+
+### DNS Zone Management
+
+```yaml
+namespace: cloudflare-dns-management
+
+# Create a new DNS zone
+my-zone:
+  defines: cloudflare/cloudflare-dns-zone
+  zone_name: myapp.com
+  plan: free  # free, pro, business, enterprise
+
+# Add multiple DNS records
+www-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_name: myapp.com
+  name: www
+  record_type: CNAME
+  content: myapp.com
+  ttl: 1
+  proxied: true
+
+api-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_name: myapp.com
+  name: api
+  record_type: A
+  content: 192.168.1.100
+  ttl: 1
+  proxied: false
+
+# MX record for email
+mx-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_name: myapp.com
+  name: "@"
+  record_type: MX
+  content: mail.myapp.com
+  priority: 10
+  ttl: 1
+```
+
+### Page Rules for CDN Optimization
+
+```yaml
+namespace: cloudflare-cdn
+
+# Page rule for caching static assets
+static-assets-rule:
+  defines: cloudflare/cloudflare-page-rule
+  zone_name: myapp.com
+  target: "*myapp.com/static/*"
+  actions:
+    - id: cache_level
+      value: cache_everything
+    - id: browser_cache_ttl
+      value: 31536000  # 1 year
+
+# Page rule for API endpoints (no caching)
+api-rule:
+  defines: cloudflare/cloudflare-page-rule
+  zone_name: myapp.com
+  target: "*myapp.com/api/*"
+  actions:
+    - id: cache_level
+      value: bypass
+```
+
+### Firewall Rules
+
+```yaml
+namespace: cloudflare-security
+
+# Block traffic from specific countries
+geo-block-rule:
+  defines: cloudflare/cloudflare-firewall-rule
+  zone_name: myapp.com
+  action: block
+  filter:
+    expression: "(ip.geoip.country in {\"CN\" \"RU\"})"
+
+# Rate limiting for login endpoints
+rate-limit-rule:
+  defines: cloudflare/cloudflare-firewall-rule
+  zone_name: myapp.com
+  action: challenge
+  filter:
+    expression: "(http.request.uri.path contains \"/login\")"
+  rate_limit:
+    requests_per_period: 10
+    period: 60
+    action: challenge
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**API token permission errors:**
+```bash
+# Verify token has correct permissions in Cloudflare dashboard
+# Ensure token has Zone:DNS:Edit and Zone:Page Rules:Edit permissions
+```
+
+**Zone not found errors:**
+```bash
+# Check zone name spelling and that it exists in your Cloudflare account
+# Verify the API token has access to the specified zone
+```
+
+**DNS propagation delays:**
+- DNS changes can take up to 24 hours to propagate globally
+- Use Cloudflare's development mode for testing to bypass cache
+
+### Best Practices
+
+1. **API Token Security**: Use restricted API tokens with minimal required permissions
+2. **Zone Organization**: Group related DNS records in logical namespaces
+3. **CDN Optimization**: Use page rules to optimize caching for different content types
+4. **Security First**: Enable firewall rules and rate limiting for sensitive endpoints
+5. **Monitoring**: Enable Cloudflare Analytics to monitor traffic patterns
+
+## Integration with Other Services
+
+Cloudflare works seamlessly with:
+
+- **Monk Applications**: Proxy traffic through Cloudflare's global network
+- **Load Balancers**: Distribute traffic across multiple origins
+- **CDNs**: Combine with other CDNs for multi-layer caching
+- **Security Tools**: Integrate with WAF and DDoS protection services
+- **Analytics**: Feed traffic data into monitoring dashboards
+
+## Support & Resources
+
+- **Cloudflare Documentation**: [DNS API Reference](https://developers.cloudflare.com/dns/)
+- **API Documentation**: [Cloudflare API v4](https://developers.cloudflare.com/api/)
+- **Community**: [Cloudflare Community](https://community.cloudflare.com/)
+- **Status Page**: [Cloudflare Status](https://www.cloudflarestatus.com/)
