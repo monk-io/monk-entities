@@ -3,7 +3,7 @@ registry:
   defines: entity
   metadata:
     name: Registry
-    version-hash: e580c49fdf63
+    version-hash: c6399121e7cb
   schema:
     name:
       type: string
@@ -72,6 +72,8 @@ registry:
       period: 15
       initialDelay: 5
       attempts: 40
+    liveness:
+      period: 300
   requires:
     - monkec/base
     - digitalocean-container-registry/do-provider-base

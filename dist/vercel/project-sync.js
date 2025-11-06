@@ -264,6 +264,9 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   /**
    * Find existing project by name
    */

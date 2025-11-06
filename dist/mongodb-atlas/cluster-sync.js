@@ -94,6 +94,22 @@ var _Cluster = class _Cluster extends MongoDBAtlasEntity {
     }
     return false;
   }
+  checkLiveness() {
+    const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
+    if (!clusterData) {
+      throw new Error(`Cluster ${this.definition.name} not found`);
+    }
+    const hasConn = Boolean(clusterData.connectionStrings?.standard || clusterData.connectionStrings?.standardSrv);
+    const state = String(clusterData.stateName || "");
+    if (!hasConn) {
+      throw new Error("Connection strings are not available yet");
+    }
+    const live = state === "IDLE" || state === "UPDATING" || state === "MAINTENANCE" || state === "RESUMING";
+    if (!live) {
+      throw new Error(`Cluster is not available (state: ${state})`);
+    }
+    return true;
+  }
 };
 __name(_Cluster, "Cluster");
 var Cluster = _Cluster;

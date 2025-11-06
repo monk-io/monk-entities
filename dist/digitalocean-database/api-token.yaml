@@ -3,7 +3,7 @@ api-token:
   defines: entity
   metadata:
     name: ApiToken
-    version-hash: 7c2ecd3c391b
+    version-hash: 69917c68b833
   schema:
     name:
       type: string

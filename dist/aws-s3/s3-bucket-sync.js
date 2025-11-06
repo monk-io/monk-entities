@@ -177,6 +177,9 @@ var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = 
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getBucketInfo(_args) {
     if (!this.state.bucket_name) {
       throw new Error("Bucket not created yet");

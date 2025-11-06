@@ -3,7 +3,7 @@ project:
   defines: entity
   metadata:
     name: Project
-    version-hash: a2d7c6d736c9
+    version-hash: 1db0d5c06a73
   schema:
     secret_ref:
       type: string
@@ -151,6 +151,8 @@ project:
       period: 15
       initialDelay: 2
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - vercel/vercel-base
     - monkec/base

@@ -3,7 +3,7 @@ database:
   defines: entity
   metadata:
     name: Database
-    version-hash: 95d84bc7ca50
+    version-hash: e7f83615fa98
   schema:
     secret_ref:
       type: string
@@ -59,6 +59,8 @@ database:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - monkec/base
     - secret

@@ -31,6 +31,9 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getPolicyName() {
     return this.definition.role_name;
   }

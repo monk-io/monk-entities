@@ -37,11 +37,6 @@ dev-cluster:
       runnables:
         - mongodb-test-stack/dev-project
       timeout: 120
-  checks:
-    readiness:
-      period: 15
-      initialDelay: 5
-      attempts: 40
 
 dev-user:
   defines: mongodb-atlas/user

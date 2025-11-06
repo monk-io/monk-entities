@@ -130,6 +130,8 @@ export class Deployment extends VercelEntity<DeploymentDefinition, DeploymentSta
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     /** Get deployment details */
     @action("Get deployment details")
     getDeployment(): void {

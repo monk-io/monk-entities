@@ -219,6 +219,9 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getInstanceInfo(_args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {

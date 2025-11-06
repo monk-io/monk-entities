@@ -69,6 +69,7 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
     }
   }
 
+  
   @action("get-info")
   getInfo(): void {
     if (!this.state.id) {

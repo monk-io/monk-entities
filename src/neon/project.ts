@@ -341,6 +341,9 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+    
+
     override update(): void {
         if (!this.state.id) {
             throw new Error("Project ID not available for update");

@@ -140,6 +140,8 @@ export class Form extends NetlifyEntity<FormDefinition, FormState> {
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     @action("get-form")
     getForm(): void {
         if (!this.state.id) {

@@ -3,7 +3,7 @@ db-subnet-group:
   defines: entity
   metadata:
     name: DBSubnetGroup
-    version-hash: 80b5108f33f8
+    version-hash: 3caf7e6be769
   schema:
     region:
       type: string
@@ -37,5 +37,7 @@ db-subnet-group:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-rds/lite-base

@@ -3,7 +3,7 @@ iam-user:
   defines: entity
   metadata:
     name: IAMUser
-    version-hash: 5282b5b2635e
+    version-hash: 426c4b1855d4
   schema:
     region:
       type: string
@@ -71,6 +71,8 @@ iam-user:
       period: 5
       initialDelay: 5
       attempts: 12
+    liveness:
+      period: 300
   requires:
     - aws-iam/base
     - aws-iam/common

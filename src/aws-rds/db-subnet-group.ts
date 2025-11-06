@@ -65,6 +65,9 @@ export class DBSubnetGroup extends AWSRDSLiteEntity<DBSubnetGroupDefinition, DBS
 			return false;
 		}
 	}
+
+	checkLiveness(): boolean { return this.checkReadiness(); }
+
 }
 
 

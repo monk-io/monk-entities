@@ -400,6 +400,10 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     // Custom actions
 
     @action("get-distribution-info")

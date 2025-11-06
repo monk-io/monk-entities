@@ -4,5 +4,5 @@ http-client:
   defines: module
   metadata:
     version: 0.1.0
-    version-hash: 1e31de784c59
+    version-hash: f1e75d29f327
   source: <<< http-client.js

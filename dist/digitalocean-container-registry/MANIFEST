@@ -1,8 +1,8 @@
 REPO digitalocean-container-registry
-VERSION_HASH e580c49fdf63
+VERSION_HASH c6399121e7cb
 DESCRIPTION Private container registries.
 HOSTING managed
 TAGS digitalocean,registry,docker
 digital-ocean-container-registry: registry.ts
-LOAD common.yaml registry.yaml do-provider-base.yaml
+LOAD common.yaml do-provider-base.yaml registry.yaml
 RESOURCES common.js do-provider-base.js registry-sync.js

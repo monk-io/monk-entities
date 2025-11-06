@@ -437,6 +437,8 @@ export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     /**
      * Find existing project by name
      */

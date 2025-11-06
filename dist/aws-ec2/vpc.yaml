@@ -3,7 +3,7 @@ vpc:
   defines: entity
   metadata:
     name: VPC
-    version-hash: d81b7171ff75
+    version-hash: ed6c62fb4c12
   schema:
     region:
       type: string
@@ -37,5 +37,7 @@ vpc:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-ec2/base

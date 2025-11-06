@@ -66,6 +66,10 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         }
     }
     
+    checkLiveness(): boolean { return this.checkReadiness(); }
+    
+    
+    
     protected getPolicyName(): string {
         // This method is inherited from base class but not applicable for roles
         // Return role name as a fallback

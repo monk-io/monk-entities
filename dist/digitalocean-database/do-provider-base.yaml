@@ -3,5 +3,5 @@ namespace: digitalocean-database
 do-provider-base:
   defines: module
   metadata:
-    version-hash: 7c2ecd3c391b
+    version-hash: 69917c68b833
   source: <<< do-provider-base.js

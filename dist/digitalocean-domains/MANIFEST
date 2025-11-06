@@ -5,4 +5,4 @@ HOSTING managed
 TAGS digitalocean,dns,domains
  
 LOAD common.yaml domain.yaml
-RESOURCES domain-sync.js common.js
+RESOURCES common.js domain-sync.js

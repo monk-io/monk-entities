@@ -3,7 +3,7 @@ rds-instance:
   defines: entity
   metadata:
     name: RDSInstance
-    version-hash: 80b5108f33f8
+    version-hash: 3caf7e6be769
   schema:
     region:
       type: string
@@ -160,6 +160,8 @@ rds-instance:
       period: 10
       initialDelay: 10
       attempts: 100
+    liveness:
+      period: 300
   requires:
     - aws-rds/base
     - monkec/base

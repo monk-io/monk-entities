@@ -211,7 +211,7 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
     @action("Restart compute")
     restart(_args?: Args): void {
         if (!this.state.id) {
-            throw new Error("Compute ID not available");
+            throw new Error("Compute ID is missing");
         }
 
         cli.output(`🔄 Restarting compute ${this.state.id}...`);
@@ -268,6 +268,22 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
         } catch (error) {
             cli.output(`❌ Error checking compute readiness: ${error}`);
             return false;
+        }
+    }
+
+    checkLiveness(): boolean {
+        if (!this.state.id) {
+            throw new Error("Compute ID not available");
+        }
+        try {
+            const endpoint = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints/${this.state.id}`);
+            const state = endpoint.endpoint?.current_state as string | undefined;
+            if (state === "active" || state === "idle") {
+                return true;
+            }
+            throw new Error(`Compute is not active or idle (state: ${state ?? "unknown"})`);
+        } catch (e: unknown) {
+            throw new Error("Unable to check compute status");
         }
     }
 }

@@ -302,6 +302,19 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
         }
     }
 
+    checkLiveness(): boolean {
+        const id = this.state.api_id;
+        if (!id) {
+            throw new Error("API ID is missing");
+        }
+        const res = this.makeV2Request("GET", `/v2/apis/${encodeURIComponent(id)}`);
+        const endpoint = (res as any).ApiEndpoint ?? (res as any).apiEndpoint;
+        if (!endpoint) {
+            throw new Error(`API ${id} has no endpoint yet`);
+        }
+        return true;
+    }
+
     @action("get-endpoint")
     getEndpoint(): void {
         // Intentionally no cli import; consumers read from entity state

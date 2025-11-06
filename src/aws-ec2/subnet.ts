@@ -77,6 +77,21 @@ export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 		return info.state === 'available';
 	}
 
+	checkLiveness(): boolean {
+		const subnetId = this.getSubnetId();
+		if (!subnetId) {
+			throw new Error("Subnet ID is missing");
+		}
+		const info = this.describeSubnetById(subnetId);
+		if (!info) {
+			throw new Error(`Subnet ${subnetId} not found`);
+		}
+		if (info.state !== 'available') {
+			throw new Error(`Subnet ${subnetId} is not available (state: ${info.state})`);
+		}
+		return true;
+	}
+
 	private describeSubnetById(subnetId: string): { subnetId: string; state: string; cidr: string } | null {
 		const resp = this.makeEC2Request('DescribeSubnets', { 'SubnetId.1': subnetId });
 		const body = resp.body || '';

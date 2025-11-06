@@ -291,6 +291,9 @@ var _CloudFrontDistribution = class _CloudFrontDistribution extends (_a = AWSClo
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getDistributionInfo(_args) {
     if (!this.state.distribution_id) {
       cli.output("Distribution not created yet");

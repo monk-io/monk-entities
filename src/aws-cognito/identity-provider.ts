@@ -310,6 +310,10 @@ export class IdentityProvider extends AWSCognitoEntity<IdentityProviderDefinitio
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     /**
      * Get comprehensive Identity Provider information
      */

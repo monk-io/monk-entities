@@ -3,7 +3,7 @@ spaces-keys:
   defines: entity
   metadata:
     name: SpacesKeys
-    version-hash: de41bdd8dd09
+    version-hash: e883000e4b2e
   schema:
     name:
       type: string

@@ -81,6 +81,8 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
             return false;
         }
     }
+
+    checkLiveness(): boolean { return this.checkReadiness(); }
     
     override create(): void {
         const userName = formatIAMResourceName(this.definition.user_name);

@@ -3,7 +3,7 @@ iam-policy:
   defines: entity
   metadata:
     name: IAMPolicy
-    version-hash: 5282b5b2635e
+    version-hash: 426c4b1855d4
   schema:
     region:
       type: string

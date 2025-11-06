@@ -3,7 +3,7 @@ iam-role:
   defines: entity
   metadata:
     name: IAMRole
-    version-hash: 5282b5b2635e
+    version-hash: 426c4b1855d4
   schema:
     region:
       type: string
@@ -56,5 +56,7 @@ iam-role:
       period: 5
       initialDelay: 5
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-iam/base

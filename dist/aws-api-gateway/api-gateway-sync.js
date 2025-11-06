@@ -299,6 +299,18 @@ var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRout
       return false;
     }
   }
+  checkLiveness() {
+    const id = this.state.api_id;
+    if (!id) {
+      throw new Error("API ID is missing");
+    }
+    const res = this.makeV2Request("GET", `/v2/apis/${encodeURIComponent(id)}`);
+    const endpoint = res.ApiEndpoint ?? res.apiEndpoint;
+    if (!endpoint) {
+      throw new Error(`API ${id} has no endpoint yet`);
+    }
+    return true;
+  }
   getEndpoint() {
   }
   listRoutes() {

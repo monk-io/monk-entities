@@ -3,7 +3,7 @@ database:
   defines: entity
   metadata:
     name: Database
-    version-hash: 7c2ecd3c391b
+    version-hash: 69917c68b833
   schema:
     name:
       type: string
@@ -152,6 +152,8 @@ database:
       period: 15
       initialDelay: 5
       attempts: 40
+    liveness:
+      period: 300
   requires:
     - monkec/base
     - digitalocean-database/do-provider-base

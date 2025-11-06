@@ -626,6 +626,10 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     // Custom actions using @action decorator
     @action("invoke")
     invoke(args?: MonkecBase.Args): void {

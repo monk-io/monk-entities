@@ -133,7 +133,7 @@ var _Compute = class _Compute extends (_a = NeonEntity, _restart_dec = [action("
   }
   restart(_args) {
     if (!this.state.id) {
-      throw new Error("Compute ID not available");
+      throw new Error("Compute ID is missing");
     }
     cli.output(`\u{1F504} Restarting compute ${this.state.id}...`);
     const response = this.makeRequest(
@@ -175,6 +175,21 @@ var _Compute = class _Compute extends (_a = NeonEntity, _restart_dec = [action("
     } catch (error) {
       cli.output(`\u274C Error checking compute readiness: ${error}`);
       return false;
+    }
+  }
+  checkLiveness() {
+    if (!this.state.id) {
+      throw new Error("Compute ID not available");
+    }
+    try {
+      const endpoint = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints/${this.state.id}`);
+      const state = endpoint.endpoint?.current_state;
+      if (state === "active" || state === "idle") {
+        return true;
+      }
+      throw new Error(`Compute is not active or idle (state: ${state ?? "unknown"})`);
+    } catch (e) {
+      throw new Error("Unable to check compute status");
     }
   }
 };

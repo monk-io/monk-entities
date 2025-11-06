@@ -228,6 +228,9 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   start() {
     if (!this.state.table_name) {
       throw new Error("Table not created yet");

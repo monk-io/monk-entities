@@ -288,6 +288,9 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
     // Custom actions
 
     @action()

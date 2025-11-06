@@ -321,6 +321,10 @@ export class Database extends DOProviderEntity<
         }
     }
 
+    checkLiveness(): boolean {
+        return this.checkReadiness();
+    }
+
     /**
      * Get current database information
      */

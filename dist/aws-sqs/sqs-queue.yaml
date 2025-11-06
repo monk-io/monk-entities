@@ -3,7 +3,7 @@ sqs-queue:
   defines: entity
   metadata:
     name: SQSQueue
-    version-hash: d0ae2d8058dd
+    version-hash: 44ae1812b96c
   schema:
     region:
       type: string
@@ -120,6 +120,8 @@ sqs-queue:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-sqs/base
     - monkec/base

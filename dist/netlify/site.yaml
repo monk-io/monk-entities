@@ -3,7 +3,7 @@ site:
   defines: entity
   metadata:
     name: Site
-    version-hash: 42a2ccb4a6c8
+    version-hash: c75bda26aba1
   schema:
     secret_ref:
       type: string
@@ -85,6 +85,8 @@ site:
       period: 15
       initialDelay: 2
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - netlify/netlify-base
     - monkec/base

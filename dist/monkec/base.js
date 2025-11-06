@@ -160,9 +160,18 @@ var MonkEntity = class _MonkEntity {
         break;
       case "check-readiness":
         if (this.isMethodImplemented("checkReadiness")) {
-          const isReady = this.checkReadiness();
+          const isReady = this["checkReadiness"].call(this);
           if (!isReady) {
             throw new Error("not ready");
+          }
+          return true;
+        }
+        break;
+      case "check-liveness":
+        if (this.isMethodImplemented("checkLiveness")) {
+          const isLive = this["checkLiveness"].call(this);
+          if (!isLive) {
+            throw new Error("not live");
           }
           return true;
         }
@@ -250,14 +259,6 @@ var MonkEntity = class _MonkEntity {
    * Override in subclasses if needed
    */
   delete() {
-  }
-  /**
-   * Checks if the entity is ready
-   * Override in subclasses if needed
-   * @returns True if the entity is ready
-   */
-  checkReadiness() {
-    return true;
   }
   /**
    * Whether base-level idempotent update short-circuiting by definition hash is enabled.

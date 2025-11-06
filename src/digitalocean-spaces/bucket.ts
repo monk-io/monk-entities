@@ -104,6 +104,8 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     private configureBucket(): void {
         const bucketName = this.getBucketName();
 

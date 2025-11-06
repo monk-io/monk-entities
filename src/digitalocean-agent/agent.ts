@@ -302,6 +302,8 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+    
     @action()
     get(_args?: MonkecBase.Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");

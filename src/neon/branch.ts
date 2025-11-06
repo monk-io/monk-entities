@@ -215,4 +215,7 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
             return false;
         }
     }
+
+    checkLiveness(): boolean { return this.checkReadiness(); }
+    
 } 

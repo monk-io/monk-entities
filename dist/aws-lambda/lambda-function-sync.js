@@ -402,6 +402,9 @@ The ECR repository must be in the same region as the Lambda function`
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   invoke(args) {
     if (!this.state.function_name) {
       throw new Error("Function does not exist, cannot invoke");
