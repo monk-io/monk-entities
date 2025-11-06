@@ -3,5 +3,5 @@ VERSION_HASH c41e66ec7d8a
 DESCRIPTION Global CDN and edge delivery.
 HOSTING managed
 TAGS aws,cloudfront,cdn,edge
-LOAD base.yaml cloud-front-distribution.yaml common.yaml
-RESOURCES base.js cloud-front-distribution-sync.js common.js
+LOAD common.yaml base.yaml cloud-front-distribution.yaml
+RESOURCES cloud-front-distribution-sync.js base.js common.js

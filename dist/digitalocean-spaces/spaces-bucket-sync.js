@@ -114,6 +114,9 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   configureBucket() {
     const bucketName = this.getBucketName();
     if (this.definition.versioning !== void 0) {

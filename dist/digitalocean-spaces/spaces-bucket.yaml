@@ -3,7 +3,7 @@ spaces-bucket:
   defines: entity
   metadata:
     name: SpacesBucket
-    version-hash: e883000e4b2e
+    version-hash: 3eabcd98bb0f
   schema:
     region:
       type: string
@@ -149,6 +149,8 @@ spaces-bucket:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - digitalocean-spaces/do-s3-base
     - cli
