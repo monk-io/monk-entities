@@ -444,6 +444,10 @@ export class UserPool extends AWSCognitoEntity<UserPoolDefinition, UserPoolState
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     @action("get-pool-info")
     getPoolInfo(): void {
         try {

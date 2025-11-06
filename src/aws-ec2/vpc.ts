@@ -107,6 +107,21 @@ export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 		return info.state === 'available';
 	}
 
+	checkLiveness(): boolean {
+		const vpcId = this.getVpcId();
+		if (!vpcId) {
+			throw new Error("VPC ID is missing");
+		}
+		const info = this.describeVpcById(vpcId);
+		if (!info) {
+			throw new Error(`VPC ${vpcId} not found`);
+		}
+		if (info.state !== 'available') {
+			throw new Error(`VPC ${vpcId} is not available (state: ${info.state})`);
+		}
+		return true;
+	}
+
 	private describeVpcById(vpcId: string): { vpcId: string; state: string; cidr: string } | null {
 		const resp = this.makeEC2Request('DescribeVpcs', { 'VpcId.1': vpcId });
 		const body = resp.body || '';

@@ -91,6 +91,9 @@ var _Deployment = class _Deployment extends (_a = VercelEntity, _getDeployment_d
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getDeployment() {
     if (!this.state.id) {
       throw new Error("Deployment ID not available");

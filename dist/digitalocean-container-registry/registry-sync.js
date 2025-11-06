@@ -190,6 +190,9 @@ var _Registry = class _Registry extends (_a = DOProviderEntity, _getRegistry_dec
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getRegistry(_args) {
     try {
       const response = this.makeRequest("GET", "/registry");

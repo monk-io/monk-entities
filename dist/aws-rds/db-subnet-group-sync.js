@@ -46,6 +46,9 @@ var _DBSubnetGroup = class _DBSubnetGroup extends AWSRDSLiteEntity {
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
 };
 __name(_DBSubnetGroup, "DBSubnetGroup");
 var DBSubnetGroup = _DBSubnetGroup;

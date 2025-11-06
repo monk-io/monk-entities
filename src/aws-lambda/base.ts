@@ -125,7 +125,7 @@ export abstract class AWSLambdaEntity<
 > extends MonkEntity<D, S> {
 
     // disable skipping updates, as Lambda updates are not fully idempotent
-    protected override isIdempotentUpdateEnabled(): boolean {
+    protected isIdempotentUpdateEnabled(): boolean {
         return false;
     }
     

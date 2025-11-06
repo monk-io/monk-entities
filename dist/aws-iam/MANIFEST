@@ -1,7 +1,7 @@
 REPO aws-iam
-VERSION_HASH 5282b5b2635e
+VERSION_HASH 426c4b1855d4
 DESCRIPTION AWS identity and access management (users, roles, policies).
 HOSTING managed
 TAGS aws,iam,identity,policy,role,user
-LOAD common.yaml iam-user.yaml base.yaml iam-policy.yaml iam-role.yaml
-RESOURCES iam-user-sync.js base.js iam-role-sync.js common.js iam-policy-sync.js
+LOAD base.yaml common.yaml iam-policy.yaml iam-role.yaml iam-user.yaml
+RESOURCES base.js common.js iam-role-sync.js iam-policy-sync.js iam-user-sync.js

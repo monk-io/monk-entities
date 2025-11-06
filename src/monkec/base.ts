@@ -8,6 +8,7 @@ const BuiltinActions = [
     "purge",
     "update",
     "check-readiness",
+    "check-liveness",
 ] as const;
 
 export type Args = Record<string, string>;
@@ -204,9 +205,18 @@ export abstract class MonkEntity<D extends object, S extends object> {
                 break;
             case "check-readiness":
                 if (this.isMethodImplemented("checkReadiness")) {
-                    const isReady = this.checkReadiness();
+                    const isReady = (this as any)["checkReadiness"].call(this);
                     if (!isReady) {
                         throw new Error("not ready");
+                    }
+                    return true;
+                }
+                break;
+            case "check-liveness":
+                if (this.isMethodImplemented("checkLiveness")) {
+                    const isLive = (this as any)["checkLiveness"].call(this);
+                    if (!isLive) {
+                        throw new Error("not live");
                     }
                     return true;
                 }
@@ -320,13 +330,15 @@ export abstract class MonkEntity<D extends object, S extends object> {
 
     /**
      * Checks if the entity is ready
-     * Override in subclasses if needed
-     * @returns True if the entity is ready
+     * Subclasses may implement to enable readiness checks
      */
-    checkReadiness(): boolean {
-        // Default implementation returns true
-        return true;
-    }
+    checkReadiness?(): boolean;
+
+    /**
+     * Checks if the entity is live
+     * Subclasses may implement to enable liveness checks
+     */
+    checkLiveness?(): boolean;
 
     /**
      * Whether base-level idempotent update short-circuiting by definition hash is enabled.

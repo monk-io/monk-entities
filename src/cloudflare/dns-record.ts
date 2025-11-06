@@ -202,6 +202,7 @@ export class CloudflareDNSRecord extends CloudflareEntity<CloudflareDNSRecordDef
     return Boolean(this.state.record_id);
   }
 
+  
   @action("get-info")
   getInfo(): void {
     const zoneId = this.resolveZoneId();

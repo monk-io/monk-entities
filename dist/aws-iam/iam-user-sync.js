@@ -92,6 +92,9 @@ var _IAMUser = class _IAMUser extends (_a = AWSIAMEntity, _getUserInfo_dec = [Mo
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   create() {
     const userName = formatIAMResourceName(this.definition.user_name);
     const existingUser = this.checkUserExists(userName);

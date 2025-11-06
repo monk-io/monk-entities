@@ -3,7 +3,7 @@ s3-bucket:
   defines: entity
   metadata:
     name: S3Bucket
-    version-hash: 5c77c1d4bfcd
+    version-hash: fe7d2af4cff0
   schema:
     region:
       type: string
@@ -243,6 +243,8 @@ s3-bucket:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-s3/base
     - monkec/base

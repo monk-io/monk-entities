@@ -1,7 +1,7 @@
 REPO digitalocean-database
-VERSION_HASH 7c2ecd3c391b
+VERSION_HASH 69917c68b833
 DESCRIPTION Managed databases on DigitalOcean.
 HOSTING managed
 TAGS digitalocean,database,postgres,mysql,redis,mongodb
-LOAD digitalocean-base.yaml database.yaml api-token.yaml common.yaml do-provider-base.yaml
-RESOURCES database-sync.js api-token-sync.js common.js digitalocean-base.js do-provider-base.js
+LOAD api-token.yaml common.yaml database.yaml digitalocean-base.yaml do-provider-base.yaml
+RESOURCES api-token-sync.js common.js digitalocean-base.js do-provider-base.js database-sync.js

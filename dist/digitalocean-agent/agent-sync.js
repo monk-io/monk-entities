@@ -287,6 +287,9 @@ var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [actio
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   get(_args) {
     if (!this.state.id) throw new Error("Agent id missing in state");
     const data = this.httpGet(`/v2/gen-ai/agents/${this.state.id}`);

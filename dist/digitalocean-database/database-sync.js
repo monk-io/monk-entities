@@ -190,6 +190,9 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getDatabase(_args) {
     if (!this.state.id) {
       throw new Error("No database ID available");

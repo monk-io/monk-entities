@@ -3,7 +3,7 @@ lambda-function:
   defines: entity
   metadata:
     name: LambdaFunction
-    version-hash: 68739f9355b7
+    version-hash: 100898ca157c
   schema:
     region:
       type: string
@@ -241,6 +241,8 @@ lambda-function:
       period: 10
       initialDelay: 5
       attempts: 30
+    liveness:
+      period: 300
   requires:
     - aws-lambda/base
     - monkec/base

@@ -159,6 +159,9 @@ var _Database = class _Database extends (_a = MonkEntity, _updateDatabase_dec = 
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   delete() {
     if (!this.state.name) {
       return;

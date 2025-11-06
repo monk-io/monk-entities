@@ -3,7 +3,7 @@ role:
   defines: entity
   metadata:
     name: Role
-    version-hash: 95d84bc7ca50
+    version-hash: e7f83615fa98
   schema:
     secret_ref:
       type: string

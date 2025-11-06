@@ -3,7 +3,7 @@ api-gateway:
   defines: entity
   metadata:
     name: APIGateway
-    version-hash: bb0ae1e78148
+    version-hash: f8a1056483b8
   schema:
     region:
       type: string
@@ -44,6 +44,8 @@ api-gateway:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-api-gateway/base
     - monkec/base

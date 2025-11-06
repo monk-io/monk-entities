@@ -3,7 +3,7 @@ compute:
   defines: entity
   metadata:
     name: Compute
-    version-hash: 95d84bc7ca50
+    version-hash: e7f83615fa98
   schema:
     secret_ref:
       type: string
@@ -92,6 +92,8 @@ compute:
       period: 15
       initialDelay: 2
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - monkec/base
     - neon/neon-base

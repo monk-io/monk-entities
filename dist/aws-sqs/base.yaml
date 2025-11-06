@@ -3,5 +3,5 @@ namespace: aws-sqs
 base:
   defines: module
   metadata:
-    version-hash: d0ae2d8058dd
+    version-hash: 44ae1812b96c
   source: <<< base.js

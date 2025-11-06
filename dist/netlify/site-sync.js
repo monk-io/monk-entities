@@ -264,6 +264,9 @@ var _Site = class _Site extends (_a = NetlifyEntity, _getSite_dec = [action("get
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getSite() {
     if (!this.state.id) {
       throw new Error("Site does not exist");

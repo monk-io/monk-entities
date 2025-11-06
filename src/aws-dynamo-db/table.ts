@@ -333,6 +333,8 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     override start(): void {
         if (!this.state.table_name) {
             throw new Error("Table not created yet");

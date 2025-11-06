@@ -3,5 +3,5 @@ namespace: digitalocean-container-registry
 common:
   defines: module
   metadata:
-    version-hash: e580c49fdf63
+    version-hash: c6399121e7cb
   source: <<< common.js

@@ -3,7 +3,7 @@ security-group:
   defines: entity
   metadata:
     name: SecurityGroup
-    version-hash: d81b7171ff75
+    version-hash: ed6c62fb4c12
   schema:
     region:
       type: string

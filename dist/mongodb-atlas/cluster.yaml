@@ -3,7 +3,7 @@ cluster:
   defines: entity
   metadata:
     name: Cluster
-    version-hash: ca16ce1f5582
+    version-hash: 509e75d40b51
   schema:
     secret_ref:
       type: string
@@ -79,6 +79,8 @@ cluster:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - mongodb-atlas/base
     - cli

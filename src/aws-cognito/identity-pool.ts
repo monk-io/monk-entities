@@ -249,6 +249,10 @@ export class IdentityPool extends AWSCognitoEntity<IdentityPoolDefinition, Ident
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     @action("get-pool-info")
     getPoolInfo(): void {
         const identityPoolId = this.getIdentityPoolId();

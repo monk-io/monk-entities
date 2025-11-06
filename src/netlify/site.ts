@@ -368,6 +368,8 @@ export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     @action("get-site")
     getSite(): void {
         if (!this.state.id) {

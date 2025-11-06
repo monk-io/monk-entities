@@ -258,6 +258,10 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     @action("get-instance-info")
     getInstanceInfo(_args?: MonkecBase.Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();

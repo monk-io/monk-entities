@@ -3,7 +3,7 @@ cloud-front-distribution:
   defines: entity
   metadata:
     name: CloudFrontDistribution
-    version-hash: 27944340f50e
+    version-hash: c41e66ec7d8a
   schema:
     region:
       type: string
@@ -372,6 +372,8 @@ cloud-front-distribution:
       period: 30
       initialDelay: 30
       attempts: 40
+    liveness:
+      period: 300
   requires:
     - aws-cloudfront/base
     - monkec/base

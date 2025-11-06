@@ -80,6 +80,20 @@ var _VPC = class _VPC extends AWSEC2Entity {
     this.state.cidr_block = info.cidr;
     return info.state === "available";
   }
+  checkLiveness() {
+    const vpcId = this.getVpcId();
+    if (!vpcId) {
+      throw new Error("VPC ID is missing");
+    }
+    const info = this.describeVpcById(vpcId);
+    if (!info) {
+      throw new Error(`VPC ${vpcId} not found`);
+    }
+    if (info.state !== "available") {
+      throw new Error(`VPC ${vpcId} is not available (state: ${info.state})`);
+    }
+    return true;
+  }
   describeVpcById(vpcId) {
     const resp = this.makeEC2Request("DescribeVpcs", { "VpcId.1": vpcId });
     const body = resp.body || "";

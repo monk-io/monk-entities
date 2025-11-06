@@ -277,6 +277,10 @@ export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, U
             return false;
         }
     }
+
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
     
     /**
      * Get comprehensive domain information

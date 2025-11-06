@@ -353,6 +353,10 @@ export class UserPoolClient extends AWSCognitoEntity<UserPoolClientDefinition, U
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     /**
      * Get comprehensive User Pool Client information
      */

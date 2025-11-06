@@ -142,6 +142,9 @@ var _Branch = class _Branch extends (_a = NeonEntity, _getBranch_dec = [action("
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getBranch", _getBranch_dec, _Branch);

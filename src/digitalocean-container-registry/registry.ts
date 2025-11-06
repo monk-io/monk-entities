@@ -268,6 +268,8 @@ export class Registry extends DOProviderEntity<
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
     /**
      * Get current registry information
      */

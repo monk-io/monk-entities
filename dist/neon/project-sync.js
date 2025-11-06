@@ -258,6 +258,9 @@ var _Project = class _Project extends (_a = NeonEntity, _getProject_dec = [actio
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   update() {
     if (!this.state.id) {
       throw new Error("Project ID not available for update");

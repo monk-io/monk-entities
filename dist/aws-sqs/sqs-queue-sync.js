@@ -163,6 +163,9 @@ var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _sendMessageAction_d
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   sendMessageAction(args) {
     const body = args?.body || args?.message;
     if (!body) {

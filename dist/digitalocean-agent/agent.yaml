@@ -3,7 +3,7 @@ agent:
   defines: entity
   metadata:
     name: Agent
-    version-hash: a6a67c6c8ae1
+    version-hash: ffdd97a5696c
   schema:
     name:
       type: string
@@ -105,6 +105,8 @@ agent:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - cli
     - monkec/base

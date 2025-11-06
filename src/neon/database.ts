@@ -216,6 +216,10 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
+
     override delete(): void {
         if (!this.state.name) {
             return;

@@ -216,6 +216,9 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
         }
     }
 
+    checkLiveness(): boolean { return this.checkReadiness(); }
+
+    
     @action("send-message")
     sendMessageAction(args?: MonkecBase.Args): void {
         const body = args?.body || args?.message;

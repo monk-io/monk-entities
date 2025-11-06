@@ -60,6 +60,20 @@ var _Subnet = class _Subnet extends AWSEC2Entity {
     this.state.cidr_block = info.cidr;
     return info.state === "available";
   }
+  checkLiveness() {
+    const subnetId = this.getSubnetId();
+    if (!subnetId) {
+      throw new Error("Subnet ID is missing");
+    }
+    const info = this.describeSubnetById(subnetId);
+    if (!info) {
+      throw new Error(`Subnet ${subnetId} not found`);
+    }
+    if (info.state !== "available") {
+      throw new Error(`Subnet ${subnetId} is not available (state: ${info.state})`);
+    }
+    return true;
+  }
   describeSubnetById(subnetId) {
     const resp = this.makeEC2Request("DescribeSubnets", { "SubnetId.1": subnetId });
     const body = resp.body || "";

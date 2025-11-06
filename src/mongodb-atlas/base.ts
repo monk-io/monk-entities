@@ -166,4 +166,6 @@ export abstract class MongoDBAtlasEntity<
     private isClusterRequest(path: string): boolean {
         return path.includes('/clusters') || path.includes('/accessList');
     }
+
+    
 } 

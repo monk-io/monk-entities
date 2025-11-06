@@ -3,7 +3,7 @@ dynamo-db-table:
   defines: entity
   metadata:
     name: DynamoDBTable
-    version-hash: 5357a1b47caa
+    version-hash: 919d1a0a41af
   schema:
     region:
       type: string
@@ -251,6 +251,8 @@ dynamo-db-table:
       period: 10
       initialDelay: 5
       attempts: 30
+    liveness:
+      period: 300
   requires:
     - aws-dynamo-db/base
     - monkec/base

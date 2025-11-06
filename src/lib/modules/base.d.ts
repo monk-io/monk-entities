@@ -6,7 +6,7 @@ export type MonkContext = {
   args?: Args;
   metadata?: Metadata;
   path: string;
-  action: "create" | "start" | "stop" | "purge" | "update" | "check-readiness" | string | undefined;
+  action: "create" | "start" | "stop" | "purge" | "update" | "check-readiness" | "check-liveness" | string | undefined;
 };
 
 export type DeepReadonly<T> = T extends (infer R)[] ? DeepReadonlyArray<R> : T extends Function ? T : T extends object ? DeepReadonlyObject<T> : T;
@@ -22,6 +22,10 @@ export interface ReadinessConfig {
   period?: number;
   initialDelay?: number;
   attempts?: number;
+}
+
+export interface LivenessConfig {
+  period?: number;
 }
 
 export abstract class MonkEntity<D extends object, S extends object> {
@@ -40,6 +44,7 @@ export abstract class MonkEntity<D extends object, S extends object> {
   update(): void;
   delete(): void;
   checkReadiness(): boolean;
+  checkLiveness(): boolean;
   protected handleUnknownAction(action: string, args?: Args): void;
   protected isIdempotentUpdateEnabled(): boolean;
 }
@@ -50,4 +55,8 @@ export function action(actionName?: string): (originalMethod: any, context: Clas
 // Static property interface for readiness configuration
 export interface ReadinessStatic {
   readonly readiness?: ReadinessConfig;
+} 
+
+export interface LivenessStatic {
+  readonly liveness?: LivenessConfig;
 } 

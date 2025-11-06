@@ -1,7 +1,7 @@
 REPO aws-ec2
-VERSION_HASH d81b7171ff75
+VERSION_HASH ed6c62fb4c12
 DESCRIPTION Compute capacity and networking primitives (VPC, subnets, security groups).
 HOSTING managed
 TAGS aws,compute,ec2,vpc,subnet,security-group
-LOAD vpc.yaml subnet.yaml base.yaml security-group.yaml
-RESOURCES vpc-sync.js security-group-sync.js base.js subnet-sync.js
+LOAD base.yaml security-group.yaml subnet.yaml vpc.yaml
+RESOURCES base.js security-group-sync.js subnet-sync.js vpc-sync.js

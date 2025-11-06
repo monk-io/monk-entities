@@ -108,6 +108,9 @@ var _Form = class _Form extends (_a = NetlifyEntity, _getForm_dec = [action("get
       return false;
     }
   }
+  checkLiveness() {
+    return this.checkReadiness();
+  }
   getForm() {
     if (!this.state.id) {
       throw new Error("Form does not exist");
