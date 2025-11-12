@@ -1,0 +1,52 @@
+namespace: azure-cosmosdb
+
+database-account:
+  defines: database-account.ts/DatabaseAccount
+  metadata:
+    name: Azure Cosmos DB Database Account
+    description: |
+      Azure Cosmos DB is a globally distributed, multi-model database service that enables you to elastically and independently scale throughput and storage across any number of Azure regions worldwide.
+    website: https://learn.microsoft.com/en-us/azure/cosmos-db/
+    icon: https://symbols.getvecta.com/stencil_27/87_cosmos-db.7e5f4b0bb2.svg
+    publisher: monk.io
+    tags: entities, azure, cosmos db, nosql, database
+  requires:
+    - cloud/azure
+  services:
+    data:
+      protocol: custom
+
+database:
+  defines: database.ts/Database
+  metadata:
+    name: Azure Cosmos DB Database
+    description: |
+      Creates and manages databases within an Azure Cosmos DB account. Supports both manual and autoscale throughput provisioning for shared throughput databases.
+    website: https://learn.microsoft.com/en-us/rest/api/cosmos-db/create-a-database
+    icon: https://symbols.getvecta.com/stencil_27/87_cosmos-db.7e5f4b0bb2.svg
+    publisher: monk.io
+    tags: entities, azure, cosmos db, database, data plane
+  requires:
+    - cloud/azure
+  services:
+    data:
+      protocol: custom
+
+container:
+  defines: container.ts/Container
+  metadata:
+    name: Azure Cosmos DB Container
+    description: |
+      Creates and manages containers (collections) within Azure Cosmos DB databases. Supports partition key configuration, throughput provisioning (manual and autoscale), indexing policies, and advanced features like TTL and conflict resolution.
+    website: https://learn.microsoft.com/en-us/rest/api/cosmos-db/create-a-collection
+    icon: https://symbols.getvecta.com/stencil_27/87_cosmos-db.7e5f4b0bb2.svg
+    publisher: monk.io
+    tags: entities, azure, cosmos db, container, collection, data plane
+  requires:
+    - cloud/azure
+  services:
+    data:
+      protocol: custom
+
+LOAD database-account.yaml azure-cosmosdb-base.yaml database.yaml container.yaml
+RESOURCES azure-cosmosdb-base.js database-account-sync.js database-sync.js container-sync.js

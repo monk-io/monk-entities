@@ -1,0 +1,18 @@
+namespace: supabase-test
+
+project:
+  defines: supabase/project
+  name: monk-test-project
+  organization_id: jvcuklwdfvsqmonfavgb
+  region_selection:
+    type: specific
+    code: us-east-1
+  secret_ref: supabase-api-token
+  db_pass_secret_ref: supabase-db-password
+  anon_api_key_secret_ref: monk-test-project-anon-key
+  service_role_api_key_secret_ref: monk-test-project-service-key
+  permitted-secrets:
+    supabase-api-token: true
+    supabase-db-password: true
+    monk-test-project-anon-key: true
+    monk-test-project-service-key: true
