@@ -160,6 +160,11 @@ export interface DatabaseAccountState extends AzureCosmosDBState {
      * @description Read locations
      */
     read_locations?: unknown[];
+
+    /**
+     * @description Whether secrets have been populated (to avoid duplicate attempts)
+     */
+    secrets_populated?: boolean;
 }
 
 export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefinition, DatabaseAccountState> {
@@ -249,9 +254,11 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         if (existingAccount) {
             // Account already exists, use it
             const properties = existingAccount.properties as Record<string, unknown> | undefined;
+            const provisioningState = typeof properties?.provisioningState === 'string' ? properties.provisioningState : undefined;
+            
             this.state = {
                 account_name: typeof existingAccount.name === 'string' ? existingAccount.name : this.definition.account_name,
-                provisioning_state: typeof properties?.provisioningState === 'string' ? properties.provisioningState : undefined,
+                provisioning_state: provisioningState,
                 document_endpoint: typeof properties?.documentEndpoint === 'string' ? properties.documentEndpoint : undefined,
                 write_locations: Array.isArray(properties?.writeLocations) ? properties.writeLocations : undefined,
                 read_locations: Array.isArray(properties?.readLocations) ? properties.readLocations : undefined,
@@ -259,8 +266,12 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
             };
             cli.output(`✅ Database account ${this.definition.account_name} already exists`);
             
-            // Populate secrets if secret references are provided
-            this.populateAccountSecrets();
+            // If existing account is ready, populate secrets immediately
+            if (provisioningState === "Succeeded") {
+                cli.output(`🔑 Existing account is ready, attempting to populate secrets...`);
+                this.populateAccountSecrets();
+                this.state.secrets_populated = true;
+            }
             return;
         }
 
@@ -353,9 +364,6 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         };
 
         cli.output(`✅ Created Cosmos DB database account: ${this.definition.account_name}`);
-        
-        // Populate secrets if secret references are provided
-        this.populateAccountSecrets();
     }
 
     override update(): void {
@@ -500,6 +508,13 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                 this.state.document_endpoint = typeof properties?.documentEndpoint === 'string' ? properties.documentEndpoint : undefined;
                 this.state.write_locations = Array.isArray(properties?.writeLocations) ? properties.writeLocations : undefined;
                 this.state.read_locations = Array.isArray(properties?.readLocations) ? properties.readLocations : undefined;
+                
+                // Populate secrets when account is ready (only once)
+                if (!this.state.secrets_populated) {
+                    cli.output(`🔑 Account is ready, attempting to populate secrets...`);
+                    this.populateAccountSecrets();
+                    this.state.secrets_populated = true;
+                }
             } else {
                 cli.output(`⏳ Database account ${this.definition.account_name} not ready yet (status: ${provisioningState || 'unknown'})`);
             }
@@ -545,7 +560,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                         try {
                             secret.set(this.definition.primary_key_secret_ref, keysData.primaryMasterKey);
                             cli.output(`🔑 Saved primary key to secret: ${this.definition.primary_key_secret_ref}`);
-                        } catch (_error) {
+                        } catch (error) {
                             cli.output(`⚠️  Failed to save primary key to secret: ${this.definition.primary_key_secret_ref}`);
                         }
                     }
@@ -555,15 +570,15 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                         try {
                             secret.set(this.definition.secondary_key_secret_ref, keysData.secondaryMasterKey);
                             cli.output(`🔑 Saved secondary key to secret: ${this.definition.secondary_key_secret_ref}`);
-                        } catch (_error) {
+                        } catch (error) {
                             cli.output(`⚠️  Failed to save secondary key to secret: ${this.definition.secondary_key_secret_ref}`);
                         }
                     }
                 } else {
                     cli.output(`⚠️  No keys data received from Azure API`);
                 }
-            } catch (_error) {
-                cli.output(`⚠️  Failed to fetch access keys from Azure`);
+            } catch (error) {
+                cli.output(`⚠️  Failed to fetch access keys from Azure: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
         }
     }

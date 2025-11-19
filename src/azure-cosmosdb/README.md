@@ -122,6 +122,60 @@ Manages individual databases within Azure Cosmos DB accounts using the Cosmos DB
 | `users_path` | string | Users endpoint path |
 | `existing` | boolean | Whether the database existed before entity management |
 
+
+### AccessList
+
+Manages Virtual Network access control for Azure Cosmos DB accounts. This entity enables service endpoints on specified subnets and configures virtual network rules to restrict database access to specific Azure Virtual Networks.
+
+**Reference**: [Configure VNet Service Endpoints](https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-configure-vnet-service-endpoint)
+
+#### Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `subscription_id` | string | Yes | Azure subscription ID |
+| `resource_group_name` | string | Yes | Azure resource group name |
+| `account_name` | string | Yes | Name of the Cosmos DB account to configure |
+| `virtual_network_rules` | VirtualNetworkRule[] | No | Array of virtual network rules |
+| `enable_virtual_network_filter` | boolean | No | Enable virtual network filtering (default: true) |
+| `create_when_missing` | boolean | No | Create configuration if it doesn't exist (default: true) |
+
+#### VirtualNetworkRule
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `subnet_id` | string | Yes | Full resource ID of the subnet (format: /subscriptions/{id}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{vnet}/subnets/{subnet}) |
+| `ignore_missing_vnet_service_endpoint` | boolean | No | Ignore if service endpoint is not yet configured (default: false) |
+
+#### State Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `account_name` | string | Account name being managed |
+| `rules_count` | number | Number of virtual network rules configured |
+| `configured_subnet_ids` | string[] | List of subnet IDs currently configured |
+
+#### Features
+
+- **Automatic Service Endpoint Configuration**: Automatically enables `Microsoft.AzureCosmosDB` service endpoint on specified subnets
+- **Multi-Subnet Support**: Configure access from multiple VNets and subnets simultaneously
+- **Network Security**: Restrict Cosmos DB access to specific Azure network resources only
+- **Integration with Database Account**: Works seamlessly with existing Cosmos DB accounts
+
+#### Important Notes
+
+1. **Public Network Access**: When using VNet restrictions, ensure `public_network_access` is set appropriately on the database account:
+   - `"Enabled"`: Allows both VNet and public access (when VNet rules are configured, requires requests from specified VNets)
+   - `"SecuredByPerimeter"`: Restricts to Azure network only
+   - `"Disabled"`: Completely disables network access
+
+2. **Service Endpoint Propagation**: It may take up to 15 minutes for service endpoint changes to fully propagate
+
+3. **Required Permissions**:
+   - Network Contributor role on VNets/subnets
+   - DocumentDB Account Contributor role on Cosmos DB account
+
+4. **Port Requirements**: When using Direct mode connections, ensure TCP ports 10000-20000 are open in Network Security Groups
 ## Examples
 
 ### Complete Cosmos DB Setup (Account + Database)

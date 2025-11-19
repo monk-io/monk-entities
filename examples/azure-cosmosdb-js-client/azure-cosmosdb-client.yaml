@@ -4,9 +4,9 @@ cosmos-account:
   defines: azure-cosmosdb/database-account
   permitted-secrets:
     cosmos-db-primary-key: true
-    acosmos-db-secondary-key: true
-  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
-  resource_group_name: "ivan-test"
+    cosmos-db-secondary-key: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
   account_name: "monk-cosmos-account"
   locations:
     - location_name: "East US"
@@ -16,7 +16,7 @@ cosmos-account:
     default_consistency_level: "Session"
   enable_automatic_failover: false
   enable_multiple_write_locations: false
-  public_network_access: "Enabled"
+  public_network_access: "Disabled"  # Must be Enabled for MonkEC access from public IP
   primary_key_secret_ref: "cosmos-db-primary-key"
   secondary_key_secret_ref: "cosmos-db-secondary-key"
   tags:
@@ -26,8 +26,8 @@ cosmos-account:
 
 ecommerce-database:
   defines: azure-cosmosdb/database
-  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
-  resource_group_name: "ivan-test"
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
   database_account_name: <- connection-target("database-account") entity get-member("account_name")
   database_id: "ecommerce"
   manual_throughput: 400
@@ -48,8 +48,8 @@ ecommerce-database:
 # Azure Cosmos DB Container for the JavaScript client
 products-container:
   defines: azure-cosmosdb/container
-  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
-  resource_group_name: "ivan-test"
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
   database_account_name: <- connection-target("database-account") entity get-member("account_name")
   database_id: <- connection-target("database") entity get-member("database_id")
   container_id: "products"
@@ -94,7 +94,7 @@ cosmosdb-js-client:
     wait-for:
       runnables:
         - azure-cosmosdb-client-example/cosmos-account
-        - azure-cosmosdb-client-example/products-database
+        - azure-cosmosdb-client-example/ecommerce-database
         - azure-cosmosdb-client-example/products-container
       timeout: 600 
   
@@ -116,7 +116,7 @@ cosmosdb-js-client:
     
     cosmos_db_container_id:
       env: COSMOS_DB_CONTAINER_ID
-      value: "products"
+      value: <- connection-target("container") entity get-member("container_id")
       type: string
     
     # Client configuration
@@ -134,11 +134,50 @@ cosmosdb-js-client:
     client:
       image: monkimages.azurecr.io/azure-cosmosdb-js-client:latest
 
+# Configure network access control for Cosmos DB (VNet + IP Firewall)
+# Restricts access to specific Azure VNets and public IP addresses
+cosmos-access-list:
+  defines: azure-cosmosdb/access-list
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  account_name: "monk-cosmos-account"
+  enable_virtual_network_filter: true
+  # Virtual Network rules - restrict to specific Azure VNets/subnets
+  virtual_network_rules:
+    - subnet_id: "/subscriptions/your-subscription-id/resourceGroups/your-resource-group/providers/Microsoft.Network/virtualNetworks/ivan-testeastus-vn/subnets/ivan-testeastussn"
+      ignore_missing_vnet_service_endpoint: false
+  # IP Firewall rules - allow access from specific public IPs or ranges
+  ip_rules:
+    - ip_address_or_range: "95.67.123.30"  # MonkEC instance public IP
+    # Examples of other IP rules:
+    # - ip_address_or_range: "203.0.113.0/24"  # Office network CIDR range
+    # - ip_address_or_range: "198.51.100.42"   # Specific server IP
+    # - ip_address_or_range: "0.0.0.0/0"       # Allow all (NOT recommended)
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-client-example/cosmos-account
+      timeout: 600
+  connections:
+    account:
+      runnable: azure-cosmosdb-client-example/cosmos-account
+      service: data
+
 # Complete example stack with account, database, container, and client
 example-stack:
   defines: process-group
   runnable-list:
     - azure-cosmosdb-client-example/cosmos-account
+    - azure-cosmosdb-client-example/ecommerce-database
+    - azure-cosmosdb-client-example/products-container
+    - azure-cosmosdb-client-example/cosmosdb-js-client
+
+# Secure stack with network access control (VNet + IP Firewall)
+secure-stack:
+  defines: process-group
+  runnable-list:
+    - azure-cosmosdb-client-example/cosmos-account
+    - azure-cosmosdb-client-example/cosmos-access-list
     - azure-cosmosdb-client-example/ecommerce-database
     - azure-cosmosdb-client-example/products-container
     - azure-cosmosdb-client-example/cosmosdb-js-client

@@ -1,6 +1,23 @@
 import { CosmosClient, Container, Database, PatchOperation } from '@azure/cosmos';
 import { DefaultAzureCredential } from '@azure/identity';
 import * as dotenv from 'dotenv';
+import * as crypto from 'crypto';
+
+// Make crypto globally available (required for Azure Cosmos SDK in some environments)
+if (typeof global !== 'undefined') {
+  if (!global.crypto) {
+    (global as any).crypto = crypto;
+  }
+  // In Node.js environment, ensure crypto is available
+  if (!(global as any).crypto) {
+    (global as any).crypto = require('crypto');
+  }
+}
+
+// Additional crypto polyfill for environments that might need it
+if (typeof globalThis !== 'undefined' && !globalThis.crypto) {
+  (globalThis as any).crypto = crypto;
+}
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +44,9 @@ class CosmosDBClient {
   private isShuttingDown = false;
 
   constructor() {
+    // Validate crypto availability first
+    this.validateCryptoAvailability();
+
     const connectionString = process.env.COSMOS_DB_CONNECTION_STRING;
     const endpoint = process.env.COSMOS_DB_ENDPOINT;
     const primaryKey = process.env.COSMOS_DB_PRIMARY_KEY;
@@ -51,33 +71,38 @@ class CosmosDBClient {
     console.log(`🔄 Max operations: ${this.maxOperations > 0 ? this.maxOperations : 'unlimited'}`);
 
     // Initialize Cosmos DB client with appropriate authentication (priority order)
-    if (connectionString) {
-      // Option 1: Use pre-built connection string
-      console.log('🔑 Using pre-built connection string authentication');
-      console.log('📍 Endpoint: [from connection string]');
-      
-      this.cosmosClient = new CosmosClient(connectionString);
-    } else if (endpoint && primaryKey) {
-      // Option 2: Construct connection string from endpoint + primary key
-      const constructedConnectionString = `AccountEndpoint=${endpoint};AccountKey=${primaryKey};`;
-      console.log('🔧 Using constructed connection string from endpoint + primary key');
-      console.log(`📍 Endpoint: ${endpoint}`);
-      console.log('🔑 Primary Key: [provided]');
-      
-      this.cosmosClient = new CosmosClient(constructedConnectionString);
-    } else if (endpoint) {
-      // Option 3: Use Azure AD authentication
-      console.log('🔐 Using Azure AD authentication (DefaultAzureCredential)');
-      console.log(`📍 Endpoint: ${endpoint}`);
-      console.log('⚠️  Note: Requires proper RBAC permissions for data plane operations');
-      
-      const credential = new DefaultAzureCredential();
-      this.cosmosClient = new CosmosClient({
-        endpoint: endpoint!,
-        aadCredentials: credential
-      });
-    } else {
-      throw new Error('Invalid configuration: Either provide COSMOS_DB_CONNECTION_STRING, or COSMOS_DB_ENDPOINT with COSMOS_DB_PRIMARY_KEY, or COSMOS_DB_ENDPOINT for Azure AD auth');
+    try {
+      if (connectionString) {
+        // Option 1: Use pre-built connection string
+        console.log('🔑 Using pre-built connection string authentication');
+        console.log('📍 Endpoint: [from connection string]');
+        
+        this.cosmosClient = new CosmosClient(connectionString);
+      } else if (endpoint && primaryKey) {
+        // Option 2: Construct connection string from endpoint + primary key
+        const constructedConnectionString = `AccountEndpoint=${endpoint};AccountKey=${primaryKey};`;
+        console.log('🔧 Using constructed connection string from endpoint + primary key');
+        console.log(`📍 Endpoint: ${endpoint}`);
+        console.log('🔑 Primary Key: [provided]');
+        
+        this.cosmosClient = new CosmosClient(constructedConnectionString);
+      } else if (endpoint) {
+        // Option 3: Use Azure AD authentication
+        console.log('🔐 Using Azure AD authentication (DefaultAzureCredential)');
+        console.log(`📍 Endpoint: ${endpoint}`);
+        console.log('⚠️  Note: Requires proper RBAC permissions for data plane operations');
+        
+        const credential = new DefaultAzureCredential();
+        this.cosmosClient = new CosmosClient({
+          endpoint: endpoint!,
+          aadCredentials: credential
+        });
+      } else {
+        throw new Error('Invalid configuration: Either provide COSMOS_DB_CONNECTION_STRING, or COSMOS_DB_ENDPOINT with COSMOS_DB_PRIMARY_KEY, or COSMOS_DB_ENDPOINT for Azure AD auth');
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize Cosmos DB client:', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
     }
 
     console.log('----------------------------------------');
@@ -87,6 +112,18 @@ class CosmosDBClient {
 
     // Setup graceful shutdown
     this.setupGracefulShutdown();
+  }
+
+  private validateCryptoAvailability(): void {
+    try {
+      // Test crypto module availability
+      const testCrypto = crypto || require('crypto');
+      const testHash = testCrypto.createHash('sha256').update('test').digest('hex');
+      console.log('✅ Crypto module is available and working');
+    } catch (error) {
+      console.error('❌ Crypto module is not available:', error instanceof Error ? error.message : 'Unknown error');
+      throw new Error('Crypto module is required but not available in this environment');
+    }
   }
 
   private setupGracefulShutdown(): void {

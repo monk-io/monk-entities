@@ -48,5 +48,21 @@ container:
     data:
       protocol: custom
 
-LOAD database-account.yaml azure-cosmosdb-base.yaml database.yaml container.yaml
-RESOURCES azure-cosmosdb-base.js database-account-sync.js database-sync.js container-sync.js
+access-list:
+  defines: access-list.ts/AccessList
+  metadata:
+    name: Azure Cosmos DB Access List
+    description: |
+      Configures Virtual Network access control for Azure Cosmos DB accounts. Enables service endpoints on specified subnets and adds virtual network rules to restrict database access to specific Azure Virtual Networks.
+    website: https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-configure-vnet-service-endpoint
+    icon: https://symbols.getvecta.com/stencil_27/87_cosmos-db.7e5f4b0bb2.svg
+    publisher: monk.io
+    tags: entities, azure, cosmos db, security, vnet, network, access control
+  requires:
+    - cloud/azure
+  services:
+    default:
+      protocol: custom
+
+LOAD database-account.yaml azure-cosmosdb-base.yaml database.yaml container.yaml access-list.yaml
+RESOURCES azure-cosmosdb-base.js database-account-sync.js database-sync.js container-sync.js access-list-sync.js
