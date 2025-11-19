@@ -1,0 +1,20 @@
+name: Supabase Project Integration Test
+
+timeout: 300000
+
+setup:
+  - { action: load, target: dist/input/supabase/MANIFEST, expect: { exitCode: 0 } }
+  - { action: load, target: test/stack-template.yaml, expect: { exitCode: 0 } }
+
+tests:
+  # Test project creation
+  - { action: run, target: supabase-test/project, expect: { exitCode: 0 } }
+  
+  # Wait for project to be ready
+  - { action: wait, target: supabase-test/project, waitFor: { condition: ready, timeout: 180000 } }
+  
+  # Test project update (should be idempotent)
+  - { action: run, target: supabase-test/project, expect: { exitCode: 0 } }
+
+cleanup:
+  - { action: delete, target: supabase-test/project, expect: { exitCode: 0 } }

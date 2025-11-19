@@ -1,0 +1,175 @@
+namespace: azure-cosmosdb
+database-account:
+  defines: entity
+  metadata:
+    name: DatabaseAccount
+    version-hash: c3ca0906da47
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    account_name:
+      type: string
+      minLength: 3
+      maxLength: 50
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      description: Cosmos DB database account name
+    database_account_offer_type:
+      type: string
+      const: Standard
+      description: The offer type for the database
+      default: Standard
+    locations:
+      type: array
+      items:
+        type: object
+        properties:
+          location_name:
+            type: string
+            description: The name of the region
+          failover_priority:
+            type: number
+            minimum: 0
+            description: >-
+              The failover priority (0 for write region, higher for read
+              regions)
+          is_zone_redundant:
+            type: boolean
+            description: Whether this region is zone redundant
+            default: false
+        required:
+          - location_name
+          - failover_priority
+        additionalProperties: false
+      description: >-
+        An array that contains the georeplication locations enabled for the
+        Cosmos DB account
+    account_kind:
+      type: string
+      enum:
+        - GlobalDocumentDB
+        - MongoDB
+        - Parse
+      description: Indicates the type of database account
+      default: GlobalDocumentDB
+    consistency_policy:
+      type: object
+      properties:
+        default_consistency_level:
+          type: string
+          enum:
+            - Eventual
+            - ConsistentPrefix
+            - Session
+            - BoundedStaleness
+            - Strong
+          description: Default consistency level
+        max_staleness_prefix:
+          type: number
+          minimum: 1
+          maximum: 2147483647
+          description: Max staleness prefix (required for BoundedStaleness)
+        max_interval_in_seconds:
+          type: number
+          minimum: 5
+          maximum: 86400
+          description: Max interval in seconds (required for BoundedStaleness)
+      required:
+        - default_consistency_level
+      additionalProperties: false
+      description: The consistency policy for the Cosmos DB account
+    enable_automatic_failover:
+      type: boolean
+      description: Enable automatic failover of the write region
+      default: false
+    enable_multiple_write_locations:
+      type: boolean
+      description: Enable multiple write locations
+      default: false
+    enable_analytical_storage:
+      type: boolean
+      description: Flag to indicate whether to enable storage analytics
+      default: false
+    public_network_access:
+      type: string
+      enum:
+        - Enabled
+        - Disabled
+        - SecuredByPerimeter
+      description: Whether requests from Public Network are allowed
+      default: Enabled
+    disable_local_auth:
+      type: boolean
+      description: >-
+        Opt-out of local authentication and ensure only MSI and AAD can be used
+        exclusively for authentication
+      default: false
+    location:
+      type: string
+      description: The location of the resource group to which the resource belongs
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Tags for the resource
+      description: Tags for the resource
+    primary_key_secret_ref:
+      type: string
+      description: >-
+        Secret reference for Cosmos DB primary access key
+
+        If provided, the primary key will be saved to this secret on account
+        creation
+    secondary_key_secret_ref:
+      type: string
+      description: >-
+        Secret reference for Cosmos DB secondary access key
+
+        If provided, the secondary key will be saved to this secret on account
+        creation
+    required:
+      - subscription_id
+      - resource_group_name
+      - account_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    account_name:
+      type: string
+      description: Database account name (primary identifier)
+    document_endpoint:
+      type: string
+      description: Document endpoint URL
+    write_locations:
+      type: array
+      items: {}
+      description: Write locations
+    read_locations:
+      type: array
+      items: {}
+      description: Read locations
+    secrets_populated:
+      type: boolean
+      description: Whether secrets have been populated (to avoid duplicate attempts)
+  lifecycle:
+    sync: <<< database-account-sync.js
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-cosmosdb/azure-cosmosdb-base
+    - cli
+    - secret

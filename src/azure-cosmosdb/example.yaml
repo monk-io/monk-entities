@@ -1,0 +1,359 @@
+namespace: azure-cosmosdb-example
+
+# Example 1: Basic single-region Cosmos DB setup
+basic-cosmos-setup:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "my-resource-group"  # Replace with your resource group
+  account_name: "my-basic-cosmos"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "Session"
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: "Enabled"
+  tags:
+    Environment: "Development"
+    Project: "MyApp"
+    Owner: "DevTeam"
+
+# Example 2: Production multi-region setup with high availability
+production-cosmos-ha:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  account_name: "prod-cosmos-ha"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: true
+    - location_name: "West US 2"
+      failover_priority: 1
+      is_zone_redundant: true
+    - location_name: "North Europe"
+      failover_priority: 2
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "BoundedStaleness"
+    max_staleness_prefix: 100000
+    max_interval_in_seconds: 300
+  enable_automatic_failover: true
+  enable_multiple_write_locations: true
+  enable_analytical_storage: true
+  public_network_access: "Enabled"
+  disable_local_auth: false
+  tags:
+    Environment: "Production"
+    HighAvailability: "true"
+    CostCenter: "Engineering"
+
+# Example 3: MongoDB API Cosmos DB
+mongodb-cosmos:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "mongodb-rg"  # Replace with your resource group
+  account_name: "my-mongodb-cosmos"
+  account_kind: "MongoDB"
+  locations:
+    - location_name: "Central US"
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "Eventual"
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: "Enabled"
+  tags:
+    Environment: "Development"
+    API: "MongoDB"
+    Team: "DataEngineering"
+
+# Example 4: Cosmos DB with secret population for access keys
+secure-cosmos-with-secrets:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "secure-rg"  # Replace with your resource group
+  account_name: "secure-cosmos-db"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "Session"
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: "Enabled"
+  # Secret references - access keys will be automatically populated on account creation
+  # Endpoint is available in entity state as 'document_endpoint'
+  primary_key_secret_ref: "cosmos-db-primary-key"
+  secondary_key_secret_ref: "cosmos-db-secondary-key"
+  tags:
+    Environment: "Production"
+    Security: "SecretManaged"
+    Team: "DevOps"
+  permitted-secrets:
+    cosmos-db-primary-key: true
+    cosmos-db-secondary-key: true
+
+# Example 5: Database with manual throughput
+ecommerce-database:
+  defines: azure-cosmosdb/database
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "my-resource-group"  # Replace with your resource group
+  database_account_name: "my-basic-cosmos"  # Must match an existing account
+  database_id: "ecommerce"
+  manual_throughput: 400
+  tags:
+    Environment: "Development"
+    Purpose: "ECommerce"
+    Team: "Backend"
+
+# Example 5: Database with autoscale throughput
+analytics-database:
+  defines: azure-cosmosdb/database
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  database_account_name: "prod-cosmos-ha"  # Must match an existing account
+  database_id: "analytics"
+  autoscale_settings:
+    max_throughput: 4000
+  tags:
+    Environment: "Production"
+    Purpose: "Analytics"
+    Team: "DataScience"
+
+# Example 6: High-throughput production database
+user-data-database:
+  defines: azure-cosmosdb/database
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  database_account_name: "prod-cosmos-ha"  # Must match an existing account
+  database_id: "user-data"
+  autoscale_settings:
+    max_throughput: 20000
+  tags:
+    Environment: "Production"
+    Purpose: "UserData"
+    Tier: "Premium"
+
+# Example 7: Basic container with manual throughput
+products-container:
+  defines: azure-cosmosdb/container
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "my-resource-group"  # Replace with your resource group
+  database_account_name: "my-basic-cosmos"
+  database_id: "ecommerce"
+  container_id: "products"
+  partition_key:
+    paths: ["/id"]
+    kind: "Hash"
+  manual_throughput: 400
+  tags:
+    Environment: "Development"
+    Purpose: "ECommerce"
+    DataType: "Products"
+
+# Example 8: Container with autoscale and custom partition key
+orders-container:
+  defines: azure-cosmosdb/container
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "my-resource-group"  # Replace with your resource group
+  database_account_name: "my-basic-cosmos"
+  database_id: "ecommerce"
+  container_id: "orders"
+  partition_key:
+    paths: ["/customerId"]
+    kind: "Hash"
+  autoscale_settings:
+    max_throughput: 4000
+  default_ttl: 2592000  # 30 days in seconds
+  tags:
+    Environment: "Development"
+    Purpose: "ECommerce"
+    DataType: "Orders"
+
+# Example 9: Production container with advanced configuration
+users-container:
+  defines: azure-cosmosdb/container
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  database_account_name: "prod-cosmos-ha"
+  database_id: "user-data"
+  container_id: "users"
+  partition_key:
+    paths: ["/userId"]
+    kind: "Hash"
+  autoscale_settings:
+    max_throughput: 10000
+  indexing_policy:
+    indexingMode: "consistent"
+    automatic: true
+    includedPaths:
+      - path: "/*"
+    excludedPaths:
+      - path: "/sensitive/*"
+      - path: "/largeData/*"
+  unique_key_policy:
+    uniqueKeys:
+      - paths: ["/email"]
+      - paths: ["/username"]
+  tags:
+    Environment: "Production"
+    Purpose: "UserManagement"
+    Compliance: "GDPR"
+
+# Example 10: Analytics container with time-series data
+events-container:
+  defines: azure-cosmosdb/container
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  database_account_name: "prod-cosmos-ha"
+  database_id: "analytics"
+  container_id: "events"
+  partition_key:
+    paths: ["/eventType", "/date"]
+    kind: "Hash"
+  manual_throughput: 1000
+  default_ttl: 7776000  # 90 days in seconds
+  conflict_resolution_policy:
+    mode: "LastWriterWins"
+    conflictResolutionPath: "/_ts"
+  tags:
+    Environment: "Production"
+    Purpose: "Analytics"
+    DataRetention: "90days"
+
+# Example 11: Complete application stack using Cosmos DB
+ecommerce-app:
+  defines: runnable
+  containers:
+    web-api:
+      image: node:18-alpine
+      bash: |
+        echo "🚀 Starting E-commerce API..."
+        echo "Cosmos DB Account: $COSMOS_ACCOUNT"
+        echo "Cosmos DB Endpoint: $COSMOS_ENDPOINT"
+        echo "Database: $DATABASE_NAME"
+        echo "Environment: $APP_ENV"
+        # Simulate API server
+        echo "API server listening on port 3000"
+        sleep 3600
+      ports:
+        - 3000:3000
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-example/basic-cosmos-setup
+        - azure-cosmosdb-example/ecommerce-database
+  connections:
+    cosmos-account:
+      runnable: azure-cosmosdb-example/basic-cosmos-setup
+      service: data
+    ecommerce-db:
+      runnable: azure-cosmosdb-example/ecommerce-database
+      service: data
+  variables:
+    COSMOS_ACCOUNT:
+      type: string
+      env: COSMOS_ACCOUNT
+      value: <- connection-target("cosmos-account") entity-state get-member("account_name")
+    COSMOS_ENDPOINT:
+      type: string
+      env: COSMOS_ENDPOINT
+      value: <- connection-target("cosmos-account") entity-state get-member("document_endpoint")
+    DATABASE_NAME:
+      type: string
+      env: DATABASE_NAME
+      value: <- connection-target("ecommerce-db") entity-state get-member("database_id")
+    APP_ENV:
+      type: string
+      env: APP_ENV
+      value: "development"
+
+# Example 8: Analytics application using autoscale database
+analytics-service:
+  defines: runnable
+  containers:
+    analytics:
+      image: python:3.11-slim
+      bash: |
+        echo "📊 Starting Analytics Service..."
+        echo "Cosmos DB Endpoint: $COSMOS_ENDPOINT"
+        echo "Analytics Database: $ANALYTICS_DB"
+        echo "Processing analytics data..."
+        # Simulate analytics processing
+        python3 -c "
+        import time
+        print('Analytics service running...')
+        while True:
+            print('Processing batch...')
+            time.sleep(30)
+        "
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-example/production-cosmos-ha
+        - azure-cosmosdb-example/analytics-database
+  connections:
+    cosmos-account:
+      runnable: azure-cosmosdb-example/production-cosmos-ha
+      service: data
+    analytics-db:
+      runnable: azure-cosmosdb-example/analytics-database
+      service: data
+  variables:
+    COSMOS_ENDPOINT:
+      type: string
+      env: COSMOS_ENDPOINT
+      value: <- connection-target("cosmos-account") entity-state get-member("document_endpoint")
+    ANALYTICS_DB:
+      type: string
+      env: ANALYTICS_DB
+      value: <- connection-target("analytics-db") entity-state get-member("database_id")
+
+# Example 9: MongoDB application using MongoDB API
+mongodb-app:
+  defines: runnable
+  containers:
+    mongodb-service:
+      image: node:18-alpine
+      bash: |
+        echo "🍃 Starting MongoDB API Application..."
+        echo "MongoDB Cosmos Endpoint: $MONGO_ENDPOINT"
+        echo "Account: $MONGO_ACCOUNT"
+        echo "Connecting to MongoDB API..."
+        # Simulate MongoDB application
+        echo "MongoDB service ready"
+        sleep 3600
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-example/mongodb-cosmos
+  connections:
+    mongodb-cosmos:
+      runnable: azure-cosmosdb-example/mongodb-cosmos
+      service: data
+  variables:
+    MONGO_ENDPOINT:
+      type: string
+      env: MONGO_ENDPOINT
+      value: <- connection-target("mongodb-cosmos") entity-state get-member("document_endpoint")
+    MONGO_ACCOUNT:
+      type: string
+      env: MONGO_ACCOUNT
+      value: <- connection-target("mongodb-cosmos") entity-state get-member("account_name")
+
+# Example 10: Stack with multiple databases for microservices
+microservices-stack:
+  defines: process-group
+  runnable-list:
+    # Infrastructure
+    - azure-cosmosdb-example/basic-cosmos-setup
+    - azure-cosmosdb-example/ecommerce-database
+    - azure-cosmosdb-example/analytics-database
+    # Applications
+    - azure-cosmosdb-example/ecommerce-app
+    - azure-cosmosdb-example/analytics-service

@@ -1,0 +1,37 @@
+{
+  "name": "azure-cosmosdb-js-client",
+  "version": "1.0.0",
+  "description": "Simple Azure Cosmos DB client for demonstrating CRUD operations with Cosmos DB for NoSQL",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "azure",
+    "cosmosdb",
+    "nosql",
+    "client",
+    "monk",
+    "typescript",
+    "crud",
+    "javascript"
+  ],
+  "author": "Monk Azure Cosmos DB Client",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "@azure/identity": "^4.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
