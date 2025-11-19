@@ -1,0 +1,156 @@
+namespace: supabase
+project:
+  defines: entity
+  metadata:
+    name: Project
+    version-hash: e92916a78ca8
+  schema:
+    secret_ref:
+      type: string
+      description: |-
+        Secret reference for Supabase Management API authentication
+        Defaults to "supabase-api-token" if not provided
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: Project name (required)
+    db_pass:
+      type: string
+      minLength: 8
+      description: >-
+        Database password (optional - if not provided, will be
+        retrieved/generated from secret)
+    db_pass_secret_ref:
+      type: string
+      description: |-
+        Secret reference for database password
+        Defaults to "{project-name}-db-password" if not provided
+    anon_api_key_secret_ref:
+      type: string
+      description: |-
+        Secret reference for anon API key
+        If provided, the anon API key will be fetched and saved to this secret
+    service_role_api_key_secret_ref:
+      type: string
+      description: >-
+        Secret reference for service_role API key
+
+        If provided, the service_role API key will be fetched and saved to this
+        secret
+    organization_id:
+      type: string
+      description: |-
+        Organization ID (required)
+        Organization slug for the project
+    desired_instance_size:
+      type: string
+      enum:
+        - pico
+        - nano
+        - micro
+        - small
+        - medium
+        - large
+        - xlarge
+        - 2xlarge
+        - 4xlarge
+        - 8xlarge
+        - 12xlarge
+        - 16xlarge
+        - 24xlarge
+        - 24xlarge_optimized_memory
+        - 24xlarge_optimized_cpu
+        - 24xlarge_high_memory
+        - 48xlarge
+        - 48xlarge_optimized_memory
+        - 48xlarge_optimized_cpu
+        - 48xlarge_high_memory
+      description: |-
+        Desired instance size for the project
+        Only available for paid plans
+    region_selection:
+      anyOf:
+        - type: object
+          properties:
+            type:
+              type: string
+              const: specific
+              description: Region selection type - specific region
+            code:
+              type: string
+              enum:
+                - us-east-1
+                - us-east-2
+                - us-west-1
+                - us-west-2
+                - ap-east-1
+                - ap-southeast-1
+                - ap-northeast-1
+                - ap-northeast-2
+                - ap-southeast-2
+                - eu-west-1
+                - eu-west-2
+                - eu-west-3
+                - eu-north-1
+                - eu-central-1
+                - eu-central-2
+                - ca-central-1
+                - ap-south-1
+                - sa-east-1
+              description: >-
+                Specific region code
+
+                Note: Codes should be retrieved from /available-regions endpoint
+                for latest options
+          required:
+            - type
+            - code
+          additionalProperties: false
+        - type: object
+          properties:
+            type:
+              type: string
+              const: smartGroup
+              description: Region selection type - smart regional group
+            code:
+              type: string
+              enum:
+                - americas
+                - emea
+                - apac
+              description: >-
+                Smart Region Group code
+
+                Note: Codes should be retrieved from /available-regions endpoint
+                for latest options
+          required:
+            - type
+            - code
+          additionalProperties: false
+      description: |-
+        Region selection for the project
+        Can be either a specific region or a smart group
+      default: '{ type: "specific", code: "us-east-1" }'
+    required:
+      - name
+      - organization_id
+      - region_selection
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Project ID (primary identifier)
+  lifecycle:
+    sync: <<< project-sync.js
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - supabase/supabase-base
+    - cli
+    - secret
