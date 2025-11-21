@@ -1,0 +1,159 @@
+name: "AWS SNS Topic Entity Integration Test"
+description: "Complete integration test for AWS SNS Topic entity including topic creation, custom actions, subscriptions, publishing, and cleanup"
+timeout: 300000
+
+setup:
+  - name: "Load AWS SNS entity manifest"
+    action: "load"
+    target: "dist/input/aws-sns/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # Test 1: Create and verify standard topic
+  - name: "Create standard SNS topic"
+    action: "run"
+    target: "aws-sns-test/test-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for standard topic readiness"
+    action: "wait"
+    target: "aws-sns-test/test-topic"
+    waitFor:
+      condition: "ready"
+      timeout: 30000
+    expect:
+      exitCode: 0
+
+  - name: "Verify standard topic status"
+    action: "describe"
+    target: "aws-sns-test/test-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Get topic attributes"
+    action: "do"
+    target: "aws-sns-test/test-topic/get-attributes"
+    expect:
+      exitCode: 0
+
+  - name: "List topic subscriptions"
+    action: "do"
+    target: "aws-sns-test/test-topic/list-subscriptions"
+    expect:
+      exitCode: 0
+
+  - name: "Publish test message to standard topic"
+    action: "do"
+    target: "aws-sns-test/test-topic/publish"
+    args:
+      message: "Test message from Monk integration test"
+      subject: "Test Subject"
+    expect:
+      exitCode: 0
+
+  # Test 2: Create and verify FIFO topic
+  - name: "Create FIFO SNS topic"
+    action: "run"
+    target: "aws-sns-test/test-fifo-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for FIFO topic readiness"
+    action: "wait"
+    target: "aws-sns-test/test-fifo-topic"
+    waitFor:
+      condition: "ready"
+      timeout: 30000
+    expect:
+      exitCode: 0
+
+  - name: "Verify FIFO topic status"
+    action: "describe"
+    target: "aws-sns-test/test-fifo-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Get FIFO topic attributes"
+    action: "do"
+    target: "aws-sns-test/test-fifo-topic/get-attributes"
+    expect:
+      exitCode: 0
+
+  - name: "Publish message to FIFO topic"
+    action: "do"
+    target: "aws-sns-test/test-fifo-topic/publish"
+    args:
+      message: "FIFO test message"
+      subject: "FIFO Test"
+      message_group_id: "test-group"
+    expect:
+      exitCode: 0
+
+  # Test 3: Create and verify encrypted topic
+  - name: "Create encrypted SNS topic"
+    action: "run"
+    target: "aws-sns-test/test-encrypted-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for encrypted topic readiness"
+    action: "wait"
+    target: "aws-sns-test/test-encrypted-topic"
+    waitFor:
+      condition: "ready"
+      timeout: 30000
+    expect:
+      exitCode: 0
+
+  - name: "Get encrypted topic attributes"
+    action: "do"
+    target: "aws-sns-test/test-encrypted-topic/get-attributes"
+    expect:
+      exitCode: 0
+
+  # Test 4: Update operations
+  - name: "Update standard topic"
+    action: "update"
+    target: "aws-sns-test/test-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Update FIFO topic"
+    action: "update"
+    target: "aws-sns-test/test-fifo-topic"
+    expect:
+      exitCode: 0
+
+  # Test 5: Verify all entities are running
+  - name: "List all running entities"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete standard topic"
+    action: "delete"
+    target: "aws-sns-test/test-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Delete FIFO topic"
+    action: "delete"
+    target: "aws-sns-test/test-fifo-topic"
+    expect:
+      exitCode: 0
+
+  - name: "Delete encrypted topic"
+    action: "delete"
+    target: "aws-sns-test/test-encrypted-topic"
+    expect:
+      exitCode: 0
+

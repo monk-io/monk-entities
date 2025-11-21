@@ -1,0 +1,140 @@
+namespace: aws-sns
+
+sns-subscription:
+  defines: entity
+
+  metadata:
+    name: SNS Subscription
+    description: |
+      AWS SNS Subscription entity for subscribing endpoints to SNS topics.
+      Supports all SNS protocols: email, HTTP/HTTPS, SQS, Lambda, SMS, etc.
+    website: https://docs.aws.amazon.com/sns/latest/dg/sns-create-subscribe-endpoint-to-topic.html
+    publisher: monk.io
+    icon: https://icons.monk.io/aws/sns.png
+
+  requirements:
+    defines: requirements
+    entities:
+      - cloud/aws:^1
+
+  definition-schema:
+    type: object
+    additionalProperties: false
+    required:
+      - region
+      - topic_arn
+      - protocol
+      - endpoint
+    properties:
+      region:
+        type: string
+        description: AWS region for SNS operations
+      
+      topic_arn:
+        type: string
+        description: ARN of the SNS topic to subscribe to
+      
+      protocol:
+        type: string
+        enum:
+          - http
+          - https
+          - email
+          - email-json
+          - sms
+          - sqs
+          - lambda
+          - application
+          - firehose
+        description: Protocol for the subscription
+      
+      endpoint:
+        type: string
+        description: |
+          Endpoint for the subscription:
+          - email/email-json: email address
+          - http/https: URL
+          - sqs: Queue ARN
+          - lambda: Lambda function ARN
+          - sms: Phone number (E.164 format)
+          - application: Platform application endpoint ARN
+          - firehose: Kinesis Firehose ARN
+      
+      filter_policy:
+        type: string
+        description: JSON message filtering policy
+      
+      delivery_policy:
+        type: string
+        description: JSON delivery retry policy
+      
+      redrive_policy:
+        type: string
+        description: Dead letter queue configuration (JSON string with deadLetterTargetArn)
+      
+      raw_message_delivery:
+        type: boolean
+        description: Enable raw message delivery (for SQS and HTTP/HTTPS subscriptions)
+      
+      attributes:
+        type: object
+        additionalProperties:
+          type: string
+        description: Additional subscription attributes
+
+  state-schema:
+    type: object
+    properties:
+      subscription_arn:
+        type: string
+        description: ARN of the subscription
+      
+      pending_confirmation:
+        type: boolean
+        description: Whether the subscription is pending confirmation
+      
+      protocol:
+        type: string
+        description: Protocol of the subscription
+      
+      endpoint:
+        type: string
+        description: Endpoint of the subscription
+      
+      existing:
+        type: boolean
+        description: Indicates if the resource pre-existed before this entity managed it
+
+  actions:
+    get-attributes:
+      description: Get all subscription attributes
+      arguments: {}
+    
+    set-filter-policy:
+      description: Update message filter policy
+      arguments:
+        filter_policy:
+          type: string
+          description: JSON filter policy
+    
+    set-redrive-policy:
+      description: Configure dead letter queue
+      arguments:
+        redrive_policy:
+          type: string
+          description: JSON redrive policy with deadLetterTargetArn
+    
+    confirm-subscription:
+      description: Confirm a pending subscription (for HTTP/HTTPS)
+      arguments:
+        token:
+          type: string
+          description: Confirmation token from subscription confirmation message
+
+  lifecycle:
+    defines: lifecycle
+    create: SNSSubscription.create
+    update: SNSSubscription.update
+    delete: SNSSubscription.delete
+    check-readiness: SNSSubscription.checkReadiness
+

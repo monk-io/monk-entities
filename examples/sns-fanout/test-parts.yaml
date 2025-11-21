@@ -1,0 +1,43 @@
+# Test Individual Components
+# Run each part separately for testing
+
+namespace: sns-test
+
+# 1. Just the topic
+topic-only:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: test-events-topic
+  display_name: Test Events
+  tags:
+    Test: individual
+
+# 2. Just the queue
+queue-only:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-events-queue
+  message_retention_period: 345600
+  visibility_timeout: 30
+  sqs_managed_sse_enabled: true
+  tags:
+    Test: individual
+
+# 3. Subscription connecting them
+# Run this AFTER both topic and queue are created
+subscription-only:
+  defines: aws-sns/sns-subscription
+  region: us-east-1
+  topic_arn: arn:aws:sns:us-east-1:065217599764:test-events-topic
+  protocol: sqs
+  endpoint: arn:aws:sqs:us-east-1:065217599764:test-events-queue
+  raw_message_delivery: true
+
+# 4. Email subscription (standalone)
+email-only:
+  defines: aws-sns/sns-subscription
+  region: us-east-1
+  topic_arn: arn:aws:sns:us-east-1:065217599764:test-events-topic
+  protocol: email
+  endpoint: your-email@example.com
+

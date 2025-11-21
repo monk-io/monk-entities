@@ -1,0 +1,35 @@
+namespace: aws-sns-example
+
+# Standard SNS topic
+notifications:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: app-notifications
+  display_name: Application Notifications
+  tags:
+    Environment: production
+    Application: myapp
+
+# FIFO topic for ordered messages
+orders:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: order-events
+  fifo_topic: true
+  content_based_deduplication: true
+  tags:
+    Environment: production
+    Application: myapp
+    MessageType: orders
+
+# Topic with encryption
+secure-notifications:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: secure-notifications
+  display_name: Secure Notifications
+  kms_master_key_id: alias/aws/sns
+  tags:
+    Environment: production
+    Security: high
+

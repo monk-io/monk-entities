@@ -1,0 +1,61 @@
+# Simple SNS Subscription Test
+# Just one topic, one queue, one subscription
+
+namespace: sns-simple-test
+
+# SNS Topic
+test-topic:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: test-topic-simple
+  display_name: Test Topic
+  services:
+    topic:
+      protocol: custom
+  tags:
+    Test: simple
+
+# SQS Queue
+test-queue:
+  defines: aws-sqs/sqs-queue
+  region: us-east-1
+  queue_name: test-queue-simple
+  message_retention_period: 345600
+  visibility_timeout: 30
+  sqs_managed_sse_enabled: true
+  services:
+    queue:
+      protocol: custom
+  tags:
+    Test: simple
+
+# Simple SQS Subscription (no filter)
+test-subscription:
+  defines: aws-sns/sns-subscription
+  region: us-east-1
+  topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
+  protocol: sqs
+  endpoint: <- connection-target("queue") entity-state get-member("queue_arn")
+  raw_message_delivery: true
+  connections:
+    topic:
+      runnable: sns-simple-test/test-topic
+      service: topic
+    queue:
+      runnable: sns-simple-test/test-queue
+      service: queue
+  depends:
+    wait-for:
+      runnables:
+        - sns-simple-test/test-topic
+        - sns-simple-test/test-queue
+      timeout: 60
+
+# Test stack
+simple-stack:
+  defines: process-group
+  runnable-list:
+    - sns-simple-test/test-topic
+    - sns-simple-test/test-queue
+    - sns-simple-test/test-subscription
+
