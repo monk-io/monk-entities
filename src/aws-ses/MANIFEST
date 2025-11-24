@@ -1,0 +1,3 @@
+REPO aws-ses
+FILES base.yaml common.yaml email-identity.yaml domain-identity.yaml configuration-set.yaml
+

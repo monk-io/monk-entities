@@ -1,0 +1,134 @@
+name: AWS SES Integration Test
+
+timeout: 300000
+
+setup:
+  - action: load
+    target: dist/input/aws-ses/MANIFEST
+    expect:
+      exitCode: 0
+
+  - action: load
+    target: test/stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # Test 1: Create email identity
+  - name: Create email identity
+    action: run
+    target: aws-ses-test/test-email
+    expect:
+      exitCode: 0
+
+  - name: Wait for email identity to be ready
+    action: wait
+    target: aws-ses-test/test-email
+    waitFor:
+      condition: ready
+      timeout: 60000
+    expect:
+      exitCode: 0
+
+  - name: Get email verification status
+    action: action
+    target: aws-ses-test/test-email
+    actionName: get-verification-status
+    expect:
+      exitCode: 0
+
+  # Test 2: Create domain identity
+  - name: Create domain identity
+    action: run
+    target: aws-ses-test/test-domain
+    expect:
+      exitCode: 0
+
+  - name: Wait for domain identity to exist (may not verify in test)
+    action: wait
+    target: aws-ses-test/test-domain
+    waitFor:
+      condition: ready
+      timeout: 120000
+    continueOnError: true
+
+  - name: Get domain verification status
+    action: action
+    target: aws-ses-test/test-domain
+    actionName: get-verification-status
+    expect:
+      exitCode: 0
+
+  - name: Get DNS records for domain
+    action: action
+    target: aws-ses-test/test-domain
+    actionName: get-dns-records
+    expect:
+      exitCode: 0
+
+  # Test 3: Create configuration set
+  - name: Create configuration set
+    action: run
+    target: aws-ses-test/test-config-set
+    expect:
+      exitCode: 0
+
+  - name: Wait for configuration set to be ready
+    action: wait
+    target: aws-ses-test/test-config-set
+    waitFor:
+      condition: ready
+      timeout: 30000
+    expect:
+      exitCode: 0
+
+  - name: Get configuration set info
+    action: action
+    target: aws-ses-test/test-config-set
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Disable sending on configuration set
+    action: action
+    target: aws-ses-test/test-config-set
+    actionName: disable-sending
+    expect:
+      exitCode: 0
+
+  - name: Enable sending on configuration set
+    action: action
+    target: aws-ses-test/test-config-set
+    actionName: enable-sending
+    expect:
+      exitCode: 0
+
+  # Test 4: Update operations
+  - name: Update email identity
+    action: update
+    target: aws-ses-test/test-email
+    expect:
+      exitCode: 0
+
+  - name: Update configuration set
+    action: update
+    target: aws-ses-test/test-config-set
+    expect:
+      exitCode: 0
+
+cleanup:
+  - action: delete
+    target: aws-ses-test/test-config-set
+    expect:
+      exitCode: 0
+
+  - action: delete
+    target: aws-ses-test/test-domain
+    expect:
+      exitCode: 0
+
+  - action: delete
+    target: aws-ses-test/test-email
+    expect:
+      exitCode: 0
+

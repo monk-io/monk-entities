@@ -1,0 +1,282 @@
+# AWS SES Integration Guide
+
+Amazon Simple Email Service (SES) integration for managing email identities, domains, and configuration sets.
+
+## Features
+
+- **Email Identity Management**: Verify and manage individual email addresses
+- **Domain Identity Management**: Verify and manage entire domains with DKIM
+- **Configuration Sets**: Organize and track email sending activities
+- **DKIM Support**: Enable email authentication for better deliverability
+- **Custom MAIL FROM**: Configure custom bounce and complaint addresses
+
+## Quick Start
+
+### Email Identity
+
+```yaml
+my-email:
+  defines: aws-ses/email-identity
+  region: us-east-1
+  email_address: noreply@example.com
+  dkim_signing_enabled: true
+```
+
+### Domain Identity
+
+```yaml
+my-domain:
+  defines: aws-ses/domain-identity
+  region: us-east-1
+  domain_name: example.com
+  dkim_signing_enabled: true
+  mail_from_domain: mail.example.com
+```
+
+### Configuration Set
+
+```yaml
+my-config:
+  defines: aws-ses/configuration-set
+  region: us-east-1
+  configuration_set_name: production
+  reputation_metrics_enabled: true
+  tls_policy: REQUIRE
+```
+
+## Entities
+
+### `email-identity`
+
+Verifies individual email addresses for sending.
+
+**Parameters:**
+- `region` (required): AWS region
+- `email_address` (required): Email address to verify
+- `dkim_signing_enabled`: Enable DKIM signing
+- `configuration_set_name`: Configuration set to use
+
+**Actions:**
+- `get-verification-status`: Check verification status
+- `send-test-email`: Send test email (requires verification)
+- `get-dkim-tokens`: Display DKIM DNS records
+
+### `domain-identity`
+
+Verifies entire domains for email sending.
+
+**Parameters:**
+- `region` (required): AWS region
+- `domain_name` (required): Domain to verify
+- `dkim_signing_enabled`: Enable DKIM
+- `mail_from_domain`: Custom MAIL FROM subdomain
+- `mail_from_behavior_on_mx_failure`: UseDefaultValue or RejectMessage
+
+**Actions:**
+- `get-verification-status`: Check verification status
+- `get-dns-records`: Display all required DNS records
+- `send-test-email`: Send test email from domain
+
+### `configuration-set`
+
+Manages configuration sets for tracking and managing emails.
+
+**Parameters:**
+- `region` (required): AWS region
+- `configuration_set_name` (required): Configuration set name
+- `reputation_metrics_enabled`: Enable reputation tracking
+- `sending_enabled`: Enable sending (default: true)
+- `custom_redirect_domain`: Custom tracking domain
+- `tls_policy`: REQUIRE or OPTIONAL
+- `suppression_list_reasons`: Array of BOUNCE/COMPLAINT
+
+**Actions:**
+- `get-info`: Display configuration details
+- `enable-sending`: Enable email sending
+- `disable-sending`: Disable email sending
+
+## Verification Workflow
+
+### Email Verification
+
+1. Create email identity
+2. AWS sends verification email
+3. Click verification link
+4. Wait for status to become "Success"
+
+### Domain Verification
+
+1. Create domain identity
+2. Run `get-dns-records` action to view required records
+3. Add DNS records to your domain:
+   - TXT record for domain verification
+   - 3 CNAME records for DKIM
+   - MX and TXT records for MAIL FROM (if configured)
+4. Wait for DNS propagation (24-72 hours)
+5. Verification completes automatically
+
+## Example DNS Configuration
+
+For domain `example.com` with MAIL FROM domain `mail.example.com`:
+
+```
+# Domain Verification
+Type: TXT
+Name: _amazonses.example.com
+Value: <verification-token-from-aws>
+
+# DKIM Authentication (3 records)
+Type: CNAME
+Name: <token1>._domainkey.example.com
+Value: <token1>.dkim.amazonses.com
+
+Type: CNAME
+Name: <token2>._domainkey.example.com
+Value: <token2>.dkim.amazonses.com
+
+Type: CNAME
+Name: <token3>._domainkey.example.com
+Value: <token3>.dkim.amazonses.com
+
+# MAIL FROM Domain
+Type: MX
+Name: mail.example.com
+Value: 10 feedback-smtp.us-east-1.amazonses.com
+
+Type: TXT
+Name: mail.example.com
+Value: "v=spf1 include:amazonses.com ~all"
+```
+
+## AWS SES Sandbox
+
+New AWS accounts start in **sandbox mode** with restrictions:
+- Can only send to verified email addresses
+- Limited to 200 emails/day
+- 1 email/second rate limit
+
+To move to production:
+1. Request production access in AWS SES Console
+2. Provide use case details
+3. Wait for AWS approval (usually 24-48 hours)
+
+## Best Practices
+
+1. **Enable DKIM**: Always enable DKIM signing for better deliverability
+2. **Use Configuration Sets**: Track bounces, complaints, and deliveries
+3. **Set up MAIL FROM**: Use custom MAIL FROM domain for better reputation
+4. **Monitor Reputation**: Enable reputation metrics in configuration sets
+5. **Handle Bounces**: Configure suppression lists for bounces and complaints
+6. **Use TLS**: Set `tls_policy: REQUIRE` for secure email delivery
+7. **Test Thoroughly**: Use sandbox mode to test before production
+
+## Common Use Cases
+
+### Transactional Emails
+
+```yaml
+transactional-sender:
+  defines: aws-ses/domain-identity
+  region: us-east-1
+  domain_name: app.example.com
+  dkim_signing_enabled: true
+  mail_from_domain: bounce.app.example.com
+
+transactional-config:
+  defines: aws-ses/configuration-set
+  depends:
+    wait-for:
+      runnables: [namespace/transactional-sender]
+  region: us-east-1
+  configuration_set_name: transactional
+  reputation_metrics_enabled: true
+  tls_policy: REQUIRE
+  suppression_list_reasons:
+    - BOUNCE
+    - COMPLAINT
+```
+
+### Marketing Emails
+
+```yaml
+marketing-sender:
+  defines: aws-ses/domain-identity
+  region: us-east-1
+  domain_name: marketing.example.com
+  dkim_signing_enabled: true
+
+marketing-config:
+  defines: aws-ses/configuration-set
+  depends:
+    wait-for:
+      runnables: [namespace/marketing-sender]
+  region: us-east-1
+  configuration_set_name: marketing
+  reputation_metrics_enabled: true
+  suppression_list_reasons:
+    - BOUNCE
+    - COMPLAINT
+```
+
+## Troubleshooting
+
+### Email Not Verified
+- Check spam folder for verification email
+- Request new verification email from AWS Console
+- Ensure email address is correctly specified
+
+### Domain Not Verifying
+- DNS records can take 24-72 hours to propagate
+- Verify DNS records with `dig` or `nslookup`
+- Ensure TXT record value matches exactly (including quotes)
+- Check DKIM CNAME records point to correct values
+
+### Cannot Send Emails
+- Verify you're out of sandbox mode for production use
+- Ensure sender email/domain is verified
+- Check AWS service quotas and limits
+- Verify IAM permissions for SES
+
+### API Errors
+- Check AWS credentials are configured
+- Verify IAM permissions include required SES actions
+- Ensure region is correct and SES is available
+- Check AWS service health dashboard
+
+## AWS Permissions Required
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ses:CreateEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:PutEmailIdentityDkimSigningAttributes",
+        "ses:PutEmailIdentityMailFromAttributes",
+        "ses:CreateConfigurationSet",
+        "ses:DeleteConfigurationSet",
+        "ses:GetConfigurationSet",
+        "ses:PutConfigurationSetReputationOptions",
+        "ses:PutConfigurationSetSendingOptions",
+        "ses:PutConfigurationSetTrackingOptions",
+        "ses:PutConfigurationSetDeliveryOptions",
+        "ses:PutConfigurationSetSuppressionOptions",
+        "ses:SendEmail"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+## Resources
+
+- [AWS SES Documentation](https://docs.aws.amazon.com/ses/)
+- [SES API v2 Reference](https://docs.aws.amazon.com/ses/latest/APIReference-V2/)
+- [Email Authentication (DKIM, SPF, DMARC)](https://docs.aws.amazon.com/ses/latest/dg/send-email-authentication.html)
+- [Moving Out of Sandbox](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
+

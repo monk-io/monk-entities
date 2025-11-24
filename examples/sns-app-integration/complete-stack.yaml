@@ -1,0 +1,422 @@
+# SNS Application Integration Example with AssumeRole
+# Demonstrates programmatic SNS interaction with secure AssumeRole credentials
+
+namespace: sns-app-integration
+
+# SNS Topics
+app-notifications:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: app-notifications-demo
+  display_name: Application Notifications
+  services:
+    topic:
+      protocol: custom
+  tags:
+    Application: notification-system
+    Environment: demo
+    ManagedBy: monk
+
+critical-alerts:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: critical-alerts-demo
+  display_name: Critical System Alerts
+  kms_master_key_id: alias/aws/sns
+  services:
+    topic:
+      protocol: custom
+  tags:
+    Application: notification-system
+    Environment: demo
+    ManagedBy: monk
+    Priority: critical
+
+order-events:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: order-events-demo.fifo
+  display_name: Order Processing Events
+  fifo_topic: true
+  content_based_deduplication: true
+  services:
+    topic:
+      protocol: custom
+  tags:
+    Application: order-system
+    Environment: demo
+    ManagedBy: monk
+
+# IAM Service Policy with SNS permissions
+sns-publisher-service-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: SNSPublisherServicePolicy
+  policy_description: "SNS publish permissions for publisher service role"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action:
+          - sns:Publish
+          - sns:GetTopicAttributes
+        Resource:
+          - <- connection-target("app-notifications") entity-state get-member("topic_arn")
+          - <- connection-target("critical-alerts") entity-state get-member("topic_arn")
+          - <- connection-target("order-events") entity-state get-member("topic_arn")
+      - Effect: Allow
+        Action:
+          - sns:ListTopics
+        Resource: "*"
+      - Effect: Allow
+        Action:
+          - kms:Decrypt
+          - kms:GenerateDataKey
+        Resource: "*"
+  services:
+    policy:
+      protocol: custom
+  connections:
+    app-notifications:
+      runnable: sns-app-integration/app-notifications
+      service: topic
+    critical-alerts:
+      runnable: sns-app-integration/critical-alerts
+      service: topic
+    order-events:
+      runnable: sns-app-integration/order-events
+      service: topic
+  depends:
+    wait-for:
+      runnables:
+        - sns-app-integration/app-notifications
+        - sns-app-integration/critical-alerts
+        - sns-app-integration/order-events
+      timeout: 60
+  tags:
+    Purpose: sns-publisher-service-access
+    Type: assume-role
+
+# Service Role with SNS permissions
+sns-publisher-service-role:
+  defines: aws-iam/iam-role
+  region: us-east-1
+  role_name: SNSPublisherServiceRole
+  role_description: "Service role with SNS permissions for publisher application"
+  max_session_duration: 3600  # 1 hour sessions
+  assume_role_policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Principal:
+          AWS: <- connection-target("assume-user") entity-state get-member("user_arn")
+        Action: sts:AssumeRole
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "sns-publisher-external-id"
+  attached_policies:
+    - <- connection-target("service-policy") entity-state get-member("policy_arn")
+  services:
+    role:
+      protocol: custom
+  connections:
+    assume-user:
+      runnable: sns-app-integration/sns-assume-user
+      service: user
+    service-policy:
+      runnable: sns-app-integration/sns-publisher-service-policy
+      service: policy
+  depends:
+    wait-for:
+      runnables:
+        - sns-app-integration/sns-assume-user
+        - sns-app-integration/sns-publisher-service-policy
+      timeout: 60
+  tags:
+    Purpose: sns-publisher-service-role
+    Type: assume-role
+
+# AssumeRole policy for the minimal user
+sns-assume-role-policy:
+  defines: aws-iam/iam-policy
+  region: us-east-1
+  policy_name: SNSAssumeRolePolicy
+  policy_description: "Allow assuming the SNS publisher service role"
+  policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Action: sts:AssumeRole
+        Resource: "arn:aws:iam::*:role/SNSPublisherServiceRole"
+        Condition:
+          StringEquals:
+            "sts:ExternalId": "sns-publisher-external-id"
+  tags:
+    Purpose: assume-role-permission
+    Type: assume-role
+
+# Minimal IAM User (can only assume roles)
+sns-assume-user:
+  defines: aws-iam/iam-user
+  permitted-secrets:
+    sns-assume-role-access-key-id: true
+    sns-assume-role-secret-access-key: true
+  region: us-east-1
+  user_name: sns-assume-role-user
+  create_access_keys: true
+  access_key_id_secret_ref: sns-assume-role-access-key-id
+  secret_access_key_secret_ref: sns-assume-role-secret-access-key
+  attached_policy_arns:
+    - <- connection-target("assume-policy") entity-state get-member("policy_arn")
+  connections:
+    assume-policy:
+      runnable: sns-app-integration/sns-assume-role-policy
+      service: policy
+  services:
+    user:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - sns-app-integration/sns-assume-role-policy
+      timeout: 60
+  tags:
+    Purpose: assume-role-user
+    Type: assume-role
+
+# SNS Publisher Application
+sns-publisher:
+  defines: runnable
+  permitted-secrets:
+    sns-assume-role-access-key-id: true
+    sns-assume-role-secret-access-key: true
+  connections:
+    app-notifications:
+      runnable: sns-app-integration/app-notifications
+      service: topic
+    critical-alerts:
+      runnable: sns-app-integration/critical-alerts
+      service: topic
+    order-events:
+      runnable: sns-app-integration/order-events
+      service: topic
+    assume-user:
+      runnable: sns-app-integration/sns-assume-user
+      service: user
+    service-role:
+      runnable: sns-app-integration/sns-publisher-service-role
+      service: role
+  depends:
+    wait-for:
+      runnables:
+        - sns-app-integration/app-notifications
+        - sns-app-integration/critical-alerts
+        - sns-app-integration/order-events
+        - sns-app-integration/sns-assume-user
+        - sns-app-integration/sns-publisher-service-role
+      timeout: 180
+  variables:
+    # Topic ARNs from connections
+    app_notifications_topic_arn:
+      env: APP_NOTIFICATIONS_TOPIC_ARN
+      value: <- connection-target("app-notifications") entity-state get-member("topic_arn")
+      type: string
+    
+    critical_alerts_topic_arn:
+      env: CRITICAL_ALERTS_TOPIC_ARN
+      value: <- connection-target("critical-alerts") entity-state get-member("topic_arn")
+      type: string
+    
+    order_events_topic_arn:
+      env: ORDER_EVENTS_TOPIC_ARN
+      value: <- connection-target("order-events") entity-state get-member("topic_arn")
+      type: string
+    
+    # AWS Region
+    aws_region:
+      env: AWS_REGION
+      value: "us-east-1"
+      type: string
+    
+    # Base user credentials (minimal permissions - only AssumeRole)
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("sns-assume-role-access-key-id")
+      type: string
+    
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("sns-assume-role-secret-access-key")
+      type: string
+    
+    # Role to assume for actual SNS work
+    aws_role_arn:
+      env: AWS_ROLE_ARN
+      value: <- connection-target("service-role") entity-state get-member("role_arn")
+      type: string
+    
+    aws_role_session_name:
+      env: AWS_ROLE_SESSION_NAME
+      value: "sns-publisher-session"
+      type: string
+    
+    aws_external_id:
+      env: AWS_EXTERNAL_ID
+      value: "sns-publisher-external-id"
+      type: string
+    
+    # Session duration (in seconds)
+    aws_role_duration:
+      env: AWS_ROLE_DURATION
+      value: "3600"
+      type: string
+
+  containers:
+    publisher:
+      image: alpine:latest
+      bash: |
+        set -e
+        
+        echo "📤 SNS Publisher Application Starting..."
+        echo "Installing dependencies..."
+        
+        # Install Python and pip
+        apk add --no-cache python3 py3-pip > /dev/null 2>&1
+        
+        # Install boto3
+        pip3 install --no-cache-dir boto3 --break-system-packages > /dev/null 2>&1
+        
+        echo ""
+        echo "Publishing messages to SNS topics using AssumeRole..."
+        echo "Region: $AWS_REGION"
+        echo "Role ARN: $AWS_ROLE_ARN"
+        echo ""
+        
+        # Create and run Python publisher script
+        python3 << 'PYEOF'
+        import boto3
+        import os
+        import time
+        from datetime import datetime
+        from botocore.credentials import AssumeRoleCredentialFetcher, DeferredRefreshableCredentials
+        from botocore.session import Session
+        
+        # Get environment variables
+        role_arn = os.environ['AWS_ROLE_ARN']
+        session_name = os.environ['AWS_ROLE_SESSION_NAME']
+        external_id = os.environ['AWS_EXTERNAL_ID']
+        region = os.environ['AWS_REGION']
+        
+        # Parse duration
+        try:
+            duration_seconds = int(os.environ.get('AWS_ROLE_DURATION', '3600'))
+            if duration_seconds < 900:
+                print(f"⚠️  Duration too low: {duration_seconds}s, using 900s")
+                duration_seconds = 900
+            elif duration_seconds > 43200:
+                print(f"⚠️  Duration too high: {duration_seconds}s, using 43200s")
+                duration_seconds = 43200
+        except ValueError:
+            duration_seconds = 3600
+            print(f"⚠️  Invalid duration, using default: {duration_seconds}s")
+        
+        print("🔐 Using AssumeRole authentication")
+        print(f"   Role ARN: {role_arn}")
+        print(f"   Session Name: {session_name}")
+        print(f"   External ID: {external_id}")
+        print(f"   Duration: {duration_seconds} seconds")
+        print("")
+        
+        # Create STS client to assume role
+        sts = boto3.client('sts', region_name=region)
+        
+        # Assume the role
+        print("Assuming role...")
+        assumed_role = sts.assume_role(
+            RoleArn=role_arn,
+            RoleSessionName=session_name,
+            DurationSeconds=duration_seconds,
+            ExternalId=external_id
+        )
+        
+        credentials = assumed_role['Credentials']
+        print("✅ Role assumed successfully!")
+        print(f"   Session expires: {credentials['Expiration']}")
+        print("")
+        
+        # Create SNS client with assumed role credentials
+        sns = boto3.client(
+            'sns',
+            region_name=region,
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretAccessKey'],
+            aws_session_token=credentials['SessionToken']
+        )
+        
+        # Get topic ARNs from environment
+        app_topic = os.environ['APP_NOTIFICATIONS_TOPIC_ARN']
+        critical_topic = os.environ['CRITICAL_ALERTS_TOPIC_ARN']
+        order_topic = os.environ['ORDER_EVENTS_TOPIC_ARN']
+        
+        print(f"App Notifications: {app_topic}")
+        print(f"Critical Alerts:   {critical_topic}")
+        print(f"Order Events:      {order_topic}")
+        print("")
+        
+        # Test 1: Standard Topic
+        print("1️⃣  Publishing to standard topic...")
+        response = sns.publish(
+            TopicArn=app_topic,
+            Subject='App Notification',
+            Message=f'Hello from SNS publisher with AssumeRole! Timestamp: {datetime.now()}'
+        )
+        print(f"   ✅ MessageId: {response['MessageId']}")
+        time.sleep(1)
+        
+        # Test 2: Encrypted Topic (KMS)
+        print("2️⃣  Publishing to encrypted topic...")
+        response = sns.publish(
+            TopicArn=critical_topic,
+            Subject='Critical Alert',
+            Message=f'System alert at {datetime.now()}'
+        )
+        print(f"   ✅ MessageId: {response['MessageId']}")
+        time.sleep(1)
+        
+        # Test 3: FIFO Topic
+        print("3️⃣  Publishing to FIFO topic...")
+        for i in range(1, 4):
+            response = sns.publish(
+                TopicArn=order_topic,
+                Subject=f'Order Event {i}',
+                Message=f'Order {i} processed at {datetime.now()}',
+                MessageGroupId='order-processing',
+                MessageDeduplicationId=f'order-{i}-{int(time.time())}'
+            )
+            print(f"   ✅ Message {i} - MessageId: {response['MessageId']}")
+            time.sleep(0.5)
+        
+        print("")
+        print("✅ All messages published successfully!")
+        print("")
+        print("🔒 Security Note: Used AssumeRole with time-limited credentials")
+        PYEOF
+
+# Complete application stack
+app-stack:
+  defines: process-group
+  runnable-list:
+    # SNS Topics first
+    - sns-app-integration/app-notifications
+    - sns-app-integration/critical-alerts
+    - sns-app-integration/order-events
+    # Service policy depends on topics
+    - sns-app-integration/sns-publisher-service-policy
+    # AssumeRole policy (independent)
+    - sns-app-integration/sns-assume-role-policy
+    # User depends on assume-role-policy
+    - sns-app-integration/sns-assume-user
+    # Service role depends on user and service-policy
+    - sns-app-integration/sns-publisher-service-role
+    # Publisher depends on everything
+    - sns-app-integration/sns-publisher

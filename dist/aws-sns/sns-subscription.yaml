@@ -1,0 +1,89 @@
+namespace: aws-sns
+sns-subscription:
+  defines: entity
+  metadata:
+    name: SNSSubscription
+    version-hash: e5180a8db1ca
+  schema:
+    region:
+      type: string
+      description: AWS region for SNS operations
+    topic_arn:
+      type: string
+      description: ARN of the SNS topic to subscribe to
+    protocol:
+      type: string
+      enum:
+        - http
+        - https
+        - email
+        - email-json
+        - sms
+        - sqs
+        - lambda
+        - application
+        - firehose
+      description: Protocol for the subscription
+    endpoint:
+      type: string
+      description: 'Endpoint for the subscription (email, URL, queue ARN, etc.)'
+    filter_policy:
+      type: string
+      description: JSON message filtering policy
+    delivery_policy:
+      type: string
+      description: JSON delivery retry policy
+    redrive_policy:
+      type: string
+      description: Dead letter queue configuration (JSON string)
+    raw_message_delivery:
+      type: boolean
+      description: Enable raw message delivery (for SQS/HTTP)
+    attributes:
+      type: object
+      additionalProperties:
+        type: string
+        description: Additional subscription attributes
+      description: Additional subscription attributes
+    required:
+      - region
+      - topic_arn
+      - protocol
+      - endpoint
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    subscription_arn:
+      type: string
+      description: ARN of the subscription
+    pending_confirmation:
+      type: boolean
+      description: Whether the subscription is pending confirmation
+    protocol:
+      type: string
+      description: Protocol of the subscription
+    endpoint:
+      type: string
+      description: Endpoint of the subscription
+    required:
+      - existing
+      - subscription_arn
+      - pending_confirmation
+      - protocol
+      - endpoint
+  lifecycle:
+    sync: <<< sns-subscription-sync.js
+    get-attributes: ''
+    set-filter-policy: ''
+    set-redrive-policy: ''
+    confirm-subscription: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 3
+      attempts: 20
+  requires:
+    - aws-sns/base
+    - monkec/base
+    - cli
