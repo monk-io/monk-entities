@@ -56,5 +56,7 @@ iam-role:
       period: 5
       initialDelay: 5
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-iam/base

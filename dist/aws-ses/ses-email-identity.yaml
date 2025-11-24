@@ -59,6 +59,8 @@ ses-email-identity:
       period: 10
       initialDelay: 5
       attempts: 30
+    liveness:
+      period: 300
   requires:
     - aws-ses/base
     - monkec/base

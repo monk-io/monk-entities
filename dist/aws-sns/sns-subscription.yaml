@@ -83,6 +83,8 @@ sns-subscription:
       period: 5
       initialDelay: 3
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - aws-sns/base
     - monkec/base

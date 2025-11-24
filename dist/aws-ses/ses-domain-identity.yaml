@@ -68,6 +68,8 @@ ses-domain-identity:
       period: 15
       initialDelay: 10
       attempts: 40
+    liveness:
+      period: 300
   requires:
     - aws-ses/base
     - monkec/base

@@ -67,6 +67,8 @@ sns-topic:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - aws-sns/base
     - monkec/base
