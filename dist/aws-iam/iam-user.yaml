@@ -71,8 +71,6 @@ iam-user:
       period: 5
       initialDelay: 5
       attempts: 12
-    liveness:
-      period: 300
   requires:
     - aws-iam/base
     - aws-iam/common

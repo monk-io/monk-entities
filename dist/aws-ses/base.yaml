@@ -1,0 +1,7 @@
+namespace: aws-ses
+
+base:
+  defines: module
+  metadata:
+    version-hash: 162f303faa27
+  source: <<< base.js

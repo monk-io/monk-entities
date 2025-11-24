@@ -1,0 +1,66 @@
+namespace: aws-ses
+ses-email-identity:
+  defines: entity
+  metadata:
+    name: SESEmailIdentity
+    version-hash: 162f303faa27
+  schema:
+    region:
+      type: string
+      description: AWS region for SES operations
+    email_address:
+      type: string
+      description: Email address to verify and use for sending
+    dkim_signing_enabled:
+      type: boolean
+      description: Enable DKIM signing for this email identity
+    configuration_set_name:
+      type: string
+      description: Configuration set name to associate with this identity
+    required:
+      - region
+      - email_address
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    email_address:
+      type: string
+      description: Email address identity
+    verification_status:
+      type: string
+      enum:
+        - PENDING
+        - SUCCESS
+        - FAILED
+        - TEMPORARY_FAILURE
+        - NOT_STARTED
+      description: Current verification status
+    verified:
+      type: boolean
+      description: Whether the identity is verified
+    dkim_status:
+      type: string
+      description: DKIM signing status
+    dkim_tokens:
+      type: array
+      items:
+        type: string
+      description: DKIM tokens for DNS configuration
+    required:
+      - existing
+  lifecycle:
+    sync: <<< ses-email-identity-sync.js
+    get-verification-status: ''
+    send-test-email: ''
+    get-dkim-tokens: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+  requires:
+    - aws-ses/base
+    - monkec/base
+    - cli
+    - aws-ses/common

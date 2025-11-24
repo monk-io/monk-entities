@@ -1,0 +1,66 @@
+namespace: aws-ses
+ses-configuration-set:
+  defines: entity
+  metadata:
+    name: SESConfigurationSet
+    version-hash: 162f303faa27
+  schema:
+    region:
+      type: string
+      description: AWS region for SES operations
+    configuration_set_name:
+      type: string
+      description: Name of the configuration set
+    reputation_metrics_enabled:
+      type: boolean
+      description: Enable reputation metrics tracking
+    sending_enabled:
+      type: boolean
+      description: Enable sending through this configuration set
+    custom_redirect_domain:
+      type: string
+      description: Custom redirect domain for tracking opens and clicks
+    tls_policy:
+      type: string
+      enum:
+        - REQUIRE
+        - OPTIONAL
+      description: TLS policy (REQUIRE or OPTIONAL)
+    suppression_list_reasons:
+      type: array
+      items:
+        type: string
+        enum:
+          - BOUNCE
+          - COMPLAINT
+      description: 'Suppression list reasons to apply (BOUNCE, COMPLAINT)'
+    required:
+      - region
+      - configuration_set_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    configuration_set_name:
+      type: string
+      description: Configuration set name
+    sending_enabled:
+      type: boolean
+      description: Whether sending is currently enabled
+    required:
+      - existing
+  lifecycle:
+    sync: <<< ses-configuration-set-sync.js
+    get-info: ''
+    enable-sending: ''
+    disable-sending: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-ses/base
+    - monkec/base
+    - cli
+    - aws-ses/common

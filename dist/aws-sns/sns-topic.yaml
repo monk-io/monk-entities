@@ -1,0 +1,74 @@
+namespace: aws-sns
+sns-topic:
+  defines: entity
+  metadata:
+    name: SNSTopic
+    version-hash: e5180a8db1ca
+  schema:
+    region:
+      type: string
+      description: AWS region for SNS operations
+    topic_name:
+      type: string
+      description: Name of the SNS topic
+    display_name:
+      type: string
+      description: Display name for the topic (max 100 characters)
+    fifo_topic:
+      type: boolean
+      description: Whether this is a FIFO topic
+    content_based_deduplication:
+      type: boolean
+      description: Enable content-based deduplication for FIFO topics
+    kms_master_key_id:
+      type: string
+      description: KMS key ID for server-side encryption
+    policy:
+      type: string
+      description: JSON policy document for the topic
+    delivery_policy:
+      type: string
+      description: JSON delivery policy for the topic
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the topic
+      description: Resource tags for the topic
+    required:
+      - region
+      - topic_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    topic_name:
+      type: string
+      description: SNS topic name
+    topic_arn:
+      type: string
+      description: SNS topic ARN
+    is_fifo:
+      type: boolean
+      description: Whether the topic is FIFO
+    required:
+      - existing
+  lifecycle:
+    sync: <<< sns-topic-sync.js
+    get-attributes: ''
+    list-subscriptions: ''
+    subscribe: ''
+    unsubscribe: ''
+    publish: ''
+    add-permission: ''
+    remove-permission: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-sns/base
+    - monkec/base
+    - cli
+    - aws-sns/common
