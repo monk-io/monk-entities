@@ -1,0 +1,7 @@
+{
+  "name": "sample-hello",
+  "version": "1.0.0",
+  "description": "Sample Hello World Function",
+  "main": "hello.js",
+  "dependencies": {}
+}

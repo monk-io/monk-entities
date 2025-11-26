@@ -1,0 +1,60 @@
+namespace: test-instances
+
+# Basic Node.js function test
+test-nodejs-function:
+  defines: digitalocean-function/app-function
+  app_name: test-nodejs-app
+  component_name: test-hello-function
+  github_repo: https://github.com/manachyn/sample-functions-nodejs-helloworld
+  github_branch: master
+  region: nyc1
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  api_token_secret_ref: test-do-api-token
+  github_deploy_on_push: false
+  envs:
+    - key: NODE_ENV
+      value: test
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: TEST_MODE
+      value: "true"
+      scope: RUN_TIME
+      type: GENERAL
+  
+  # Secret permissions
+  permitted-secrets:
+    test-do-api-token: true
+
+# Python function test with environment variables
+test-python-function:
+  defines: digitalocean-function/app-function
+  app_name: test-python-app
+  component_name: test-api-function
+  github_repo: https://github.com/manachyn/sample-functions-python-helloworld
+  github_branch: master
+  source_dir: /
+  region: sfo3
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  api_token_secret_ref: test-do-api-token
+  github_deploy_on_push: false
+  envs:
+    - key: PYTHON_ENV
+      value: test
+      scope: RUN_AND_BUILD_TIME
+      type: GENERAL
+    - key: TEST_SECRET
+      value: secret("test-secret")
+      scope: RUN_TIME
+      type: SECRET
+  routes:
+    - path: /api
+      preserve_path_prefix: true
+  
+  # Secret permissions
+  permitted-secrets:
+    test-do-api-token: true
+    test-secret: true
