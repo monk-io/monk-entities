@@ -38,7 +38,7 @@ __export(base_exports, {
 module.exports = __toCommonJS(base_exports);
 var import_crypto = __toESM(require("crypto"));
 var import_cli = __toESM(require("cli"));
-var ACTION_METADATA_KEY = Symbol("monk:actions");
+var ACTION_METADATA_KEY = Symbol.for("monk:actions");
 function camelToKebab(str) {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 }
