@@ -3,6 +3,7 @@ pro-database:
   defines: entity
   metadata:
     name: ProDatabase
+    version-hash: daf4c6568d15
   schema:
     account_key_secret:
       type: string
@@ -222,14 +223,87 @@ pro-database:
     required:
       - name
       - subscription_id
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    name:
+      type: string
+    status:
+      type: string
+    public_endpoint:
+      type: string
+    private_endpoint:
+      type: string
+    port:
+      type: number
+    memory_usage_in_mb:
+      type: number
+    memory_limit_in_mb:
+      type: number
+    task_id:
+      type: string
+    high_availability_status:
+      type: string
+    replication_status:
+      type: string
+    cluster_info:
+      type: object
+      properties:
+        shard_count:
+          type: number
+        status:
+          type: string
+      additionalProperties: false
+    ssl_certificate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      additionalProperties: false
+    backup:
+      type: object
+      properties:
+        path:
+          type: string
+        last_backup:
+          type: string
+        status:
+          type: string
+      additionalProperties: false
+    enabled_modules:
+      type: array
+      items:
+        type: string
+    current_alerts:
+      type: object
+      properties:
+        memory_usage_enabled:
+          type: boolean
+        throughput_enabled:
+          type: boolean
+        connection_limit_enabled:
+          type: boolean
+        latency_enabled:
+          type: boolean
+      additionalProperties: false
   lifecycle:
     sync: <<< pro-database-sync.js
+    backup: ''
+    restore: ''
+    list-backups: ''
   checks:
     readiness:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - cli
     - secret
     - redis-cloud/base
+    - monkec/base

@@ -2,4 +2,6 @@ namespace: redis-cloud
 
 base:
   defines: module
+  metadata:
+    version-hash: daf4c6568d15
   source: <<< base.js

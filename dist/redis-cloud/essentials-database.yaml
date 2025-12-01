@@ -3,6 +3,7 @@ essentials-database:
   defines: entity
   metadata:
     name: EssentialsDatabase
+    version-hash: daf4c6568d15
   schema:
     account_key_secret:
       type: string
@@ -133,14 +134,37 @@ essentials-database:
     required:
       - name
       - subscription_id
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    name:
+      type: string
+    username:
+      type: string
+    publicEndpoint:
+      type: string
+    publicEndpointHost:
+      type: string
+    publicEndpointPort:
+      type: string
+    task_id:
+      type: string
   lifecycle:
     sync: <<< essentials-database-sync.js
+    backup: ''
+    restore: ''
+    list-backups: ''
   checks:
     readiness:
       period: 5
       initialDelay: 2
       attempts: 10
+    liveness:
+      period: 300
   requires:
     - secret
     - cli
     - redis-cloud/base
+    - monkec/base

@@ -1,7 +1,8 @@
 import secret from "secret";
 import cli from "cli";
-
 import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
+import * as MonkecBase from "monkec/base";
+const action = MonkecBase.action;
 
 /**
  * Client TLS certificate specification
@@ -526,5 +527,316 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
         }
 
         return false;
+    }
+
+    override checkLiveness(): boolean { return this.checkReadiness(); }
+
+    /**
+     * Manually back up the Essentials database
+     * Backs up to the periodicBackupPath configured for this database,
+     * or to a custom location if adhocBackupPath is provided in args
+     * 
+     * Usage:
+     * - monk do namespace/database-instance backup
+     * - monk do namespace/database-instance backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
+     */
+    @action("backup")
+    backup(args?: any): void {
+        cli.output(`==================================================`);
+        cli.output(`Starting backup for database: ${this.state.name}`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`Subscription ID: ${this.definition.subscription_id}`);
+        cli.output(`Backup path: ${this.definition.periodic_backup_path || 'not set'}`);
+        cli.output(`==================================================`);
+        
+        if (!this.state.id) {
+            cli.output(`ERROR: Database ID is not available`);
+            throw new Error("Database ID is not available. Cannot initiate backup.");
+        }
+
+        if (!this.definition.periodic_backup_path && !args?.adhocBackupPath) {
+            cli.output(`ERROR: No backup path configured`);
+            throw new Error("periodic_backup_path is not configured for this database, and no adhocBackupPath was provided. Cannot initiate backup.");
+        }
+
+        const body: any = {};
+        if (args?.adhocBackupPath) {
+            body.adhocBackupPath = args.adhocBackupPath as string;
+            cli.output(`Using ad-hoc backup path: ${args.adhocBackupPath}`);
+        } else {
+            cli.output(`Using configured periodic backup path`);
+        }
+
+        try {
+            const endpoint = `/fixed/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}/backup`;
+            cli.output(`Making request to: POST ${endpoint}`);
+            
+            if (Object.keys(body).length > 0) {
+                cli.output(`Request body: ${JSON.stringify(body)}`);
+            } else {
+                cli.output(`Request body: (empty - using configured path)`);
+            }
+            
+            const response = this.makeRequest(
+                "POST",
+                endpoint,
+                Object.keys(body).length > 0 ? body : undefined
+            );
+
+            cli.output(`Response received: ${JSON.stringify(response)}`);
+
+            if (response && response.taskId) {
+                cli.output(`--------------------------------------------------`);
+                cli.output(`✅ Backup task created!`);
+                cli.output(`Task ID: ${response.taskId}`);
+                cli.output(`Waiting for task to complete...`);
+                
+                this.waitForTask(response.taskId);
+                
+                cli.output(`--------------------------------------------------`);
+                cli.output(`✅ BACKUP COMPLETED SUCCESSFULLY`);
+                cli.output(`Database: ${this.state.name}`);
+                cli.output(`Task ID: ${response.taskId}`);
+                cli.output(`==================================================`);
+            } else {
+                cli.output(`--------------------------------------------------`);
+                cli.output(`⚠️  WARNING: No task ID in response!`);
+                cli.output(`Response was: ${JSON.stringify(response)}`);
+                cli.output(`==================================================`);
+            }
+        } catch (error) {
+            cli.output(`--------------------------------------------------`);
+            cli.output(`❌ BACKUP FAILED`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Failed to initiate backup for Essentials database ${this.state.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Restore/Import database from backup
+     * 
+     * This action imports data from an external storage location into the database.
+     * WARNING: This will OVERWRITE all existing data in the database!
+     * 
+     * @param args.sourceType - Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)
+     * @param args.importFromUri - URI to the backup file
+     * 
+     * @example
+     * ```bash
+     * # Restore from S3
+     * monk do namespace/essentials-database restore sourceType="aws-s3" importFromUri="s3://bucket/backup.rdb"
+     * 
+     * # Restore from Google Cloud Storage
+     * monk do namespace/essentials-database restore sourceType="google-blob-storage" importFromUri="gs://bucket/backup.rdb"
+     * ```
+     */
+    @action("restore")
+    restore(args?: any): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE DATABASE FROM BACKUP`);
+        cli.output(`==================================================`);
+        cli.output(`Database: ${this.state.name}`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`Subscription ID: ${this.definition.subscription_id}`);
+        cli.output(`--------------------------------------------------`);
+
+        if (!this.state.id) {
+            cli.output(`❌ ERROR: Database does not exist, cannot restore`);
+            throw new Error("Database does not exist, cannot restore");
+        }
+
+        // Extract and validate parameters
+        const sourceType = args?.sourceType as string;
+        const importFromUri = args?.importFromUri as string;
+
+        if (!sourceType || !importFromUri) {
+            cli.output(`❌ ERROR: Missing required parameters`);
+            cli.output(`Required parameters:`);
+            cli.output(`  - sourceType: Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)`);
+            cli.output(`  - importFromUri: URI to the backup file`);
+            cli.output(`--------------------------------------------------`);
+            cli.output(`Example usage:`);
+            cli.output(`  monk do <namespace>/<database> restore sourceType="aws-s3" importFromUri="s3://bucket/backup.rdb"`);
+            cli.output(`==================================================`);
+            throw new Error("Both sourceType and importFromUri are required parameters");
+        }
+
+        // Validate sourceType
+        const validSourceTypes = ['aws-s3', 'ftp', 'google-blob-storage', 'azure-blob-storage', 'redis', 'http'];
+        if (!validSourceTypes.includes(sourceType)) {
+            cli.output(`❌ ERROR: Invalid sourceType: ${sourceType}`);
+            cli.output(`Valid source types: ${validSourceTypes.join(', ')}`);
+            cli.output(`==================================================`);
+            throw new Error(`Invalid sourceType: ${sourceType}`);
+        }
+
+        // Display warning
+        cli.output(`⚠️  WARNING: DESTRUCTIVE OPERATION!`);
+        cli.output(`⚠️  This will OVERWRITE ALL EXISTING DATA in the database!`);
+        cli.output(`⚠️  Ensure you have a backup before proceeding.`);
+        cli.output(`--------------------------------------------------`);
+        cli.output(`Source Type: ${sourceType}`);
+        cli.output(`Import From: ${importFromUri}`);
+        cli.output(`--------------------------------------------------`);
+
+        try {
+            // Use the Essentials (fixed) endpoint for import
+            const endpoint = `/fixed/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}/import`;
+            cli.output(`Making request to: POST ${endpoint}`);
+            
+            const body = {
+                sourceType: sourceType,
+                importFromUri: [importFromUri]  // Must be an array
+            };
+            
+            cli.output(`Request body: ${JSON.stringify(body, null, 2)}`);
+            
+            const response = this.makeRequest("POST", endpoint, body);
+
+            cli.output(`Response received: ${JSON.stringify(response)}`);
+
+            if (response && response.taskId) {
+                cli.output(`--------------------------------------------------`);
+                cli.output(`✅ Import task created!`);
+                cli.output(`Task ID: ${response.taskId}`);
+                cli.output(`⏳ Waiting for import to complete...`);
+                cli.output(`Note: Large datasets may take several minutes to import.`);
+                
+                this.waitForTask(response.taskId);
+                
+                cli.output(`--------------------------------------------------`);
+                cli.output(`✅ RESTORE COMPLETED SUCCESSFULLY`);
+                cli.output(`Database: ${this.state.name}`);
+                cli.output(`Database ID: ${this.state.id}`);
+                cli.output(`Source: ${importFromUri}`);
+                cli.output(`Task ID: ${response.taskId}`);
+                cli.output(`==================================================`);
+            } else {
+                cli.output(`--------------------------------------------------`);
+                cli.output(`⚠️  WARNING: No task ID in response!`);
+                cli.output(`Response was: ${JSON.stringify(response)}`);
+                cli.output(`==================================================`);
+            }
+        } catch (error) {
+            cli.output(`--------------------------------------------------`);
+            cli.output(`❌ FAILED to restore database`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Failed to restore Essentials database ${this.state.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+    }
+
+    /**
+     * Helper method to display backup information
+     */
+    private displayBackups(backups: any[]): void {
+        if (backups.length === 0) {
+            cli.output(`--------------------------------------------------`);
+            cli.output(`ℹ️  No backups found for this database`);
+            cli.output(`==================================================`);
+        } else {
+            cli.output(`--------------------------------------------------`);
+            cli.output(`✅ Found ${backups.length} backup(s):`);
+            cli.output(`--------------------------------------------------`);
+            
+            backups.forEach((backup: any, index: number) => {
+                cli.output(`\n📦 Backup #${index + 1}:`);
+                if (backup.backupId) cli.output(`  ID: ${backup.backupId}`);
+                if (backup.status) cli.output(`  Status: ${backup.status}`);
+                if (backup.timestamp) cli.output(`  Timestamp: ${backup.timestamp}`);
+                if (backup.size) cli.output(`  Size: ${backup.size}`);
+                if (backup.path) cli.output(`  Path: ${backup.path}`);
+                if (backup.type) cli.output(`  Type: ${backup.type}`);
+            });
+            
+            cli.output(`\n==================================================`);
+        }
+    }
+
+    /**
+     * List all backups for this Essentials database
+     * 
+     * This action retrieves the list of available backups for the database.
+     * 
+     * @example
+     * ```bash
+     * monk do namespace/database-instance list-backups
+     * ```
+     */
+    @action()
+    listBackups(): void {
+        cli.output(`==================================================`);
+        cli.output(`📋 Listing backups for database: ${this.state.name}`);
+        cli.output(`==================================================`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`Subscription ID: ${this.definition.subscription_id}`);
+        
+        if (!this.state.id) {
+            cli.output(`ERROR: Database ID is not available`);
+            throw new Error("Database ID is not available. Cannot list backups.");
+        }
+
+        try {
+            const endpoint = `/fixed/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}/backup`;
+            cli.output(`Making request to: GET ${endpoint}`);
+            cli.output(`--------------------------------------------------`);
+            
+            const response = this.makeRequest("GET", endpoint);
+            
+            cli.output(`📥 Response received`);
+            
+            // Check if response is a task (async operation)
+            if (response && response.taskId) {
+                cli.output(`⏳ Backup listing is processing (Task ID: ${response.taskId})`);
+                cli.output(`Waiting for task to complete...`);
+                
+                const taskResult = this.waitForTask(response.taskId);
+                
+                cli.output(`--------------------------------------------------`);
+                
+                // Extract backup data from task result
+                if (taskResult && taskResult.response) {
+                    const backupData = taskResult.response;
+                    
+                    // Handle different response formats
+                    if (Array.isArray(backupData)) {
+                        this.displayBackups(backupData);
+                    } else if (backupData.backups && Array.isArray(backupData.backups)) {
+                        this.displayBackups(backupData.backups);
+                    } else if (backupData.resource && backupData.resource.lastBackupTime) {
+                        // Essentials database - shows last backup time only
+                        cli.output(`📦 Last backup time: ${backupData.resource.lastBackupTime}`);
+                        cli.output(`ℹ️  Note: Essentials databases only track the last backup time.`);
+                        cli.output(`   For detailed backup history, upgrade to a Pro subscription.`);
+                        cli.output(`==================================================`);
+                    } else {
+                        cli.output(`📋 Backup status:`);
+                        cli.output(JSON.stringify(taskResult.response, null, 2));
+                        cli.output(`==================================================`);
+                    }
+                } else {
+                    cli.output(`📋 Task completed but no backup data found in response`);
+                    cli.output(`Full task result:`);
+                    cli.output(JSON.stringify(taskResult, null, 2));
+                    cli.output(`==================================================`);
+                }
+            } else if (response && Array.isArray(response)) {
+                this.displayBackups(response);
+            } else if (response && response.backups && Array.isArray(response.backups)) {
+                this.displayBackups(response.backups);
+            } else {
+                cli.output(`--------------------------------------------------`);
+                cli.output(`📋 Backup information:`);
+                cli.output(JSON.stringify(response, null, 2));
+                cli.output(`==================================================`);
+            }
+        } catch (error) {
+            cli.output(`--------------------------------------------------`);
+            cli.output(`❌ FAILED TO LIST BACKUPS`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Failed to list backups for Essentials database ${this.state.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 } 

@@ -1,3 +1,4 @@
 REPO redis-cloud
-LOAD essentials-database.yaml pro-subscription.yaml base.yaml subscription.yaml essentials-subscription.yaml common.yaml pro-database.yaml
-RESOURCES common.js subscription-sync.js essentials-subscription-sync.js pro-subscription-sync.js essentials-database-sync.js base.js pro-database-sync.js
+VERSION_HASH daf4c6568d15
+LOAD essentials-database.yaml pro-subscription.yaml base.yaml essentials-subscription.yaml common.yaml pro-database.yaml
+RESOURCES common.js essentials-database.js essentials-subscription-sync.js pro-subscription-sync.js pro-database.js essentials-database-sync.js base.js pro-database-sync.js

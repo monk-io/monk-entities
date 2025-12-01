@@ -3,6 +3,7 @@ pro-subscription:
   defines: entity
   metadata:
     name: ProSubscription
+    version-hash: daf4c6568d15
   schema:
     account_key_secret:
       type: string
@@ -74,6 +75,21 @@ pro-subscription:
     payment_method_type:
       type: string
       description: Type of payment method to auto-select
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type:
+        - string
+        - number
+    ready:
+      type: boolean
+    name:
+      type: string
+    status:
+      type: string
+    payment_method_id:
+      type: number
   lifecycle:
     sync: <<< pro-subscription-sync.js
   checks:
