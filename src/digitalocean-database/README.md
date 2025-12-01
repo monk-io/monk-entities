@@ -6,7 +6,7 @@ This directory contains a TypeScript entity for managing DigitalOcean Database c
 
 - **Complete Lifecycle Management**: Create, update, delete, and manage DigitalOcean database clusters
 - **Provider Integration**: Automatic authentication using DigitalOcean provider (no manual secrets required)
-- **Multiple Database Engines**: Support for PostgreSQL, MySQL, Redis, MongoDB, Kafka, and OpenSearch
+- **Multiple Database Engines**: Support for PostgreSQL, MySQL, Valkey, MongoDB, Kafka, and OpenSearch
 - **Flexible Configuration**: Support for different cluster sizes, node counts, and engine-specific settings
 - **Custom Actions**: Built-in actions for database management (create/delete databases, get connection info)
 - **Error Handling**: Robust error handling with detailed error messages
@@ -16,7 +16,7 @@ This directory contains a TypeScript entity for managing DigitalOcean Database c
 
 - **PostgreSQL** (`pg`) - Versions 11, 12, 13, 14, 15, 16
 - **MySQL** (`mysql`) - Versions 5.7, 8.0
-- **Redis** (`redis`) - Versions 6, 7
+- **Valkey** (`valkey`) - Versions 7, 8 (Note: `redis` is accepted for backwards compatibility and maps to `valkey`)
 - **MongoDB** (`mongodb`) - Versions 4.4, 5.0, 6.0, 7.0
 - **Apache Kafka** (`kafka`) - Version 3.5
 - **OpenSearch** (`opensearch`) - Versions 1.x, 2.x
@@ -50,7 +50,7 @@ This directory contains a TypeScript entity for managing DigitalOcean Database c
 | Property | Type | Description |
 |----------|------|-------------|
 | `name` | string | Database cluster name (3-63 chars, alphanumeric and hyphens) |
-| `engine` | string | Database engine (pg, mysql, redis, mongodb, kafka, opensearch) |
+| `engine` | string | Database engine (pg, mysql, valkey, mongodb, kafka, opensearch) |
 | `num_nodes` | number | Number of nodes in the cluster (1-10) |
 | `region` | string | DigitalOcean region |
 | `size` | string | Database cluster size |
@@ -103,22 +103,24 @@ my-mysql-cluster:
     default_time_zone: "UTC"
 ```
 
-### Redis Cache (with Provider)
+### Valkey Cache (with Provider)
 
 ```yaml
 namespace: my-app
 
-my-redis:
+my-valkey:
   defines: digitalocean-database/database
   name: app-cache
-  engine: redis
-  version: "7"
+  engine: valkey
+  version: "8"
   num_nodes: 1
   region: fra1
   size: db-s-2vcpu-4gb
   db_config:
     redis_maxmemory_policy: "allkeys-lru"
 ```
+
+> **Note**: If you specify `engine: redis`, it will automatically be mapped to `valkey` for backwards compatibility.
 
 ### Using Custom API Token Secret (Legacy)
 

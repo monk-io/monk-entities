@@ -29,12 +29,12 @@ my-mysql-cluster:
     sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO"
     default_time_zone: "UTC"
 
-# Redis cache cluster
-my-redis-cache:
+# Valkey cache cluster (redis is mapped to valkey for backwards compatibility)
+my-valkey-cache:
   defines: digitalocean-database/database
-  name: my-redis-cache
+  name: my-valkey-cache
   engine: valkey
-  version: "7"
+  version: "8"
   num_nodes: 1
   region: fra1
   size: db-s-1vcpu-2gb
