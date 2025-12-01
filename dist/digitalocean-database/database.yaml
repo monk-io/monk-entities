@@ -3,7 +3,7 @@ database:
   defines: entity
   metadata:
     name: Database
-    version-hash: 69917c68b833
+    version-hash: 75465066b6b5
   schema:
     name:
       type: string
@@ -15,13 +15,12 @@ database:
       enum:
         - mysql
         - pg
-        - redis
         - mongodb
         - kafka
         - opensearch
         - valkey
       description: >-
-        The database engine to use (mysql, pg, redis, mongodb, kafka,
+        The database engine to use (mysql, pg, valkey, mongodb, kafka,
         opensearch)
     version:
       type: string

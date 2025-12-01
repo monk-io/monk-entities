@@ -1,15 +1,28 @@
 ---
 title: DigitalOcean Databases
-description: Managed Postgres, MySQL, MongoDB, Redis (Valkey).
+description: Managed Postgres, MySQL, MongoDB, Valkey, Kafka, and OpenSearch.
 website_url: https://docs.digitalocean.com/products/databases/
 docs_url: https://docs.digitalocean.com/reference/api/api-reference/#tag/Databases
 primary_category: database
-tags: [digitalocean, database, postgres, mysql, redis, mongodb]
+tags: [digitalocean, database, postgres, mysql, valkey, mongodb, kafka, opensearch]
 hosting_models: [managed]
 ---
 
 ## What is this integration?
 Provision and manage DigitalOcean managed databases.
+
+## Supported Engines
+
+| Engine | Slug | Versions |
+|--------|------|----------|
+| PostgreSQL | `pg` | 11, 12, 13, 14, 15, 16 |
+| MySQL | `mysql` | 5.7, 8.0 |
+| Valkey | `valkey` | 7, 8 |
+| MongoDB | `mongodb` | 4.4, 5.0, 6.0, 7.0 |
+| Apache Kafka | `kafka` | 3.5 |
+| OpenSearch | `opensearch` | 1.x, 2.x |
+
+> **Note:** Redis has been replaced by Valkey on DigitalOcean. If you want to use Redis, use `valkey` as the engine instead. For backwards compatibility, specifying `engine: redis` will automatically be mapped to `valkey`.
 
 ## What Monk manages
 - Database clusters and configuration

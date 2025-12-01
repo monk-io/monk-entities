@@ -23,7 +23,7 @@ export interface DatabaseDefinition extends DOProviderDefinitionBase {
 
     /**
      * Database engine type
-     * @description The database engine to use (mysql, pg, redis, mongodb, kafka, opensearch)
+     * @description The database engine to use (mysql, pg, valkey, mongodb, kafka, opensearch)
      */
     engine: DatabaseEngine;
 
