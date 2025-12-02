@@ -1,0 +1,193 @@
+---
+namespace: ses-example-direct
+
+# IAM Group for SES senders
+ses-sender-group:
+  defines: entity-instance
+  entity: aws-iam/iam-group
+  metadata:
+    name: ses-senders
+    description: IAM group for SES email senders
+  variables:
+    group_name: ses-senders
+    group_path: /
+
+# IAM Policy for SES sending permissions
+ses-sender-policy:
+  defines: entity-instance
+  entity: aws-iam/iam-policy
+  metadata:
+    name: ses-sender-policy
+    description: Policy allowing SES email sending
+  variables:
+    policy_name: ses-sender-policy
+    policy_path: /
+    policy_description: Allows sending emails via AWS SES
+    policy_document:
+      Version: "2012-10-17"
+      Statement:
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            - ses:GetEmailIdentity
+            - ses:GetAccount
+            - ses:ListEmailIdentities
+          Resource: "*"
+          Condition:
+            StringLike:
+              ses:FromAddress:
+                - "sender@example.com"
+                - "*@example.com"
+
+# IAM User for SES sending
+ses-sender-user:
+  defines: entity-instance
+  entity: aws-iam/iam-user
+  metadata:
+    name: ses-sender-user
+    description: IAM user for SES email sending
+  variables:
+    user_name: ses-sender-user
+    user_path: /
+    create_access_key: true
+    access_key_secret_ref: ses-sender-access-key
+    secret_key_secret_ref: ses-sender-secret-access-key
+    smtp_password_secret_ref: ses-sender-smtp-password
+    permitted_secrets:
+      - ses-sender-access-key
+      - ses-sender-secret-access-key
+      - ses-sender-smtp-password
+  connections:
+    iam-group:
+      entity: <- get-hostname("ses-example-direct/ses-sender-group", "")
+      user: <- connection-user("ses-example-direct/ses-sender-group")
+
+# Attach policy to group
+policy-group-attachment:
+  defines: entity-instance
+  entity: aws-iam/iam-policy-group-attachment
+  metadata:
+    name: ses-sender-policy-attachment
+    description: Attaches SES sender policy to group
+  connections:
+    iam-group:
+      entity: <- get-hostname("ses-example-direct/ses-sender-group", "")
+      user: <- connection-user("ses-example-direct/ses-sender-group")
+    iam-policy:
+      entity: <- get-hostname("ses-example-direct/ses-sender-policy", "")
+      user: <- connection-user("ses-example-direct/ses-sender-policy")
+
+# Email identity for sender@example.com
+sender-email:
+  defines: entity-instance
+  entity: aws-ses/ses-email-identity
+  metadata:
+    name: sender-email-identity
+    description: Email identity for sender@example.com
+  variables:
+    email: sender@example.com
+    region: us-east-1
+
+# Domain identity for example.com
+sender-domain:
+  defines: entity-instance
+  entity: aws-ses/ses-domain-identity
+  metadata:
+    name: sender-domain-identity
+    description: Domain identity for example.com
+  variables:
+    domain_name: example.com
+    region: us-east-1
+    dkim_signing_enabled: true
+    mail_from_domain: mail.example.com
+
+# Demo container that sends email via SMTP
+ses-sender-demo:
+  defines: runnable
+  metadata:
+    name: SES Sender Demo
+    description: Demo container that sends email via SMTP on startup
+    website: https://aws.amazon.com/ses/
+    publisher: monk.io
+    icon: https://assets.monk.io/icons/aws.png
+  connections:
+    iam-user:
+      entity: <- get-hostname("ses-example-direct/ses-sender-user", "")
+      user: <- connection-user("ses-example-direct/ses-sender-user")
+    email-identity:
+      entity: <- get-hostname("ses-example-direct/sender-email", "")
+      user: <- connection-user("ses-example-direct/sender-email")
+    domain-identity:
+      entity: <- get-hostname("ses-example-direct/sender-domain", "")
+      user: <- connection-user("ses-example-direct/sender-domain")
+  containers:
+    alpine:
+      image: alpine:latest
+      bash: |
+        set -e
+        
+        echo "Installing curl..."
+        apk add --no-cache curl
+        
+        echo "Sending email via SMTP..."
+        
+        # SMTP server details
+        SMTP_HOST="email-smtp.${AWS_REGION}.amazonaws.com"
+        SMTP_PORT="587"
+        FROM_EMAIL="sender@example.com"
+        TO_EMAIL="recipient@example.com"
+        SUBJECT="Test Email from Monk SES Demo"
+        BODY="This is a test email sent from Monk using AWS SES SMTP interface."
+        
+        # Create email message
+        cat > /tmp/email.txt << 'EMAILEOF'
+        From: ${FROM_EMAIL}
+        To: ${TO_EMAIL}
+        Subject: ${SUBJECT}
+        
+        ${BODY}
+        EMAILEOF
+        
+        # Send email using curl
+        curl -v --ssl-reqd \
+          --url "smtp://${SMTP_HOST}:${SMTP_PORT}" \
+          --user "${AWS_ACCESS_KEY_ID}:${AWS_SMTP_PASSWORD}" \
+          --mail-from "${FROM_EMAIL}" \
+          --mail-rcpt "${TO_EMAIL}" \
+          --upload-file /tmp/email.txt
+        
+        echo "Email sent successfully!"
+        echo "Check your inbox at ${TO_EMAIL}"
+        
+        # Exit after sending
+        exit 0
+  variables:
+    aws_access_key_id:
+      type: string
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret-get("ses-sender-access-key")
+    aws_smtp_password:
+      type: string
+      env: AWS_SMTP_PASSWORD
+      value: <- secret-get("ses-sender-smtp-password")
+    aws_region:
+      type: string
+      env: AWS_REGION
+      value: us-east-1
+
+# Stack that runs everything together
+direct-access-stack:
+  defines: process-group
+  metadata:
+    name: SES Direct Access Stack
+    description: Complete SES sender setup with IAM and email sending demo
+  runnable-list:
+    - ses-example-direct/ses-sender-group
+    - ses-example-direct/ses-sender-policy
+    - ses-example-direct/ses-sender-user
+    - ses-example-direct/policy-group-attachment
+    - ses-example-direct/sender-email
+    - ses-example-direct/sender-domain
+    - ses-example-direct/ses-sender-demo
+
