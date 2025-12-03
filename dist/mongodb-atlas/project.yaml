@@ -3,7 +3,7 @@ project:
   defines: entity
   metadata:
     name: Project
-    version-hash: 509e75d40b51
+    version-hash: b5c32c0d4d26
   schema:
     secret_ref:
       type: string
@@ -39,6 +39,13 @@ project:
       description: Project Name
   lifecycle:
     sync: <<< project-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 12
+    liveness:
+      period: 300
   requires:
     - mongodb-atlas/base
     - mongodb-atlas/common

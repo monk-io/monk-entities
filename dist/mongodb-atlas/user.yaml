@@ -3,7 +3,7 @@ user:
   defines: entity
   metadata:
     name: User
-    version-hash: 509e75d40b51
+    version-hash: b5c32c0d4d26
   schema:
     secret_ref:
       type: string
@@ -63,6 +63,13 @@ user:
       description: User roles
   lifecycle:
     sync: <<< user-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
   requires:
     - mongodb-atlas/base
     - secret

@@ -52,19 +52,21 @@ function getToken(secretRef) {
     cachedToken = import_secret.default.get(secretRef + "_cached_token");
     cachedTokenExpires = import_secret.default.get(secretRef + "_cached_token_expires");
     cachedSecretHash = import_secret.default.get(secretRef + "_cached_secret_hash");
-  } catch (e) {
+  } catch (_e) {
     cachedToken = void 0;
     cachedTokenExpires = void 0;
     cachedSecretHash = void 0;
   }
-  const serviceAccountToken = import_secret.default.get(secretRef);
-  if (!serviceAccountToken) {
-    throw new Error(`Failed to retrieve MongoDB Atlas service account token from secret: ${secretRef}`);
+  const serviceAccountCreds = import_secret.default.get(secretRef);
+  if (!serviceAccountCreds) {
+    throw new Error(`Failed to retrieve MongoDB Atlas service account credentials from secret: ${secretRef}`);
   }
-  if (!serviceAccountToken.startsWith("mdb_sa_id")) {
-    throw new Error("Token is not a service account token");
+  if (!serviceAccountCreds.includes(":")) {
+    throw new Error(
+      `Service account credentials must be in format 'clientId:clientSecret'. Get these from MongoDB Atlas: Organization Settings \u2192 Access Manager \u2192 Service Accounts \u2192 Generate Token`
+    );
   }
-  const currentSecretHash = import_crypto.default.sha256(serviceAccountToken);
+  const currentSecretHash = import_crypto.default.sha256(serviceAccountCreds);
   if (cachedToken && cachedTokenExpires && cachedSecretHash) {
     const expires = new Date(cachedTokenExpires);
     if (now < expires && cachedSecretHash === currentSecretHash) {
@@ -73,7 +75,7 @@ function getToken(secretRef) {
   }
   const headers = {
     "Accept": "application/json",
-    "Authorization": "Basic " + btoa(serviceAccountToken),
+    "Authorization": "Basic " + btoa(serviceAccountCreds),
     "Content-Type": "application/x-www-form-urlencoded",
     "Cache-Control": "no-cache"
   };

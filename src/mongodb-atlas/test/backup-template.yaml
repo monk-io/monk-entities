@@ -1,0 +1,78 @@
+namespace: mongodb-backup-test
+
+# Backup Test Environment
+# This template creates a dedicated M10 cluster for testing backup operations
+# NOTE: M10 clusters incur costs. Use only for testing and clean up afterwards.
+
+backup-project:
+  defines: mongodb-atlas/project
+  name: monkec-backup-test-project
+  organization: Monk
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+
+backup-cluster:
+  defines: mongodb-atlas/cluster
+  name: monkec-backup-test-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_WEST_2
+  instance_size: M10  # M10 required for backup operations
+  secret_ref: mongodb-atlas-token
+  allow_ips:
+    - 0.0.0.0/0  # Allow all IPs for testing
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-backup-test/backup-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-backup-test/backup-project
+      timeout: 120
+
+# Optional: Shared tier cluster for testing validation
+# Uncomment to test backup validation on shared tiers
+# backup-shared-cluster:
+#   defines: mongodb-atlas/cluster
+#   name: monkec-shared-test-cluster
+#   project_id: <- connection-target("project") entity-state get-member("id")
+#   provider: AWS
+#   region: US_WEST_2
+#   instance_size: M0  # Shared tier - backups not supported
+#   secret_ref: mongodb-atlas-token
+#   allow_ips:
+#     - 0.0.0.0/0
+#   permitted-secrets:
+#     mongodb-atlas-token: true
+#   services:
+#     data:
+#       protocol: custom
+#   connections:
+#     project:
+#       runnable: mongodb-backup-test/backup-project
+#       service: data
+#   depends:
+#     wait-for:
+#       runnables:
+#         - mongodb-backup-test/backup-project
+#       timeout: 120
+
+# Stack Definition
+
+backup-stack:
+  defines: process-group
+  runnable-list:
+    - mongodb-backup-test/backup-project
+    - mongodb-backup-test/backup-cluster
+    # - mongodb-backup-test/backup-shared-cluster  # Uncomment for validation testing
+
