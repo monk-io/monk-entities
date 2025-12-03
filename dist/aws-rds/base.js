@@ -770,6 +770,205 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     };
     return portMap[engine.toLowerCase()] || 3306;
   }
+  // ==================== Snapshot Operations ====================
+  /**
+   * List DB snapshots for an instance
+   * @param dbInstanceIdentifier - Optional: filter by instance identifier
+   * @param snapshotType - Optional: 'manual', 'automated', or 'shared'
+   */
+  listDBSnapshots(dbInstanceIdentifier, snapshotType) {
+    const params = {};
+    if (dbInstanceIdentifier) {
+      params.DBInstanceIdentifier = dbInstanceIdentifier;
+    }
+    if (snapshotType) {
+      params.SnapshotType = snapshotType;
+    }
+    const response = this.makeSnapshotRequest("DescribeDBSnapshots", params);
+    return this.parseSnapshotsFromResponse(response);
+  }
+  /**
+   * Get details of a specific snapshot
+   * @param snapshotIdentifier - The snapshot identifier
+   */
+  describeDBSnapshot(snapshotIdentifier) {
+    try {
+      const params = {
+        DBSnapshotIdentifier: snapshotIdentifier
+      };
+      const response = this.makeSnapshotRequest("DescribeDBSnapshots", params);
+      const snapshots = this.parseSnapshotsFromResponse(response);
+      return snapshots.length > 0 ? snapshots[0] : null;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("DBSnapshotNotFound")) {
+        return null;
+      }
+      throw error;
+    }
+  }
+  /**
+   * Delete a manual DB snapshot
+   * @param snapshotIdentifier - The snapshot identifier to delete
+   */
+  deleteDBSnapshot(snapshotIdentifier) {
+    this.makeSnapshotRequest("DeleteDBSnapshot", {
+      DBSnapshotIdentifier: snapshotIdentifier
+    });
+  }
+  /**
+   * Create a manual DB snapshot
+   * @param dbInstanceIdentifier - The DB instance identifier
+   * @param snapshotIdentifier - The snapshot identifier
+   * @param tags - Optional tags for the snapshot
+   */
+  createDBSnapshot(dbInstanceIdentifier, snapshotIdentifier, tags) {
+    const params = {
+      DBInstanceIdentifier: dbInstanceIdentifier,
+      DBSnapshotIdentifier: snapshotIdentifier
+    };
+    if (tags && Object.keys(tags).length > 0) {
+      const tagList = [];
+      Object.entries(tags).forEach(([key, value]) => {
+        tagList.push({ Key: key, Value: value });
+      });
+      params.Tags = tagList;
+    }
+    const response = this.makeSnapshotRequest("CreateDBSnapshot", params);
+    const snapshots = this.parseSnapshotsFromResponse(response);
+    return snapshots.length > 0 ? snapshots[0] : {
+      db_snapshot_identifier: snapshotIdentifier,
+      db_instance_identifier: dbInstanceIdentifier,
+      status: "creating"
+    };
+  }
+  /**
+   * Parse snapshot information from RDS API XML response
+   */
+  parseSnapshotsFromResponse(response) {
+    const snapshots = [];
+    if (response.DBSnapshot) {
+      snapshots.push(this.parseSnapshotObject(response.DBSnapshot));
+      return snapshots;
+    }
+    if (response.DBSnapshots && Array.isArray(response.DBSnapshots)) {
+      for (const snapshot of response.DBSnapshots) {
+        snapshots.push(this.parseSnapshotObject(snapshot));
+      }
+    }
+    return snapshots;
+  }
+  parseSnapshotObject(snapshot) {
+    return {
+      db_snapshot_identifier: snapshot.DBSnapshotIdentifier,
+      db_instance_identifier: snapshot.DBInstanceIdentifier,
+      snapshot_create_time: snapshot.SnapshotCreateTime,
+      engine: snapshot.Engine,
+      engine_version: snapshot.EngineVersion,
+      status: snapshot.Status,
+      allocated_storage: snapshot.AllocatedStorage ? parseInt(snapshot.AllocatedStorage) : void 0,
+      availability_zone: snapshot.AvailabilityZone,
+      vpc_id: snapshot.VpcId,
+      snapshot_type: snapshot.SnapshotType,
+      percent_progress: snapshot.PercentProgress ? parseInt(snapshot.PercentProgress) : void 0,
+      storage_type: snapshot.StorageType,
+      encrypted: snapshot.Encrypted === "true" || snapshot.Encrypted === true,
+      kms_key_id: snapshot.KmsKeyId,
+      db_snapshot_arn: snapshot.DBSnapshotArn
+    };
+  }
+  /**
+   * Override makeRDSRequest to handle snapshot responses
+   */
+  parseSnapshotXmlResponse(xmlBody) {
+    const result = {};
+    const snapshotsMatch = /<DBSnapshots>(.*?)<\/DBSnapshots>/s.exec(xmlBody);
+    if (snapshotsMatch) {
+      result.DBSnapshots = [];
+      const snapshotMatches = snapshotsMatch[1].match(/<DBSnapshot>(.*?)<\/DBSnapshot>/gs);
+      if (snapshotMatches) {
+        for (const snapshotXml of snapshotMatches) {
+          result.DBSnapshots.push(this.parseSnapshotXml(snapshotXml));
+        }
+      }
+      return result;
+    }
+    const singleSnapshotMatch = /<DBSnapshot>(.*?)<\/DBSnapshot>/s.exec(xmlBody);
+    if (singleSnapshotMatch) {
+      result.DBSnapshot = this.parseSnapshotXml(singleSnapshotMatch[0]);
+      return result;
+    }
+    return result;
+  }
+  parseSnapshotXml(snapshotXml) {
+    const snapshot = {};
+    const fields = [
+      "DBSnapshotIdentifier",
+      "DBInstanceIdentifier",
+      "SnapshotCreateTime",
+      "Engine",
+      "EngineVersion",
+      "Status",
+      "AllocatedStorage",
+      "AvailabilityZone",
+      "VpcId",
+      "SnapshotType",
+      "PercentProgress",
+      "StorageType",
+      "Encrypted",
+      "KmsKeyId",
+      "DBSnapshotArn",
+      "MasterUsername",
+      "Port",
+      "InstanceCreateTime",
+      "OptionGroupName",
+      "SourceRegion",
+      "SourceDBSnapshotIdentifier"
+    ];
+    for (const field of fields) {
+      const match = new RegExp(`<${field}>(.*?)</${field}>`).exec(snapshotXml);
+      if (match) {
+        snapshot[field] = match[1];
+      }
+    }
+    return snapshot;
+  }
+  /**
+   * Enhanced RDS request that handles snapshot responses
+   */
+  makeSnapshotRequest(action, params = {}) {
+    const url = `https://rds.${this.region}.amazonaws.com/`;
+    const formParams = {
+      "Action": action,
+      "Version": "2014-10-31"
+    };
+    addParamsToFormData(formParams, params);
+    const formBody = Object.entries(formParams).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+    const response = import_aws2.default.post(url, {
+      service: "rds",
+      region: this.region,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: formBody
+    });
+    if (response.statusCode >= 400) {
+      let errorMessage = `AWS RDS API error: ${response.statusCode} ${response.status}`;
+      try {
+        const errorMatch = /<Message>(.*?)<\/Message>/.exec(response.body);
+        if (errorMatch) {
+          errorMessage += ` - ${errorMatch[1]}`;
+        }
+        const codeMatch = /<Code>(.*?)<\/Code>/.exec(response.body);
+        if (codeMatch) {
+          errorMessage += ` (${codeMatch[1]})`;
+        }
+      } catch (_parseError) {
+        errorMessage += ` - Raw: ${response.body}`;
+      }
+      throw new Error(errorMessage);
+    }
+    return this.parseSnapshotXmlResponse(response.body);
+  }
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
