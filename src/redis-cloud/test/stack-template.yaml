@@ -1,0 +1,225 @@
+namespace: redis-cloud-example
+
+essentials-subscription:
+  defines: redis-cloud/essentials-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Essentials-Subscription
+  #plan_id: 20927 # 30MB Free AWS us-east-1
+  size: 30
+  provider: AWS
+  region: us-east-1
+  redis_flex: false
+  availability: No replication
+  support_data_persistence: false
+  support_instant_and_daily_backups: false
+  support_replication: false
+  support_clustering: false
+  support_ssl: false
+  #  payment_method: credit-card # Payment info is not allowed for free plans
+  #  payment_method_id: 42073
+  #  OR
+  #  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    subscription:
+      protocol: custom
+
+pro-subscription:
+  defines: redis-cloud/pro-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Pro-Subscription
+  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    subscription:
+      protocol: custom
+
+# Essentials Database - Free tier testing
+essentials-database:
+  defines: redis-cloud/essentials-database
+  subscription_id: <- connection-target("subscription") entity-state get-member("id")
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  password_secret_ref: redis-cloud-db-password
+  name: Essentials-database
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+    redis-cloud-db-password: true
+  services:
+    db:
+      protocol: custom
+  connections:
+    subscription:
+      runnable: redis-cloud-example/essentials-subscription
+      service: subscription
+  depends:
+    wait-for:
+      runnables:
+        - redis-cloud-example/essentials-subscription
+      timeout: 60
+
+
+# Pro Database - Advanced features testing
+dev-pro-database:
+  defines: redis-cloud/pro-database
+  name: monkec-dev-pro
+  subscription_id: <- connection-target("subscription") entity-state get-member("id")
+  protocol: redis
+  dataset_size_in_gb: 0.1
+  redis_version: "7.2"
+  resp_version: resp3
+  support_oss_cluster_api: false
+  data_persistence: none
+  data_eviction_policy: volatile-lru
+  replication: false
+  password: "dev-pro-password-456"
+  source_ip:
+    - 0.0.0.0/0  # Allow all IPs for testing
+  enable_tls: false
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    subscription:
+      runnable: redis-cloud-example/pro-subscription
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - redis-cloud-example/pro-subscription
+      timeout: 300
+
+
+# Stack Definitions - Process Groups
+
+essentials-stack:
+  defines: process-group
+  runnable-list:
+    - redis-cloud-example/essentials-subscription
+    - redis-cloud-example/essentials-database
+    - redis-cloud-example/essentials-connection-test
+
+
+pro-stack:
+  defines: process-group
+  runnable-list:
+    - redis-cloud-example/pro-subscription
+
+essentials-connection-test:
+  defines: runnable
+  permitted-secrets:
+    redis-cloud-db-password: true
+  connections:
+    db:
+      runnable: redis-cloud-example/essentials-database
+      service: db
+  depends:
+    wait-for:
+      runnables:
+        - redis-cloud-example/essentials-database
+      timeout: 180
+  variables:
+    redis_db:
+      env: REDIS_DB
+      value: <- connection-target("db") entity get-member("name")
+      type: string
+    redis_password_secret:
+      value: <- connection-target("db") entity get-member("password_secret_ref")
+      type: string
+    redis_password:
+      env: REDIS_PASSWORD
+      value: <- secret("redis-cloud-db-password")
+      type: string
+    redis_user:
+      env: REDIS_USER
+      value: <- connection-target("db") entity-state get-member("username")
+      type: string
+    redis_addr:
+      env: REDIS_ADDR
+      value: <- connection-target("db") entity-state get-member("publicEndpoint")
+      type: string
+    redis_host:
+      env: REDIS_HOST
+      value: <- connection-target("db") entity-state get-member("publicEndpointHost")
+      type: string
+    redis_port:
+      env: REDIS_PORT
+      value: <- connection-target("db") entity-state get-member("publicEndpointPort")
+      type: string
+  containers:
+    redis-test:
+      image: redis:7-alpine
+      restart: no
+      bash: |
+        echo "Testing Redis Cloud Essentials connection..."
+        echo "Host: $REDIS_HOST"
+        echo "Port: $REDIS_PORT"
+        
+        # Test connection using redis-cli
+        redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning ping
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Connected to Redis Cloud Essentials successfully!"
+          echo "✅ Redis Cloud Essentials test completed successfully!"
+        else
+          echo "❌ Failed to connect to Redis Cloud Essentials"
+          exit 1
+        fi
+
+dev-pro-connection-test:
+  defines: runnable
+  connections:
+    db:
+      runnable: redis-test-stack/dev-pro-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - redis-test-stack/dev-pro-database
+      timeout: 600
+  variables:
+    redis_endpoint:
+      env: REDIS_ENDPOINT
+      value: <- connection-target("db") entity-state get-member("public_endpoint")
+      type: string
+    redis_password:
+      env: REDIS_PASSWORD
+      value: <- connection-target("db") entity-state get-member("password")
+      type: string
+  containers:
+    redis-test:
+      image: redis:7-alpine
+      restart: no
+      bash: |
+        echo "Testing Redis Cloud Pro connection..."
+        echo "Endpoint: $REDIS_ENDPOINT"
+        
+        # Extract host and port from endpoint
+        REDIS_HOST=$(echo "$REDIS_ENDPOINT" | cut -d':' -f1)
+        REDIS_PORT=$(echo "$REDIS_ENDPOINT" | cut -d':' -f2)
+        
+        echo "Host: $REDIS_HOST"
+        echo "Port: $REDIS_PORT"
+        
+        # Test connection using redis-cli
+        redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning ping
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Connected to Redis Cloud Pro successfully!"
+          echo "✅ Redis Cloud Pro test completed successfully!"
+        else
+          echo "❌ Failed to connect to Redis Cloud Pro"
+          exit 1
+        fi 

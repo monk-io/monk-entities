@@ -1,0 +1,34 @@
+namespace: ses-example
+
+# Example 1: Email Identity
+email-identity:
+  defines: aws-ses/email-identity
+  region: us-east-1
+  email_address: noreply@example.com
+  dkim_signing_enabled: true
+
+# Example 2: Domain Identity with full configuration
+domain-identity:
+  defines: aws-ses/domain-identity
+  region: us-east-1
+  domain_name: example.com
+  dkim_signing_enabled: true
+  mail_from_domain: mail.example.com
+  mail_from_behavior_on_mx_failure: UseDefaultValue
+
+# Example 3: Configuration Set
+configuration-set:
+  defines: aws-ses/configuration-set
+  depends:
+    wait-for:
+      runnables:
+        - ses-example/domain-identity
+  region: us-east-1
+  configuration_set_name: production-emails
+  reputation_metrics_enabled: true
+  sending_enabled: true
+  tls_policy: REQUIRE
+  suppression_list_reasons:
+    - BOUNCE
+    - COMPLAINT
+

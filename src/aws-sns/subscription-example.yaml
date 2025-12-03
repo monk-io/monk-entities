@@ -1,0 +1,91 @@
+# SNS Subscription Example
+# Demonstrates subscribing to an SNS topic
+
+namespace: sns-subscription-demo
+
+# SNS Topic
+my-topic:
+  defines: aws-sns/sns-topic
+  region: us-east-1
+  topic_name: my-demo-topic
+  display_name: My Demo Topic
+  services:
+    topic:
+      protocol: custom
+  tags:
+    Environment: demo
+    ManagedBy: monk
+
+# Email Subscription
+email-subscription:
+  defines: aws-sns/sns-subscription
+  region: us-east-1
+  topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
+  protocol: email
+  endpoint: your-email@example.com
+  connections:
+    topic:
+      runnable: sns-subscription-demo/my-topic
+      service: topic
+  depends:
+    wait-for:
+      runnables:
+        - sns-subscription-demo/my-topic
+      timeout: 60
+
+# SQS Queue (requires aws-sqs module)
+# my-queue:
+#   defines: aws-sqs/sqs-queue
+#   region: us-east-1
+#   queue_name: my-demo-queue
+
+# SQS Subscription (requires queue above)
+# sqs-subscription:
+#   defines: aws-sns/sns-subscription
+#   region: us-east-1
+#   topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
+#   protocol: sqs
+#   endpoint: <- connection-target("queue") entity-state get-member("queue_arn")
+#   raw_message_delivery: true
+#   filter_policy: |
+#     {
+#       "event_type": ["order", "payment"]
+#     }
+#   connections:
+#     topic:
+#       runnable: sns-subscription-demo/my-topic
+#       service: topic
+#     queue:
+#       runnable: sns-subscription-demo/my-queue
+#       service: queue
+#   depends:
+#     wait-for:
+#       runnables:
+#         - sns-subscription-demo/my-topic
+#         - sns-subscription-demo/my-queue
+#       timeout: 60
+
+# HTTP/HTTPS Subscription
+# http-subscription:
+#   defines: aws-sns/sns-subscription
+#   region: us-east-1
+#   topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
+#   protocol: https
+#   endpoint: https://your-domain.com/sns-webhook
+#   connections:
+#     topic:
+#       runnable: sns-subscription-demo/my-topic
+#       service: topic
+#   depends:
+#     wait-for:
+#       runnables:
+#         - sns-subscription-demo/my-topic
+#       timeout: 60
+
+# Stack
+subscription-stack:
+  defines: process-group
+  runnable-list:
+    - sns-subscription-demo/my-topic
+    - sns-subscription-demo/email-subscription
+

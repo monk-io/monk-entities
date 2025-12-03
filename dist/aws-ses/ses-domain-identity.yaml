@@ -1,0 +1,77 @@
+namespace: aws-ses
+ses-domain-identity:
+  defines: entity
+  metadata:
+    name: SESDomainIdentity
+    version-hash: 162f303faa27
+  schema:
+    region:
+      type: string
+      description: AWS region for SES operations
+    domain_name:
+      type: string
+      description: Domain name to verify and use for sending
+    dkim_signing_enabled:
+      type: boolean
+      description: Enable DKIM signing for this domain
+    mail_from_domain:
+      type: string
+      description: Custom MAIL FROM domain (subdomain of main domain)
+    mail_from_behavior_on_mx_failure:
+      type: string
+      enum:
+        - UseDefaultValue
+        - RejectMessage
+      description: Behavior when MX record not found (UseDefaultValue or RejectMessage)
+    required:
+      - region
+      - domain_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    domain_name:
+      type: string
+      description: Domain name identity
+    verification_status:
+      type: string
+      enum:
+        - PENDING
+        - SUCCESS
+        - FAILED
+        - TEMPORARY_FAILURE
+        - NOT_STARTED
+      description: Current verification status
+    verified:
+      type: boolean
+      description: Whether the domain is verified
+    dkim_status:
+      type: string
+      description: DKIM signing status
+    dkim_tokens:
+      type: array
+      items:
+        type: string
+      description: DKIM tokens for DNS configuration
+    verification_token:
+      type: string
+      description: Domain verification token for DNS TXT record
+    required:
+      - existing
+  lifecycle:
+    sync: <<< ses-domain-identity-sync.js
+    get-verification-status: ''
+    get-dns-records: ''
+    send-test-email: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 40
+    liveness:
+      period: 300
+  requires:
+    - aws-ses/base
+    - monkec/base
+    - cli
+    - aws-ses/common

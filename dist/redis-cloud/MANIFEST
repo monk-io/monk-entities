@@ -1,0 +1,3 @@
+REPO redis-cloud
+LOAD essentials-database.yaml pro-subscription.yaml base.yaml subscription.yaml essentials-subscription.yaml common.yaml pro-database.yaml
+RESOURCES common.js subscription-sync.js essentials-subscription-sync.js pro-subscription-sync.js essentials-database-sync.js base.js pro-database-sync.js

@@ -1,0 +1,33 @@
+namespace: ses-demo
+
+# Demo Email Identity Configuration
+demo-email:
+  defines: aws-ses/ses-email-identity
+  region: us-east-1
+  email_address: ivan@monk.io
+  dkim_signing_enabled: true
+
+# Demo Domain Identity Configuration
+demo-domain:
+  defines: aws-ses/ses-domain-identity
+  region: us-east-1
+  domain_name: demo.monk.io
+  dkim_signing_enabled: true
+  mail_from_domain: mail.demo.monk.io
+  mail_from_behavior_on_mx_failure: UseDefaultValue
+
+# Demo Configuration Set
+demo-config:
+  defines: aws-ses/ses-configuration-set
+  depends:
+    wait-for:
+      runnables:
+        - ses-demo/demo-domain
+  region: us-east-1
+  configuration_set_name: demo-emails
+  reputation_metrics_enabled: true
+  sending_enabled: true
+  tls_policy: REQUIRE
+  suppression_list_reasons:
+    - BOUNCE
+    - COMPLAINT

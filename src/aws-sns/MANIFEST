@@ -1,0 +1,14 @@
+namespace: aws-sns
+
+topic:
+  defines: entity
+  source: topic.yaml
+
+sns-topic:
+  defines: entity
+  source: sns-topic.yaml
+
+sns-subscription:
+  defines: entity
+  source: sns-subscription.yaml
+

@@ -1,0 +1,7 @@
+namespace: aws-sns
+
+base:
+  defines: module
+  metadata:
+    version-hash: e5180a8db1ca
+  source: <<< base.js

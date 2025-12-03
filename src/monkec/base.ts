@@ -15,8 +15,9 @@ export type Args = Record<string, string>;
 
 export type Metadata = Record<string, string>;
 
-// Symbol to store action metadata
-const ACTION_METADATA_KEY = Symbol("monk:actions");
+// Symbol to store action metadata - use Symbol.for() to ensure the same symbol
+// is used across all module loads (Goja runtime may not cache modules)
+const ACTION_METADATA_KEY = Symbol.for("monk:actions");
 
 // Convert camelCase to kebab-case
 function camelToKebab(str: string): string {

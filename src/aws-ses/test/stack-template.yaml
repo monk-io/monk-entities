@@ -1,0 +1,28 @@
+namespace: aws-ses-test
+
+# Email identity for testing
+test-email:
+  defines: aws-ses/email-identity
+  region: us-east-1
+  email_address: <- $TEST_EMAIL_ADDRESS default("test@example.com")
+  dkim_signing_enabled: false
+
+# Domain identity for testing
+test-domain:
+  defines: aws-ses/domain-identity
+  region: us-east-1
+  domain_name: monk-test-ses.example.com
+  dkim_signing_enabled: true
+
+# Configuration set for testing
+test-config-set:
+  defines: aws-ses/configuration-set
+  region: us-east-1
+  configuration_set_name: monk-test-config
+  reputation_metrics_enabled: true
+  sending_enabled: true
+  tls_policy: OPTIONAL
+  suppression_list_reasons:
+    - BOUNCE
+    - COMPLAINT
+
