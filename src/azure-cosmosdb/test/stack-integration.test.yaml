@@ -1,0 +1,23 @@
+name: Azure Cosmos DB Database Account Integration Test
+
+timeout: 900000
+
+setup:
+  - { action: load, target: dist/input/azure-cosmosdb/MANIFEST, expect: { exitCode: 0 } }
+  - { action: load, target: test/stack-template.yaml, expect: { exitCode: 0 } }
+
+tests:
+  # Test database account creation
+  - { action: run, target: azure-cosmosdb-test/database-account, expect: { exitCode: 0 } }
+  
+  # Wait for database account to be ready
+  - { action: wait, target: azure-cosmosdb-test/database-account, waitFor: { condition: ready, timeout: 600000 } }
+  
+  # Test database account update (should be idempotent)
+  - { action: run, target: azure-cosmosdb-test/database-account, expect: { exitCode: 0 } }
+
+  # Verify the account is still ready after update
+  - { action: wait, target: azure-cosmosdb-test/database-account, waitFor: { condition: ready, timeout: 180000 } }
+
+cleanup:
+  - { action: delete, target: azure-cosmosdb-test/database-account, expect: { exitCode: 0 } }

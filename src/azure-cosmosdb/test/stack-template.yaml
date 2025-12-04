@@ -1,0 +1,33 @@
+namespace: azure-cosmosdb-test
+
+# Test Cosmos DB Database Account
+database-account:
+  defines: azure-cosmosdb/database-account
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  account_name: monk-test-cosmos-db
+  locations:
+    - location_name: East US
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: Session
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: Enabled
+  tags:
+    Environment: Test
+    ManagedBy: MonkEC
+
+# Data service provider for connections
+data-provider:
+  defines: runnable
+  containers:
+    provider:
+      image: alpine:latest
+      bash: |
+        echo "Data provider ready"
+        sleep 3600
+  services:
+    data:
+      protocol: custom

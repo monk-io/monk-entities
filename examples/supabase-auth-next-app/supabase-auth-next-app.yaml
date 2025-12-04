@@ -1,0 +1,78 @@
+namespace: supabase-auth-next-app-example
+
+# Supabase project for the Next.js auth application
+supabase-project:
+  defines: supabase/project
+  name: nextjs-auth-demo-project
+  organization_id: "your-org-id-here" # Replace with your organization ID
+  region_selection:
+    type: specific
+    code: us-east-1
+  secret_ref: supabase-api-token
+  db_pass_secret_ref: supabase-db-password
+  anon_api_key_secret_ref: supabase-anon-key
+  service_role_api_key_secret_ref: supabase-service-key
+  permitted-secrets:
+    supabase-api-token: true
+    supabase-db-password: true
+    supabase-anon-key: true
+    supabase-service-key: true
+
+# Next.js authentication application
+nextjs-auth-app:
+  defines: runnable
+  permitted-secrets:
+    supabase-anon-key: true
+    supabase-service-key: true
+  connections:
+    supabase:
+      runnable: supabase-auth-next-app-example/supabase-project
+      service: data
+  
+  depends:
+    wait-for:
+      runnables:
+        - supabase-auth-next-app-example/supabase-project
+      timeout: 600
+  
+  variables:
+    # Supabase configuration - these are used by the Next.js app
+    next-public-supabase-url:
+      env: NEXT_PUBLIC_SUPABASE_URL
+      value: <- "https://" connection-target("supabase") entity-state get-member("id") ".supabase.co" concat-all
+      type: string
+    
+    next-public-supabase-publishable-key:
+      env: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      value: <- secret("supabase-anon-key")
+      type: string
+    
+    # Optional: Service role key for server-side operations (if needed)
+    supabase-service-role-key:
+      env: SUPABASE_SERVICE_ROLE_KEY
+      value: <- secret("supabase-service-key")
+      type: string
+    
+    # Next.js configuration
+    node-env:
+      env: NODE_ENV
+      value: "development"
+      type: string
+    
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+
+  containers:
+    app:
+      image: monkimages.azurecr.io/supabase-auth-next-app:latest
+      ports:
+        - "3000:3000"
+
+# Complete example stack with Supabase project and Next.js app
+example-stack:
+  defines: process-group
+  runnable-list:
+    - supabase-auth-next-app-example/supabase-project
+    - supabase-auth-next-app-example/nextjs-auth-app

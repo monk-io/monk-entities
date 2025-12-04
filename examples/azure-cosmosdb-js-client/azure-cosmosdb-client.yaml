@@ -1,0 +1,183 @@
+namespace: azure-cosmosdb-client-example
+
+cosmos-account:
+  defines: azure-cosmosdb/database-account
+  permitted-secrets:
+    cosmos-db-primary-key: true
+    cosmos-db-secondary-key: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  account_name: "monk-cosmos-account"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "Session"
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: "Disabled"  # Must be Enabled for MonkEC access from public IP
+  primary_key_secret_ref: "cosmos-db-primary-key"
+  secondary_key_secret_ref: "cosmos-db-secondary-key"
+  tags:
+    Environment: "example"
+    Application: "cosmosdb-js-client"
+    Purpose: "demonstration"
+
+ecommerce-database:
+  defines: azure-cosmosdb/database
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  database_account_name: <- connection-target("database-account") entity get-member("account_name")
+  database_id: "ecommerce"
+  manual_throughput: 400
+  tags:
+    Environment: "example"
+    Purpose: "demonstration"
+    DataType: "products"
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-client-example/cosmos-account
+      timeout: 600
+  connections:
+    database-account:
+      runnable: azure-cosmosdb-client-example/cosmos-account
+      service: default
+
+# Azure Cosmos DB Container for the JavaScript client
+products-container:
+  defines: azure-cosmosdb/container
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  database_account_name: <- connection-target("database-account") entity get-member("account_name")
+  database_id: <- connection-target("database") entity get-member("database_id")
+  container_id: "products"
+  partition_key:
+    paths: ["/id"]
+    kind: "Hash"
+  manual_throughput: 400
+  tags:
+    Environment: "example"
+    Purpose: "demonstration"
+    DataType: "products"
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-client-example/cosmos-account
+        - azure-cosmosdb-client-example/ecommerce-database
+      timeout: 600
+  connections:
+    database-account:
+      runnable: azure-cosmosdb-client-example/cosmos-account
+      service: default
+    database:
+      runnable: azure-cosmosdb-client-example/ecommerce-database
+      service: default
+
+cosmosdb-js-client:
+  defines: runnable
+  permitted-secrets:
+    cosmos-db-primary-key: true
+  connections:
+    cosmos-account:
+      runnable: azure-cosmosdb-client-example/cosmos-account
+      service: data
+    database:
+      runnable: azure-cosmosdb-client-example/ecommerce-database
+      service: data
+    container:
+      runnable: azure-cosmosdb-client-example/products-container
+      service: data
+  
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-client-example/cosmos-account
+        - azure-cosmosdb-client-example/ecommerce-database
+        - azure-cosmosdb-client-example/products-container
+      timeout: 600 
+  
+  variables:
+    cosmos_db_endpoint:
+      env: COSMOS_DB_ENDPOINT
+      value: <- connection-target("cosmos-account") entity-state get-member("document_endpoint")
+      type: string
+    
+    cosmos_db_primary_key:
+      env: COSMOS_DB_PRIMARY_KEY
+      value: <- secret("cosmos-db-primary-key")
+      type: string
+    
+    cosmos_db_database_id:
+      env: COSMOS_DB_DATABASE_ID
+      value: <- connection-target("database") entity get-member("database_id")
+      type: string
+    
+    cosmos_db_container_id:
+      env: COSMOS_DB_CONTAINER_ID
+      value: <- connection-target("container") entity get-member("container_id")
+      type: string
+    
+    # Client configuration
+    operation_interval_ms:
+      env: OPERATION_INTERVAL_MS
+      value: "3000"
+      type: string
+    
+    max_operations:
+      env: MAX_OPERATIONS
+      value: "50"
+      type: string
+
+  containers:
+    client:
+      image: monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+
+# Configure network access control for Cosmos DB (VNet + IP Firewall)
+# Restricts access to specific Azure VNets and public IP addresses
+cosmos-access-list:
+  defines: azure-cosmosdb/access-list
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  account_name: "monk-cosmos-account"
+  enable_virtual_network_filter: true
+  # Virtual Network rules - restrict to specific Azure VNets/subnets
+  virtual_network_rules:
+    - subnet_id: "/subscriptions/your-subscription-id/resourceGroups/your-resource-group/providers/Microsoft.Network/virtualNetworks/ivan-testeastus-vn/subnets/ivan-testeastussn"
+      ignore_missing_vnet_service_endpoint: false
+  # IP Firewall rules - allow access from specific public IPs or ranges
+  ip_rules:
+    - ip_address_or_range: "95.67.123.30"  # MonkEC instance public IP
+    # Examples of other IP rules:
+    # - ip_address_or_range: "203.0.113.0/24"  # Office network CIDR range
+    # - ip_address_or_range: "198.51.100.42"   # Specific server IP
+    # - ip_address_or_range: "0.0.0.0/0"       # Allow all (NOT recommended)
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-client-example/cosmos-account
+      timeout: 600
+  connections:
+    account:
+      runnable: azure-cosmosdb-client-example/cosmos-account
+      service: data
+
+# Complete example stack with account, database, container, and client
+example-stack:
+  defines: process-group
+  runnable-list:
+    - azure-cosmosdb-client-example/cosmos-account
+    - azure-cosmosdb-client-example/ecommerce-database
+    - azure-cosmosdb-client-example/products-container
+    - azure-cosmosdb-client-example/cosmosdb-js-client
+
+# Secure stack with network access control (VNet + IP Firewall)
+secure-stack:
+  defines: process-group
+  runnable-list:
+    - azure-cosmosdb-client-example/cosmos-account
+    - azure-cosmosdb-client-example/cosmos-access-list
+    - azure-cosmosdb-client-example/ecommerce-database
+    - azure-cosmosdb-client-example/products-container
+    - azure-cosmosdb-client-example/cosmosdb-js-client

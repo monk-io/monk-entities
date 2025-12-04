@@ -1,0 +1,72 @@
+namespace: supabase-example
+
+# Example Supabase project with specific region
+project:
+  defines: supabase/project
+  name: my-supabase-project
+  organization_id: jvcuklwdfvsqmonfavgb
+  region_selection:
+    type: specific
+    code: us-east-1
+  secret_ref: supabase-api-token
+  db_pass_secret_ref: supabase-db-password
+  anon_api_key_secret_ref: my-supabase-project-anon-key
+  service_role_api_key_secret_ref: my-supabase-project-service-key
+  permitted-secrets:
+    supabase-api-token: true
+    supabase-db-password: true
+    my-supabase-project-anon-key: true
+    my-supabase-project-service-key: true
+
+# Example Supabase project with smart group region  
+project-smart:
+  defines: supabase/project
+  name: my-smart-project
+  organization_id: jvcuklwdfvsqmonfavgb
+  region_selection:
+    type: smartGroup
+    code: americas
+  secret_ref: supabase-api-token
+  db_pass_secret_ref: supabase-db-password
+  anon_api_key_secret_ref: my-smart-project-anon-key
+  service_role_api_key_secret_ref: my-smart-project-service-key
+  permitted-secrets:
+    supabase-api-token: true
+    supabase-db-password: true
+    my-smart-project-anon-key: true
+    my-smart-project-service-key: true
+
+# Example application that depends on the Supabase project
+app:
+  defines: runnable
+  permitted-secrets:
+    my-supabase-project-anon-key: true
+    my-supabase-project-service-key: true
+  containers:
+    app:
+      image: node:18-alpine
+      bash: |
+        echo "🚀 Starting application..."
+        echo "Project ID: $SUPABASE_PROJECT_ID"
+        sleep 3600
+  depends:
+    wait-for:
+      runnables:
+        - supabase-example/project
+  connections:
+    supabase:
+      runnable: supabase-example/project
+      service: data
+  variables:
+    SUPABASE_PROJECT_ID:
+      type: string
+      env: SUPABASE_PROJECT_ID
+      value: <- connection-target("supabase") entity-state get-member("id")
+    SUPABASE_ANON_KEY:
+      type: string
+      env: SUPABASE_ANON_KEY
+      value: <- secret(my-supabase-project-anon-key)
+    SUPABASE_SERVICE_KEY:
+      type: string
+      env: SUPABASE_SERVICE_KEY
+      value: <- secret(my-supabase-project-service-key)
