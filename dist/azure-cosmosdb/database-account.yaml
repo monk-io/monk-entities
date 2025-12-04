@@ -169,6 +169,8 @@ database-account:
       period: 30
       initialDelay: 10
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - azure-cosmosdb/azure-cosmosdb-base
     - cli

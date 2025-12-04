@@ -150,6 +150,8 @@ project:
       period: 15
       initialDelay: 2
       attempts: 20
+    liveness:
+      period: 300
   requires:
     - supabase/supabase-base
     - cli
