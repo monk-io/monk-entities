@@ -3,7 +3,7 @@ container:
   defines: entity
   metadata:
     name: Container
-    version-hash: c3ca0906da47
+    version-hash: 742444944feb
   schema:
     subscription_id:
       type: string

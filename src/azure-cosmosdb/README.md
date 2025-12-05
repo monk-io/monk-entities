@@ -58,6 +58,7 @@ Manages Azure Cosmos DB database accounts with full lifecycle support using the 
 | `location` | string | No | Resource location (defaults to first location in locations array) |
 | `tags` | object | No | Resource tags |
 | `create_when_missing` | boolean | No | Create resource if it doesn't exist (default: true) |
+| `backup_policy` | BackupPolicy | No | Backup policy configuration (see Backup & Restore section) |
 
 #### LocationConfig
 
@@ -85,6 +86,10 @@ Manages Azure Cosmos DB database accounts with full lifecycle support using the 
 | `write_locations` | array | Write locations |
 | `read_locations` | array | Read locations |
 | `existing` | boolean | Whether the resource existed before entity management |
+| `backup_policy_type` | string | Current backup policy type ("Continuous" or "Periodic") |
+| `continuous_backup_tier` | string | Continuous backup tier if applicable |
+| `restorable_instance_id` | string | Instance ID for restore operations |
+| `earliest_restore_time` | string | Earliest point-in-time available for restore (ISO 8601) |
 
 ### Database
 
@@ -391,6 +396,78 @@ When configuring multiple regions:
 3. **Zone Redundancy**: Enable `is_zone_redundant: true` for production workloads
 4. **Multiple Writes**: Set `enable_multiple_write_locations: true` for multi-master scenarios
 5. **Automatic Failover**: Enable for high availability scenarios
+
+## Backup & Restore
+
+Azure Cosmos DB supports two backup modes: **Continuous** (point-in-time restore) and **Periodic** (traditional scheduled backups).
+
+### Backup Policy Configuration
+
+Configure backup when creating an account using the `backup_policy` property:
+
+```yaml
+# Continuous backup with 7-day retention (enables point-in-time restore)
+cosmos-with-backup:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-rg"
+  account_name: "cosmos-backup-enabled"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+  backup_policy:
+    backup_type: "Continuous"
+    continuous_tier: "Continuous7Days"  # or "Continuous30Days"
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `backup_type` | string | `"Continuous"` or `"Periodic"` |
+| `continuous_tier` | string | `"Continuous7Days"` or `"Continuous30Days"` (for Continuous only) |
+| `periodic_interval_minutes` | number | Backup interval 60-1440 (for Periodic only, default: 240) |
+| `periodic_retention_hours` | number | Retention 8-720 hours (for Periodic only, default: 8) |
+| `backup_storage_redundancy` | string | `"Geo"`, `"Local"`, or `"Zone"` (default: "Geo") |
+
+### Backup Actions
+
+The DatabaseAccount entity provides actions for backup management:
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | Get current backup policy and earliest restore time |
+| `list-restorable-accounts` | List accounts available for restore in subscription |
+| `list-restorable-databases` | List databases that can be restored from an account |
+| `list-restorable-containers` | List containers that can be restored from a database |
+| `restore` | Create a new account from point-in-time backup |
+
+### Usage Examples
+
+```bash
+# Get backup information
+monk do my-app/cosmos-account get-backup-info
+
+# List restorable accounts
+monk do my-app/cosmos-account list-restorable-accounts
+
+# List restorable databases
+monk do my-app/cosmos-account list-restorable-databases \
+  instance_id="<restorable-instance-id>" \
+  location="East US"
+
+# Restore to a new account
+monk do my-app/cosmos-account restore \
+  target_account_name="restored-cosmos" \
+  instance_id="<restorable-instance-id>" \
+  location="East US" \
+  restore_timestamp="2024-12-01T10:00:00Z"
+```
+
+### Important Notes
+
+- **Continuous backup cannot be disabled** once enabled (one-way migration from Periodic)
+- **Restore always creates a NEW account** - cannot restore in-place
+- **Periodic backup restore** requires Azure Support ticket (not self-service)
+- Restore operations may take several minutes to hours depending on data size
 
 ## Testing
 
