@@ -3,5 +3,5 @@ VERSION_HASH b5c32c0d4d26
 DESCRIPTION Managed MongoDB projects, clusters, and users.
 HOSTING managed
 TAGS mongodb,database,atlas
-LOAD cluster.yaml base.yaml project.yaml user.yaml common.yaml
-RESOURCES common.js user-sync.js project-sync.js cluster-sync.js base.js
+LOAD user.yaml common.yaml base.yaml project.yaml cluster.yaml
+RESOURCES cluster-sync.js project-sync.js base.js common.js user-sync.js
