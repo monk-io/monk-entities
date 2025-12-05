@@ -244,10 +244,72 @@ Create a manual database snapshot.
 
 ```bash
 monk do my-app/my-database/create-snapshot
+monk do my-app/my-database/create-snapshot snapshot_id="pre-upgrade-backup"
+monk do my-app/my-database/create-snapshot snapshot_id="my-backup" description="Before migration"
 ```
 
 **Optional Parameters:**
-- `snapshot_id` - Custom snapshot identifier
+- `snapshot_id` - Custom snapshot identifier (default: `{instance}-snapshot-{timestamp}`)
+- `description` - Description tag for the snapshot
+
+**Notes:**
+- Snapshot creation may take several minutes depending on database size
+- Manual snapshots persist until explicitly deleted
+- Use `list-snapshots` to check creation progress
+
+### list-snapshots
+List all available backup snapshots for the instance.
+
+```bash
+monk do my-app/my-database/list-snapshots
+monk do my-app/my-database/list-snapshots limit=20
+monk do my-app/my-database/list-snapshots snapshot_type=manual
+monk do my-app/my-database/list-snapshots snapshot_type=automated
+```
+
+**Optional Parameters:**
+- `limit` - Maximum number of snapshots to display (default: 10)
+- `snapshot_type` - Filter by type: `manual`, `automated`, or `shared`
+
+**Output includes:**
+- Snapshot ID and status
+- Snapshot type (manual/automated)
+- Creation timestamp
+- Engine and storage details
+- Encryption status
+- Progress percentage (if creating)
+
+### describe-snapshot
+Get detailed information about a specific snapshot.
+
+```bash
+monk do my-app/my-database/describe-snapshot snapshot_id="my-snapshot-id"
+```
+
+**Required Parameters:**
+- `snapshot_id` - The snapshot identifier to describe
+
+**Output includes:**
+- Full snapshot details (ID, status, type, creation time)
+- Source instance information
+- Storage configuration (size, type, encryption)
+- Availability zone and VPC information
+- ARN and KMS key details (if encrypted)
+
+### delete-snapshot
+Delete a manual snapshot.
+
+```bash
+monk do my-app/my-database/delete-snapshot snapshot_id="my-snapshot-id"
+```
+
+**Required Parameters:**
+- `snapshot_id` - The snapshot identifier to delete
+
+**⚠️ Important:**
+- This permanently deletes the snapshot and cannot be undone
+- Only manual snapshots can be deleted
+- Automated snapshots are managed by the `backup_retention_period` setting
 
 ## Lifecycle Management
 

@@ -106,8 +106,9 @@ var RedisCloudEntity = class extends import_base.MonkEntity {
    */
   makeRequest(method, path, body) {
     try {
+      const requestBody = body !== void 0 ? body : {};
       const response = this.httpClient.request(method, path, {
-        body,
+        body: requestBody,
         headers: {
           "x-api-key": this.credentials.accessKey,
           "x-api-secret-key": this.credentials.secretKey,

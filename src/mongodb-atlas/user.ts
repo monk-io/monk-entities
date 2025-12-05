@@ -180,13 +180,27 @@ export class User extends MongoDBAtlasEntity<UserDefinition, UserState> {
     }
 
     /** Check if user is ready (exists and is active) */
-    isReady(): boolean {
+    override checkReadiness(): boolean {
         if (!this.state.name) {
             return false;
         }
 
         const userData = this.checkResourceExists(`/groups/${this.definition.project_id}/databaseUsers/admin/${this.definition.name}`);
         return userData && userData.username === this.definition.name;
+    }
+
+    override checkLiveness(): boolean {
+        if (!this.state.name) {
+            throw new Error("User name is not available");
+        }
+
+        const userData = this.checkResourceExists(`/groups/${this.definition.project_id}/databaseUsers/admin/${this.definition.name}`);
+        
+        if (!userData) {
+            throw new Error(`User ${this.definition.name} not found`);
+        }
+
+        return true;
     }
 
     /** Update user password */

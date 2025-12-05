@@ -3,6 +3,7 @@ essentials-subscription:
   defines: entity
   metadata:
     name: EssentialsSubscription
+    version-hash: daf4c6568d15
   schema:
     account_key_secret:
       type: string
@@ -77,6 +78,23 @@ essentials-subscription:
       - support_replication
       - support_clustering
       - support_ssl
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type:
+        - string
+        - number
+    ready:
+      type: boolean
+    name:
+      type: string
+    status:
+      type: string
+    plan_id:
+      type: number
+    payment_method_id:
+      type: number
   lifecycle:
     sync: <<< essentials-subscription-sync.js
   checks:

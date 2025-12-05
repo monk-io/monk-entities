@@ -5,7 +5,7 @@ namespace: mongodb-test-stack
 dev-project:
   defines: mongodb-atlas/project
   name: monkec-dev-project
-  organization: PD
+  organization: Monk
   secret_ref: mongodb-atlas-token
   permitted-secrets:
     mongodb-atlas-token: true

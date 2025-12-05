@@ -10,6 +10,7 @@ This entity allows you to:
 - Create and manage database users
 - Configure IP access lists
 - Retrieve connection strings for applications
+- Create and manage backup snapshots (M10+ clusters)
 
 ## Features
 
@@ -18,33 +19,56 @@ This entity allows you to:
 - **User Management**: Create database users with specific roles and permissions
 - **IP Access Control**: Configure IP access lists for security
 - **Connection String Generation**: Automatically generate connection strings for applications
+- **Backup Management**: Create on-demand snapshots and list available backups (M10+ clusters)
+- **Restore Operations**: Restore from snapshots or point-in-time, monitor restore progress (M10+ clusters)
 - **Error Handling**: Comprehensive error handling and logging
 - **Resource Cleanup**: Proper resource cleanup on entity deletion
+
+## Snapshots Quick Reference
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| **Create Backup** | `monk do ns/cluster backup` | Create on-demand snapshot |
+| **List Snapshots** | `monk do ns/cluster list-snapshots` | View available snapshots |
+| **Restore** | `monk do ns/cluster restore snapshotId="xxx"` | Restore from snapshot |
+| **Check Status** | `monk do ns/cluster restore-status jobId="xxx"` | Monitor restore progress |
+| **List Jobs** | `monk do ns/cluster list-restore-jobs` | View all restore jobs |
+
+**Requirements:** M10+ cluster (dedicated). M0/M2/M5 shared tiers do not support backup API.
+
+**⚠️ Important:** Restore operations make the cluster **READ-ONLY** until complete.
 
 ## Prerequisites
 
 1. **MongoDB Atlas Account**: You need a MongoDB Atlas account with API access
 2. **Service Account Token**: Create a service account token in MongoDB Atlas
 3. **Organization Access**: Ensure your service account has access to the target organization
+4. **Organization Name**: Know your exact MongoDB Atlas organization name (find it in the top-left of the Atlas console)
 
 ## Setup
 
-### 1. Create MongoDB Atlas Service Account Token
+### 1. Create MongoDB Atlas Service Account Credentials
 
 1. Log in to MongoDB Atlas
 2. Go to Organization Settings → Access Manager → Service Accounts
-3. Create a new service account with appropriate permissions
-4. Generate an API key (service account token)
-5. The token should start with `mdb_`
+3. Create a new service account with appropriate permissions:
+   - Organization Project Creator (for creating projects)
+   - Organization Owner or Organization Member (for managing resources)
+4. Click "Generate Token" or "Create Service Account Credentials"
+5. Copy both the **Client ID** and **Client Secret** (you'll need both)
+6. Format as: `clientId:clientSecret` (colon-separated, no spaces)
 
 ### 2. Store Credentials in Monk Secrets
 
 ```bash
-# Store your MongoDB Atlas service account token
-monk secret set -g mongodb-atlas-token "mdb_your_service_account_token_here"
+# Store your MongoDB Atlas service account credentials (format: clientId:clientSecret)
+monk secrets add -g mongodb-atlas-token="your_client_id:your_client_secret"
+
+# Example (not real credentials):
+# monk secrets add -g mongodb-atlas-token="mdb_client_abc123:secret_xyz789"
 
 # Store password for database users (optional)
-monk secret set -g mongodb-user-password "your_secure_password_here"
+monk secrets add -g mongodb-user-password="your_secure_password_here"
 ```
 
 ## Entity Types
@@ -133,7 +157,7 @@ namespace: my-mongodb
 my-project:
   defines: mongodb-atlas/project
   name: my-application-project
-  organization: my-organization
+  organization: YourOrgName  # Replace with your actual MongoDB Atlas organization name
   secret_ref: mongodb-atlas-token
   permitted-secrets:
     mongodb-atlas-token: true
@@ -208,6 +232,275 @@ my-app:
     app:
       image: my-app:latest
 ```
+
+## Custom Actions
+
+### Backup Actions
+
+MongoDB Atlas clusters (M10 and higher) support on-demand backup snapshots via custom actions. Backups are stored according to your backup retention policy and can be used for restore operations.
+
+**⚠️ Important Backup Limitations:**
+- **M0 Free clusters:** No backup API support. Use `mongodump`/`mongorestore` for manual backups
+- **M2/M5 clusters:** Being migrated to Flex clusters (as of February 2025)
+- **Flex clusters:** Automatic daily snapshots (cannot be disabled)
+- **M10+ clusters:** Full Cloud Backup support with on-demand snapshots via API
+- **During restore:** Cluster becomes read-only until restore completes
+
+#### Create Backup Snapshot
+
+Create an on-demand backup snapshot of your cluster:
+
+```bash
+# Create backup with default settings (7 days retention)
+monk do my-mongodb/my-cluster backup
+
+# Create backup with custom description
+monk do my-mongodb/my-cluster backup description="Pre-migration backup"
+
+# Create backup with custom retention period
+monk do my-mongodb/my-cluster backup description="Before upgrade" retentionInDays=14
+```
+
+**Parameters:**
+- `description` (optional): Description for the snapshot. Default: "Manual backup at <timestamp>"
+- `retentionInDays` (optional): Number of days to retain the snapshot. Default: 7
+
+**Requirements:**
+- Cluster must be M10 or higher (dedicated cluster)
+- Cluster must be in IDLE state (not UPDATING or MAINTENANCE)
+- Sufficient storage quota for backups
+- Project must have Cloud Backup enabled
+
+**Important Constraints:**
+- Cluster becomes **read-only** during restore operations
+- Snapshots are **immutable** and cannot be modified
+- Can restore to same version or higher version only
+- Maximum retention depends on your backup policy
+
+#### List Available Snapshots
+
+View all available backup snapshots:
+
+```bash
+# List snapshots (default: show 10)
+monk do my-mongodb/my-cluster list-snapshots
+
+# List more snapshots
+monk do my-mongodb/my-cluster list-snapshots limit=20
+```
+
+**Parameters:**
+- `limit` (optional): Maximum number of snapshots to display. Default: 10
+
+**Output includes:**
+- Snapshot ID (needed for restore operations)
+- Status (queued, inProgress, completed, failed)
+- Type (onDemand or scheduled)
+- Creation and expiration dates
+- Description and size
+
+**Example output:**
+```
+==================================================
+Listing backup snapshots for cluster: my-cluster
+==================================================
+
+Total snapshots available: 5
+Showing: 5 snapshot(s)
+
+📸 Snapshot #1
+   ID: 5e8f8f8f8f8f8f8f8f8f8f8f
+   Status: completed
+   Type: onDemand
+   Created: 2024-11-27T10:30:00Z
+   Expires: 2024-12-04T10:30:00Z
+   Description: Pre-migration backup
+   Size: 2.45 GB
+
+📸 Snapshot #2
+   ID: 5e8f8f8f8f8f8f8f8f8f8f90
+   Status: completed
+   Type: scheduled
+   Created: 2024-11-26T00:00:00Z
+   Expires: 2024-12-26T00:00:00Z
+   Size: 2.40 GB
+```
+
+#### Configuration Example for Backups
+
+For clusters that need backup support, ensure you're using M10 or higher:
+
+```yaml
+namespace: my-mongodb
+
+my-production-cluster:
+  defines: mongodb-atlas/cluster
+  name: production-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_EAST_1
+  instance_size: M10  # M10+ required for backups
+  secret_ref: mongodb-atlas-token
+  connections:
+    project:
+      runnable: my-mongodb/my-project
+      service: data
+```
+
+#### Backup Best Practices
+
+1. **Before Major Changes**: Always create a backup before deployments or migrations
+   ```bash
+   monk do my-mongodb/my-cluster backup description="Pre-deployment backup"
+   ```
+
+2. **Retention Planning**: Consider your recovery requirements when setting retention
+   - Development: 3-7 days
+   - Staging: 7-14 days
+   - Production: 14-30 days (or more)
+
+3. **Regular Verification**: Periodically list snapshots to verify backups are being created
+   ```bash
+   monk do my-mongodb/my-cluster list-snapshots
+   ```
+
+4. **Document Snapshot IDs**: Save snapshot IDs for critical backups for quick restore
+
+5. **Monitor Costs**: Snapshots consume storage and incur costs. Review retention policies regularly.
+
+### Restore Actions
+
+MongoDB Atlas clusters (M10 and higher) support restoring from snapshots via custom actions.
+
+**⚠️ IMPORTANT WARNINGS:**
+- The target cluster becomes **READ-ONLY** during restore operations
+- Restoring to the same cluster **OVERWRITES ALL EXISTING DATA**
+- Restore operations can take **several hours** depending on data size
+- Plan maintenance windows accordingly
+
+#### Restore from Snapshot
+
+Restore the cluster from a backup snapshot:
+
+```bash
+# Restore from snapshot (overwrites current cluster data!)
+monk do my-mongodb/my-cluster restore snapshotId="5e8f8f8f8f8f8f8f8f8f8f8f"
+
+# Restore to a different cluster
+monk do my-mongodb/my-cluster restore snapshotId="xxx" targetClusterName="restored-cluster"
+
+# Restore to a different project
+monk do my-mongodb/my-cluster restore snapshotId="xxx" targetProjectId="project-id"
+```
+
+**Parameters:**
+- `snapshotId` (required*): ID of the snapshot to restore
+- `pointInTimeUTCSeconds` (required*): Unix timestamp for point-in-time restore (alternative to snapshotId)
+- `targetClusterName` (optional): Target cluster name (default: current cluster)
+- `targetProjectId` (optional): Target project ID (default: current project)
+
+*Either `snapshotId` or `pointInTimeUTCSeconds` is required.
+
+#### Point-in-Time Restore
+
+Restore to a specific point in time (requires continuous cloud backup):
+
+```bash
+# Restore to specific timestamp (Unix seconds)
+monk do my-mongodb/my-cluster restore pointInTimeUTCSeconds=1700000000
+
+# Restore to specific time on different cluster
+monk do my-mongodb/my-cluster restore pointInTimeUTCSeconds=1700000000 targetClusterName="pitr-cluster"
+```
+
+#### Check Restore Status
+
+Monitor the progress of a restore job:
+
+```bash
+# Check status of a specific restore job
+monk do my-mongodb/my-cluster restore-status jobId="restore-job-id"
+```
+
+**Output includes:**
+- Job ID and status (IN_PROGRESS, COMPLETED, FAILED)
+- Target cluster and project
+- Creation and completion times
+- Snapshot or point-in-time details
+
+#### List Restore Jobs
+
+View all restore jobs for the cluster:
+
+```bash
+# List restore jobs (default: show 10)
+monk do my-mongodb/my-cluster list-restore-jobs
+
+# List more jobs
+monk do my-mongodb/my-cluster list-restore-jobs limit=20
+```
+
+#### Restore Workflow Example
+
+Complete disaster recovery workflow:
+
+```bash
+# 1. List available snapshots to find the right one
+monk do my-mongodb/my-cluster list-snapshots
+
+# 2. Start restore from snapshot
+monk do my-mongodb/my-cluster restore snapshotId="5e8f8f8f8f8f8f8f8f8f8f8f"
+
+# 3. Check restore progress periodically
+monk do my-mongodb/my-cluster restore-status jobId="restore-job-id"
+
+# 4. Once complete, verify data integrity
+# (cluster is read-write again after restore completes)
+```
+
+#### Restore Best Practices
+
+1. **Test Restores Regularly**: Practice restore procedures before you need them
+   ```bash
+   # Restore to a test cluster, not production
+   monk do prod/cluster restore snapshotId="xxx" targetClusterName="restore-test"
+   ```
+
+2. **Document Recovery Procedures**: Keep runbooks with snapshot IDs and restore commands
+
+3. **Plan Maintenance Windows**: Restores make clusters read-only; schedule accordingly
+
+4. **Verify After Restore**: Always validate data integrity after restore completes
+
+5. **Monitor Long-Running Restores**: Large datasets can take hours; use `restore-status` to track
+
+#### Automated Backup Workflows
+
+Integrate backups into your deployment workflows:
+
+```yaml
+# Pre-deployment backup action
+pre-deploy-backup:
+  defines: action
+  action:
+    code: |
+      monk do my-mongodb/my-cluster backup \
+        description="Pre-deployment $(date +%Y-%m-%d-%H:%M)"
+
+production-deployment:
+  defines: runnable
+  # ... your deployment config
+  depends:
+    wait-for:
+      runnables:
+        - my-mongodb/pre-deploy-backup
+```
+
+**Notes:**
+- Snapshot creation is asynchronous and may take several minutes to hours depending on cluster size
+- Maximum 4 simultaneous backup operations per cluster (default limit)
+- Scheduled backups are managed by Atlas backup policy (not via these actions)
+- On-demand snapshots count toward your backup storage quota
 
 ## Testing
 

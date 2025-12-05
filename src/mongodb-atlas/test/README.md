@@ -6,6 +6,8 @@ This directory contains test configurations and examples for the MongoDB Atlas e
 
 - **`stack-integration.test.yaml`** - Comprehensive functional test configuration for MongoDB Atlas stack deployment
 - **`stack-template.yaml`** - Stack template with MongoDB Atlas project, cluster, user, and connection testing
+- **`backup.test.yaml`** - Backup operations test for M10+ clusters (backup/restore actions)
+- **`backup-template.yaml`** - Stack template with M10 cluster for testing backup operations
 - **`env.example`** - Example environment variables file
 
 ## Environment Configuration
@@ -93,7 +95,7 @@ export MONGODB_ATLAS_TOKEN="mdb_your_service_account_token_here"
 Use the wrapper to execute comprehensive functional tests:
 
 ```bash
-# Run with automatic .env loading
+# Run stack integration test with automatic .env loading
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 
 # Run with verbose output
@@ -102,6 +104,25 @@ sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-inte
 # Run with custom environment
 MONGODB_ATLAS_TOKEN="your-token" sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-integration.test.yaml
 ```
+
+### 4b. Run Backup Tests (M10+ Required)
+
+Test backup operations (requires M10 dedicated cluster, incurs costs):
+
+```bash
+# Run backup test
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/backup.test.yaml
+
+# Run with verbose output
+sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/backup.test.yaml --verbose
+```
+
+**⚠️ Important Notes:**
+- Backup tests require M10 or higher cluster (dedicated, not shared)
+- M10 clusters incur costs (~$0.08/hour or ~$57/month)
+- The test creates a cluster, runs backup operations, then cleans up
+- Total test duration: ~15 minutes including cluster provisioning
+- Snapshots may need manual cleanup from Atlas console
 
 Alternatively, run the stack manually:
 
@@ -152,8 +173,24 @@ monk delete --force mongodb-test-stack/dev-project
 
 - **Namespace**: `mongodb-test-stack`
 - **Instance Size**: M0 (free tier)
-- **Provider**: AWS US_EAST_1
+- **Provider**: AWS US_WEST_2
 - **Features**: Project, cluster, user creation with connection testing container
+
+### backup.test.yaml
+
+- **Test Framework**: YAML-based functional test for backup operations
+- **Namespace**: `mongodb-backup-test`
+- **Timeout**: 15 minutes total test execution
+- **Features**: Backup creation, snapshot listing, validation testing
+- **Requirements**: M10+ dedicated cluster
+
+### backup-template.yaml
+
+- **Namespace**: `mongodb-backup-test`
+- **Instance Size**: M10 (dedicated cluster)
+- **Provider**: AWS US_WEST_2
+- **Features**: Dedicated cluster for backup testing
+- **Cost**: ~$0.08/hour (~$57/month) - ensure cleanup after testing
 
 ## Prerequisites
 
@@ -186,6 +223,17 @@ monk delete --force mongodb-test-stack/dev-project
    - Verify IP access list includes your IP range
    - Check cluster is in IDLE state before connecting
    - Validate connection strings in entity state
+
+5. **Backup Operation Failures**
+   - **M0 clusters:** No backup API support - use manual `mongodump`/`mongorestore`
+   - **M2/M5 clusters:** Being migrated to Flex (as of Feb 2025), no on-demand API backups
+   - **Flex clusters:** Automatic daily backups only, cannot trigger on-demand via API
+   - **M10+ clusters:** Full Cloud Backup support ✅
+   - Check cluster is in IDLE state (backups can't run during UPDATING/MAINTENANCE)
+   - Ensure sufficient backup storage quota is available
+   - Verify Cloud Backup is enabled for the project
+   - **During restore:** Cluster becomes read-only until restore completes
+   - Check MongoDB Atlas console for backup-specific errors
 
 ### Debug Commands
 

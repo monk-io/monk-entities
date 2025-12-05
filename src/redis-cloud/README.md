@@ -87,3 +87,153 @@ Warning: Using a password with '-a' or '-u' option on the command line interface
 ```
 monk delete redis-cloud-example/stack
 ```
+
+## Custom Actions
+
+### Backup Actions
+
+Both Essentials and Pro databases support manual on-demand backups via custom actions.
+
+#### Essentials Database Backup
+
+Back up an Essentials database to its configured `periodic_backup_path` or a custom location:
+
+```bash
+# Backup to configured periodic_backup_path
+monk do redis-cloud-example/essentials-database backup
+
+# Backup to custom location
+monk do redis-cloud-example/essentials-database backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
+```
+
+**Requirements:**
+- Database must have `periodic_backup_path` configured, OR
+- Provide `adhocBackupPath` parameter
+
+**Configuration Example:**
+```yaml
+essentials-database:
+  defines: redis-cloud/essentials-database
+  name: MyDatabase
+  subscription_id: 12345
+  periodic_backup_path: "s3://my-backups/redis/"  # Required for automatic backups
+```
+
+#### Pro Database Backup
+
+Back up a Pro database to its configured `remote_backup` location or a custom location:
+
+```bash
+# Backup to configured remote_backup storage path
+monk do redis-cloud-example/pro-database backup
+
+# Backup to custom location
+monk do redis-cloud-example/pro-database backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
+
+# For Active-Active databases, backup specific region
+monk do redis-cloud-example/pro-database backup regionName="us-east-1"
+
+# Backup specific region to custom location
+monk do redis-cloud-example/pro-database backup regionName="us-east-1" adhocBackupPath="s3://custom-path/"
+```
+
+**Requirements:**
+- Database must have `remote_backup.storage_path` configured, OR
+- Provide `adhocBackupPath` parameter
+- For Active-Active databases, you must backup each region separately using `regionName`
+
+**Configuration Example:**
+```yaml
+pro-database:
+  defines: redis-cloud/pro-database
+  name: ProductionDB
+  subscription_id: 67890
+  dataset_size_in_gb: 10
+  remote_backup:
+    active: true
+    interval: every-6-hours
+    storage_type: aws-s3
+    storage_path: s3://prod-backups/redis/
+```
+
+**Notes:**
+- Backups are asynchronous operations
+- Maximum 4 simultaneous backups per cluster (default limit)
+- Backup storage must have available capacity
+- Supported storage types: AWS S3, Google Cloud Storage, Azure Blob Storage, FTP
+
+### Restore Actions
+
+Both Essentials and Pro databases support restoring/importing data from external storage locations.
+
+**⚠️ WARNING:** Restore operations will **OVERWRITE ALL EXISTING DATA** in the target database. Always ensure you have current backups before performing a restore.
+
+#### Essentials Database Restore
+
+Restore an Essentials database from an external backup file:
+
+```bash
+# Restore from AWS S3
+monk do redis-cloud-example/essentials-database restore \
+  sourceType="aws-s3" \
+  importFromUri="s3://my-backups/redis/backup-2025-11-27.rdb"
+
+# Restore from Google Cloud Storage
+monk do redis-cloud-example/essentials-database restore \
+  sourceType="google-blob-storage" \
+  importFromUri="gs://my-backups/redis/backup.rdb.gz"
+
+# Restore from FTP server
+monk do redis-cloud-example/essentials-database restore \
+  sourceType="ftp" \
+  importFromUri="ftp://user:pass@ftp.example.com/backup.rdb"
+
+# Restore from HTTP server
+monk do redis-cloud-example/essentials-database restore \
+  sourceType="http" \
+  importFromUri="http://backups.example.com/redis/backup.rdb"
+```
+
+#### Pro Database Restore
+
+Restore a Pro database from an external backup file:
+
+```bash
+# Restore from AWS S3
+monk do redis-cloud-example/pro-database restore \
+  sourceType="aws-s3" \
+  importFromUri="s3://prod-backups/redis/latest.rdb"
+
+# Restore from Azure Blob Storage
+monk do redis-cloud-example/pro-database restore \
+  sourceType="azure-blob-storage" \
+  importFromUri="abs://:accesskey@storageaccount/container/backup.rdb"
+
+# Import from another Redis instance
+monk do redis-cloud-example/pro-database restore \
+  sourceType="redis" \
+  importFromUri="redis://password@source-host:6379"
+```
+
+#### Supported Source Types
+
+| Source Type | `sourceType` Value | URI Format |
+|------------|-------------------|-----------|
+| AWS S3 | `aws-s3` | `s3://bucket/[path/]file.rdb[.gz]` |
+| Google Cloud Storage | `google-blob-storage` | `gs://bucket/[path/]file.rdb[.gz]` |
+| Azure Blob Storage | `azure-blob-storage` | `abs://:key@account/[container/]file.rdb[.gz]` |
+| FTP Server | `ftp` | `ftp://[user[:pass]@]host[:port]/[path/]file.rdb[.gz]` |
+| HTTP/HTTPS | `http` | `http://[user[:pass]@]host[:port]/[path/]file.rdb[.gz]` |
+| Redis Server | `redis` | `redis://[password@]host:port` |
+
+**Requirements:**
+- Backup file must be in RDB format (`.rdb` or `.rdb.gz`)
+- Redis Cloud must have READ access to the backup file location
+- For S3/GCS/Azure: Ensure proper bucket/container permissions
+- For FTP/HTTP: Include credentials in URI if required
+
+**Notes:**
+- Restore is an asynchronous operation that may take several minutes for large datasets
+- Database may be unavailable during the restore process
+- Gzip-compressed files (`.rdb.gz`) are supported
+- AOF files are NOT supported for import

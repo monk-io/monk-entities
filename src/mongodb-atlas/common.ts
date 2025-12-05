@@ -22,24 +22,28 @@ export function getToken(secretRef: string): string {
         cachedToken = secret.get(secretRef + "_cached_token");
         cachedTokenExpires = secret.get(secretRef + "_cached_token_expires");
         cachedSecretHash = secret.get(secretRef + "_cached_secret_hash");
-    } catch (e) {
+    } catch (_e) {
         cachedToken = undefined;
         cachedTokenExpires = undefined;
         cachedSecretHash = undefined;
     }
 
-    // Get service account token
-    const serviceAccountToken = secret.get(secretRef);
-    if (!serviceAccountToken) {
-        throw new Error(`Failed to retrieve MongoDB Atlas service account token from secret: ${secretRef}`);
+    // Get service account credentials (format: clientId:clientSecret)
+    const serviceAccountCreds = secret.get(secretRef);
+    if (!serviceAccountCreds) {
+        throw new Error(`Failed to retrieve MongoDB Atlas service account credentials from secret: ${secretRef}`);
     }
 
-    if (!serviceAccountToken.startsWith("mdb_sa_id")) {
-        throw new Error("Token is not a service account token");
+    // Validate credentials format (should contain a colon separating clientId and clientSecret)
+    if (!serviceAccountCreds.includes(":")) {
+        throw new Error(
+            `Service account credentials must be in format 'clientId:clientSecret'. ` +
+            `Get these from MongoDB Atlas: Organization Settings → Access Manager → Service Accounts → Generate Token`
+        );
     }
 
     // Calculate current secret hash using SHA256
-    const currentSecretHash = crypto.sha256(serviceAccountToken);
+    const currentSecretHash = crypto.sha256(serviceAccountCreds);
 
     // Return cached token if it's still valid and secret hasn't changed
     if (cachedToken && cachedTokenExpires && cachedSecretHash) {
@@ -50,9 +54,10 @@ export function getToken(secretRef: string): string {
     }
     
     // Exchange service account credentials for OAuth2 Bearer token
+    // Base64-encode the clientId:clientSecret for Basic auth
     const headers = {
         "Accept": "application/json",
-        "Authorization": "Basic " + btoa(serviceAccountToken),
+        "Authorization": "Basic " + btoa(serviceAccountCreds),
         "Content-Type": "application/x-www-form-urlencoded",
         "Cache-Control": "no-cache"
     };

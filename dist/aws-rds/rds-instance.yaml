@@ -3,7 +3,7 @@ rds-instance:
   defines: entity
   metadata:
     name: RDSInstance
-    version-hash: 3caf7e6be769
+    version-hash: da55718119a6
   schema:
     region:
       type: string
@@ -154,6 +154,9 @@ rds-instance:
     get-instance-info: ''
     update-password: ''
     create-snapshot: ''
+    list-snapshots: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
     get-connection-info: ''
   checks:
     readiness:

@@ -47,6 +47,19 @@ export interface ProjectState extends MongoDBAtlasEntityState {
 
 export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState> {
     
+    /**
+     * Readiness check configuration
+     * Projects are usually ready immediately after creation
+     * - period: Check every 10 seconds
+     * - initialDelay: Wait 5 seconds before first check
+     * - attempts: Try for up to 2 minutes (12 attempts × 10 seconds)
+     */
+    static readiness = {
+        period: 10,        // seconds between checks
+        initialDelay: 5,   // seconds before first check
+        attempts: 12       // max attempts (12 × 10s = 2 min)
+    };
+
     protected getEntityName(): string {
         return this.definition.name;
     }
@@ -108,6 +121,37 @@ export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState>
         
         // Then delete the project
         this.deleteResource(`/groups/${this.state.id}`, "Project");
+    }
+
+    override checkReadiness(): boolean {
+        if (!this.state.id) {
+            return false;
+        }
+
+        // Verify the project exists and is accessible
+        const projectData = this.checkResourceExists(`/groups/${this.state.id}`);
+        
+        if (!projectData) {
+            return false;
+        }
+
+        // Project is ready if it exists and we can access it
+        return true;
+    }
+
+    override checkLiveness(): boolean {
+        if (!this.state.id) {
+            throw new Error("Project ID is not available");
+        }
+
+        // Verify the project still exists
+        const projectData = this.checkResourceExists(`/groups/${this.state.id}`);
+        
+        if (!projectData) {
+            throw new Error(`Project ${this.state.name} not found`);
+        }
+
+        return true;
     }
 
     /**

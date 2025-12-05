@@ -188,8 +188,11 @@ export abstract class RedisCloudEntity<
      */
     protected makeRequest(method: string, path: string, body?: any): any {
         try {
+            // If no body is provided, use an empty object for POST requests
+            const requestBody = body !== undefined ? body : {};
+            
             const response = this.httpClient.request(method as any, path, { 
-                body,
+                body: requestBody,
                 headers: {
                     "x-api-key": this.credentials.accessKey,
                     "x-api-secret-key": this.credentials.secretKey,

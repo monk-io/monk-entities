@@ -62,8 +62,8 @@ const buildCreateInstanceParams = common.buildCreateInstanceParams;
 const buildModifyInstanceParams = common.buildModifyInstanceParams;
 const formatInstanceState = common.formatInstanceState;
 var action2 = MonkecBase.action;
-var _getConnectionInfo_dec, _createSnapshot_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
-var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _createSnapshot_dec = [action2("create-snapshot")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
+var _getConnectionInfo_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
+var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -318,21 +318,245 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
   }
   createSnapshot(args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    cli.output(`==================================================`);
+    cli.output(`Creating backup snapshot for RDS instance`);
+    cli.output(`Instance: ${dbInstanceIdentifier}`);
+    cli.output(`Region: ${this.region}`);
+    cli.output(`==================================================`);
+    if (!this.state.db_instance_identifier) {
+      cli.output(`
+\u274C DB instance ${dbInstanceIdentifier} not found in entity state`);
+      throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+    }
     const snapshotId = args?.snapshot_id || `${dbInstanceIdentifier}-snapshot-${Date.now()}`;
+    const description = args?.description;
+    cli.output(`Snapshot ID: ${snapshotId}`);
+    if (description) {
+      cli.output(`Description: ${description}`);
+    }
     try {
-      if (!this.state.db_instance_identifier) {
-        cli.output(`DB instance ${dbInstanceIdentifier} not found in entity state`);
-        throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+      const tags = {};
+      if (description) {
+        tags["Description"] = description;
       }
-      this.makeRDSRequest("CreateDBSnapshot", {
-        DBInstanceIdentifier: dbInstanceIdentifier,
-        DBSnapshotIdentifier: snapshotId
-      });
-      cli.output(`Snapshot creation initiated: ${snapshotId}`);
+      tags["CreatedBy"] = "monk-rds-entity";
+      tags["CreatedAt"] = (/* @__PURE__ */ new Date()).toISOString();
+      const snapshot = this.createDBSnapshot(dbInstanceIdentifier, snapshotId, tags);
+      cli.output(`
+\u2705 Snapshot creation initiated successfully!`);
+      cli.output(`Snapshot ID: ${snapshot.db_snapshot_identifier}`);
+      cli.output(`Status: ${snapshot.status || "creating"}`);
+      cli.output(`Engine: ${snapshot.engine || this.definition.engine}`);
+      if (snapshot.snapshot_create_time) {
+        cli.output(`Created at: ${snapshot.snapshot_create_time}`);
+      }
+      cli.output(`
+\u{1F4CB} Note: Snapshot creation may take several minutes depending on database size.`);
+      cli.output(`Use 'monk do namespace/instance list-snapshots' to check status.`);
+      cli.output(`==================================================`);
     } catch (error) {
-      const errorMsg = `Failed to create snapshot for ${dbInstanceIdentifier}: ${error instanceof Error ? error.message : "Unknown error"}`;
-      cli.output(errorMsg);
-      throw new Error(errorMsg);
+      cli.output(`
+\u274C Failed to create backup snapshot`);
+      throw new Error(`Snapshot creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  listSnapshots(args) {
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    cli.output(`==================================================`);
+    cli.output(`Listing backup snapshots for RDS instance`);
+    cli.output(`Instance: ${dbInstanceIdentifier}`);
+    cli.output(`Region: ${this.region}`);
+    cli.output(`==================================================`);
+    if (!this.state.db_instance_identifier) {
+      cli.output(`
+\u274C DB instance ${dbInstanceIdentifier} not found in entity state`);
+      throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+    }
+    const limit = Number(args?.limit) || 10;
+    const snapshotType = args?.snapshot_type;
+    if (snapshotType) {
+      cli.output(`Filter: ${snapshotType} snapshots only`);
+    }
+    try {
+      const snapshots = this.listDBSnapshots(dbInstanceIdentifier, snapshotType);
+      cli.output(`
+Total snapshots found: ${snapshots.length}`);
+      cli.output(`Showing: ${Math.min(snapshots.length, limit)} snapshot(s)
+`);
+      if (snapshots.length === 0) {
+        cli.output(`No snapshots found for this instance.`);
+        cli.output(`Create a snapshot using: monk do namespace/instance create-snapshot`);
+      } else {
+        const sortedSnapshots = [...snapshots].sort((a, b) => {
+          const timeA = a.snapshot_create_time ? new Date(a.snapshot_create_time).getTime() : 0;
+          const timeB = b.snapshot_create_time ? new Date(b.snapshot_create_time).getTime() : 0;
+          return timeB - timeA;
+        });
+        const displaySnapshots = sortedSnapshots.slice(0, limit);
+        for (let i = 0; i < displaySnapshots.length; i++) {
+          const snapshot = displaySnapshots[i];
+          const statusIcon = this.getSnapshotStatusIcon(snapshot.status);
+          cli.output(`${statusIcon} Snapshot #${i + 1}`);
+          cli.output(`   ID: ${snapshot.db_snapshot_identifier}`);
+          cli.output(`   Status: ${snapshot.status || "unknown"}`);
+          cli.output(`   Type: ${snapshot.snapshot_type || "manual"}`);
+          cli.output(`   Created: ${snapshot.snapshot_create_time || "N/A"}`);
+          cli.output(`   Engine: ${snapshot.engine || "N/A"} ${snapshot.engine_version || ""}`);
+          cli.output(`   Storage: ${snapshot.allocated_storage || 0} GB (${snapshot.storage_type || "N/A"})`);
+          if (snapshot.encrypted) {
+            cli.output(`   Encrypted: Yes`);
+          }
+          if (snapshot.percent_progress !== void 0 && snapshot.percent_progress < 100) {
+            cli.output(`   Progress: ${snapshot.percent_progress}%`);
+          }
+          cli.output(``);
+        }
+        if (snapshots.length > limit) {
+          cli.output(`... and ${snapshots.length - limit} more snapshot(s)`);
+          cli.output(`Increase limit with: monk do namespace/instance list-snapshots limit=${snapshots.length}`);
+        }
+      }
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to list backup snapshots`);
+      throw new Error(`List snapshots failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  describeSnapshot(args) {
+    cli.output(`==================================================`);
+    cli.output(`Describing backup snapshot`);
+    cli.output(`==================================================`);
+    const snapshotId = args?.snapshot_id;
+    if (!snapshotId) {
+      cli.output(`
+\u274C 'snapshot_id' is required`);
+      throw new Error(
+        `'snapshot_id' is required.
+Usage: monk do namespace/instance describe-snapshot snapshot_id="your-snapshot-id"
+
+To find snapshot IDs, run: monk do namespace/instance list-snapshots`
+      );
+    }
+    cli.output(`Snapshot ID: ${snapshotId}`);
+    try {
+      const snapshot = this.describeDBSnapshot(snapshotId);
+      if (!snapshot) {
+        cli.output(`
+\u274C Snapshot not found: ${snapshotId}`);
+        throw new Error(`Snapshot ${snapshotId} not found`);
+      }
+      const statusIcon = this.getSnapshotStatusIcon(snapshot.status);
+      cli.output(`
+${statusIcon} Snapshot Details`);
+      cli.output(`   Identifier: ${snapshot.db_snapshot_identifier}`);
+      cli.output(`   Source Instance: ${snapshot.db_instance_identifier}`);
+      cli.output(`   Status: ${snapshot.status || "unknown"}`);
+      cli.output(`   Type: ${snapshot.snapshot_type || "manual"}`);
+      cli.output(`   Created: ${snapshot.snapshot_create_time || "N/A"}`);
+      cli.output(`   Engine: ${snapshot.engine || "N/A"} ${snapshot.engine_version || ""}`);
+      cli.output(`   Storage: ${snapshot.allocated_storage || 0} GB`);
+      cli.output(`   Storage Type: ${snapshot.storage_type || "N/A"}`);
+      cli.output(`   Availability Zone: ${snapshot.availability_zone || "N/A"}`);
+      cli.output(`   VPC ID: ${snapshot.vpc_id || "N/A"}`);
+      cli.output(`   Encrypted: ${snapshot.encrypted ? "Yes" : "No"}`);
+      if (snapshot.kms_key_id) {
+        cli.output(`   KMS Key: ${snapshot.kms_key_id}`);
+      }
+      if (snapshot.db_snapshot_arn) {
+        cli.output(`   ARN: ${snapshot.db_snapshot_arn}`);
+      }
+      if (snapshot.percent_progress !== void 0) {
+        cli.output(`   Progress: ${snapshot.percent_progress}%`);
+      }
+      if (snapshot.status === "available") {
+        cli.output(`
+\u{1F4CB} This snapshot can be used for restore operations.`);
+        cli.output(`   Use: monk do namespace/instance restore snapshot_id="${snapshotId}"`);
+      } else if (snapshot.status === "creating") {
+        cli.output(`
+\u23F3 Snapshot is still being created. Check back later.`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found")) {
+        throw error;
+      }
+      cli.output(`
+\u274C Failed to describe snapshot`);
+      throw new Error(`Describe snapshot failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  deleteSnapshot(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u26A0\uFE0F  DELETE SNAPSHOT - READ CAREFULLY!`);
+    cli.output(`==================================================`);
+    const snapshotId = args?.snapshot_id;
+    if (!snapshotId) {
+      cli.output(`
+\u274C 'snapshot_id' is required`);
+      throw new Error(
+        `'snapshot_id' is required.
+Usage: monk do namespace/instance delete-snapshot snapshot_id="your-snapshot-id"
+
+To find snapshot IDs, run: monk do namespace/instance list-snapshots`
+      );
+    }
+    cli.output(`Snapshot ID: ${snapshotId}`);
+    try {
+      const snapshot = this.describeDBSnapshot(snapshotId);
+      if (!snapshot) {
+        cli.output(`
+\u274C Snapshot not found: ${snapshotId}`);
+        throw new Error(`Snapshot ${snapshotId} not found`);
+      }
+      if (snapshot.snapshot_type === "automated") {
+        cli.output(`
+\u274C Cannot delete automated snapshots`);
+        throw new Error(
+          "Automated snapshots cannot be deleted directly. They are managed by the backup_retention_period setting. Only manual snapshots can be deleted."
+        );
+      }
+      cli.output(`
+\u26A0\uFE0F  WARNING: This will permanently delete the snapshot!`);
+      cli.output(`   Type: ${snapshot.snapshot_type || "manual"}`);
+      cli.output(`   Created: ${snapshot.snapshot_create_time || "N/A"}`);
+      cli.output(`   Storage: ${snapshot.allocated_storage || 0} GB`);
+      this.deleteDBSnapshot(snapshotId);
+      cli.output(`
+\u2705 Snapshot deletion initiated successfully!`);
+      cli.output(`Snapshot ID: ${snapshotId}`);
+      cli.output(`
+\u{1F4CB} Note: Snapshot deletion may take a few moments to complete.`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes("not found") || error.message.includes("Cannot delete"))) {
+        throw error;
+      }
+      cli.output(`
+\u274C Failed to delete snapshot`);
+      throw new Error(`Delete snapshot failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Get status icon for snapshot status
+   */
+  getSnapshotStatusIcon(status) {
+    const statusLower = (status || "").toLowerCase();
+    switch (statusLower) {
+      case "available":
+        return "\u{1F4F8}";
+      case "creating":
+      case "pending":
+        return "\u23F3";
+      case "deleting":
+        return "\u{1F5D1}\uFE0F";
+      case "failed":
+      case "error":
+        return "\u274C";
+      default:
+        return "\u{1F4F7}";
     }
   }
   getConnectionInfo(_args) {
@@ -388,6 +612,9 @@ _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInstanceInfo", _getInstanceInfo_dec, _RDSInstance);
 __decorateElement(_init, 1, "updatePassword", _updatePassword_dec, _RDSInstance);
 __decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _RDSInstance);
+__decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _RDSInstance);
+__decorateElement(_init, 1, "describeSnapshot", _describeSnapshot_dec, _RDSInstance);
+__decorateElement(_init, 1, "deleteSnapshot", _deleteSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _RDSInstance);
 __decoratorMetadata(_init, _RDSInstance);
 __name(_RDSInstance, "RDSInstance");

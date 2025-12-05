@@ -3,7 +3,7 @@ cluster:
   defines: entity
   metadata:
     name: Cluster
-    version-hash: 509e75d40b51
+    version-hash: b5c32c0d4d26
   schema:
     secret_ref:
       type: string
@@ -74,13 +74,19 @@ cluster:
       description: SRV connection string
   lifecycle:
     sync: <<< cluster-sync.js
+    backup: ''
+    list-snapshots: ''
+    restore: ''
+    restore-status: ''
+    list-restore-jobs: ''
   checks:
     readiness:
-      period: 5
-      initialDelay: 2
-      attempts: 10
+      period: 30
+      initialDelay: 60
+      attempts: 30
     liveness:
       period: 300
   requires:
     - mongodb-atlas/base
     - cli
+    - monkec/base
