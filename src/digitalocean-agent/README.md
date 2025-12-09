@@ -8,9 +8,50 @@ Manage DigitalOcean GenAI Agents (create/read/update/delete) and related sub-res
 ## Definition
 - `name` (string, required): Agent display name
 - `instruction` (string, required): System instruction
-- `model_uuid` (string, required): Model UUID
-  - Alternatively provide `model_id` or `inference_name` (e.g. `openai-o3`); it will be resolved to the correct UUID automatically.
+- `model_uuid` (string, optional): Model UUID (provide this OR `model_id`/`inference_name`)
+- `model_id` (string, optional): Human-readable model identifier (resolved to UUID automatically). See available models below.
+- `inference_name` (string, optional): Alias to `model_id`
 - `project_id` (string, optional)
+
+### Available Models
+
+The following models are available on the DigitalOcean GenAI platform. You can also specify custom model identifiers not in this list.
+
+| Model Name |
+|------------|
+| OpenAI GPT-oss-120b |
+| OpenAI GPT-oss-20b |
+| Llama 3.3 Instruct (70B) |
+| Llama 3.1 Instruct (8B) |
+| DeepSeek R1 Distill Llama 70B |
+| Anthropic Claude Opus 4 |
+| Anthropic Claude Sonnet 4 |
+| Anthropic Claude 3.7 Sonnet |
+| Anthropic Claude 3.5 Haiku |
+| Anthropic Claude 3 Opus |
+| OpenAI GPT-5 |
+| OpenAI GPT-4.1 |
+| OpenAI o3 |
+| OpenAI GPT-4o |
+| OpenAI GPT-4o mini |
+| OpenAI o1 |
+| OpenAI o3 mini |
+| OpenAI GPT-5 Mini |
+| OpenAI GPT-5 Nano |
+| OpenAI GPT Image 1 |
+| Qwen3 32B |
+| Mistral Nemo Instruct |
+| GTE Large EN v1.5 |
+| Fal Fast SDXL |
+| Fal Flux Schnell |
+| Fal Stable Audio 2.5 |
+| Fal ElevenLabs TTS Multilingual v2 |
+| Multi QA MPNet Base Dot v1 |
+| All MiniLM L6 v2 |
+| Anthropic Claude 4.5 Haiku |
+| Anthropic Claude 4.1 Opus |
+| Anthropic Claude 4.5 Sonnet |
+| Anthropic Claude Opus 4.5 |
 - `knowledge_base_uuids` (string[], optional): Knowledge Base UUIDs (alias of API `knowledge_base_uuid`)
 - `guardrail_uuids` (string[], optional)
 - `tags` (string[], optional)

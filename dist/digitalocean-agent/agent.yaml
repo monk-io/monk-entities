@@ -3,7 +3,7 @@ agent:
   defines: entity
   metadata:
     name: Agent
-    version-hash: ffdd97a5696c
+    version-hash: 27ccf05a321f
   schema:
     name:
       type: string
@@ -16,10 +16,14 @@ agent:
       description: Model UUID to use (or provide model_id/inference_name instead)
     model_id:
       type: string
-      description: 'Human-readable model identifier, e.g. "openai-o3" (resolved to UUID)'
+      description: >-
+        Human-readable model identifier, e.g. "OpenAI GPT-4o" (resolved to
+        UUID). See AVAILABLE_MODELS for available options.
     inference_name:
       type: string
-      description: Inference name (alias to model_id)
+      description: >-
+        Inference name (alias to model_id). See AVAILABLE_MODELS for available
+        options.
     project_id:
       type: string
       description: Optional project id
