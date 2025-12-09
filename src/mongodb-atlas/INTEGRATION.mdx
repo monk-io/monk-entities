@@ -1,0 +1,81 @@
+---
+title: MongoDB Atlas
+description: Managed MongoDB clusters, projects, and users.
+website_url: https://www.mongodb.com/atlas
+docs_url: https://www.mongodb.com/docs/atlas/
+primary_category: database
+tags: [mongodb, database, atlas]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Manage MongoDB Atlas projects, clusters, and users with Monk.
+
+## What Monk manages
+- Project, Cluster, User
+
+## Auth
+- Uses a Monk secret for API token (e.g., mongodb-atlas-token) and password secret for users
+
+## Getting Started
+
+1) Set secrets:
+```bash
+monk secrets add -g mongodb-atlas-token="mdb_xxx"
+monk secrets add -g mongodb-user-password="strong-password"
+```
+
+2) Define resources (save as mongodb-atlas.yaml):
+```yaml
+namespace: my-mongodb
+
+my-project:
+  defines: mongodb-atlas/project
+  name: my-application-project
+  organization: my-organization
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+
+my-cluster:
+  defines: mongodb-atlas/cluster
+  name: my-application-cluster
+  project_id: \<- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_EAST_1
+  instance_size: M0
+  secret_ref: mongodb-atlas-token
+  connections:
+    project:
+      runnable: my-mongodb/my-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - my-mongodb/my-project
+      timeout: 120
+
+my-user:
+  defines: mongodb-atlas/user
+  name: app-user
+  role: readWrite
+  project_id: \<- connection-target("project") entity-state get-member("id")
+  secret_ref: mongodb-atlas-token
+  password_secret_ref: mongodb-user-password
+  connections:
+    project:
+      runnable: my-mongodb/my-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - my-mongodb/my-project
+      timeout: 120
+```
+
+3) Create/update:
+```bash
+monk update my-mongodb/my-project
+monk update my-mongodb/my-cluster
+monk update my-mongodb/my-user
+```
