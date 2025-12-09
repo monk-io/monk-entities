@@ -9,6 +9,46 @@ declare const require: any;
 const digitalocean = require("cloud/digitalocean");
 // @ts-ignore
 
+/**
+ * Available model nodes on DigitalOcean GenAI platform.
+ * Users can also specify custom model identifiers not in this list.
+ */
+export const AVAILABLE_MODELS = [
+    "OpenAI GPT-oss-120b",
+    "OpenAI GPT-oss-20b",
+    "Llama 3.3 Instruct (70B)",
+    "Llama 3.1 Instruct (8B)",
+    "DeepSeek R1 Distill Llama 70B",
+    "Anthropic Claude Opus 4",
+    "Anthropic Claude Sonnet 4",
+    "Anthropic Claude 3.7 Sonnet",
+    "Anthropic Claude 3.5 Haiku",
+    "Anthropic Claude 3 Opus",
+    "OpenAI GPT-5",
+    "OpenAI GPT-4.1",
+    "OpenAI o3",
+    "OpenAI GPT-4o",
+    "OpenAI GPT-4o mini",
+    "OpenAI o1",
+    "OpenAI o3 mini",
+    "OpenAI GPT-5 Mini",
+    "OpenAI GPT-5 Nano",
+    "OpenAI GPT Image 1",
+    "Qwen3 32B",
+    "Mistral Nemo Instruct",
+    "GTE Large EN v1.5",
+    "Fal Fast SDXL",
+    "Fal Flux Schnell",
+    "Fal Stable Audio 2.5",
+    "Fal ElevenLabs TTS Multilingual v2",
+    "Multi QA MPNet Base Dot v1",
+    "All MiniLM L6 v2",
+    "Anthropic Claude 4.5 Haiku",
+    "Anthropic Claude 4.1 Opus",
+    "Anthropic Claude 4.5 Sonnet",
+    "Anthropic Claude Opus 4.5",
+] as const;
+
 export interface DOAgentDefinition {
     /** @description Agent display name */
     name: string;
@@ -16,9 +56,9 @@ export interface DOAgentDefinition {
     instruction: string;
     /** @description Model UUID to use (or provide model_id/inference_name instead) */
     model_uuid?: string;
-    /** @description Human-readable model identifier, e.g. "openai-o3" (resolved to UUID) */
+    /** @description Human-readable model identifier, e.g. "OpenAI GPT-4o" (resolved to UUID). See AVAILABLE_MODELS for available options. */
     model_id?: string;
-    /** @description Inference name (alias to model_id) */
+    /** @description Inference name (alias to model_id). See AVAILABLE_MODELS for available options. */
     inference_name?: string;
     /** @description Optional project id */
     project_id?: string;

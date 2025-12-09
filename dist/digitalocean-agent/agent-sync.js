@@ -59,6 +59,41 @@ const cli = require("cli");
 const MonkecBase = require("monkec/base");
 var action2 = MonkecBase.action;
 var digitalocean = __require("cloud/digitalocean");
+var AVAILABLE_MODELS = [
+  "OpenAI GPT-oss-120b",
+  "OpenAI GPT-oss-20b",
+  "Llama 3.3 Instruct (70B)",
+  "Llama 3.1 Instruct (8B)",
+  "DeepSeek R1 Distill Llama 70B",
+  "Anthropic Claude Opus 4",
+  "Anthropic Claude Sonnet 4",
+  "Anthropic Claude 3.7 Sonnet",
+  "Anthropic Claude 3.5 Haiku",
+  "Anthropic Claude 3 Opus",
+  "OpenAI GPT-5",
+  "OpenAI GPT-4.1",
+  "OpenAI o3",
+  "OpenAI GPT-4o",
+  "OpenAI GPT-4o mini",
+  "OpenAI o1",
+  "OpenAI o3 mini",
+  "OpenAI GPT-5 Mini",
+  "OpenAI GPT-5 Nano",
+  "OpenAI GPT Image 1",
+  "Qwen3 32B",
+  "Mistral Nemo Instruct",
+  "GTE Large EN v1.5",
+  "Fal Fast SDXL",
+  "Fal Flux Schnell",
+  "Fal Stable Audio 2.5",
+  "Fal ElevenLabs TTS Multilingual v2",
+  "Multi QA MPNet Base Dot v1",
+  "All MiniLM L6 v2",
+  "Anthropic Claude 4.5 Haiku",
+  "Anthropic Claude 4.1 Opus",
+  "Anthropic Claude 4.5 Sonnet",
+  "Anthropic Claude Opus 4.5"
+];
 var _models_dec, _makePublic_dec, _deploy_dec, _listApiKeys_dec, _deleteApiKey_dec, _revokeApiKey_dec, _createApiKey_dec, _setKnowledgeBases_dec, _setGuardrails_dec, _get_dec, _a, _init;
 var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [action2()], _setGuardrails_dec = [action2()], _setKnowledgeBases_dec = [action2()], _createApiKey_dec = [action2()], _revokeApiKey_dec = [action2()], _deleteApiKey_dec = [action2()], _listApiKeys_dec = [action2()], _deploy_dec = [action2()], _makePublic_dec = [action2()], _models_dec = [action2()], _a) {
   constructor() {
