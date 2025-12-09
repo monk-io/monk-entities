@@ -842,6 +842,61 @@ var AWSRDSEntity = class extends import_base.MonkEntity {
     };
   }
   /**
+   * Restore a DB instance from a snapshot
+   * Creates a new DB instance from the specified snapshot
+   * 
+   * @param snapshotIdentifier - The snapshot to restore from
+   * @param targetInstanceIdentifier - The identifier for the new instance
+   * @param options - Optional configuration for the restored instance
+   */
+  restoreDBInstanceFromSnapshot(snapshotIdentifier, targetInstanceIdentifier, options) {
+    const params = {
+      DBSnapshotIdentifier: snapshotIdentifier,
+      DBInstanceIdentifier: targetInstanceIdentifier
+    };
+    if (options?.dbInstanceClass) {
+      params.DBInstanceClass = options.dbInstanceClass;
+    }
+    if (options?.port !== void 0) {
+      params.Port = options.port;
+    }
+    if (options?.availabilityZone) {
+      params.AvailabilityZone = options.availabilityZone;
+    }
+    if (options?.dbSubnetGroupName) {
+      params.DBSubnetGroupName = options.dbSubnetGroupName;
+    }
+    if (options?.multiAZ !== void 0) {
+      params.MultiAZ = options.multiAZ;
+    }
+    if (options?.publiclyAccessible !== void 0) {
+      params.PubliclyAccessible = options.publiclyAccessible;
+    }
+    if (options?.autoMinorVersionUpgrade !== void 0) {
+      params.AutoMinorVersionUpgrade = options.autoMinorVersionUpgrade;
+    }
+    if (options?.storageType) {
+      params.StorageType = options.storageType;
+    }
+    if (options?.vpcSecurityGroupIds && options.vpcSecurityGroupIds.length > 0) {
+      params.VpcSecurityGroupIds = options.vpcSecurityGroupIds;
+    }
+    if (options?.dbName) {
+      params.DBName = options.dbName;
+    }
+    if (options?.engine) {
+      params.Engine = options.engine;
+    }
+    if (options?.tags && Object.keys(options.tags).length > 0) {
+      const tagList = [];
+      Object.entries(options.tags).forEach(([key, value]) => {
+        tagList.push({ Key: key, Value: value });
+      });
+      params.Tags = tagList;
+    }
+    return this.makeRDSRequest("RestoreDBInstanceFromDBSnapshot", params);
+  }
+  /**
    * Parse snapshot information from RDS API XML response
    */
   parseSnapshotsFromResponse(response) {

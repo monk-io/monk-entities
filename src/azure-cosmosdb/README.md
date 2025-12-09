@@ -451,13 +451,13 @@ monk do my-app/cosmos-account list-restorable-accounts
 
 # List restorable databases
 monk do my-app/cosmos-account list-restorable-databases \
-  instance_id="<restorable-instance-id>" \
+  source_id="<restorable-instance-id>" \
   location="East US"
 
 # Restore to a new account
 monk do my-app/cosmos-account restore \
-  target_account_name="restored-cosmos" \
-  instance_id="<restorable-instance-id>" \
+  target_id="restored-cosmos" \
+  source_id="<restorable-instance-id>" \
   location="East US" \
   restore_timestamp="2024-12-01T10:00:00Z"
 ```

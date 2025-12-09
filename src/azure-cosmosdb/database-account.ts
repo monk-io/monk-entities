@@ -895,7 +895,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
             }
 
             cli.output(`==================================================`);
-            cli.output(`\n💡 Use the Instance ID with 'list-restorable-databases' action`);
+            cli.output(`\n💡 Use the Instance ID as 'source_id' with 'list-restorable-databases' action`);
             cli.output(`   to see which databases can be restored.`);
         } catch (error) {
             cli.output(`\n❌ Failed to list restorable accounts`);
@@ -907,10 +907,10 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
      * List restorable databases for a specific restorable account
      * 
      * Usage:
-     *   monk do namespace/account list-restorable-databases instance_id="xxx" location="East US"
+     *   monk do namespace/account list-restorable-databases source_id="xxx" location="East US"
      * 
      * @param args Required arguments:
-     *   - instance_id: The restorable account instance ID (from list-restorable-accounts)
+     *   - source_id: The restorable account instance ID (from list-restorable-accounts)
      *   - location: Azure region where the account exists
      */
     @action("list-restorable-databases")
@@ -919,21 +919,21 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         cli.output(`📋 Restorable Databases`);
         cli.output(`==================================================`);
 
-        const instanceId = args?.instance_id as string | undefined;
+        const instanceId = (args?.source_id || args?.instance_id) as string | undefined; // Support both for backward compatibility
         const location = args?.location as string | undefined;
 
         if (!instanceId) {
             throw new Error(
-                "Required argument 'instance_id' not provided.\n" +
-                "Usage: monk do namespace/account list-restorable-databases instance_id=\"xxx\" location=\"East US\"\n" +
-                "\nTo find instance IDs, run: monk do namespace/account list-restorable-accounts"
+                "Required argument 'source_id' not provided.\n" +
+                "Usage: monk do namespace/account list-restorable-databases source_id=\"xxx\" location=\"East US\"\n" +
+                "\nTo find source IDs, run: monk do namespace/account list-restorable-accounts"
             );
         }
 
         if (!location) {
             throw new Error(
                 "Required argument 'location' not provided.\n" +
-                "Usage: monk do namespace/account list-restorable-databases instance_id=\"xxx\" location=\"East US\""
+                "Usage: monk do namespace/account list-restorable-databases source_id=\"xxx\" location=\"East US\""
             );
         }
 
@@ -941,7 +941,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
             const encodedLocation = location.replace(/ /g, '%20');
             const path = `/subscriptions/${this.definition.subscription_id}/providers/Microsoft.DocumentDB/locations/${encodedLocation}/restorableDatabaseAccounts/${instanceId}/restorableSqlDatabases?api-version=${this.apiVersion}`;
 
-            cli.output(`Instance ID: ${instanceId}`);
+            cli.output(`Source ID: ${instanceId}`);
             cli.output(`Location: ${location}\n`);
 
             const response = this.makeAzureRequest("GET", path);
@@ -986,10 +986,10 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
      * List restorable containers for a specific database
      * 
      * Usage:
-     *   monk do namespace/account list-restorable-containers instance_id="xxx" location="East US" database_rid="xxx"
+     *   monk do namespace/account list-restorable-containers source_id="xxx" location="East US" database_rid="xxx"
      * 
      * @param args Required arguments:
-     *   - instance_id: The restorable account instance ID
+     *   - source_id: The restorable account instance ID
      *   - location: Azure region
      *   - database_rid: The database resource ID (_rid from list-restorable-databases)
      */
@@ -999,14 +999,14 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         cli.output(`📋 Restorable Containers`);
         cli.output(`==================================================`);
 
-        const instanceId = args?.instance_id as string | undefined;
+        const instanceId = (args?.source_id || args?.instance_id) as string | undefined; // Support both for backward compatibility
         const location = args?.location as string | undefined;
         const databaseRid = args?.database_rid as string | undefined;
 
         if (!instanceId || !location) {
             throw new Error(
-                "Required arguments 'instance_id' and 'location' not provided.\n" +
-                "Usage: monk do namespace/account list-restorable-containers instance_id=\"xxx\" location=\"East US\" database_rid=\"xxx\""
+                "Required arguments 'source_id' and 'location' not provided.\n" +
+                "Usage: monk do namespace/account list-restorable-containers source_id=\"xxx\" location=\"East US\" database_rid=\"xxx\""
             );
         }
 
@@ -1020,7 +1020,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                 cli.output(`Database RID filter: ${databaseRid}`);
             }
 
-            cli.output(`Instance ID: ${instanceId}`);
+            cli.output(`Source ID: ${instanceId}`);
             cli.output(`Location: ${location}\n`);
 
             const response = this.makeAzureRequest("GET", path);
@@ -1067,11 +1067,11 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
      * The original account remains unchanged.
      * 
      * Usage:
-     *   monk do namespace/account restore target_account_name="restored-cosmos" instance_id="xxx" location="East US" restore_timestamp="2024-12-01T10:00:00Z"
+     *   monk do namespace/account restore target_id="restored-cosmos" source_id="xxx" location="East US" restore_timestamp="2024-12-01T10:00:00Z"
      * 
      * @param args Required/Optional arguments:
-     *   - target_account_name: Name for the new restored account (required)
-     *   - instance_id: Restorable account instance ID (required, from list-restorable-accounts)
+     *   - target_id: Name for the new restored account (required)
+     *   - source_id: Restorable account instance ID (required, from list-restorable-accounts)
      *   - location: Azure region for the restored account (required)
      *   - restore_timestamp: Point-in-time to restore to in ISO 8601 format (required)
      *   - target_resource_group: Resource group for restored account (default: current resource group)
@@ -1083,24 +1083,24 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         cli.output(`🔄 RESTORE OPERATION`);
         cli.output(`==================================================`);
 
-        // Validate required arguments
-        const targetAccountName = args?.target_account_name as string | undefined;
-        const instanceId = args?.instance_id as string | undefined;
+        // Validate required arguments (support old param names for backward compatibility)
+        const targetAccountName = (args?.target_id || args?.target_account_name) as string | undefined;
+        const instanceId = (args?.source_id || args?.instance_id) as string | undefined;
         const location = args?.location as string | undefined;
         const restoreTimestamp = args?.restore_timestamp as string | undefined;
 
         if (!targetAccountName) {
             throw new Error(
-                "Required argument 'target_account_name' not provided.\n" +
+                "Required argument 'target_id' not provided.\n" +
                 "This is the name for the NEW account that will be created with restored data.\n\n" +
-                "Usage: monk do namespace/account restore target_account_name=\"restored-cosmos\" instance_id=\"xxx\" location=\"East US\" restore_timestamp=\"2024-12-01T10:00:00Z\""
+                "Usage: monk do namespace/account restore target_id=\"restored-cosmos\" source_id=\"xxx\" location=\"East US\" restore_timestamp=\"2024-12-01T10:00:00Z\""
             );
         }
 
         if (!instanceId) {
             throw new Error(
-                "Required argument 'instance_id' not provided.\n" +
-                "Get the instance ID by running: monk do namespace/account list-restorable-accounts"
+                "Required argument 'source_id' not provided.\n" +
+                "Get the source ID by running: monk do namespace/account list-restorable-accounts"
             );
         }
 
@@ -1125,7 +1125,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         cli.output(`   The original account will NOT be modified.\n`);
         cli.output(`   Target Account Name: ${targetAccountName}`);
         cli.output(`   Target Resource Group: ${targetResourceGroup}`);
-        cli.output(`   Source Instance ID: ${instanceId}`);
+        cli.output(`   Source ID: ${instanceId}`);
         cli.output(`   Location: ${location}`);
         cli.output(`   Restore Timestamp: ${restoreTimestamp}`);
 

@@ -1,0 +1,125 @@
+namespace: redis-cloud-backup-test
+
+# Redis Cloud Backup Test Template
+# This template creates Redis Cloud databases with backup support for testing
+
+# Essentials subscription with backup support
+backup-subscription:
+  defines: redis-cloud/essentials-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Backup-Test-Subscription
+  size: 250.0
+  provider: AWS
+  region: us-east-1
+  redis_flex: false
+  availability: No replication
+  support_data_persistence: false
+  support_instant_and_daily_backups: true
+  support_replication: false
+  support_clustering: false
+  support_ssl: true
+  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    subscription:
+      protocol: custom
+
+# Essentials database with backup configured
+backup-essentials-database:
+  defines: redis-cloud/essentials-database
+  subscription_id: <- connection-target("subscription") entity-state get-member("id")
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  password_secret_ref: redis-cloud-backup-db-password
+  name: backup-test-essentials-db
+  periodic_backup_path: s3://test-redis-cloud-backups
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+    redis-cloud-backup-db-password: true
+  services:
+    db:
+      protocol: custom
+  connections:
+    subscription:
+      runnable: redis-cloud-backup-test/backup-subscription
+      service: subscription
+  depends:
+    wait-for:
+      runnables:
+        - redis-cloud-backup-test/backup-subscription
+      timeout: 300
+
+# Pro subscription for advanced backup testing
+pro-backup-subscription:
+  defines: redis-cloud/pro-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Pro-Backup-Test-Subscription
+  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+  services:
+    subscription:
+      protocol: custom
+
+# Pro database with remote backup configured
+backup-pro-database:
+  defines: redis-cloud/pro-database
+  name: backup-test-pro-db
+  subscription_id: <- connection-target("subscription") entity-state get-member("id")
+  protocol: redis
+  dataset_size_in_gb: 0.1
+  redis_version: "7.2"
+  resp_version: resp3
+  support_oss_cluster_api: false
+  data_persistence: aof-every-1-second
+  data_eviction_policy: volatile-lru
+  replication: false
+  password_secret_ref: redis-cloud-backup-pro-password
+  source_ip:
+    - 0.0.0.0/0
+  enable_tls: false
+  # Remote backup configuration
+  remote_backup:
+    active: true
+    interval: every-24-hours
+    storage_type: s3
+    storage_path: s3://test-redis-cloud-backups/pro
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+    redis-cloud-backup-pro-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    subscription:
+      runnable: redis-cloud-backup-test/pro-backup-subscription
+      service: subscription
+  depends:
+    wait-for:
+      runnables:
+        - redis-cloud-backup-test/pro-backup-subscription
+      timeout: 300
+
+# Stack Definitions
+
+essentials-backup-stack:
+  defines: process-group
+  runnable-list:
+    - redis-cloud-backup-test/backup-subscription
+    - redis-cloud-backup-test/backup-essentials-database
+
+pro-backup-stack:
+  defines: process-group
+  runnable-list:
+    - redis-cloud-backup-test/pro-backup-subscription
+    - redis-cloud-backup-test/backup-pro-database
+

@@ -679,6 +679,82 @@ export abstract class AWSRDSEntity<
     }
 
     /**
+     * Restore a DB instance from a snapshot
+     * Creates a new DB instance from the specified snapshot
+     * 
+     * @param snapshotIdentifier - The snapshot to restore from
+     * @param targetInstanceIdentifier - The identifier for the new instance
+     * @param options - Optional configuration for the restored instance
+     */
+    protected restoreDBInstanceFromSnapshot(
+        snapshotIdentifier: string,
+        targetInstanceIdentifier: string,
+        options?: {
+            dbInstanceClass?: string;
+            port?: number;
+            availabilityZone?: string;
+            dbSubnetGroupName?: string;
+            multiAZ?: boolean;
+            publiclyAccessible?: boolean;
+            autoMinorVersionUpgrade?: boolean;
+            storageType?: string;
+            vpcSecurityGroupIds?: string[];
+            dbName?: string;
+            engine?: string;
+            tags?: Record<string, string>;
+        }
+    ): RDSResponse {
+        const params: Record<string, any> = {
+            DBSnapshotIdentifier: snapshotIdentifier,
+            DBInstanceIdentifier: targetInstanceIdentifier
+        };
+        
+        // Add optional parameters
+        if (options?.dbInstanceClass) {
+            params.DBInstanceClass = options.dbInstanceClass;
+        }
+        if (options?.port !== undefined) {
+            params.Port = options.port;
+        }
+        if (options?.availabilityZone) {
+            params.AvailabilityZone = options.availabilityZone;
+        }
+        if (options?.dbSubnetGroupName) {
+            params.DBSubnetGroupName = options.dbSubnetGroupName;
+        }
+        if (options?.multiAZ !== undefined) {
+            params.MultiAZ = options.multiAZ;
+        }
+        if (options?.publiclyAccessible !== undefined) {
+            params.PubliclyAccessible = options.publiclyAccessible;
+        }
+        if (options?.autoMinorVersionUpgrade !== undefined) {
+            params.AutoMinorVersionUpgrade = options.autoMinorVersionUpgrade;
+        }
+        if (options?.storageType) {
+            params.StorageType = options.storageType;
+        }
+        if (options?.vpcSecurityGroupIds && options.vpcSecurityGroupIds.length > 0) {
+            params.VpcSecurityGroupIds = options.vpcSecurityGroupIds;
+        }
+        if (options?.dbName) {
+            params.DBName = options.dbName;
+        }
+        if (options?.engine) {
+            params.Engine = options.engine;
+        }
+        if (options?.tags && Object.keys(options.tags).length > 0) {
+            const tagList: any[] = [];
+            Object.entries(options.tags).forEach(([key, value]) => {
+                tagList.push({ Key: key, Value: value });
+            });
+            params.Tags = tagList;
+        }
+        
+        return this.makeRDSRequest('RestoreDBInstanceFromDBSnapshot', params);
+    }
+
+    /**
      * Parse snapshot information from RDS API XML response
      */
     private parseSnapshotsFromResponse(response: any): DBSnapshot[] {

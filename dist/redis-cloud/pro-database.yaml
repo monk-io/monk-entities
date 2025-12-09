@@ -3,7 +3,7 @@ pro-database:
   defines: entity
   metadata:
     name: ProDatabase
-    version-hash: daf4c6568d15
+    version-hash: ff214627e5dd
   schema:
     account_key_secret:
       type: string
@@ -292,9 +292,10 @@ pro-database:
       additionalProperties: false
   lifecycle:
     sync: <<< pro-database-sync.js
-    backup: ''
+    get-backup-info: ''
+    create-snapshot: ''
     restore: ''
-    list-backups: ''
+    list-snapshots: ''
   checks:
     readiness:
       period: 5

@@ -518,7 +518,7 @@ Found ${accounts.length} restorable account(s):
       }
       cli.output(`==================================================`);
       cli.output(`
-\u{1F4A1} Use the Instance ID with 'list-restorable-databases' action`);
+\u{1F4A1} Use the Instance ID as 'source_id' with 'list-restorable-databases' action`);
       cli.output(`   to see which databases can be restored.`);
     } catch (error) {
       cli.output(`
@@ -530,26 +530,26 @@ Found ${accounts.length} restorable account(s):
     cli.output(`==================================================`);
     cli.output(`\u{1F4CB} Restorable Databases`);
     cli.output(`==================================================`);
-    const instanceId = args?.instance_id;
+    const instanceId = args?.source_id || args?.instance_id;
     const location = args?.location;
     if (!instanceId) {
       throw new Error(
-        `Required argument 'instance_id' not provided.
-Usage: monk do namespace/account list-restorable-databases instance_id="xxx" location="East US"
+        `Required argument 'source_id' not provided.
+Usage: monk do namespace/account list-restorable-databases source_id="xxx" location="East US"
 
-To find instance IDs, run: monk do namespace/account list-restorable-accounts`
+To find source IDs, run: monk do namespace/account list-restorable-accounts`
       );
     }
     if (!location) {
       throw new Error(
         `Required argument 'location' not provided.
-Usage: monk do namespace/account list-restorable-databases instance_id="xxx" location="East US"`
+Usage: monk do namespace/account list-restorable-databases source_id="xxx" location="East US"`
       );
     }
     try {
       const encodedLocation = location.replace(/ /g, "%20");
       const path = `/subscriptions/${this.definition.subscription_id}/providers/Microsoft.DocumentDB/locations/${encodedLocation}/restorableDatabaseAccounts/${instanceId}/restorableSqlDatabases?api-version=${this.apiVersion}`;
-      cli.output(`Instance ID: ${instanceId}`);
+      cli.output(`Source ID: ${instanceId}`);
       cli.output(`Location: ${location}
 `);
       const response = this.makeAzureRequest("GET", path);
@@ -590,13 +590,13 @@ No restorable databases found for this account.`);
     cli.output(`==================================================`);
     cli.output(`\u{1F4CB} Restorable Containers`);
     cli.output(`==================================================`);
-    const instanceId = args?.instance_id;
+    const instanceId = args?.source_id || args?.instance_id;
     const location = args?.location;
     const databaseRid = args?.database_rid;
     if (!instanceId || !location) {
       throw new Error(
-        `Required arguments 'instance_id' and 'location' not provided.
-Usage: monk do namespace/account list-restorable-containers instance_id="xxx" location="East US" database_rid="xxx"`
+        `Required arguments 'source_id' and 'location' not provided.
+Usage: monk do namespace/account list-restorable-containers source_id="xxx" location="East US" database_rid="xxx"`
       );
     }
     try {
@@ -606,7 +606,7 @@ Usage: monk do namespace/account list-restorable-containers instance_id="xxx" lo
         path += `&restorableSqlDatabaseRid=${databaseRid}`;
         cli.output(`Database RID filter: ${databaseRid}`);
       }
-      cli.output(`Instance ID: ${instanceId}`);
+      cli.output(`Source ID: ${instanceId}`);
       cli.output(`Location: ${location}
 `);
       const response = this.makeAzureRequest("GET", path);
@@ -645,21 +645,21 @@ No restorable containers found.`);
     cli.output(`==================================================`);
     cli.output(`\u{1F504} RESTORE OPERATION`);
     cli.output(`==================================================`);
-    const targetAccountName = args?.target_account_name;
-    const instanceId = args?.instance_id;
+    const targetAccountName = args?.target_id || args?.target_account_name;
+    const instanceId = args?.source_id || args?.instance_id;
     const location = args?.location;
     const restoreTimestamp = args?.restore_timestamp;
     if (!targetAccountName) {
       throw new Error(
-        `Required argument 'target_account_name' not provided.
+        `Required argument 'target_id' not provided.
 This is the name for the NEW account that will be created with restored data.
 
-Usage: monk do namespace/account restore target_account_name="restored-cosmos" instance_id="xxx" location="East US" restore_timestamp="2024-12-01T10:00:00Z"`
+Usage: monk do namespace/account restore target_id="restored-cosmos" source_id="xxx" location="East US" restore_timestamp="2024-12-01T10:00:00Z"`
       );
     }
     if (!instanceId) {
       throw new Error(
-        "Required argument 'instance_id' not provided.\nGet the instance ID by running: monk do namespace/account list-restorable-accounts"
+        "Required argument 'source_id' not provided.\nGet the source ID by running: monk do namespace/account list-restorable-accounts"
       );
     }
     if (!location) {
@@ -682,7 +682,7 @@ Specify the point-in-time to restore to in ISO 8601 format (e.g., restore_timest
 `);
     cli.output(`   Target Account Name: ${targetAccountName}`);
     cli.output(`   Target Resource Group: ${targetResourceGroup}`);
-    cli.output(`   Source Instance ID: ${instanceId}`);
+    cli.output(`   Source ID: ${instanceId}`);
     cli.output(`   Location: ${location}`);
     cli.output(`   Restore Timestamp: ${restoreTimestamp}`);
     try {

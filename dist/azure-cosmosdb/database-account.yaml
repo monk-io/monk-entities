@@ -3,7 +3,7 @@ database-account:
   defines: entity
   metadata:
     name: DatabaseAccount
-    version-hash: 742444944feb
+    version-hash: 9df870fd7da9
   schema:
     subscription_id:
       type: string

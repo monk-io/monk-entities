@@ -55,8 +55,8 @@ const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
 const cli = require("cli");
 const MonkecBase = require("monkec/base");
 var action2 = MonkecBase.action;
-var _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _backupCluster_dec, _a, _init;
-var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _backupCluster_dec = [action2("backup")], _listSnapshots_dec = [action2("list-snapshots")], _restoreCluster_dec = [action2("restore")], _getRestoreStatus_dec = [action2("restore-status")], _listRestoreJobs_dec = [action2("list-restore-jobs")], _a) {
+var _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
+var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _restoreCluster_dec = [action2("restore")], _getRestoreStatus_dec = [action2("get-restore-status")], _listRestoreJobs_dec = [action2("list-restore-jobs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -189,7 +189,50 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _backupCluster_d
       );
     }
   }
-  backupCluster(args) {
+  getBackupInfo(_args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4E6} Backup Information for cluster: ${this.definition.name}`);
+    cli.output(`Project ID: ${this.definition.project_id}`);
+    cli.output(`==================================================`);
+    if (!this.state.id) {
+      throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
+    }
+    try {
+      const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
+      if (!clusterData) {
+        throw new Error(`Cluster ${this.definition.name} not found`);
+      }
+      cli.output(`
+\u{1F527} Cluster Configuration:`);
+      cli.output(`   Cluster Tier: ${this.definition.instance_size}`);
+      cli.output(`   Provider: ${this.definition.provider}`);
+      cli.output(`   Region: ${this.definition.region}`);
+      const backupSupported = !this.isSharedTier();
+      cli.output(`   Backup Supported: ${backupSupported ? "\u2705 Yes (M10+)" : "\u274C No (shared tier)"}`);
+      if (clusterData.backupEnabled !== void 0) {
+        cli.output(`   Backup Enabled: ${clusterData.backupEnabled ? "\u2705 Yes" : "\u274C No"}`);
+      }
+      if (!backupSupported) {
+        cli.output(`
+\u26A0\uFE0F  Note: Backups require a dedicated cluster (M10 or higher).`);
+        cli.output(`   Current tier ${this.definition.instance_size} is a shared tier.`);
+      } else {
+        cli.output(`
+\u{1F4CB} To create a manual snapshot:`);
+        cli.output(`   monk do namespace/cluster create-snapshot`);
+        cli.output(`
+\u{1F4CB} To list all snapshots:`);
+        cli.output(`   monk do namespace/cluster list-snapshots`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get backup info`);
+      throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  createSnapshot(args) {
     cli.output(`==================================================`);
     cli.output(`Creating backup snapshot for cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
@@ -199,7 +242,7 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _backupCluster_d
       throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
     }
     const description = args?.description || `Manual backup at ${(/* @__PURE__ */ new Date()).toISOString()}`;
-    const retentionInDays = Number(args?.retentionInDays) || 7;
+    const retentionInDays = Number(args?.retention_days || args?.retentionInDays) || 7;
     cli.output(`Description: ${description}`);
     cli.output(`Retention: ${retentionInDays} days`);
     const body = {
@@ -252,7 +295,7 @@ Total snapshots available: ${totalCount}`);
 `);
       if (snapshots.length === 0) {
         cli.output(`No snapshots found for this cluster.`);
-        cli.output(`Create a snapshot using: monk do namespace/cluster backup`);
+        cli.output(`Create a snapshot using: monk do namespace/cluster create-snapshot`);
       } else {
         const displaySnapshots = snapshots.slice(0, limit);
         for (let i = 0; i < displaySnapshots.length; i++) {
@@ -296,20 +339,28 @@ Total snapshots available: ${totalCount}`);
     if (!this.state.id) {
       throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
     }
-    const snapshotId = args?.snapshotId;
-    const pointInTimeUTCSeconds = args?.pointInTimeUTCSeconds ? Number(args.pointInTimeUTCSeconds) : void 0;
+    const snapshotId = args?.snapshot_id || args?.snapshotId;
+    let pointInTimeUTCSeconds;
+    const restoreTimestamp = args?.restore_timestamp || args?.pointInTimeUTCSeconds;
+    if (restoreTimestamp) {
+      if (typeof restoreTimestamp === "string" && restoreTimestamp.includes("T")) {
+        pointInTimeUTCSeconds = Math.floor(new Date(restoreTimestamp).getTime() / 1e3);
+      } else {
+        pointInTimeUTCSeconds = Number(restoreTimestamp);
+      }
+    }
     if (!snapshotId && !pointInTimeUTCSeconds) {
       throw new Error(
-        `Either 'snapshotId' or 'pointInTimeUTCSeconds' is required.
+        `Either 'snapshot_id' or 'restore_timestamp' is required.
 Usage:
-  monk do namespace/cluster restore snapshotId="your-snapshot-id"
-  monk do namespace/cluster restore pointInTimeUTCSeconds=1700000000
+  monk do namespace/cluster restore snapshot_id="your-snapshot-id"
+  monk do namespace/cluster restore restore_timestamp="2024-12-01T10:00:00Z"
 
 To find snapshot IDs, run: monk do namespace/cluster list-snapshots`
       );
     }
-    const targetClusterName = args?.targetClusterName || this.definition.name;
-    const targetProjectId = args?.targetProjectId || this.definition.project_id;
+    const targetClusterName = args?.target_id || args?.targetClusterName || this.definition.name;
+    const targetProjectId = args?.target_project_id || args?.targetProjectId || this.definition.project_id;
     cli.output(`
 \u26A0\uFE0F  WARNING: This operation will:`);
     if (targetClusterName === this.definition.name) {
@@ -358,7 +409,7 @@ Restoring to Point-in-Time: ${restoreDate}`);
       }
       cli.output(`
 \u{1F4CB} To check restore progress:`);
-      cli.output(`   monk do namespace/cluster restore-status jobId="${response.id}"`);
+      cli.output(`   monk do namespace/cluster get-restore-status job_id="${response.id}"`);
       cli.output(`
 \u23F3 Restore may take several hours. The cluster will be read-only until complete.`);
       cli.output(`==================================================`);
@@ -374,11 +425,11 @@ Restoring to Point-in-Time: ${restoreDate}`);
     cli.output(`Cluster: ${this.definition.name}`);
     cli.output(`==================================================`);
     this.validateBackupSupport();
-    const jobId = args?.jobId;
+    const jobId = args?.job_id || args?.jobId;
     if (!jobId) {
       throw new Error(
-        `'jobId' is required.
-Usage: monk do namespace/cluster restore-status jobId="your-job-id"
+        `'job_id' is required.
+Usage: monk do namespace/cluster get-restore-status job_id="your-job-id"
 
 To find job IDs, run: monk do namespace/cluster list-restore-jobs`
       );
@@ -415,7 +466,7 @@ To find job IDs, run: monk do namespace/cluster list-restore-jobs`
         cli.output(`
 \u23F3 Restore is still in progress...`);
         cli.output(`   The cluster is READ-ONLY until restore completes.`);
-        cli.output(`   Check again later with: monk do namespace/cluster restore-status jobId="${jobId}"`);
+        cli.output(`   Check again later with: monk do namespace/cluster get-restore-status job_id="${jobId}"`);
       } else if (status === "FAILED" || status === "CANCELLED") {
         cli.output(`
 \u274C Restore ${status.toLowerCase()}!`);
@@ -451,7 +502,7 @@ Total restore jobs: ${totalCount}`);
 `);
       if (jobs.length === 0) {
         cli.output(`No restore jobs found for this cluster.`);
-        cli.output(`Create a restore job using: monk do namespace/cluster restore snapshotId="xxx"`);
+        cli.output(`Create a restore job using: monk do namespace/cluster restore snapshot_id="xxx"`);
       } else {
         const displayJobs = jobs.slice(0, limit);
         for (let i = 0; i < displayJobs.length; i++) {
@@ -507,7 +558,8 @@ ${statusIcon} Restore Job #${i + 1}`);
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "backupCluster", _backupCluster_dec, _Cluster);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _Cluster);
+__decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _Cluster);
 __decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _Cluster);
 __decorateElement(_init, 1, "restoreCluster", _restoreCluster_dec, _Cluster);
 __decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _Cluster);

@@ -392,6 +392,73 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     }
 
     /**
+     * Get backup configuration and status information for the RDS instance
+     * 
+     * Shows current backup settings including retention period, backup window,
+     * and the latest automated backup information.
+     * 
+     * Usage:
+     * - monk do namespace/instance get-backup-info
+     */
+    @action("get-backup-info")
+    getBackupInfo(_args?: MonkecBase.Args): void {
+        const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+        
+        cli.output(`==================================================`);
+        cli.output(`📦 Backup Information for RDS instance`);
+        cli.output(`Instance: ${dbInstanceIdentifier}`);
+        cli.output(`Region: ${this.region}`);
+        cli.output(`==================================================`);
+        
+        if (!this.state.db_instance_identifier) {
+            cli.output(`\n❌ DB instance ${dbInstanceIdentifier} not found in entity state`);
+            throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+        }
+        
+        try {
+            const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+            if (!response) {
+                cli.output(`\n❌ DB instance ${dbInstanceIdentifier} not found in AWS`);
+                throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+            }
+            
+            const dbInstance = response.DBInstance;
+            if (!dbInstance) {
+                cli.output(`\n❌ No DB instance data returned for ${dbInstanceIdentifier}`);
+                throw new Error(`No DB instance data returned for ${dbInstanceIdentifier}`);
+            }
+            
+            cli.output(`\n🔧 Backup Configuration:`);
+            cli.output(`   Backup Retention Period: ${dbInstance.BackupRetentionPeriod || 0} days`);
+            cli.output(`   Preferred Backup Window: ${dbInstance.PreferredBackupWindow || 'Not set'}`);
+            cli.output(`   Auto Minor Version Upgrade: ${(dbInstance as any)?.AutoMinorVersionUpgrade ? 'Yes' : 'No'}`);
+            
+            // Check if automated backups are enabled
+            const backupEnabled = (dbInstance.BackupRetentionPeriod || 0) > 0;
+            cli.output(`   Automated Backups: ${backupEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+            
+            if (!backupEnabled) {
+                cli.output(`\n⚠️  Note: Set backup_retention_period > 0 to enable automated backups`);
+            }
+            
+            // Show latest restorable time if available
+            if ((dbInstance as any)?.LatestRestorableTime) {
+                cli.output(`\n📅 Latest Restorable Time: ${(dbInstance as any).LatestRestorableTime}`);
+            }
+            
+            cli.output(`\n📋 To create a manual snapshot:`);
+            cli.output(`   monk do namespace/instance create-snapshot`);
+            cli.output(`\n📋 To list all snapshots:`);
+            cli.output(`   monk do namespace/instance list-snapshots`);
+            cli.output(`\n==================================================`);
+            
+        } catch (error) {
+            cli.output(`\n❌ Failed to get backup info`);
+            throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
      * Create an on-demand backup snapshot of the RDS instance
      * 
      * Creates a manual snapshot that persists until explicitly deleted.
@@ -618,7 +685,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             // Show usage hints based on status
             if (snapshot.status === 'available') {
                 cli.output(`\n📋 This snapshot can be used for restore operations.`);
-                cli.output(`   Use: monk do namespace/instance restore snapshot_id="${snapshotId}"`);
+                cli.output(`   Use: monk do namespace/instance restore snapshot_id="${snapshotId}" target_id="new-instance"`);
             } else if (snapshot.status === 'creating') {
                 cli.output(`\n⏳ Snapshot is still being created. Check back later.`);
             }
@@ -721,6 +788,188 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 return '❌';
             default:
                 return '📷';
+        }
+    }
+
+    /**
+     * Restore a new RDS instance from a snapshot
+     * 
+     * ⚠️ WARNING: This creates a NEW DB instance from the snapshot.
+     * The original instance is NOT affected.
+     * 
+     * Usage:
+     * - monk do namespace/instance restore snapshot_id="my-snapshot" target_id="restored-db"
+     * - monk do namespace/instance restore snapshot_id="my-snapshot" target_id="restored-db" instance_class="db.t3.medium"
+     * - monk do namespace/instance restore snapshot_id="my-snapshot" target_id="restored-db" publicly_accessible=true
+     * 
+     * @param args Required/Optional arguments:
+     *   - snapshot_id: The snapshot identifier to restore from (required)
+     *   - target_id: The identifier for the new instance (required)
+     *   - instance_class: DB instance class (optional, uses snapshot's original if not specified)
+     *   - port: Database port (optional)
+     *   - availability_zone: Availability zone (optional)
+     *   - db_subnet_group_name: DB subnet group (optional)
+     *   - multi_az: Enable Multi-AZ (optional, true/false)
+     *   - publicly_accessible: Enable public access (optional, true/false)
+     *   - storage_type: Storage type gp2/gp3/io1 (optional)
+     *   - vpc_security_group_ids: Comma-separated security group IDs (optional)
+     */
+    @action("restore")
+    restoreFromSnapshot(args?: MonkecBase.Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE RDS INSTANCE FROM SNAPSHOT`);
+        cli.output(`==================================================`);
+        cli.output(`Region: ${this.region}`);
+        
+        // Validate required parameters
+        const snapshotId = args?.snapshot_id as string | undefined;
+        const targetInstanceId = (args?.target_id || args?.target_instance_id) as string | undefined; // Support both for backward compatibility
+        
+        if (!snapshotId) {
+            cli.output(`\n❌ 'snapshot_id' is required`);
+            cli.output(`\nUsage:`);
+            cli.output(`  monk do namespace/instance restore snapshot_id="my-snapshot" target_id="new-db"`);
+            cli.output(`\nTo find snapshot IDs, run:`);
+            cli.output(`  monk do namespace/instance list-snapshots`);
+            cli.output(`==================================================`);
+            throw new Error("'snapshot_id' is required for restore operation");
+        }
+        
+        if (!targetInstanceId) {
+            cli.output(`\n❌ 'target_id' is required`);
+            cli.output(`\nUsage:`);
+            cli.output(`  monk do namespace/instance restore snapshot_id="${snapshotId}" target_id="new-db"`);
+            cli.output(`==================================================`);
+            throw new Error("'target_id' is required for restore operation");
+        }
+        
+        // Validate snapshot exists
+        cli.output(`\nValidating snapshot: ${snapshotId}`);
+        const snapshot = this.describeDBSnapshot(snapshotId);
+        
+        if (!snapshot) {
+            cli.output(`\n❌ Snapshot not found: ${snapshotId}`);
+            throw new Error(`Snapshot ${snapshotId} not found`);
+        }
+        
+        if (snapshot.status !== 'available') {
+            cli.output(`\n❌ Snapshot is not available (status: ${snapshot.status})`);
+            throw new Error(`Snapshot ${snapshotId} is not available for restore (status: ${snapshot.status})`);
+        }
+        
+        // Check if target instance already exists
+        const existingInstance = this.checkDBInstanceExists(targetInstanceId);
+        if (existingInstance) {
+            cli.output(`\n❌ Target instance already exists: ${targetInstanceId}`);
+            throw new Error(`Cannot restore: DB instance ${targetInstanceId} already exists`);
+        }
+        
+        cli.output(`✅ Snapshot found: ${snapshot.db_snapshot_identifier}`);
+        cli.output(`   Source Instance: ${snapshot.db_instance_identifier}`);
+        cli.output(`   Engine: ${snapshot.engine || 'N/A'} ${snapshot.engine_version || ''}`);
+        cli.output(`   Storage: ${snapshot.allocated_storage || 0} GB`);
+        cli.output(`   Created: ${snapshot.snapshot_create_time || 'N/A'}`);
+        
+        // Build restore options
+        const options: {
+            dbInstanceClass?: string;
+            port?: number;
+            availabilityZone?: string;
+            dbSubnetGroupName?: string;
+            multiAZ?: boolean;
+            publiclyAccessible?: boolean;
+            autoMinorVersionUpgrade?: boolean;
+            storageType?: string;
+            vpcSecurityGroupIds?: string[];
+            tags?: Record<string, string>;
+        } = {};
+        
+        // Parse optional parameters
+        if (args?.instance_class) {
+            options.dbInstanceClass = args.instance_class as string;
+        }
+        if (args?.port) {
+            options.port = Number(args.port);
+        }
+        if (args?.availability_zone) {
+            options.availabilityZone = args.availability_zone as string;
+        }
+        if (args?.db_subnet_group_name) {
+            options.dbSubnetGroupName = args.db_subnet_group_name as string;
+        }
+        if (args?.multi_az !== undefined) {
+            options.multiAZ = String(args.multi_az) === 'true';
+        }
+        if (args?.publicly_accessible !== undefined) {
+            options.publiclyAccessible = String(args.publicly_accessible) === 'true';
+        }
+        if (args?.storage_type) {
+            options.storageType = args.storage_type as string;
+        }
+        if (args?.vpc_security_group_ids) {
+            const sgIds = (args.vpc_security_group_ids as string).split(',').map(s => s.trim()).filter(s => s);
+            if (sgIds.length > 0) {
+                options.vpcSecurityGroupIds = sgIds;
+            }
+        }
+        
+        // Add tags
+        options.tags = {
+            'RestoredFrom': snapshotId,
+            'RestoredBy': 'monk-rds-entity',
+            'RestoredAt': new Date().toISOString()
+        };
+        
+        // Show restore configuration
+        cli.output(`\n--------------------------------------------------`);
+        cli.output(`📋 Restore Configuration:`);
+        cli.output(`   Target Instance ID: ${targetInstanceId}`);
+        cli.output(`   Source Snapshot: ${snapshotId}`);
+        if (options.dbInstanceClass) cli.output(`   Instance Class: ${options.dbInstanceClass}`);
+        if (options.port) cli.output(`   Port: ${options.port}`);
+        if (options.availabilityZone) cli.output(`   Availability Zone: ${options.availabilityZone}`);
+        if (options.dbSubnetGroupName) cli.output(`   Subnet Group: ${options.dbSubnetGroupName}`);
+        if (options.multiAZ !== undefined) cli.output(`   Multi-AZ: ${options.multiAZ}`);
+        if (options.publiclyAccessible !== undefined) cli.output(`   Publicly Accessible: ${options.publiclyAccessible}`);
+        if (options.storageType) cli.output(`   Storage Type: ${options.storageType}`);
+        if (options.vpcSecurityGroupIds) cli.output(`   Security Groups: ${options.vpcSecurityGroupIds.join(', ')}`);
+        
+        cli.output(`\n⚠️  WARNING: This will create a NEW RDS instance.`);
+        cli.output(`   The original instance will NOT be affected.`);
+        cli.output(`--------------------------------------------------`);
+        
+        try {
+            cli.output(`\n🚀 Initiating restore operation...`);
+            
+            const response = this.restoreDBInstanceFromSnapshot(snapshotId, targetInstanceId, options);
+            
+            if (response?.DBInstance) {
+                cli.output(`\n✅ Restore initiated successfully!`);
+                cli.output(`   New Instance ID: ${response.DBInstance.DBInstanceIdentifier}`);
+                cli.output(`   Status: ${response.DBInstance.DBInstanceStatus || 'creating'}`);
+                cli.output(`   Engine: ${response.DBInstance.Engine || snapshot.engine}`);
+                
+                if (response.DBInstance.DBInstanceClass) {
+                    cli.output(`   Instance Class: ${response.DBInstance.DBInstanceClass}`);
+                }
+                
+                cli.output(`\n⏳ The instance is being restored. This may take several minutes.`);
+                cli.output(`\n📋 To check the status of the restored instance:`);
+                cli.output(`   aws rds describe-db-instances --db-instance-identifier ${targetInstanceId} --region ${this.region}`);
+                cli.output(`\n📋 Once available, you can connect using the endpoint shown in AWS Console.`);
+                cli.output(`\n⚠️  Note: The restored instance will have a new endpoint address.`);
+                cli.output(`   You may need to update your application configuration.`);
+            } else {
+                cli.output(`\n⚠️  Restore initiated but no instance details returned.`);
+                cli.output(`   Check AWS Console for status.`);
+            }
+            
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to restore from snapshot`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Restore failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

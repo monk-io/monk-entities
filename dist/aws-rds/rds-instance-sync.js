@@ -62,8 +62,8 @@ const buildCreateInstanceParams = common.buildCreateInstanceParams;
 const buildModifyInstanceParams = common.buildModifyInstanceParams;
 const formatInstanceState = common.formatInstanceState;
 var action2 = MonkecBase.action;
-var _getConnectionInfo_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
-var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
+var _getConnectionInfo_dec, _restoreFromSnapshot_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
+var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _restoreFromSnapshot_dec = [action2("restore")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -316,6 +316,60 @@ var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceIn
       throw new Error(errorMsg);
     }
   }
+  getBackupInfo(_args) {
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4E6} Backup Information for RDS instance`);
+    cli.output(`Instance: ${dbInstanceIdentifier}`);
+    cli.output(`Region: ${this.region}`);
+    cli.output(`==================================================`);
+    if (!this.state.db_instance_identifier) {
+      cli.output(`
+\u274C DB instance ${dbInstanceIdentifier} not found in entity state`);
+      throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+    }
+    try {
+      const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+      if (!response) {
+        cli.output(`
+\u274C DB instance ${dbInstanceIdentifier} not found in AWS`);
+        throw new Error(`DB instance ${dbInstanceIdentifier} not found`);
+      }
+      const dbInstance = response.DBInstance;
+      if (!dbInstance) {
+        cli.output(`
+\u274C No DB instance data returned for ${dbInstanceIdentifier}`);
+        throw new Error(`No DB instance data returned for ${dbInstanceIdentifier}`);
+      }
+      cli.output(`
+\u{1F527} Backup Configuration:`);
+      cli.output(`   Backup Retention Period: ${dbInstance.BackupRetentionPeriod || 0} days`);
+      cli.output(`   Preferred Backup Window: ${dbInstance.PreferredBackupWindow || "Not set"}`);
+      cli.output(`   Auto Minor Version Upgrade: ${dbInstance?.AutoMinorVersionUpgrade ? "Yes" : "No"}`);
+      const backupEnabled = (dbInstance.BackupRetentionPeriod || 0) > 0;
+      cli.output(`   Automated Backups: ${backupEnabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
+      if (!backupEnabled) {
+        cli.output(`
+\u26A0\uFE0F  Note: Set backup_retention_period > 0 to enable automated backups`);
+      }
+      if (dbInstance?.LatestRestorableTime) {
+        cli.output(`
+\u{1F4C5} Latest Restorable Time: ${dbInstance.LatestRestorableTime}`);
+      }
+      cli.output(`
+\u{1F4CB} To create a manual snapshot:`);
+      cli.output(`   monk do namespace/instance create-snapshot`);
+      cli.output(`
+\u{1F4CB} To list all snapshots:`);
+      cli.output(`   monk do namespace/instance list-snapshots`);
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get backup info`);
+      throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   createSnapshot(args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     cli.output(`==================================================`);
@@ -472,7 +526,7 @@ ${statusIcon} Snapshot Details`);
       if (snapshot.status === "available") {
         cli.output(`
 \u{1F4CB} This snapshot can be used for restore operations.`);
-        cli.output(`   Use: monk do namespace/instance restore snapshot_id="${snapshotId}"`);
+        cli.output(`   Use: monk do namespace/instance restore snapshot_id="${snapshotId}" target_id="new-instance"`);
       } else if (snapshot.status === "creating") {
         cli.output(`
 \u23F3 Snapshot is still being created. Check back later.`);
@@ -559,6 +613,146 @@ To find snapshot IDs, run: monk do namespace/instance list-snapshots`
         return "\u{1F4F7}";
     }
   }
+  restoreFromSnapshot(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F504} RESTORE RDS INSTANCE FROM SNAPSHOT`);
+    cli.output(`==================================================`);
+    cli.output(`Region: ${this.region}`);
+    const snapshotId = args?.snapshot_id;
+    const targetInstanceId = args?.target_id || args?.target_instance_id;
+    if (!snapshotId) {
+      cli.output(`
+\u274C 'snapshot_id' is required`);
+      cli.output(`
+Usage:`);
+      cli.output(`  monk do namespace/instance restore snapshot_id="my-snapshot" target_id="new-db"`);
+      cli.output(`
+To find snapshot IDs, run:`);
+      cli.output(`  monk do namespace/instance list-snapshots`);
+      cli.output(`==================================================`);
+      throw new Error("'snapshot_id' is required for restore operation");
+    }
+    if (!targetInstanceId) {
+      cli.output(`
+\u274C 'target_id' is required`);
+      cli.output(`
+Usage:`);
+      cli.output(`  monk do namespace/instance restore snapshot_id="${snapshotId}" target_id="new-db"`);
+      cli.output(`==================================================`);
+      throw new Error("'target_id' is required for restore operation");
+    }
+    cli.output(`
+Validating snapshot: ${snapshotId}`);
+    const snapshot = this.describeDBSnapshot(snapshotId);
+    if (!snapshot) {
+      cli.output(`
+\u274C Snapshot not found: ${snapshotId}`);
+      throw new Error(`Snapshot ${snapshotId} not found`);
+    }
+    if (snapshot.status !== "available") {
+      cli.output(`
+\u274C Snapshot is not available (status: ${snapshot.status})`);
+      throw new Error(`Snapshot ${snapshotId} is not available for restore (status: ${snapshot.status})`);
+    }
+    const existingInstance = this.checkDBInstanceExists(targetInstanceId);
+    if (existingInstance) {
+      cli.output(`
+\u274C Target instance already exists: ${targetInstanceId}`);
+      throw new Error(`Cannot restore: DB instance ${targetInstanceId} already exists`);
+    }
+    cli.output(`\u2705 Snapshot found: ${snapshot.db_snapshot_identifier}`);
+    cli.output(`   Source Instance: ${snapshot.db_instance_identifier}`);
+    cli.output(`   Engine: ${snapshot.engine || "N/A"} ${snapshot.engine_version || ""}`);
+    cli.output(`   Storage: ${snapshot.allocated_storage || 0} GB`);
+    cli.output(`   Created: ${snapshot.snapshot_create_time || "N/A"}`);
+    const options = {};
+    if (args?.instance_class) {
+      options.dbInstanceClass = args.instance_class;
+    }
+    if (args?.port) {
+      options.port = Number(args.port);
+    }
+    if (args?.availability_zone) {
+      options.availabilityZone = args.availability_zone;
+    }
+    if (args?.db_subnet_group_name) {
+      options.dbSubnetGroupName = args.db_subnet_group_name;
+    }
+    if (args?.multi_az !== void 0) {
+      options.multiAZ = String(args.multi_az) === "true";
+    }
+    if (args?.publicly_accessible !== void 0) {
+      options.publiclyAccessible = String(args.publicly_accessible) === "true";
+    }
+    if (args?.storage_type) {
+      options.storageType = args.storage_type;
+    }
+    if (args?.vpc_security_group_ids) {
+      const sgIds = args.vpc_security_group_ids.split(",").map((s) => s.trim()).filter((s) => s);
+      if (sgIds.length > 0) {
+        options.vpcSecurityGroupIds = sgIds;
+      }
+    }
+    options.tags = {
+      "RestoredFrom": snapshotId,
+      "RestoredBy": "monk-rds-entity",
+      "RestoredAt": (/* @__PURE__ */ new Date()).toISOString()
+    };
+    cli.output(`
+--------------------------------------------------`);
+    cli.output(`\u{1F4CB} Restore Configuration:`);
+    cli.output(`   Target Instance ID: ${targetInstanceId}`);
+    cli.output(`   Source Snapshot: ${snapshotId}`);
+    if (options.dbInstanceClass) cli.output(`   Instance Class: ${options.dbInstanceClass}`);
+    if (options.port) cli.output(`   Port: ${options.port}`);
+    if (options.availabilityZone) cli.output(`   Availability Zone: ${options.availabilityZone}`);
+    if (options.dbSubnetGroupName) cli.output(`   Subnet Group: ${options.dbSubnetGroupName}`);
+    if (options.multiAZ !== void 0) cli.output(`   Multi-AZ: ${options.multiAZ}`);
+    if (options.publiclyAccessible !== void 0) cli.output(`   Publicly Accessible: ${options.publiclyAccessible}`);
+    if (options.storageType) cli.output(`   Storage Type: ${options.storageType}`);
+    if (options.vpcSecurityGroupIds) cli.output(`   Security Groups: ${options.vpcSecurityGroupIds.join(", ")}`);
+    cli.output(`
+\u26A0\uFE0F  WARNING: This will create a NEW RDS instance.`);
+    cli.output(`   The original instance will NOT be affected.`);
+    cli.output(`--------------------------------------------------`);
+    try {
+      cli.output(`
+\u{1F680} Initiating restore operation...`);
+      const response = this.restoreDBInstanceFromSnapshot(snapshotId, targetInstanceId, options);
+      if (response?.DBInstance) {
+        cli.output(`
+\u2705 Restore initiated successfully!`);
+        cli.output(`   New Instance ID: ${response.DBInstance.DBInstanceIdentifier}`);
+        cli.output(`   Status: ${response.DBInstance.DBInstanceStatus || "creating"}`);
+        cli.output(`   Engine: ${response.DBInstance.Engine || snapshot.engine}`);
+        if (response.DBInstance.DBInstanceClass) {
+          cli.output(`   Instance Class: ${response.DBInstance.DBInstanceClass}`);
+        }
+        cli.output(`
+\u23F3 The instance is being restored. This may take several minutes.`);
+        cli.output(`
+\u{1F4CB} To check the status of the restored instance:`);
+        cli.output(`   aws rds describe-db-instances --db-instance-identifier ${targetInstanceId} --region ${this.region}`);
+        cli.output(`
+\u{1F4CB} Once available, you can connect using the endpoint shown in AWS Console.`);
+        cli.output(`
+\u26A0\uFE0F  Note: The restored instance will have a new endpoint address.`);
+        cli.output(`   You may need to update your application configuration.`);
+      } else {
+        cli.output(`
+\u26A0\uFE0F  Restore initiated but no instance details returned.`);
+        cli.output(`   Check AWS Console for status.`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to restore from snapshot`);
+      cli.output(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      cli.output(`==================================================`);
+      throw new Error(`Restore failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   getConnectionInfo(_args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
@@ -611,10 +805,12 @@ To find snapshot IDs, run: monk do namespace/instance list-snapshots`
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInstanceInfo", _getInstanceInfo_dec, _RDSInstance);
 __decorateElement(_init, 1, "updatePassword", _updatePassword_dec, _RDSInstance);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _RDSInstance);
 __decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _RDSInstance);
 __decorateElement(_init, 1, "describeSnapshot", _describeSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "deleteSnapshot", _deleteSnapshot_dec, _RDSInstance);
+__decorateElement(_init, 1, "restoreFromSnapshot", _restoreFromSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _RDSInstance);
 __decoratorMetadata(_init, _RDSInstance);
 __name(_RDSInstance, "RDSInstance");

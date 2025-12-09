@@ -55,8 +55,8 @@ const base = require("redis-cloud/base");
 const RedisCloudEntity = base.RedisCloudEntity;
 const MonkecBase = require("monkec/base");
 var action2 = MonkecBase.action;
-var _listBackups_dec, _restore_dec, _backup_dec, _a, _init;
-var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEntity, _backup_dec = [action2("backup")], _restore_dec = [action2("restore")], _listBackups_dec = [action2()], _a) {
+var _listSnapshots_dec, _restore_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
+var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _restore_dec = [action2("restore")], _listSnapshots_dec = [action2("list-snapshots")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -270,7 +270,41 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
   checkLiveness() {
     return this.checkReadiness();
   }
-  backup(args) {
+  getBackupInfo(_args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4E6} Backup Information for Essentials database: ${this.state.name}`);
+    cli.output(`==================================================`);
+    cli.output(`Database ID: ${this.state.id}`);
+    cli.output(`Subscription ID: ${this.definition.subscription_id}`);
+    if (!this.state.id) {
+      throw new Error("Database ID is not available. Ensure the database is created and ready.");
+    }
+    try {
+      cli.output(`
+\u{1F527} Backup Configuration:`);
+      if (this.definition.periodic_backup_path) {
+        cli.output(`   Periodic Backup: \u2705 Enabled`);
+        cli.output(`   Backup Path: ${this.definition.periodic_backup_path}`);
+        cli.output(`   Interval: Every 24 hours`);
+      } else {
+        cli.output(`   Periodic Backup: \u274C Not configured`);
+        cli.output(`   Note: Set periodic_backup_path to enable automatic backups`);
+      }
+      cli.output(`
+\u{1F4CB} To create a manual snapshot:`);
+      cli.output(`   monk do namespace/database create-snapshot`);
+      cli.output(`
+\u{1F4CB} To list all backups:`);
+      cli.output(`   monk do namespace/database list-snapshots`);
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get backup info`);
+      throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  createSnapshot(args) {
     cli.output(`==================================================`);
     cli.output(`Starting backup for database: ${this.state.name}`);
     cli.output(`Database ID: ${this.state.id}`);
@@ -281,14 +315,15 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
       cli.output(`ERROR: Database ID is not available`);
       throw new Error("Database ID is not available. Cannot initiate backup.");
     }
-    if (!this.definition.periodic_backup_path && !args?.adhocBackupPath) {
+    const backupPath = args?.backup_path || args?.adhocBackupPath;
+    if (!this.definition.periodic_backup_path && !backupPath) {
       cli.output(`ERROR: No backup path configured`);
-      throw new Error("periodic_backup_path is not configured for this database, and no adhocBackupPath was provided. Cannot initiate backup.");
+      throw new Error("periodic_backup_path is not configured for this database, and no backup_path was provided. Cannot initiate backup.");
     }
     const body = {};
-    if (args?.adhocBackupPath) {
-      body.adhocBackupPath = args.adhocBackupPath;
-      cli.output(`Using ad-hoc backup path: ${args.adhocBackupPath}`);
+    if (backupPath) {
+      body.adhocBackupPath = backupPath;
+      cli.output(`Using ad-hoc backup path: ${backupPath}`);
     } else {
       cli.output(`Using configured periodic backup path`);
     }
@@ -343,25 +378,25 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
       cli.output(`\u274C ERROR: Database does not exist, cannot restore`);
       throw new Error("Database does not exist, cannot restore");
     }
-    const sourceType = args?.sourceType;
-    const importFromUri = args?.importFromUri;
+    const sourceType = args?.source_type || args?.sourceType;
+    const importFromUri = args?.source_uri || args?.importFromUri;
     if (!sourceType || !importFromUri) {
       cli.output(`\u274C ERROR: Missing required parameters`);
       cli.output(`Required parameters:`);
-      cli.output(`  - sourceType: Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)`);
-      cli.output(`  - importFromUri: URI to the backup file`);
+      cli.output(`  - source_type: Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)`);
+      cli.output(`  - source_uri: URI to the backup file`);
       cli.output(`--------------------------------------------------`);
       cli.output(`Example usage:`);
-      cli.output(`  monk do <namespace>/<database> restore sourceType="aws-s3" importFromUri="s3://bucket/backup.rdb"`);
+      cli.output(`  monk do <namespace>/<database> restore source_type="aws-s3" source_uri="s3://bucket/backup.rdb"`);
       cli.output(`==================================================`);
-      throw new Error("Both sourceType and importFromUri are required parameters");
+      throw new Error("Both source_type and source_uri are required parameters");
     }
     const validSourceTypes = ["aws-s3", "ftp", "google-blob-storage", "azure-blob-storage", "redis", "http"];
     if (!validSourceTypes.includes(sourceType)) {
-      cli.output(`\u274C ERROR: Invalid sourceType: ${sourceType}`);
+      cli.output(`\u274C ERROR: Invalid source_type: ${sourceType}`);
       cli.output(`Valid source types: ${validSourceTypes.join(", ")}`);
       cli.output(`==================================================`);
-      throw new Error(`Invalid sourceType: ${sourceType}`);
+      throw new Error(`Invalid source_type: ${sourceType}`);
     }
     cli.output(`\u26A0\uFE0F  WARNING: DESTRUCTIVE OPERATION!`);
     cli.output(`\u26A0\uFE0F  This will OVERWRITE ALL EXISTING DATA in the database!`);
@@ -435,7 +470,7 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
 ==================================================`);
     }
   }
-  listBackups() {
+  listSnapshots() {
     cli.output(`==================================================`);
     cli.output(`\u{1F4CB} Listing backups for database: ${this.state.name}`);
     cli.output(`==================================================`);
@@ -498,9 +533,10 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "backup", _backup_dec, _EssentialsDatabase);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _EssentialsDatabase);
+__decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _EssentialsDatabase);
 __decorateElement(_init, 1, "restore", _restore_dec, _EssentialsDatabase);
-__decorateElement(_init, 1, "listBackups", _listBackups_dec, _EssentialsDatabase);
+__decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _EssentialsDatabase);
 __decoratorMetadata(_init, _EssentialsDatabase);
 __name(_EssentialsDatabase, "EssentialsDatabase");
 var EssentialsDatabase = _EssentialsDatabase;

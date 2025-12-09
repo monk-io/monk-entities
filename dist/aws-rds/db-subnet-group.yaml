@@ -3,7 +3,7 @@ db-subnet-group:
   defines: entity
   metadata:
     name: DBSubnetGroup
-    version-hash: da55718119a6
+    version-hash: 27a8986f92a0
   schema:
     region:
       type: string

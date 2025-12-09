@@ -94,16 +94,28 @@ monk delete redis-cloud-example/stack
 
 Both Essentials and Pro databases support manual on-demand backups via custom actions.
 
+#### Get Backup Info
+
+View backup configuration for any database:
+
+```bash
+# Get backup info for Essentials database
+monk do redis-cloud-example/essentials-database get-backup-info
+
+# Get backup info for Pro database
+monk do redis-cloud-example/pro-database get-backup-info
+```
+
 #### Essentials Database Backup
 
 Back up an Essentials database to its configured `periodic_backup_path` or a custom location:
 
 ```bash
 # Backup to configured periodic_backup_path
-monk do redis-cloud-example/essentials-database backup
+monk do redis-cloud-example/essentials-database create-snapshot
 
 # Backup to custom location
-monk do redis-cloud-example/essentials-database backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
+monk do redis-cloud-example/essentials-database create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
 ```
 
 **Requirements:**
@@ -125,16 +137,16 @@ Back up a Pro database to its configured `remote_backup` location or a custom lo
 
 ```bash
 # Backup to configured remote_backup storage path
-monk do redis-cloud-example/pro-database backup
+monk do redis-cloud-example/pro-database create-snapshot
 
 # Backup to custom location
-monk do redis-cloud-example/pro-database backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
+monk do redis-cloud-example/pro-database create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
 
 # For Active-Active databases, backup specific region
-monk do redis-cloud-example/pro-database backup regionName="us-east-1"
+monk do redis-cloud-example/pro-database create-snapshot region_name="us-east-1"
 
 # Backup specific region to custom location
-monk do redis-cloud-example/pro-database backup regionName="us-east-1" adhocBackupPath="s3://custom-path/"
+monk do redis-cloud-example/pro-database create-snapshot region_name="us-east-1" backup_path="s3://custom-path/"
 ```
 
 **Requirements:**
@@ -162,6 +174,18 @@ pro-database:
 - Backup storage must have available capacity
 - Supported storage types: AWS S3, Google Cloud Storage, Azure Blob Storage, FTP
 
+#### List Snapshots
+
+View available backups for a database:
+
+```bash
+# List backups for Essentials database
+monk do redis-cloud-example/essentials-database list-snapshots
+
+# List backups for Pro database
+monk do redis-cloud-example/pro-database list-snapshots
+```
+
 ### Restore Actions
 
 Both Essentials and Pro databases support restoring/importing data from external storage locations.
@@ -175,23 +199,23 @@ Restore an Essentials database from an external backup file:
 ```bash
 # Restore from AWS S3
 monk do redis-cloud-example/essentials-database restore \
-  sourceType="aws-s3" \
-  importFromUri="s3://my-backups/redis/backup-2025-11-27.rdb"
+  source_type="aws-s3" \
+  source_uri="s3://my-backups/redis/backup-2025-11-27.rdb"
 
 # Restore from Google Cloud Storage
 monk do redis-cloud-example/essentials-database restore \
-  sourceType="google-blob-storage" \
-  importFromUri="gs://my-backups/redis/backup.rdb.gz"
+  source_type="google-blob-storage" \
+  source_uri="gs://my-backups/redis/backup.rdb.gz"
 
 # Restore from FTP server
 monk do redis-cloud-example/essentials-database restore \
-  sourceType="ftp" \
-  importFromUri="ftp://user:pass@ftp.example.com/backup.rdb"
+  source_type="ftp" \
+  source_uri="ftp://user:pass@ftp.example.com/backup.rdb"
 
 # Restore from HTTP server
 monk do redis-cloud-example/essentials-database restore \
-  sourceType="http" \
-  importFromUri="http://backups.example.com/redis/backup.rdb"
+  source_type="http" \
+  source_uri="http://backups.example.com/redis/backup.rdb"
 ```
 
 #### Pro Database Restore
@@ -201,23 +225,23 @@ Restore a Pro database from an external backup file:
 ```bash
 # Restore from AWS S3
 monk do redis-cloud-example/pro-database restore \
-  sourceType="aws-s3" \
-  importFromUri="s3://prod-backups/redis/latest.rdb"
+  source_type="aws-s3" \
+  source_uri="s3://prod-backups/redis/latest.rdb"
 
 # Restore from Azure Blob Storage
 monk do redis-cloud-example/pro-database restore \
-  sourceType="azure-blob-storage" \
-  importFromUri="abs://:accesskey@storageaccount/container/backup.rdb"
+  source_type="azure-blob-storage" \
+  source_uri="abs://:accesskey@storageaccount/container/backup.rdb"
 
 # Import from another Redis instance
 monk do redis-cloud-example/pro-database restore \
-  sourceType="redis" \
-  importFromUri="redis://password@source-host:6379"
+  source_type="redis" \
+  source_uri="redis://password@source-host:6379"
 ```
 
 #### Supported Source Types
 
-| Source Type | `sourceType` Value | URI Format |
+| Source Type | `source_type` Value | URI Format (`source_uri`) |
 |------------|-------------------|-----------|
 | AWS S3 | `aws-s3` | `s3://bucket/[path/]file.rdb[.gz]` |
 | Google Cloud Storage | `google-blob-storage` | `gs://bucket/[path/]file.rdb[.gz]` |

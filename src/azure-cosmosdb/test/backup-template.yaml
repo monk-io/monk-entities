@@ -1,0 +1,80 @@
+namespace: azure-cosmosdb-backup-test
+
+# Azure Cosmos DB Backup Test Template
+# This template creates a Cosmos DB account with continuous backup enabled for testing
+
+backup-account:
+  defines: azure-cosmosdb/database-account
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  account_name: monk-backup-test-cosmos
+  locations:
+    - location_name: East US
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: Session
+  backup_policy:
+    type: Continuous
+    continuous_mode_properties:
+      tier: Continuous7Days
+  enable_automatic_failover: false
+  enable_multiple_write_locations: false
+  public_network_access: Enabled
+  tags:
+    Environment: backup-test
+    Application: monkec-backup-test
+    ManagedBy: monk
+
+# Test database for backup/restore scenarios
+backup-database:
+  defines: azure-cosmosdb/database
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  account_name: <- connection-target("account") entity-state get-member("account_name")
+  database_name: backup-test-db
+  throughput: 400
+  connections:
+    account:
+      runnable: azure-cosmosdb-backup-test/backup-account
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-backup-test/backup-account
+      timeout: 300
+
+# Test container for backup/restore scenarios
+backup-container:
+  defines: azure-cosmosdb/container
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  account_name: <- connection-target("account") entity-state get-member("account_name")
+  database_name: <- connection-target("database") entity-state get-member("database_name")
+  container_name: backup-test-container
+  partition_key:
+    paths:
+      - /id
+    kind: Hash
+  throughput: 400
+  connections:
+    account:
+      runnable: azure-cosmosdb-backup-test/backup-account
+      service: data
+    database:
+      runnable: azure-cosmosdb-backup-test/backup-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-cosmosdb-backup-test/backup-database
+      timeout: 300
+
+# Stack Definition
+backup-stack:
+  defines: process-group
+  runnable-list:
+    - azure-cosmosdb-backup-test/backup-account
+    - azure-cosmosdb-backup-test/backup-database
+    - azure-cosmosdb-backup-test/backup-container
+

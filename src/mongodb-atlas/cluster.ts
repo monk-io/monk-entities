@@ -249,22 +249,78 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
     }
 
     /**
+     * Get backup configuration and status information for the cluster
+     * 
+     * Shows current backup settings and cluster backup capability.
+     * Backups are only available for M10+ (dedicated) clusters.
+     * 
+     * Usage:
+     * - monk do namespace/cluster get-backup-info
+     */
+    @action("get-backup-info")
+    getBackupInfo(_args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`📦 Backup Information for cluster: ${this.definition.name}`);
+        cli.output(`Project ID: ${this.definition.project_id}`);
+        cli.output(`==================================================`);
+
+        if (!this.state.id) {
+            throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
+        }
+
+        try {
+            const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
+            
+            if (!clusterData) {
+                throw new Error(`Cluster ${this.definition.name} not found`);
+            }
+
+            cli.output(`\n🔧 Cluster Configuration:`);
+            cli.output(`   Cluster Tier: ${this.definition.instance_size}`);
+            cli.output(`   Provider: ${this.definition.provider}`);
+            cli.output(`   Region: ${this.definition.region}`);
+            
+            const backupSupported = !this.isSharedTier();
+            cli.output(`   Backup Supported: ${backupSupported ? '✅ Yes (M10+)' : '❌ No (shared tier)'}`);
+            
+            if (clusterData.backupEnabled !== undefined) {
+                cli.output(`   Backup Enabled: ${clusterData.backupEnabled ? '✅ Yes' : '❌ No'}`);
+            }
+            
+            if (!backupSupported) {
+                cli.output(`\n⚠️  Note: Backups require a dedicated cluster (M10 or higher).`);
+                cli.output(`   Current tier ${this.definition.instance_size} is a shared tier.`);
+            } else {
+                cli.output(`\n📋 To create a manual snapshot:`);
+                cli.output(`   monk do namespace/cluster create-snapshot`);
+                cli.output(`\n📋 To list all snapshots:`);
+                cli.output(`   monk do namespace/cluster list-snapshots`);
+            }
+            
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get backup info`);
+            throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
      * Create an on-demand backup snapshot of the cluster
      * 
      * Backups are only available for M10+ (dedicated) clusters.
      * Snapshots are stored according to your backup retention policy.
      * 
      * Usage:
-     * - monk do namespace/cluster backup
-     * - monk do namespace/cluster backup description="Pre-migration backup"
-     * - monk do namespace/cluster backup description="Before upgrade" retentionInDays=14
+     * - monk do namespace/cluster create-snapshot
+     * - monk do namespace/cluster create-snapshot description="Pre-migration backup"
+     * - monk do namespace/cluster create-snapshot retention_days=14
      * 
      * @param args Optional arguments:
      *   - description: Description for the snapshot (default: "Manual backup at <timestamp>")
-     *   - retentionInDays: Number of days to retain the snapshot (default: 7)
+     *   - retention_days: Number of days to retain the snapshot (default: 7)
      */
-    @action("backup")
-    backupCluster(args?: Args): void {
+    @action("create-snapshot")
+    createSnapshot(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`Creating backup snapshot for cluster: ${this.definition.name}`);
         cli.output(`Project ID: ${this.definition.project_id}`);
@@ -278,7 +334,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         }
 
         const description = args?.description || `Manual backup at ${new Date().toISOString()}`;
-        const retentionInDays = Number(args?.retentionInDays) || 7;
+        const retentionInDays = Number(args?.retention_days || args?.retentionInDays) || 7; // Support both for backward compatibility
 
         cli.output(`Description: ${description}`);
         cli.output(`Retention: ${retentionInDays} days`);
@@ -353,7 +409,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
 
             if (snapshots.length === 0) {
                 cli.output(`No snapshots found for this cluster.`);
-                cli.output(`Create a snapshot using: monk do namespace/cluster backup`);
+                cli.output(`Create a snapshot using: monk do namespace/cluster create-snapshot`);
             } else {
                 const displaySnapshots = snapshots.slice(0, limit);
                 
@@ -396,15 +452,15 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
      * This operation may take several hours depending on data size.
      * 
      * Usage:
-     * - monk do namespace/cluster restore snapshotId="xxx"
-     * - monk do namespace/cluster restore snapshotId="xxx" targetClusterName="new-cluster"
-     * - monk do namespace/cluster restore pointInTimeUTCSeconds=1700000000
+     * - monk do namespace/cluster restore snapshot_id="xxx"
+     * - monk do namespace/cluster restore snapshot_id="xxx" target_id="new-cluster"
+     * - monk do namespace/cluster restore restore_timestamp="2024-12-01T10:00:00Z"
      * 
      * @param args Required/Optional arguments:
-     *   - snapshotId: ID of the snapshot to restore (required unless using pointInTimeUTCSeconds)
-     *   - pointInTimeUTCSeconds: Unix timestamp for point-in-time restore (alternative to snapshotId)
-     *   - targetClusterName: Target cluster name (default: current cluster - WARNING: overwrites data!)
-     *   - targetProjectId: Target project ID (default: current project)
+     *   - snapshot_id: ID of the snapshot to restore (required unless using restore_timestamp)
+     *   - restore_timestamp: ISO 8601 timestamp or Unix seconds for point-in-time restore (alternative to snapshot_id)
+     *   - target_id: Target cluster name (default: current cluster - WARNING: overwrites data!)
+     *   - target_project_id: Target project ID (default: current project)
      */
     @action("restore")
     restoreCluster(args?: Args): void {
@@ -421,22 +477,33 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
         }
 
-        // Validate required parameters
-        const snapshotId = args?.snapshotId as string | undefined;
-        const pointInTimeUTCSeconds = args?.pointInTimeUTCSeconds ? Number(args.pointInTimeUTCSeconds) : undefined;
+        // Validate required parameters (support old param names for backward compatibility)
+        const snapshotId = (args?.snapshot_id || args?.snapshotId) as string | undefined;
+        
+        // Handle restore_timestamp - can be ISO 8601 string or Unix seconds
+        let pointInTimeUTCSeconds: number | undefined;
+        const restoreTimestamp = args?.restore_timestamp || args?.pointInTimeUTCSeconds;
+        if (restoreTimestamp) {
+            if (typeof restoreTimestamp === 'string' && restoreTimestamp.includes('T')) {
+                // ISO 8601 format - convert to Unix seconds
+                pointInTimeUTCSeconds = Math.floor(new Date(restoreTimestamp).getTime() / 1000);
+            } else {
+                pointInTimeUTCSeconds = Number(restoreTimestamp);
+            }
+        }
 
         if (!snapshotId && !pointInTimeUTCSeconds) {
             throw new Error(
-                "Either 'snapshotId' or 'pointInTimeUTCSeconds' is required.\n" +
+                "Either 'snapshot_id' or 'restore_timestamp' is required.\n" +
                 "Usage:\n" +
-                "  monk do namespace/cluster restore snapshotId=\"your-snapshot-id\"\n" +
-                "  monk do namespace/cluster restore pointInTimeUTCSeconds=1700000000\n" +
+                "  monk do namespace/cluster restore snapshot_id=\"your-snapshot-id\"\n" +
+                "  monk do namespace/cluster restore restore_timestamp=\"2024-12-01T10:00:00Z\"\n" +
                 "\nTo find snapshot IDs, run: monk do namespace/cluster list-snapshots"
             );
         }
 
-        const targetClusterName = (args?.targetClusterName as string) || this.definition.name;
-        const targetProjectId = (args?.targetProjectId as string) || this.definition.project_id;
+        const targetClusterName = (args?.target_id || args?.targetClusterName as string) || this.definition.name;
+        const targetProjectId = (args?.target_project_id || args?.targetProjectId as string) || this.definition.project_id;
 
         // Show warnings
         cli.output(`\n⚠️  WARNING: This operation will:`);
@@ -490,7 +557,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             }
             
             cli.output(`\n📋 To check restore progress:`);
-            cli.output(`   monk do namespace/cluster restore-status jobId="${response.id}"`);
+            cli.output(`   monk do namespace/cluster get-restore-status job_id="${response.id}"`);
             cli.output(`\n⏳ Restore may take several hours. The cluster will be read-only until complete.`);
             cli.output(`==================================================`);
         } catch (error) {
@@ -503,12 +570,12 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
      * Check the status of a restore job
      * 
      * Usage:
-     * - monk do namespace/cluster restore-status jobId="xxx"
+     * - monk do namespace/cluster get-restore-status job_id="xxx"
      * 
      * @param args Required arguments:
-     *   - jobId: ID of the restore job to check
+     *   - job_id: ID of the restore job to check
      */
-    @action("restore-status")
+    @action("get-restore-status")
     getRestoreStatus(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`Checking restore job status`);
@@ -518,11 +585,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         // Validate cluster tier supports backups
         this.validateBackupSupport();
 
-        const jobId = args?.jobId as string | undefined;
+        const jobId = (args?.job_id || args?.jobId) as string | undefined; // Support both for backward compatibility
         if (!jobId) {
             throw new Error(
-                "'jobId' is required.\n" +
-                "Usage: monk do namespace/cluster restore-status jobId=\"your-job-id\"\n" +
+                "'job_id' is required.\n" +
+                "Usage: monk do namespace/cluster get-restore-status job_id=\"your-job-id\"\n" +
                 "\nTo find job IDs, run: monk do namespace/cluster list-restore-jobs"
             );
         }
@@ -561,7 +628,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             } else if (status === 'IN_PROGRESS' || status === 'PENDING') {
                 cli.output(`\n⏳ Restore is still in progress...`);
                 cli.output(`   The cluster is READ-ONLY until restore completes.`);
-                cli.output(`   Check again later with: monk do namespace/cluster restore-status jobId="${jobId}"`);
+                cli.output(`   Check again later with: monk do namespace/cluster get-restore-status job_id="${jobId}"`);
             } else if (status === 'FAILED' || status === 'CANCELLED') {
                 cli.output(`\n❌ Restore ${status.toLowerCase()}!`);
                 if (response.statusMessage) {
@@ -612,7 +679,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
 
             if (jobs.length === 0) {
                 cli.output(`No restore jobs found for this cluster.`);
-                cli.output(`Create a restore job using: monk do namespace/cluster restore snapshotId="xxx"`);
+                cli.output(`Create a restore job using: monk do namespace/cluster restore snapshot_id="xxx"`);
             } else {
                 const displayJobs = jobs.slice(0, limit);
                 
