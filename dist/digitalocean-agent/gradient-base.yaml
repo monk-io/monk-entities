@@ -2,4 +2,6 @@ namespace: digitalocean-agent
 
 gradient-base:
   defines: module
+  metadata:
+    version-hash: 5fc69e6c5200
   source: <<< gradient-base.js
