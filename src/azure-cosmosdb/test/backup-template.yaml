@@ -15,9 +15,8 @@ backup-account:
   consistency_policy:
     default_consistency_level: Session
   backup_policy:
-    type: Continuous
-    continuous_mode_properties:
-      tier: Continuous7Days
+    backup_type: Continuous
+    continuous_tier: Continuous7Days
   enable_automatic_failover: false
   enable_multiple_write_locations: false
   public_network_access: Enabled
