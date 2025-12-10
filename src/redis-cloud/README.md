@@ -100,10 +100,10 @@ View backup configuration for any database:
 
 ```bash
 # Get backup info for Essentials database
-monk do redis-cloud-example/essentials-database get-backup-info
+monk do redis-cloud-example/essentials-database/get-backup-info
 
 # Get backup info for Pro database
-monk do redis-cloud-example/pro-database get-backup-info
+monk do redis-cloud-example/pro-database/get-backup-info
 ```
 
 #### Essentials Database Backup
@@ -112,15 +112,15 @@ Back up an Essentials database to its configured `periodic_backup_path` or a cus
 
 ```bash
 # Backup to configured periodic_backup_path
-monk do redis-cloud-example/essentials-database create-snapshot
+monk do redis-cloud-example/essentials-database/create-snapshot
 
 # Backup to custom location
-monk do redis-cloud-example/essentials-database create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
+monk do redis-cloud-example/essentials-database/create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
 ```
 
 **Requirements:**
 - Database must have `periodic_backup_path` configured, OR
-- Provide `adhocBackupPath` parameter
+- Provide `backup_path` parameter
 
 **Configuration Example:**
 ```yaml
@@ -137,22 +137,22 @@ Back up a Pro database to its configured `remote_backup` location or a custom lo
 
 ```bash
 # Backup to configured remote_backup storage path
-monk do redis-cloud-example/pro-database create-snapshot
+monk do redis-cloud-example/pro-database/create-snapshot
 
 # Backup to custom location
-monk do redis-cloud-example/pro-database create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
+monk do redis-cloud-example/pro-database/create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
 
 # For Active-Active databases, backup specific region
-monk do redis-cloud-example/pro-database create-snapshot region_name="us-east-1"
+monk do redis-cloud-example/pro-database/create-snapshot region_name="us-east-1"
 
 # Backup specific region to custom location
-monk do redis-cloud-example/pro-database create-snapshot region_name="us-east-1" backup_path="s3://custom-path/"
+monk do redis-cloud-example/pro-database/create-snapshot region_name="us-east-1" backup_path="s3://custom-path/"
 ```
 
 **Requirements:**
 - Database must have `remote_backup.storage_path` configured, OR
-- Provide `adhocBackupPath` parameter
-- For Active-Active databases, you must backup each region separately using `regionName`
+- Provide `backup_path` parameter
+- For Active-Active databases, you must backup each region separately using `region_name`
 
 **Configuration Example:**
 ```yaml
@@ -180,10 +180,10 @@ View available backups for a database:
 
 ```bash
 # List backups for Essentials database
-monk do redis-cloud-example/essentials-database list-snapshots
+monk do redis-cloud-example/essentials-database/list-snapshots
 
 # List backups for Pro database
-monk do redis-cloud-example/pro-database list-snapshots
+monk do redis-cloud-example/pro-database/list-snapshots
 ```
 
 ### Restore Actions
@@ -198,22 +198,22 @@ Restore an Essentials database from an external backup file:
 
 ```bash
 # Restore from AWS S3
-monk do redis-cloud-example/essentials-database restore \
+monk do redis-cloud-example/essentials-database/restore \
   source_type="aws-s3" \
   source_uri="s3://my-backups/redis/backup-2025-11-27.rdb"
 
 # Restore from Google Cloud Storage
-monk do redis-cloud-example/essentials-database restore \
+monk do redis-cloud-example/essentials-database/restore \
   source_type="google-blob-storage" \
   source_uri="gs://my-backups/redis/backup.rdb.gz"
 
 # Restore from FTP server
-monk do redis-cloud-example/essentials-database restore \
+monk do redis-cloud-example/essentials-database/restore \
   source_type="ftp" \
   source_uri="ftp://user:pass@ftp.example.com/backup.rdb"
 
 # Restore from HTTP server
-monk do redis-cloud-example/essentials-database restore \
+monk do redis-cloud-example/essentials-database/restore \
   source_type="http" \
   source_uri="http://backups.example.com/redis/backup.rdb"
 ```
@@ -224,17 +224,17 @@ Restore a Pro database from an external backup file:
 
 ```bash
 # Restore from AWS S3
-monk do redis-cloud-example/pro-database restore \
+monk do redis-cloud-example/pro-database/restore \
   source_type="aws-s3" \
   source_uri="s3://prod-backups/redis/latest.rdb"
 
 # Restore from Azure Blob Storage
-monk do redis-cloud-example/pro-database restore \
+monk do redis-cloud-example/pro-database/restore \
   source_type="azure-blob-storage" \
   source_uri="abs://:accesskey@storageaccount/container/backup.rdb"
 
 # Import from another Redis instance
-monk do redis-cloud-example/pro-database restore \
+monk do redis-cloud-example/pro-database/restore \
   source_type="redis" \
   source_uri="redis://password@source-host:6379"
 ```

@@ -28,12 +28,12 @@ This entity allows you to:
 
 | Action | Command | Description |
 |--------|---------|-------------|
-| **Get Backup Info** | `monk do ns/cluster get-backup-info` | View backup configuration |
-| **Create Backup** | `monk do ns/cluster create-snapshot` | Create on-demand snapshot |
-| **List Snapshots** | `monk do ns/cluster list-snapshots` | View available snapshots |
-| **Restore** | `monk do ns/cluster restore snapshot_id="xxx"` | Restore from snapshot |
-| **Check Status** | `monk do ns/cluster get-restore-status job_id="xxx"` | Monitor restore progress |
-| **List Jobs** | `monk do ns/cluster list-restore-jobs` | View all restore jobs |
+| **Get Backup Info** | `monk do ns/cluster/get-backup-info` | View backup configuration |
+| **Create Backup** | `monk do ns/cluster/create-snapshot` | Create on-demand snapshot |
+| **List Snapshots** | `monk do ns/cluster/list-snapshots` | View available snapshots |
+| **Restore** | `monk do ns/cluster/restore snapshot_id="xxx"` | Restore from snapshot |
+| **Check Status** | `monk do ns/cluster/get-restore-status job_id="xxx"` | Monitor restore progress |
+| **List Jobs** | `monk do ns/cluster/list-restore-jobs` | View all restore jobs |
 
 **Requirements:** M10+ cluster (dedicated). M0/M2/M5 shared tiers do not support backup API.
 
@@ -252,7 +252,7 @@ MongoDB Atlas clusters (M10 and higher) support on-demand backup snapshots via c
 View backup configuration and status:
 
 ```bash
-monk do my-mongodb/my-cluster get-backup-info
+monk do my-mongodb/my-cluster/get-backup-info
 ```
 
 **Output includes:**
@@ -266,13 +266,13 @@ Create an on-demand backup snapshot of your cluster:
 
 ```bash
 # Create backup with default settings (7 days retention)
-monk do my-mongodb/my-cluster create-snapshot
+monk do my-mongodb/my-cluster/create-snapshot
 
 # Create backup with custom description
-monk do my-mongodb/my-cluster create-snapshot description="Pre-migration backup"
+monk do my-mongodb/my-cluster/create-snapshot description="Pre-migration backup"
 
 # Create backup with custom retention period
-monk do my-mongodb/my-cluster create-snapshot description="Before upgrade" retention_days=14
+monk do my-mongodb/my-cluster/create-snapshot description="Before upgrade" retention_days=14
 ```
 
 **Parameters:**
@@ -297,10 +297,10 @@ View all available backup snapshots:
 
 ```bash
 # List snapshots (default: show 10)
-monk do my-mongodb/my-cluster list-snapshots
+monk do my-mongodb/my-cluster/list-snapshots
 
 # List more snapshots
-monk do my-mongodb/my-cluster list-snapshots limit=20
+monk do my-mongodb/my-cluster/list-snapshots limit=20
 ```
 
 **Parameters:**
@@ -365,7 +365,7 @@ my-production-cluster:
 
 1. **Before Major Changes**: Always create a backup before deployments or migrations
    ```bash
-   monk do my-mongodb/my-cluster create-snapshot description="Pre-deployment backup"
+   monk do my-mongodb/my-cluster/create-snapshot description="Pre-deployment backup"
    ```
 
 2. **Retention Planning**: Consider your recovery requirements when setting retention
@@ -375,7 +375,7 @@ my-production-cluster:
 
 3. **Regular Verification**: Periodically list snapshots to verify backups are being created
    ```bash
-   monk do my-mongodb/my-cluster list-snapshots
+   monk do my-mongodb/my-cluster/list-snapshots
    ```
 
 4. **Document Snapshot IDs**: Save snapshot IDs for critical backups for quick restore
@@ -398,13 +398,13 @@ Restore the cluster from a backup snapshot:
 
 ```bash
 # Restore from snapshot (overwrites current cluster data!)
-monk do my-mongodb/my-cluster restore snapshot_id="5e8f8f8f8f8f8f8f8f8f8f8f"
+monk do my-mongodb/my-cluster/restore snapshot_id="5e8f8f8f8f8f8f8f8f8f8f8f"
 
 # Restore to a different cluster
-monk do my-mongodb/my-cluster restore snapshot_id="xxx" target_id="restored-cluster"
+monk do my-mongodb/my-cluster/restore snapshot_id="xxx" target_id="restored-cluster"
 
 # Restore to a different project
-monk do my-mongodb/my-cluster restore snapshot_id="xxx" target_project_id="project-id"
+monk do my-mongodb/my-cluster/restore snapshot_id="xxx" target_project_id="project-id"
 ```
 
 **Parameters:**
@@ -421,10 +421,10 @@ Restore to a specific point in time (requires continuous cloud backup):
 
 ```bash
 # Restore to specific timestamp (ISO 8601 format)
-monk do my-mongodb/my-cluster restore restore_timestamp="2024-12-01T10:00:00Z"
+monk do my-mongodb/my-cluster/restore restore_timestamp="2024-12-01T10:00:00Z"
 
 # Restore to specific time on different cluster
-monk do my-mongodb/my-cluster restore restore_timestamp="2024-12-01T10:00:00Z" target_id="pitr-cluster"
+monk do my-mongodb/my-cluster/restore restore_timestamp="2024-12-01T10:00:00Z" target_id="pitr-cluster"
 ```
 
 #### Check Restore Status
@@ -433,7 +433,7 @@ Monitor the progress of a restore job:
 
 ```bash
 # Check status of a specific restore job
-monk do my-mongodb/my-cluster get-restore-status job_id="restore-job-id"
+monk do my-mongodb/my-cluster/get-restore-status job_id="restore-job-id"
 ```
 
 **Output includes:**
@@ -448,10 +448,10 @@ View all restore jobs for the cluster:
 
 ```bash
 # List restore jobs (default: show 10)
-monk do my-mongodb/my-cluster list-restore-jobs
+monk do my-mongodb/my-cluster/list-restore-jobs
 
 # List more jobs
-monk do my-mongodb/my-cluster list-restore-jobs limit=20
+monk do my-mongodb/my-cluster/list-restore-jobs limit=20
 ```
 
 #### Restore Workflow Example
@@ -460,16 +460,16 @@ Complete disaster recovery workflow:
 
 ```bash
 # 1. Get backup info to confirm backup is enabled
-monk do my-mongodb/my-cluster get-backup-info
+monk do my-mongodb/my-cluster/get-backup-info
 
 # 2. List available snapshots to find the right one
-monk do my-mongodb/my-cluster list-snapshots
+monk do my-mongodb/my-cluster/list-snapshots
 
 # 3. Start restore from snapshot
-monk do my-mongodb/my-cluster restore snapshot_id="5e8f8f8f8f8f8f8f8f8f8f8f"
+monk do my-mongodb/my-cluster/restore snapshot_id="5e8f8f8f8f8f8f8f8f8f8f8f"
 
 # 4. Check restore progress periodically
-monk do my-mongodb/my-cluster get-restore-status job_id="restore-job-id"
+monk do my-mongodb/my-cluster/get-restore-status job_id="restore-job-id"
 
 # 5. Once complete, verify data integrity
 # (cluster is read-write again after restore completes)
@@ -480,7 +480,7 @@ monk do my-mongodb/my-cluster get-restore-status job_id="restore-job-id"
 1. **Test Restores Regularly**: Practice restore procedures before you need them
    ```bash
    # Restore to a test cluster, not production
-   monk do prod/cluster restore snapshot_id="xxx" target_id="restore-test"
+   monk do prod/cluster/restore snapshot_id="xxx" target_id="restore-test"
    ```
 
 2. **Document Recovery Procedures**: Keep runbooks with snapshot IDs and restore commands
@@ -501,7 +501,7 @@ pre-deploy-backup:
   defines: action
   action:
     code: |
-      monk do my-mongodb/my-cluster create-snapshot \
+      monk do my-mongodb/my-cluster/create-snapshot \
         description="Pre-deployment $(date +%Y-%m-%d-%H:%M)"
 
 production-deployment:

@@ -444,18 +444,18 @@ The DatabaseAccount entity provides actions for backup management:
 
 ```bash
 # Get backup information
-monk do my-app/cosmos-account get-backup-info
+monk do my-app/cosmos-account/get-backup-info
 
 # List restorable accounts
-monk do my-app/cosmos-account list-restorable-accounts
+monk do my-app/cosmos-account/list-restorable-accounts
 
 # List restorable databases
-monk do my-app/cosmos-account list-restorable-databases \
+monk do my-app/cosmos-account/list-restorable-databases \
   source_id="<restorable-instance-id>" \
   location="East US"
 
 # Restore to a new account
-monk do my-app/cosmos-account restore \
+monk do my-app/cosmos-account/restore \
   target_id="restored-cosmos" \
   source_id="<restorable-instance-id>" \
   location="East US" \

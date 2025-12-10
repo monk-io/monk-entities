@@ -122,4 +122,3 @@ pro-backup-stack:
   runnable-list:
     - redis-cloud-backup-test/pro-backup-subscription
     - redis-cloud-backup-test/backup-pro-database
-

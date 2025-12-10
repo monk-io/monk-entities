@@ -973,6 +973,115 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
     }
 
+    /**
+     * Get the status of a restored RDS instance
+     * 
+     * Check the progress of a restore operation by querying the status of the
+     * target instance. Use this after running a restore operation.
+     * 
+     * Usage:
+     *   monk do namespace/instance/get-restore-status instance_id="restored-db"
+     * 
+     * @param args Required arguments:
+     *   - instance_id: The identifier of the restored instance to check
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args?: MonkecBase.Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE STATUS CHECK`);
+        cli.output(`==================================================`);
+        cli.output(`Region: ${this.region}`);
+
+        const instanceId = (args?.instance_id || args?.target_id) as string | undefined;
+
+        if (!instanceId) {
+            cli.output(`\n❌ 'instance_id' is required`);
+            cli.output(`\nUsage:`);
+            cli.output(`  monk do namespace/instance/get-restore-status instance_id="restored-db"`);
+            cli.output(`\nThe instance_id is the target_id used in the restore operation.`);
+            cli.output(`==================================================`);
+            throw new Error("'instance_id' is required");
+        }
+
+        cli.output(`Checking instance: ${instanceId}`);
+        cli.output(`--------------------------------------------------`);
+
+        try {
+            const response = this.checkDBInstanceExists(instanceId);
+
+            if (!response) {
+                cli.output(`\n❌ Instance not found: ${instanceId}`);
+                cli.output(`   The instance may still be initializing or the ID is incorrect.`);
+                cli.output(`==================================================`);
+                throw new Error(`Instance ${instanceId} not found`);
+            }
+
+            const dbInstance = response.DBInstance;
+            const status = dbInstance?.DBInstanceStatus || 'unknown';
+
+            cli.output(`\n📋 Instance Information`);
+            cli.output(`   Instance ID: ${dbInstance?.DBInstanceIdentifier}`);
+            cli.output(`   Status: ${this.getRestoreStatusIcon(status)} ${status}`);
+            cli.output(`   Engine: ${dbInstance?.Engine || 'N/A'} ${dbInstance?.EngineVersion || ''}`);
+            cli.output(`   Instance Class: ${dbInstance?.DBInstanceClass || 'N/A'}`);
+            cli.output(`   Storage: ${dbInstance?.AllocatedStorage || 0} GB`);
+
+            if (dbInstance?.Endpoint) {
+                cli.output(`\n🔗 Connection Details`);
+                cli.output(`   Endpoint: ${dbInstance.Endpoint.Address}`);
+                cli.output(`   Port: ${dbInstance.Endpoint.Port}`);
+            } else {
+                cli.output(`\n⏳ Endpoint not available yet (instance still creating)`);
+            }
+
+            if (status === 'available') {
+                cli.output(`\n✅ Instance is ready and available!`);
+                cli.output(`   You can now connect to the database.`);
+            } else if (status === 'creating' || status === 'backing-up' || status === 'modifying') {
+                cli.output(`\n⏳ Instance is still being created/restored.`);
+                cli.output(`   Check again in a few minutes.`);
+            } else if (status === 'failed') {
+                cli.output(`\n❌ Instance creation/restore failed.`);
+                cli.output(`   Check AWS Console for more details.`);
+            }
+
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            cli.output(`\n❌ Failed to get instance status`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get status icon for restore/instance status
+     */
+    private getRestoreStatusIcon(status: string): string {
+        switch (status.toLowerCase()) {
+            case 'available':
+                return '✅';
+            case 'creating':
+            case 'backing-up':
+            case 'modifying':
+            case 'rebooting':
+            case 'starting':
+                return '⏳';
+            case 'failed':
+            case 'incompatible-restore':
+            case 'incompatible-network':
+                return '❌';
+            case 'stopped':
+            case 'stopping':
+                return '⏸️';
+            default:
+                return '🔄';
+        }
+    }
+
     @action("get-connection-info")
     getConnectionInfo(_args?: MonkecBase.Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();

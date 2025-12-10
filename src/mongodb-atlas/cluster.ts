@@ -717,6 +717,142 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
     }
 
     /**
+     * Get detailed information about a specific snapshot
+     * 
+     * Usage:
+     * - monk do namespace/cluster/describe-snapshot snapshot_id="xxx"
+     * 
+     * @param args Required arguments:
+     *   - snapshot_id: ID of the snapshot to describe
+     */
+    @action("describe-snapshot")
+    describeSnapshot(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`📸 Snapshot Details`);
+        cli.output(`==================================================`);
+        cli.output(`Cluster: ${this.definition.name}`);
+        cli.output(`Project ID: ${this.definition.project_id}`);
+
+        // Validate cluster tier supports backups
+        this.validateBackupSupport();
+
+        const snapshotId = (args?.snapshot_id || args?.snapshotId) as string | undefined;
+
+        if (!snapshotId) {
+            throw new Error(
+                "Required argument 'snapshot_id' not provided.\n" +
+                "Usage: monk do namespace/cluster/describe-snapshot snapshot_id=\"xxx\"\n" +
+                "\nTo find snapshot IDs, run: monk do namespace/cluster/list-snapshots"
+            );
+        }
+
+        try {
+            const snapshot = this.makeRequest(
+                "GET",
+                `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+            );
+
+            cli.output(`\n📸 Snapshot Information`);
+            cli.output(`--------------------------------------------------`);
+            cli.output(`ID: ${snapshot.id}`);
+            cli.output(`Status: ${snapshot.status}`);
+            cli.output(`Type: ${snapshot.type || 'scheduled'}`);
+            cli.output(`Created: ${snapshot.createdAt}`);
+            cli.output(`Expires: ${snapshot.expiresAt || 'N/A'}`);
+            
+            if (snapshot.description) {
+                cli.output(`Description: ${snapshot.description}`);
+            }
+            
+            if (snapshot.storageSizeBytes) {
+                const sizeGB = (snapshot.storageSizeBytes / (1024 * 1024 * 1024)).toFixed(2);
+                cli.output(`Size: ${sizeGB} GB`);
+            }
+
+            if (snapshot.mongodVersion) {
+                cli.output(`MongoDB Version: ${snapshot.mongodVersion}`);
+            }
+
+            if (snapshot.replicaSetName) {
+                cli.output(`Replica Set: ${snapshot.replicaSetName}`);
+            }
+
+            if (snapshot.snapshotType) {
+                cli.output(`Snapshot Type: ${snapshot.snapshotType}`);
+            }
+
+            cli.output(`\n📋 To restore from this snapshot:`);
+            cli.output(`   monk do namespace/cluster/restore snapshot_id="${snapshotId}"`);
+            cli.output(`\n📋 To delete this snapshot:`);
+            cli.output(`   monk do namespace/cluster/delete-snapshot snapshot_id="${snapshotId}"`);
+            cli.output(`==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get snapshot details`);
+            throw new Error(`Describe snapshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Delete a backup snapshot
+     * 
+     * Usage:
+     * - monk do namespace/cluster/delete-snapshot snapshot_id="xxx"
+     * 
+     * @param args Required arguments:
+     *   - snapshot_id: ID of the snapshot to delete
+     */
+    @action("delete-snapshot")
+    deleteSnapshot(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🗑️ DELETE SNAPSHOT`);
+        cli.output(`==================================================`);
+        cli.output(`Cluster: ${this.definition.name}`);
+        cli.output(`Project ID: ${this.definition.project_id}`);
+
+        // Validate cluster tier supports backups
+        this.validateBackupSupport();
+
+        const snapshotId = (args?.snapshot_id || args?.snapshotId) as string | undefined;
+
+        if (!snapshotId) {
+            throw new Error(
+                "Required argument 'snapshot_id' not provided.\n" +
+                "Usage: monk do namespace/cluster/delete-snapshot snapshot_id=\"xxx\"\n" +
+                "\nTo find snapshot IDs, run: monk do namespace/cluster/list-snapshots"
+            );
+        }
+
+        cli.output(`\n⚠️  WARNING: This will permanently delete the snapshot.`);
+        cli.output(`   Snapshot ID: ${snapshotId}`);
+        cli.output(`--------------------------------------------------`);
+
+        try {
+            // First verify the snapshot exists
+            const snapshot = this.makeRequest(
+                "GET",
+                `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+            );
+
+            cli.output(`Found snapshot: ${snapshot.id}`);
+            cli.output(`Type: ${snapshot.type || 'scheduled'}`);
+            cli.output(`Created: ${snapshot.createdAt}`);
+
+            // Delete the snapshot
+            this.makeRequest(
+                "DELETE",
+                `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+            );
+
+            cli.output(`\n✅ Snapshot deleted successfully!`);
+            cli.output(`   Snapshot ID: ${snapshotId}`);
+            cli.output(`==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to delete snapshot`);
+            throw new Error(`Delete snapshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
      * Get status icon for restore job status
      */
     private getStatusIcon(status: string): string {

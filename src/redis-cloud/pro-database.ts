@@ -1088,4 +1088,92 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
             throw new Error(`Failed to list backups for Pro database ${this.state.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+
+    /**
+     * Get the status of a restore/import task
+     * 
+     * Check the progress of an ongoing restore operation using its task ID.
+     * 
+     * @param args Required arguments:
+     *   - task_id: The task ID returned from a restore operation
+     * 
+     * @example
+     * ```bash
+     * monk do namespace/pro-database/get-restore-status task_id="abc123"
+     * ```
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE TASK STATUS`);
+        cli.output(`==================================================`);
+        cli.output(`Database: ${this.state.name}`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`--------------------------------------------------`);
+
+        const taskId = (args?.task_id || args?.job_id || args?.taskId) as string | undefined;
+
+        if (!taskId) {
+            cli.output(`❌ ERROR: Missing required parameter 'task_id'`);
+            cli.output(`\nUsage:`);
+            cli.output(`  monk do namespace/database/get-restore-status task_id="your-task-id"`);
+            cli.output(`\nThe task_id is returned when you run a restore operation.`);
+            cli.output(`==================================================`);
+            throw new Error("task_id is required");
+        }
+
+        try {
+            const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+
+            cli.output(`\n📋 Task Information`);
+            cli.output(`   Task ID: ${taskId}`);
+            cli.output(`   Status: ${this.getTaskStatusIcon(taskData.status)} ${taskData.status}`);
+            
+            if (taskData.commandType) {
+                cli.output(`   Command: ${taskData.commandType}`);
+            }
+            
+            if (taskData.description) {
+                cli.output(`   Description: ${taskData.description}`);
+            }
+
+            if (taskData.timestamp) {
+                cli.output(`   Timestamp: ${taskData.timestamp}`);
+            }
+
+            if (taskData.response) {
+                cli.output(`\n📦 Response Details:`);
+                if (taskData.response.resourceId) {
+                    cli.output(`   Resource ID: ${taskData.response.resourceId}`);
+                }
+                if (taskData.response.error) {
+                    cli.output(`   ❌ Error: ${JSON.stringify(taskData.response.error)}`);
+                }
+            }
+
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get task status`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get status icon for task status
+     */
+    private getTaskStatusIcon(status: string): string {
+        switch (status) {
+            case 'processing-completed':
+                return '✅';
+            case 'processing-in-progress':
+            case 'received':
+                return '⏳';
+            case 'processing-error':
+                return '❌';
+            default:
+                return '🔄';
+        }
+    }
 } 
