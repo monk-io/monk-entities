@@ -55,8 +55,8 @@ const base = require("redis-cloud/base");
 const RedisCloudEntity = base.RedisCloudEntity;
 const MonkecBase = require("monkec/base");
 var action2 = MonkecBase.action;
-var _listSnapshots_dec, _restore_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
-var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _restore_dec = [action2("restore")], _listSnapshots_dec = [action2("list-snapshots")], _a) {
+var _getRestoreStatus_dec, _listSnapshots_dec, _restore_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
+var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _restore_dec = [action2("restore")], _listSnapshots_dec = [action2("list-snapshots")], _getRestoreStatus_dec = [action2("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -531,12 +531,82 @@ var _EssentialsDatabase = class _EssentialsDatabase extends (_a = RedisCloudEnti
       throw new Error(`Failed to list backups for Essentials database ${this.state.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  getRestoreStatus(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F504} RESTORE TASK STATUS`);
+    cli.output(`==================================================`);
+    cli.output(`Database: ${this.state.name}`);
+    cli.output(`Database ID: ${this.state.id}`);
+    cli.output(`--------------------------------------------------`);
+    const taskId = args?.task_id || args?.job_id || args?.taskId;
+    if (!taskId) {
+      cli.output(`\u274C ERROR: Missing required parameter 'task_id'`);
+      cli.output(`
+Usage:`);
+      cli.output(`  monk do namespace/database/get-restore-status task_id="your-task-id"`);
+      cli.output(`
+The task_id is returned when you run a restore operation.`);
+      cli.output(`==================================================`);
+      throw new Error("task_id is required");
+    }
+    try {
+      const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+      cli.output(`
+\u{1F4CB} Task Information`);
+      cli.output(`   Task ID: ${taskId}`);
+      cli.output(`   Status: ${this.getTaskStatusIcon(taskData.status)} ${taskData.status}`);
+      if (taskData.commandType) {
+        cli.output(`   Command: ${taskData.commandType}`);
+      }
+      if (taskData.description) {
+        cli.output(`   Description: ${taskData.description}`);
+      }
+      if (taskData.timestamp) {
+        cli.output(`   Timestamp: ${taskData.timestamp}`);
+      }
+      if (taskData.response) {
+        cli.output(`
+\u{1F4E6} Response Details:`);
+        if (taskData.response.resourceId) {
+          cli.output(`   Resource ID: ${taskData.response.resourceId}`);
+        }
+        if (taskData.response.error) {
+          cli.output(`   \u274C Error: ${JSON.stringify(taskData.response.error)}`);
+        }
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get task status`);
+      cli.output(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      cli.output(`==================================================`);
+      throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Get status icon for task status
+   */
+  getTaskStatusIcon(status) {
+    switch (status) {
+      case "processing-completed":
+        return "\u2705";
+      case "processing-in-progress":
+      case "received":
+        return "\u23F3";
+      case "processing-error":
+        return "\u274C";
+      default:
+        return "\u{1F504}";
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _EssentialsDatabase);
 __decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _EssentialsDatabase);
 __decorateElement(_init, 1, "restore", _restore_dec, _EssentialsDatabase);
 __decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _EssentialsDatabase);
+__decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _EssentialsDatabase);
 __decoratorMetadata(_init, _EssentialsDatabase);
 __name(_EssentialsDatabase, "EssentialsDatabase");
 var EssentialsDatabase = _EssentialsDatabase;

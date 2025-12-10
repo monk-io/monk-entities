@@ -3,7 +3,7 @@ cluster:
   defines: entity
   metadata:
     name: Cluster
-    version-hash: 07b62e1236fb
+    version-hash: e9061ea345a0
   schema:
     secret_ref:
       type: string
@@ -80,6 +80,8 @@ cluster:
     restore: ''
     get-restore-status: ''
     list-restore-jobs: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
   checks:
     readiness:
       period: 30

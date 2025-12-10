@@ -1,7 +1,4 @@
 REPO mongodb-atlas
-VERSION_HASH 07b62e1236fb
-DESCRIPTION Managed MongoDB projects, clusters, and users.
-HOSTING managed
-TAGS mongodb,database,atlas
+VERSION_HASH e9061ea345a0
 LOAD cluster.yaml base.yaml project.yaml user.yaml common.yaml
 RESOURCES common.js user-sync.js project-sync.js cluster-sync.js base.js

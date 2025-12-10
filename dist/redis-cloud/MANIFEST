@@ -1,4 +1,4 @@
 REPO redis-cloud
-VERSION_HASH ff214627e5dd
-LOAD essentials-database.yaml pro-subscription.yaml base.yaml essentials-subscription.yaml common.yaml pro-database.yaml
-RESOURCES common.js essentials-database.js essentials-subscription-sync.js pro-subscription-sync.js pro-database.js essentials-database-sync.js base.js pro-database-sync.js
+VERSION_HASH 839cd92bbb9c
+LOAD essentials-database.yaml rds-access-list.yaml rds-instance.yaml pro-subscription.yaml db-subnet-group.yaml security-group.yaml base.yaml essentials-subscription.yaml lite-base.yaml common.yaml pro-database.yaml
+RESOURCES common.js essentials-database.js essentials-subscription-sync.js pro-subscription-sync.js db-subnet-group-sync.js lite-base.js pro-database.js essentials-database-sync.js base.js pro-database-sync.js security-group.js rds-instance-sync.js rds-access-list-sync.js

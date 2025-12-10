@@ -686,7 +686,7 @@ Specify the point-in-time to restore to in ISO 8601 format (e.g., restore_timest
     cli.output(`   Location: ${location}`);
     cli.output(`   Restore Timestamp: ${restoreTimestamp}`);
     try {
-      const encodedLocation = location.replace(/ /g, "");
+      const encodedLocation = location.replace(/ /g, "%20");
       const restoreSource = `/subscriptions/${this.definition.subscription_id}/providers/Microsoft.DocumentDB/locations/${encodedLocation}/restorableDatabaseAccounts/${instanceId}`;
       const restoreParameters = {
         restoreMode: "PointInTime",

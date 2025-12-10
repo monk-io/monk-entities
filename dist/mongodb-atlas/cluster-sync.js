@@ -55,8 +55,8 @@ const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
 const cli = require("cli");
 const MonkecBase = require("monkec/base");
 var action2 = MonkecBase.action;
-var _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
-var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _restoreCluster_dec = [action2("restore")], _getRestoreStatus_dec = [action2("get-restore-status")], _listRestoreJobs_dec = [action2("list-restore-jobs")], _a) {
+var _deleteSnapshot_dec, _describeSnapshot_dec, _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
+var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _restoreCluster_dec = [action2("restore")], _getRestoreStatus_dec = [action2("get-restore-status")], _listRestoreJobs_dec = [action2("list-restore-jobs")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -536,6 +536,106 @@ ${statusIcon} Restore Job #${i + 1}`);
       throw new Error(`List restore jobs failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  describeSnapshot(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4F8} Snapshot Details`);
+    cli.output(`==================================================`);
+    cli.output(`Cluster: ${this.definition.name}`);
+    cli.output(`Project ID: ${this.definition.project_id}`);
+    this.validateBackupSupport();
+    const snapshotId = args?.snapshot_id || args?.snapshotId;
+    if (!snapshotId) {
+      throw new Error(
+        `Required argument 'snapshot_id' not provided.
+Usage: monk do namespace/cluster/describe-snapshot snapshot_id="xxx"
+
+To find snapshot IDs, run: monk do namespace/cluster/list-snapshots`
+      );
+    }
+    try {
+      const snapshot = this.makeRequest(
+        "GET",
+        `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+      );
+      cli.output(`
+\u{1F4F8} Snapshot Information`);
+      cli.output(`--------------------------------------------------`);
+      cli.output(`ID: ${snapshot.id}`);
+      cli.output(`Status: ${snapshot.status}`);
+      cli.output(`Type: ${snapshot.type || "scheduled"}`);
+      cli.output(`Created: ${snapshot.createdAt}`);
+      cli.output(`Expires: ${snapshot.expiresAt || "N/A"}`);
+      if (snapshot.description) {
+        cli.output(`Description: ${snapshot.description}`);
+      }
+      if (snapshot.storageSizeBytes) {
+        const sizeGB = (snapshot.storageSizeBytes / (1024 * 1024 * 1024)).toFixed(2);
+        cli.output(`Size: ${sizeGB} GB`);
+      }
+      if (snapshot.mongodVersion) {
+        cli.output(`MongoDB Version: ${snapshot.mongodVersion}`);
+      }
+      if (snapshot.replicaSetName) {
+        cli.output(`Replica Set: ${snapshot.replicaSetName}`);
+      }
+      if (snapshot.snapshotType) {
+        cli.output(`Snapshot Type: ${snapshot.snapshotType}`);
+      }
+      cli.output(`
+\u{1F4CB} To restore from this snapshot:`);
+      cli.output(`   monk do namespace/cluster/restore snapshot_id="${snapshotId}"`);
+      cli.output(`
+\u{1F4CB} To delete this snapshot:`);
+      cli.output(`   monk do namespace/cluster/delete-snapshot snapshot_id="${snapshotId}"`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get snapshot details`);
+      throw new Error(`Describe snapshot failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  deleteSnapshot(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F5D1}\uFE0F DELETE SNAPSHOT`);
+    cli.output(`==================================================`);
+    cli.output(`Cluster: ${this.definition.name}`);
+    cli.output(`Project ID: ${this.definition.project_id}`);
+    this.validateBackupSupport();
+    const snapshotId = args?.snapshot_id || args?.snapshotId;
+    if (!snapshotId) {
+      throw new Error(
+        `Required argument 'snapshot_id' not provided.
+Usage: monk do namespace/cluster/delete-snapshot snapshot_id="xxx"
+
+To find snapshot IDs, run: monk do namespace/cluster/list-snapshots`
+      );
+    }
+    cli.output(`
+\u26A0\uFE0F  WARNING: This will permanently delete the snapshot.`);
+    cli.output(`   Snapshot ID: ${snapshotId}`);
+    cli.output(`--------------------------------------------------`);
+    try {
+      const snapshot = this.makeRequest(
+        "GET",
+        `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+      );
+      cli.output(`Found snapshot: ${snapshot.id}`);
+      cli.output(`Type: ${snapshot.type || "scheduled"}`);
+      cli.output(`Created: ${snapshot.createdAt}`);
+      this.makeRequest(
+        "DELETE",
+        `/groups/${this.definition.project_id}/clusters/${this.definition.name}/backup/snapshots/${snapshotId}`
+      );
+      cli.output(`
+\u2705 Snapshot deleted successfully!`);
+      cli.output(`   Snapshot ID: ${snapshotId}`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to delete snapshot`);
+      throw new Error(`Delete snapshot failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   /**
    * Get status icon for restore job status
    */
@@ -564,6 +664,8 @@ __decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _Cluster);
 __decorateElement(_init, 1, "restoreCluster", _restoreCluster_dec, _Cluster);
 __decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _Cluster);
 __decorateElement(_init, 1, "listRestoreJobs", _listRestoreJobs_dec, _Cluster);
+__decorateElement(_init, 1, "describeSnapshot", _describeSnapshot_dec, _Cluster);
+__decorateElement(_init, 1, "deleteSnapshot", _deleteSnapshot_dec, _Cluster);
 __decoratorMetadata(_init, _Cluster);
 __name(_Cluster, "Cluster");
 /**

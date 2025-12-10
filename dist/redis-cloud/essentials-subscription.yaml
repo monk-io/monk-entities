@@ -3,7 +3,7 @@ essentials-subscription:
   defines: entity
   metadata:
     name: EssentialsSubscription
-    version-hash: ff214627e5dd
+    version-hash: 839cd92bbb9c
   schema:
     account_key_secret:
       type: string
