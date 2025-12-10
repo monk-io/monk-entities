@@ -1,0 +1,100 @@
+namespace: azure-cosmosdb
+database:
+  defines: entity
+  metadata:
+    name: Database
+    version-hash: 9c7915697b94
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    database_account_name:
+      type: string
+      description: The name of the database account that contains this database
+    database_id:
+      type: string
+      minLength: 1
+      maxLength: 255
+      pattern: '^[^/?#\\r\\n\\t]*$'
+      description: The user-generated unique name for the database
+    manual_throughput:
+      type: number
+      minimum: 400
+      maximum: 1000000
+      description: Manual throughput (RU/s) for shared throughput database
+    autoscale_settings:
+      type: object
+      properties:
+        max_throughput:
+          type: number
+          minimum: 4000
+          description: Maximum throughput (RU/s) for autoscale
+      required:
+        - max_throughput
+      additionalProperties: false
+      description: Autoscale settings for shared throughput database
+    required:
+      - subscription_id
+      - resource_group_name
+      - database_account_name
+      - database_id
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    database_id:
+      type: string
+      description: The database ID
+    resource_id:
+      type: string
+      description: System-generated resource ID
+    timestamp:
+      type: number
+      description: System-generated timestamp
+    self_link:
+      type: string
+      description: System-generated self link
+    etag:
+      type: string
+      description: System-generated ETag
+    collections_path:
+      type: string
+      description: Collections resource path
+    users_path:
+      type: string
+      description: Users resource path
+    offer_details:
+      type: object
+      properties:
+        throughput:
+          type: number
+        offer_type:
+          type: string
+        autoscale_max_throughput:
+          type: number
+      additionalProperties: false
+      description: Current throughput offer details
+  lifecycle:
+    sync: <<< database-sync.js
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 10
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - azure-cosmosdb/azure-cosmosdb-base
+    - cli
+    - http
+    - crypto

@@ -1,0 +1,196 @@
+namespace: azure-cosmosdb
+container:
+  defines: entity
+  metadata:
+    name: Container
+    version-hash: 9c7915697b94
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    database_account_name:
+      type: string
+    database_id:
+      type: string
+    container_id:
+      type: string
+    partition_key:
+      type: object
+      properties:
+        paths:
+          type: array
+          items:
+            type: string
+        kind:
+          type: string
+          enum:
+            - Hash
+            - Range
+        version:
+          type: number
+      required:
+        - paths
+        - kind
+      additionalProperties: false
+    manual_throughput:
+      type: number
+    autoscale_settings:
+      type: object
+      properties:
+        max_throughput:
+          type: number
+      required:
+        - max_throughput
+      additionalProperties: false
+    indexing_policy:
+      type: object
+      properties:
+        indexingMode:
+          type: string
+          enum:
+            - consistent
+            - lazy
+            - none
+        automatic:
+          type: boolean
+        includedPaths:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              indexes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                        - Hash
+                        - Range
+                        - Spatial
+                    dataType:
+                      type: string
+                      enum:
+                        - String
+                        - Number
+                        - Point
+                        - Polygon
+                        - LineString
+                    precision:
+                      type: number
+                  required:
+                    - kind
+                    - dataType
+                  additionalProperties: false
+            required:
+              - path
+            additionalProperties: false
+        excludedPaths:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+            required:
+              - path
+            additionalProperties: false
+      required:
+        - indexingMode
+      additionalProperties: false
+    default_ttl:
+      type: number
+    unique_key_policy:
+      type: object
+      properties:
+        uniqueKeys:
+          type: array
+          items:
+            type: object
+            properties:
+              paths:
+                type: array
+                items:
+                  type: string
+            required:
+              - paths
+            additionalProperties: false
+      required:
+        - uniqueKeys
+      additionalProperties: false
+    conflict_resolution_policy:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - LastWriterWins
+            - Custom
+        conflictResolutionPath:
+          type: string
+        conflictResolutionProcedure:
+          type: string
+      required:
+        - mode
+      additionalProperties: false
+    required:
+      - subscription_id
+      - resource_group_name
+      - database_account_name
+      - database_id
+      - container_id
+      - partition_key
+  state-schema:
+    existing:
+      type: boolean
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    container_id:
+      type: string
+    resource_id:
+      type: string
+    self_link:
+      type: string
+    etag:
+      type: string
+    timestamp:
+      type: number
+    documents_path:
+      type: string
+    stored_procedures_path:
+      type: string
+    triggers_path:
+      type: string
+    user_defined_functions_path:
+      type: string
+    conflicts_path:
+      type: string
+    current_throughput:
+      type: number
+    current_autoscale_max_throughput:
+      type: number
+  lifecycle:
+    sync: <<< container-sync.js
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 10
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - azure-cosmosdb/azure-cosmosdb-base
+    - cli
+    - http
+    - crypto

@@ -1131,7 +1131,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
 
         try {
             // Build the restore request body
-            const encodedLocation = location.replace(/ /g, '');
+            const encodedLocation = location.replace(/ /g, '%20');
             const restoreSource = `/subscriptions/${this.definition.subscription_id}/providers/Microsoft.DocumentDB/locations/${encodedLocation}/restorableDatabaseAccounts/${instanceId}`;
 
             const restoreParameters: Record<string, unknown> = {

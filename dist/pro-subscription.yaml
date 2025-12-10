@@ -1,0 +1,102 @@
+namespace: redis-cloud
+pro-subscription:
+  defines: entity
+  metadata:
+    name: ProSubscription
+    version-hash: 839cd92bbb9c
+  schema:
+    account_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    user_key_secret:
+      type: string
+      minLength: 1
+      maxLength: 24
+    name:
+      type: string
+      description: Optional. New subscription name.
+    dry_run:
+      type: boolean
+      description: >-
+        Optional. When 'false': Creates a deployment plan and deploys it,
+        creating any resources required by the plan. When 'true': creates a
+        read-only deployment plan and does not create any resources. Default:
+        'false'
+    deployment_type:
+      type: string
+      enum:
+        - single-region
+        - active-active
+      description: >-
+        Optional. When 'single-region' or not set: Creates a single region
+        subscription. When 'active-active': creates an Active-Active
+        (multi-region) subscription.
+    payment_method:
+      type: string
+      enum:
+        - credit-card
+        - marketplace
+      description: >-
+        Optional. The payment method for the subscription. If set to
+        'credit-card', 'payment_method_id' must be defined. Default:
+        'credit-card'
+    payment_method_id:
+      type: number
+      description: >-
+        Optional. A valid payment method ID for this account. Use GET
+        /payment-methods to get a list of all payment methods for your account.
+        This value is optional if 'payment_method' is 'marketplace', but
+        required for all other account types.
+    memory_storage:
+      type: string
+      enum:
+        - ram
+        - ram-and-flash
+      description: >-
+        Optional. Memory storage preference: either 'ram' or a combination of
+        'ram-and-flash' (also known as Auto Tiering). Default: 'ram'
+    persistent_storage_encryption_type:
+      type: string
+      enum:
+        - cloud-provider-managed-key
+        - customer-managed-key
+      description: >-
+        Optional. Persistent storage encryption secures data-at-rest for
+        database persistence. You can use 'cloud-provider-managed-key' or
+        'customer-managed-key'. Default: 'cloud-provider-managed-key'
+    redis_version:
+      type: string
+      description: >-
+        Optional. Defines the Redis version of the databases in the
+        subscription. If not set, the Redis version for your databases will be
+        the default version. Use GET /subscriptions/redis-versions to get a list
+        of available Redis versions.
+    payment_method_type:
+      type: string
+      description: Type of payment method to auto-select
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type:
+        - string
+        - number
+    ready:
+      type: boolean
+    name:
+      type: string
+    status:
+      type: string
+    payment_method_id:
+      type: number
+  lifecycle:
+    sync: <<< pro-subscription-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - cli
+    - redis-cloud/base

@@ -1,0 +1,93 @@
+namespace: azure-cosmosdb
+access-list:
+  defines: entity
+  metadata:
+    name: AccessList
+    version-hash: 9c7915697b94
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    account_name:
+      type: string
+      description: Cosmos DB database account name to configure access for
+    virtual_network_rules:
+      type: array
+      items:
+        type: object
+        properties:
+          subnet_id:
+            type: string
+            description: >-
+              Full resource ID of the subnet
+
+              Format:
+              /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Network/virtualNetworks/{vnet-name}/subnets/{subnet-name}
+          ignore_missing_vnet_service_endpoint:
+            type: boolean
+            description: Ignore missing VNet service endpoint
+            default: false
+        required:
+          - subnet_id
+        additionalProperties: false
+      description: Array of virtual network rules to configure
+    ip_rules:
+      type: array
+      items:
+        type: object
+        properties:
+          ip_address_or_range:
+            type: string
+            description: |-
+              IP address or CIDR range to allow
+              Examples: "203.0.113.5", "198.51.100.0/24", "0.0.0.0/0"
+        required:
+          - ip_address_or_range
+        additionalProperties: false
+      description: Array of IP firewall rules to configure (IP addresses or CIDR ranges)
+    enable_virtual_network_filter:
+      type: boolean
+      description: Enable virtual network filtering on the account
+      default: true
+    required:
+      - subscription_id
+      - resource_group_name
+      - account_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    account_name:
+      type: string
+      description: Account name being managed
+    vnet_rules_count:
+      type: number
+      description: Number of virtual network rules configured
+    configured_subnet_ids:
+      type: array
+      items:
+        type: string
+      description: List of subnet IDs currently configured
+    ip_rules_count:
+      type: number
+      description: Number of IP firewall rules configured
+    configured_ip_ranges:
+      type: array
+      items:
+        type: string
+      description: List of IP addresses/ranges currently configured
+  lifecycle:
+    sync: <<< access-list-sync.js
+  requires:
+    - azure-cosmosdb/azure-cosmosdb-base
+    - cli
