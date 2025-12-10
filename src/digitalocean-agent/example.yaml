@@ -4,7 +4,7 @@ agent:
   defines: digitalocean-agent/agent
   name: api-create
   instruction: "be a weather reporter"
-  model_id: "openai-gpt-oss-120b"
+  model_id: "OpenAI GPT-oss-120b"
   project_id: ""
   tags: ["tag1"]
   region: "tor1"

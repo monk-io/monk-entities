@@ -1,5 +1,5 @@
 REPO digitalocean-agent
-VERSION_HASH ffdd97a5696c
+VERSION_HASH 5fc69e6c5200
 DESCRIPTION Manage DigitalOcean GenAI Agents, deployments, and keys.
 HOSTING managed
 TAGS digitalocean,ai,agent,genai
