@@ -1,7 +1,0 @@
-namespace: redis-cloud
-
-common:
-  defines: module
-  metadata:
-    version-hash: 839cd92bbb9c
-  source: <<< common.js
