@@ -14,8 +14,10 @@ remoteconfig:
     required: [ "project", "name", "vars" ]
     project:
       type: string
-    variables:
+    name:
       type: string
+    vars:
+      type: object
   requires:
     - cloud/gcp
   lifecycle:

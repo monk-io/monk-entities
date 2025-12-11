@@ -9,7 +9,7 @@ let prepareBody = function (def, storage) {
         "projectId": def["project"],
         "databaseURL": "https://" + def["project"] + "-default-rtdb.firebaseio.com",
         "storageBucket": def["project"] + ".appspot.com",
-        "locationId": def["region"]
+        "locationId": def["location"]
     }
 
     let body = {
@@ -43,7 +43,7 @@ let prepareBody = function (def, storage) {
 
         body.serviceConfig.environmentVariables.FUNCTION_SIGNATURE_TYPE = "cloudevent";
         body.serviceConfig.environmentVariables.EVENTARC_CLOUD_EVENT_SOURCE = "projects/" +
-            def["project"] + "/locations/" + def["region"] + "/services/" + def["name"];
+            def["project"] + "/locations/" + def["location"] + "/services/" + def["name"];
     }
 
     return body
