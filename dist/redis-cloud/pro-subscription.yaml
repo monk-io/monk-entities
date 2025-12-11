@@ -3,7 +3,7 @@ pro-subscription:
   defines: entity
   metadata:
     name: ProSubscription
-    version-hash: daf4c6568d15
+    version-hash: 839cd92bbb9c
   schema:
     account_key_secret:
       type: string

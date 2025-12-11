@@ -58,3 +58,32 @@ monk update my-app/my-mysql-db
 monk describe my-app/my-mysql-db
 ```
 
+## Backup & Snapshot Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View backup retention, window, and automated backup status |
+| `create-snapshot` | Create an on-demand manual snapshot |
+| `list-snapshots` | List available snapshots (manual and automated) |
+| `describe-snapshot` | Get detailed information about a specific snapshot |
+| `delete-snapshot` | Delete a manual snapshot |
+| `restore` | Restore to a new RDS instance from a snapshot |
+| `get-restore-status` | Check status of a restored instance |
+
+```bash
+# View backup configuration
+monk do my-app/my-mysql-db/get-backup-info
+
+# Create a snapshot before maintenance
+monk do my-app/my-mysql-db/create-snapshot snapshot_id="pre-upgrade"
+
+# List available snapshots
+monk do my-app/my-mysql-db/list-snapshots
+
+# Restore to a new instance
+monk do my-app/my-mysql-db/restore snapshot_id="pre-upgrade" target_id="restored-db"
+
+# Check status of restored instance
+monk do my-app/my-mysql-db/get-restore-status instance_id="restored-db"
+```
+

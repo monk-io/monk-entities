@@ -1,0 +1,115 @@
+name: "MongoDB Atlas Backup Integration Test"
+description: "Integration test for MongoDB Atlas backup operations using standardized action names"
+timeout: 900000
+
+# NOTE: This test requires a dedicated cluster (M10 or higher) to run backup operations.
+# Shared tier clusters (M0, M2, M5) do not support the backup API.
+
+secrets:
+  global:
+    mongodb-atlas-token: "$MONGODB_ATLAS_TOKEN"
+
+setup:
+  - name: "Load MongoDB Atlas entity manifest"
+    action: "load"
+    target: "dist/input/mongodb-atlas/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load backup test template"
+    action: "load"
+    target: "test/backup-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy backup test stack"
+    action: "run"
+    target: "mongodb-backup-test/backup-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for cluster readiness"
+    action: "wait"
+    target: "mongodb-backup-test/backup-cluster"
+    waitFor:
+      condition: "ready"
+      timeout: 600000
+
+  - name: "Verify cluster is running"
+    action: "describe"
+    target: "mongodb-backup-test/backup-cluster"
+    expect:
+      exitCode: 0
+
+  # Test get-backup-info action (standardized)
+  - name: "Get backup policy info"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/get-backup-info"
+    expect:
+      exitCode: 0
+
+  # Test create-snapshot action (standardized from 'backup')
+  - name: "Create backup snapshot"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/create-snapshot"
+    args:
+      description: "CI test backup snapshot"
+      retention_days: "3"
+    expect:
+      exitCode: 0
+
+  # Test list-snapshots action (standardized)
+  - name: "List available snapshots"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/list-snapshots"
+    expect:
+      exitCode: 0
+
+  # Test list-snapshots with limit parameter
+  - name: "List snapshots with limit"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/list-snapshots"
+    args:
+      limit: "5"
+    expect:
+      exitCode: 0
+
+  # Test list-restore-jobs action (standardized)
+  - name: "List restore jobs"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/list-restore-jobs"
+    expect:
+      exitCode: 0
+
+  # Test restore action (creates a new cluster or restores to existing)
+  # Note: This requires a valid snapshot_id from the previous list-snapshots output
+  - name: "Restore from snapshot"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/restore"
+    args:
+      snapshot_id: "${SNAPSHOT_ID}"
+      target_id: "monkec-backup-restored"
+      target_project_id: "${TARGET_PROJECT_ID}"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+  # Test get-restore-status action (standardized from 'restore-status')
+  - name: "Get restore job status"
+    action: "do"
+    target: "mongodb-backup-test/backup-cluster/get-restore-status"
+    args:
+      job_id: "${RESTORE_JOB_ID}"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+cleanup:
+  - name: "Delete backup test stack"
+    action: "delete"
+    target: "mongodb-backup-test/backup-stack"
+    expect:
+      exitCode: 0
+
+  # Note: Snapshots and restored clusters should be manually cleaned up via Atlas console if needed

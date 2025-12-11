@@ -79,3 +79,44 @@ monk update my-mongodb/my-project
 monk update my-mongodb/my-cluster
 monk update my-mongodb/my-user
 ```
+
+## Backup & Snapshot Actions (M10+ Clusters)
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View backup configuration and status |
+| `create-snapshot` | Create an on-demand backup snapshot |
+| `list-snapshots` | List available snapshots |
+| `describe-snapshot` | Get detailed info about a specific snapshot |
+| `delete-snapshot` | Delete a backup snapshot |
+| `restore` | Restore from snapshot or point-in-time |
+| `get-restore-status` | Check restore job progress |
+| `list-restore-jobs` | View all restore jobs |
+
+```bash
+# View backup configuration
+monk do my-mongodb/my-cluster/get-backup-info
+
+# Create a snapshot before migration
+monk do my-mongodb/my-cluster/create-snapshot description="Pre-migration"
+
+# List available snapshots
+monk do my-mongodb/my-cluster/list-snapshots
+
+# Restore from snapshot (WARNING: overwrites data!)
+monk do my-mongodb/my-cluster/restore snapshot_id="xxx"
+
+# Point-in-time restore
+monk do my-mongodb/my-cluster/restore restore_timestamp="2024-12-01T10:00:00Z"
+
+# Check restore progress
+monk do my-mongodb/my-cluster/get-restore-status job_id="xxx"
+
+# Get details about a specific snapshot
+monk do my-mongodb/my-cluster/describe-snapshot snapshot_id="xxx"
+
+# Delete a snapshot
+monk do my-mongodb/my-cluster/delete-snapshot snapshot_id="xxx"
+```
+
+**Note:** Backup API requires M10+ dedicated clusters. M0/M2/M5 shared tiers do not support backup API.

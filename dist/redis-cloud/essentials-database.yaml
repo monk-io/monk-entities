@@ -3,7 +3,7 @@ essentials-database:
   defines: entity
   metadata:
     name: EssentialsDatabase
-    version-hash: daf4c6568d15
+    version-hash: 839cd92bbb9c
   schema:
     account_key_secret:
       type: string
@@ -153,9 +153,11 @@ essentials-database:
       type: string
   lifecycle:
     sync: <<< essentials-database-sync.js
-    backup: ''
+    get-backup-info: ''
+    create-snapshot: ''
     restore: ''
-    list-backups: ''
+    list-snapshots: ''
+    get-restore-status: ''
   checks:
     readiness:
       period: 5

@@ -741,36 +741,109 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
     checkLiveness(): boolean { return this.checkReadiness(); }
 
     /**
-     * Manually back up the Pro database
-     * Backs up to the remoteBackup storage path configured for this database,
-     * or to a custom location if adhocBackupPath is provided in args
+     * Get backup configuration and status information for the database
      * 
-     * For Active-Active databases, you must back up each region separately using regionName parameter
+     * Shows current backup settings including remote backup configuration
+     * and last backup status.
      * 
      * Usage:
-     * - monk do namespace/database-instance backup
-     * - monk do namespace/database-instance backup adhocBackupPath="s3://my-bucket/adhoc-backup/"
-     * - monk do namespace/database-instance backup regionName="us-east-1" (for Active-Active)
-     * - monk do namespace/database-instance backup regionName="us-east-1" adhocBackupPath="s3://custom-path/"
+     * - monk do namespace/database-instance get-backup-info
      */
-    @action()
-    backup(args?: Args): void {
+    @action("get-backup-info")
+    getBackupInfo(_args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`📦 Backup Information for Pro database: ${this.state.name}`);
+        cli.output(`==================================================`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`Subscription ID: ${this.definition.subscription_id}`);
+
+        if (!this.state.id) {
+            throw new Error("Database ID is not available. Ensure the database is created and ready.");
+        }
+
+        try {
+            const databaseData = this.checkResourceExists(`/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`);
+            
+            if (!databaseData) {
+                throw new Error(`Database ${this.state.name} not found`);
+            }
+
+            cli.output(`\n🔧 Backup Configuration:`);
+            
+            // Show remote backup config from definition
+            if (this.definition.remote_backup) {
+                cli.output(`   Remote Backup: ${this.definition.remote_backup.active ? '✅ Enabled' : '❌ Disabled'}`);
+                if (this.definition.remote_backup.interval) {
+                    cli.output(`   Backup Interval: ${this.definition.remote_backup.interval}`);
+                }
+                if (this.definition.remote_backup.storage_type) {
+                    cli.output(`   Storage Type: ${this.definition.remote_backup.storage_type}`);
+                }
+                if (this.definition.remote_backup.storage_path) {
+                    cli.output(`   Storage Path: ${this.definition.remote_backup.storage_path}`);
+                }
+                if (this.definition.remote_backup.time_utc) {
+                    cli.output(`   Backup Time (UTC): ${this.definition.remote_backup.time_utc}`);
+                }
+            } else {
+                cli.output(`   Remote Backup: ❌ Not configured`);
+            }
+            
+            // Show backup state if available
+            if (this.state.backup) {
+                cli.output(`\n📅 Last Backup Status:`);
+                if (this.state.backup.status) cli.output(`   Status: ${this.state.backup.status}`);
+                if (this.state.backup.last_backup) cli.output(`   Last Backup: ${this.state.backup.last_backup}`);
+                if (this.state.backup.path) cli.output(`   Path: ${this.state.backup.path}`);
+            }
+            
+            cli.output(`\n📋 To create a manual snapshot:`);
+            cli.output(`   monk do namespace/database create-snapshot`);
+            cli.output(`\n📋 To list all backups:`);
+            cli.output(`   monk do namespace/database list-snapshots`);
+            
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get backup info`);
+            throw new Error(`Get backup info failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Create a manual backup snapshot of the Pro database
+     * Backs up to the remoteBackup storage path configured for this database,
+     * or to a custom location if backup_path is provided in args
+     * 
+     * For Active-Active databases, you must back up each region separately using region_name parameter
+     * 
+     * Usage:
+     * - monk do namespace/database-instance create-snapshot
+     * - monk do namespace/database-instance create-snapshot backup_path="s3://my-bucket/adhoc-backup/"
+     * - monk do namespace/database-instance create-snapshot region_name="us-east-1" (for Active-Active)
+     * - monk do namespace/database-instance create-snapshot region_name="us-east-1" backup_path="s3://custom-path/"
+     */
+    @action("create-snapshot")
+    createSnapshot(args?: Args): void {
         cli.output(`Initiating backup for Pro database: ${this.state.name}`);
         
         if (!this.state.id) {
             throw new Error("Database ID is not available. Cannot initiate backup.");
         }
 
-        if (!this.definition.remote_backup?.storage_path && !args?.adhocBackupPath) {
-            throw new Error("remote_backup.storage_path is not configured for this database, and no adhocBackupPath was provided. Cannot initiate backup.");
+        // Support both old and new parameter names for backward compatibility
+        const backupPath = args?.backup_path || args?.adhocBackupPath;
+        const regionName = args?.region_name || args?.regionName;
+
+        if (!this.definition.remote_backup?.storage_path && !backupPath) {
+            throw new Error("remote_backup.storage_path is not configured for this database, and no backup_path was provided. Cannot initiate backup.");
         }
 
         const body: any = {};
-        if (args?.regionName) {
-            body.regionName = args.regionName as string;
+        if (regionName) {
+            body.regionName = regionName as string;
         }
-        if (args?.adhocBackupPath) {
-            body.adhocBackupPath = args.adhocBackupPath as string;
+        if (backupPath) {
+            body.adhocBackupPath = backupPath as string;
         }
 
         try {
@@ -798,19 +871,19 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
      * This action imports data from an external storage location into the database.
      * WARNING: This will OVERWRITE all existing data in the database!
      * 
-     * @param args.sourceType - Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)
-     * @param args.importFromUri - URI to the backup file
+     * @param args.source_type - Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)
+     * @param args.source_uri - URI to the backup file
      * 
      * @example
      * ```bash
      * # Restore from S3
-     * monk do namespace/pro-database restore sourceType="aws-s3" importFromUri="s3://bucket/backup.rdb"
+     * monk do namespace/pro-database restore source_type="aws-s3" source_uri="s3://bucket/backup.rdb"
      * 
      * # Restore from Google Cloud Storage
-     * monk do namespace/pro-database restore sourceType="google-blob-storage" importFromUri="gs://bucket/backup.rdb"
+     * monk do namespace/pro-database restore source_type="google-blob-storage" source_uri="gs://bucket/backup.rdb"
      * 
      * # Import from another Redis instance
-     * monk do namespace/pro-database restore sourceType="redis" importFromUri="redis://password@host:6379"
+     * monk do namespace/pro-database restore source_type="redis" source_uri="redis://password@host:6379"
      * ```
      */
     @action("restore")
@@ -828,29 +901,29 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
             throw new Error("Database does not exist, cannot restore");
         }
 
-        // Extract and validate parameters
-        const sourceType = args?.sourceType as string;
-        const importFromUri = args?.importFromUri as string;
+        // Extract and validate parameters (support both old and new param names for backward compatibility)
+        const sourceType = (args?.source_type || args?.sourceType) as string;
+        const importFromUri = (args?.source_uri || args?.importFromUri) as string;
 
         if (!sourceType || !importFromUri) {
             cli.output(`❌ ERROR: Missing required parameters`);
             cli.output(`Required parameters:`);
-            cli.output(`  - sourceType: Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)`);
-            cli.output(`  - importFromUri: URI to the backup file`);
+            cli.output(`  - source_type: Type of storage (aws-s3, ftp, google-blob-storage, azure-blob-storage, redis, http)`);
+            cli.output(`  - source_uri: URI to the backup file`);
             cli.output(`--------------------------------------------------`);
             cli.output(`Example usage:`);
-            cli.output(`  monk do <namespace>/<database> restore sourceType="aws-s3" importFromUri="s3://bucket/backup.rdb"`);
+            cli.output(`  monk do <namespace>/<database> restore source_type="aws-s3" source_uri="s3://bucket/backup.rdb"`);
             cli.output(`==================================================`);
-            throw new Error("Both sourceType and importFromUri are required parameters");
+            throw new Error("Both source_type and source_uri are required parameters");
         }
 
         // Validate sourceType
         const validSourceTypes = ['aws-s3', 'ftp', 'google-blob-storage', 'azure-blob-storage', 'redis', 'http'];
         if (!validSourceTypes.includes(sourceType)) {
-            cli.output(`❌ ERROR: Invalid sourceType: ${sourceType}`);
+            cli.output(`❌ ERROR: Invalid source_type: ${sourceType}`);
             cli.output(`Valid source types: ${validSourceTypes.join(', ')}`);
             cli.output(`==================================================`);
-            throw new Error(`Invalid sourceType: ${sourceType}`);
+            throw new Error(`Invalid source_type: ${sourceType}`);
         }
 
         // Display warning
@@ -938,17 +1011,17 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
     }
 
     /**
-     * List all backups for this Pro database
+     * List all backups/snapshots for this Pro database
      * 
      * This action retrieves the list of available backups for the database.
      * 
      * @example
      * ```bash
-     * monk do namespace/database-instance list-backups
+     * monk do namespace/database-instance list-snapshots
      * ```
      */
-    @action()
-    listBackups(): void {
+    @action("list-snapshots")
+    listSnapshots(): void {
         cli.output(`==================================================`);
         cli.output(`📋 Listing backups for Pro database: ${this.state.name}`);
         cli.output(`==================================================`);
@@ -1013,6 +1086,94 @@ export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProData
             cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
             cli.output(`==================================================`);
             throw new Error(`Failed to list backups for Pro database ${this.state.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get the status of a restore/import task
+     * 
+     * Check the progress of an ongoing restore operation using its task ID.
+     * 
+     * @param args Required arguments:
+     *   - task_id: The task ID returned from a restore operation
+     * 
+     * @example
+     * ```bash
+     * monk do namespace/pro-database/get-restore-status task_id="abc123"
+     * ```
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE TASK STATUS`);
+        cli.output(`==================================================`);
+        cli.output(`Database: ${this.state.name}`);
+        cli.output(`Database ID: ${this.state.id}`);
+        cli.output(`--------------------------------------------------`);
+
+        const taskId = (args?.task_id || args?.job_id || args?.taskId) as string | undefined;
+
+        if (!taskId) {
+            cli.output(`❌ ERROR: Missing required parameter 'task_id'`);
+            cli.output(`\nUsage:`);
+            cli.output(`  monk do namespace/database/get-restore-status task_id="your-task-id"`);
+            cli.output(`\nThe task_id is returned when you run a restore operation.`);
+            cli.output(`==================================================`);
+            throw new Error("task_id is required");
+        }
+
+        try {
+            const taskData = this.makeRequest("GET", `/tasks/${taskId}`);
+
+            cli.output(`\n📋 Task Information`);
+            cli.output(`   Task ID: ${taskId}`);
+            cli.output(`   Status: ${this.getTaskStatusIcon(taskData.status)} ${taskData.status}`);
+            
+            if (taskData.commandType) {
+                cli.output(`   Command: ${taskData.commandType}`);
+            }
+            
+            if (taskData.description) {
+                cli.output(`   Description: ${taskData.description}`);
+            }
+
+            if (taskData.timestamp) {
+                cli.output(`   Timestamp: ${taskData.timestamp}`);
+            }
+
+            if (taskData.response) {
+                cli.output(`\n📦 Response Details:`);
+                if (taskData.response.resourceId) {
+                    cli.output(`   Resource ID: ${taskData.response.resourceId}`);
+                }
+                if (taskData.response.error) {
+                    cli.output(`   ❌ Error: ${JSON.stringify(taskData.response.error)}`);
+                }
+            }
+
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get task status`);
+            cli.output(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            cli.output(`==================================================`);
+            throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get status icon for task status
+     */
+    private getTaskStatusIcon(status: string): string {
+        switch (status) {
+            case 'processing-completed':
+                return '✅';
+            case 'processing-in-progress':
+            case 'received':
+                return '⏳';
+            case 'processing-error':
+                return '❌';
+            default:
+                return '🔄';
         }
     }
 } 

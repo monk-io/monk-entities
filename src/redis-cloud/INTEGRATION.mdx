@@ -1,0 +1,152 @@
+---
+title: Redis Cloud
+description: Managed Redis databases with Essentials and Pro tiers.
+website_url: https://redis.com/redis-enterprise-cloud/
+docs_url: https://docs.redis.com/latest/rc/
+primary_category: database
+tags: [redis, database, cache, redis-cloud]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Redis Cloud is a fully managed Redis service that offers both Essentials (shared) and Pro (dedicated) database tiers with automatic failover, backups, and scaling.
+
+## What Monk manages
+- Essentials Subscription, Essentials Database
+- Pro Subscription, Pro Database
+
+## What the Agent can do and how to use it
+- **Subscription Management**: Create and manage Essentials and Pro subscriptions
+- **Database Provisioning**: Deploy Redis databases with configurable memory, persistence, and modules
+- **Backup & Recovery**: Create on-demand snapshots and restore from external backups
+- **Security**: Configure TLS, IP access lists, and authentication
+- **High Availability**: Enable replication and multi-zone deployments (Pro)
+- **Clustering**: Configure Redis Cluster with sharding (Pro)
+
+Steps:
+1) Set Redis Cloud API secrets
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses Monk secrets for Redis Cloud API credentials:
+  - `redis-cloud-account-key`: Account API key
+  - `redis-cloud-user-key`: User API key
+
+## Getting Started
+
+1) Set secrets:
+```bash
+monk secrets add -g redis-cloud-account-key="YOUR_ACCOUNT_KEY"
+monk secrets add -g redis-cloud-user-key="YOUR_USER_KEY"
+```
+
+2) Define an Essentials database (save as redis.yaml):
+```yaml
+namespace: my-app
+
+my-subscription:
+  defines: redis-cloud/essentials-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: My-Subscription
+  size: 30
+  provider: AWS
+  region: us-east-1
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+
+my-redis:
+  defines: redis-cloud/essentials-database
+  subscription_id: <- connection-target("sub") entity-state get-member("id")
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: my-redis-db
+  connections:
+    sub:
+      runnable: my-app/my-subscription
+      service: subscription
+  depends:
+    wait-for:
+      runnables:
+        - my-app/my-subscription
+      timeout: 300
+```
+
+3) Create/update:
+```bash
+monk update my-app/my-subscription
+monk update my-app/my-redis
+monk describe my-app/my-redis
+```
+
+## Pro Database (Dedicated Clusters)
+
+For production workloads requiring dedicated resources, clustering, and advanced features:
+
+```yaml
+namespace: my-app
+
+pro-subscription:
+  defines: redis-cloud/pro-subscription
+  account_key_secret: redis-cloud-account-key
+  user_key_secret: redis-cloud-user-key
+  name: Pro-Subscription
+  payment_method_type: Visa
+  permitted-secrets:
+    redis-cloud-account-key: true
+    redis-cloud-user-key: true
+
+pro-redis:
+  defines: redis-cloud/pro-database
+  name: production-redis
+  subscription_id: <- connection-target("sub") entity-state get-member("id")
+  dataset_size_in_gb: 1
+  data_persistence: aof-every-1-second
+  replication: true
+  remote_backup:
+    active: true
+    interval: every-6-hours
+    storage_type: s3
+    storage_path: s3://my-backups/redis/
+  connections:
+    sub:
+      runnable: my-app/pro-subscription
+      service: subscription
+```
+
+**Pro Features:**
+- Dedicated infrastructure with configurable memory/storage
+- Redis modules (RediSearch, RedisJSON, RedisTimeSeries, etc.)
+- Active-Active geo-replication
+- Scheduled remote backups to S3/GCS/Azure
+- VPC peering and private endpoints
+
+## Backup & Snapshot Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View backup configuration and status |
+| `create-snapshot` | Create an on-demand backup snapshot |
+| `list-snapshots` | List available backups |
+| `restore` | Restore/import data from external backup |
+| `get-restore-status` | Check restore task progress |
+
+```bash
+# View backup configuration
+monk do my-app/my-redis/get-backup-info
+
+# Create a backup snapshot
+monk do my-app/my-redis/create-snapshot
+
+# List available backups
+monk do my-app/my-redis/list-snapshots
+
+# Restore from S3 backup
+monk do my-app/my-redis/restore source_type="aws-s3" source_uri="s3://bucket/backup.rdb"
+
+# Check restore task progress
+monk do my-app/my-redis/get-restore-status task_id="xxx"
+```
+
+

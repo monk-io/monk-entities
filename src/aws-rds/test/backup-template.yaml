@@ -1,0 +1,38 @@
+namespace: aws-rds-backup-test
+
+# AWS RDS Backup Test Template
+# This template creates an RDS instance configured with backups enabled for testing backup operations
+
+backup-mysql-instance:
+  defines: aws-rds/rds-instance
+  region: us-east-1
+  db_instance_identifier: monkec-backup-test-mysql
+  db_instance_class: db.t3.micro
+  engine: mysql
+  engine_version: "8.0"
+  master_username: testuser
+  password_secret_ref: test-mysql-backup-password
+  allocated_storage: 20
+  port: 3306
+  storage_type: gp2
+  auto_minor_version_upgrade: true
+  backup_retention_period: 7  # Enable automated backups
+  preferred_backup_window: "05:00-06:00"
+  preferred_maintenance_window: "sun:06:00-sun:07:00"
+  publicly_accessible: false
+  multi_az: false
+  deletion_protection: false
+  skip_final_snapshot: true
+  tags:
+    Environment: backup-test
+    Application: monkec-backup-test
+    ManagedBy: monk
+  permitted-secrets:
+    test-mysql-backup-password: true
+
+# Stack Definition
+backup-stack:
+  defines: process-group
+  runnable-list:
+    - aws-rds-backup-test/backup-mysql-instance
+

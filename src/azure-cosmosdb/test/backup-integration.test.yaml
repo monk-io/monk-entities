@@ -1,0 +1,134 @@
+name: "Azure Cosmos DB Backup Integration Test"
+description: "Integration test for Azure Cosmos DB continuous backup and point-in-time restore operations"
+timeout: 1200000
+
+setup:
+  - name: "Load Azure Cosmos DB entity manifest"
+    action: "load"
+    target: "dist/input/azure-cosmosdb/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load backup test template"
+    action: "load"
+    target: "test/backup-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy backup test account"
+    action: "run"
+    target: "azure-cosmosdb-backup-test/backup-account"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for account readiness"
+    action: "wait"
+    target: "azure-cosmosdb-backup-test/backup-account"
+    waitFor:
+      condition: "ready"
+      timeout: 600000
+
+  - name: "Verify account is running"
+    action: "describe"
+    target: "azure-cosmosdb-backup-test/backup-account"
+    expect:
+      exitCode: 0
+
+  # Test get-backup-info action
+  - name: "Get backup configuration info"
+    action: "do"
+    target: "azure-cosmosdb-backup-test/backup-account/get-backup-info"
+    expect:
+      exitCode: 0
+
+  # Deploy database and container for restore testing
+  - name: "Deploy backup test database"
+    action: "run"
+    target: "azure-cosmosdb-backup-test/backup-database"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for database readiness"
+    action: "wait"
+    target: "azure-cosmosdb-backup-test/backup-database"
+    waitFor:
+      condition: "ready"
+      timeout: 300000
+
+  - name: "Deploy backup test container"
+    action: "run"
+    target: "azure-cosmosdb-backup-test/backup-container"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for container readiness"
+    action: "wait"
+    target: "azure-cosmosdb-backup-test/backup-container"
+    waitFor:
+      condition: "ready"
+      timeout: 300000
+
+  # Test list-restorable-accounts action
+  - name: "List restorable accounts"
+    action: "do"
+    target: "azure-cosmosdb-backup-test/backup-account/list-restorable-accounts"
+    expect:
+      exitCode: 0
+
+  # Test list-restorable-databases action (requires source_id from list-restorable-accounts)
+  # Note: This test may need manual source_id input
+  - name: "List restorable databases"
+    action: "do"
+    target: "azure-cosmosdb-backup-test/backup-account/list-restorable-databases"
+    args:
+      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+  # Test list-restorable-containers action
+  - name: "List restorable containers"
+    action: "do"
+    target: "azure-cosmosdb-backup-test/backup-account/list-restorable-containers"
+    args:
+      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
+      database_name: "backup-test-db"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+  # Test restore action (creates a new Cosmos DB account)
+  # Note: This is a long-running operation
+  - name: "Restore to new account (point-in-time)"
+    action: "do"
+    target: "azure-cosmosdb-backup-test/backup-account/restore"
+    args:
+      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
+      target_id: "monk-backup-test-restored"
+      restore_timestamp: "${RESTORE_TIMESTAMP}"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+cleanup:
+  - name: "Delete backup test container"
+    action: "delete"
+    target: "azure-cosmosdb-backup-test/backup-container"
+    expect:
+      exitCode: 0
+
+  - name: "Delete backup test database"
+    action: "delete"
+    target: "azure-cosmosdb-backup-test/backup-database"
+    expect:
+      exitCode: 0
+
+  - name: "Delete backup test account"
+    action: "delete"
+    target: "azure-cosmosdb-backup-test/backup-account"
+    expect:
+      exitCode: 0
+
+  # Note: If restore was executed, the restored account 'monk-backup-test-restored' 
+  # should be manually deleted via Azure Portal or CLI

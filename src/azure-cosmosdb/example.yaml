@@ -357,3 +357,85 @@ microservices-stack:
     # Applications
     - azure-cosmosdb-example/ecommerce-app
     - azure-cosmosdb-example/analytics-service
+
+# ========================================
+# Backup & Restore Examples
+# ========================================
+
+# Example 11: Cosmos DB with Continuous Backup (7-day retention)
+# Enables point-in-time restore capability
+cosmos-continuous-backup-7day:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
+  resource_group_name: "ivan-test"
+  account_name: "cosmos-backup-7day-test"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: false
+  consistency_policy:
+    default_consistency_level: "Session"
+  # Enable continuous backup with 7-day point-in-time restore
+  backup_policy:
+    backup_type: "Continuous"
+    continuous_tier: "Continuous7Days"
+  tags:
+    Environment: "Development"
+    BackupType: "Continuous7Days"
+    Purpose: "BackupDemo"
+
+# Example 12: Cosmos DB with Continuous Backup (30-day retention)
+# Production-grade backup with extended restore window
+cosmos-continuous-backup-30day:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "production-rg"  # Replace with your resource group
+  account_name: "cosmos-backup-30day"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: true
+    - location_name: "West US 2"
+      failover_priority: 1
+      is_zone_redundant: true
+  consistency_policy:
+    default_consistency_level: "Session"
+  enable_automatic_failover: true
+  # Enable continuous backup with 30-day point-in-time restore (production)
+  backup_policy:
+    backup_type: "Continuous"
+    continuous_tier: "Continuous30Days"
+  tags:
+    Environment: "Production"
+    BackupType: "Continuous30Days"
+    Compliance: "BusinessContinuity"
+
+# Example 13: Cosmos DB with Periodic Backup (custom schedule)
+# Traditional backup mode with configurable interval
+cosmos-periodic-backup:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
+  resource_group_name: "backup-demo-rg"  # Replace with your resource group
+  account_name: "cosmos-periodic-backup"
+  locations:
+    - location_name: "Central US"
+      failover_priority: 0
+  consistency_policy:
+    default_consistency_level: "Session"
+  # Periodic backup with custom schedule
+  backup_policy:
+    backup_type: "Periodic"
+    periodic_interval_minutes: 120  # Backup every 2 hours
+    periodic_retention_hours: 48    # Keep backups for 48 hours
+    backup_storage_redundancy: "Zone"  # Zone-redundant storage
+  tags:
+    Environment: "Staging"
+    BackupType: "Periodic"
+    BackupInterval: "2hours"
+
+# Example 14: Full backup demo stack
+# Use this to test backup/restore actions
+backup-demo-stack:
+  defines: process-group
+  runnable-list:
+    - azure-cosmosdb-example/cosmos-continuous-backup-7day

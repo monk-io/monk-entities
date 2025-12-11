@@ -1,0 +1,139 @@
+---
+title: Azure Cosmos DB
+description: Globally distributed, multi-model database service.
+website_url: https://azure.microsoft.com/en-us/products/cosmos-db
+docs_url: https://learn.microsoft.com/en-us/azure/cosmos-db/
+primary_category: database
+tags: [azure, database, cosmosdb, nosql, mongodb]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Azure Cosmos DB is a globally distributed, multi-model database service that supports NoSQL, MongoDB, and other APIs with guaranteed low latency at any scale.
+
+## What Monk manages
+- Database Account (with geo-replication, consistency policies, backup configuration)
+- Database (with throughput provisioning)
+- Access List (VNet service endpoints)
+
+## What the Agent can do and how to use it
+- **Account Management**: Create and manage Cosmos DB accounts with multiple APIs (NoSQL, MongoDB)
+- **Global Distribution**: Configure multi-region replication with automatic failover
+- **Consistency Levels**: Set consistency from Strong to Eventual based on requirements
+- **Backup & Recovery**: Configure continuous or periodic backup, point-in-time restore
+- **Throughput**: Provision manual or autoscale throughput for databases
+- **Security**: Configure VNet access rules, private endpoints, and authentication
+
+Steps:
+1) Ensure Azure credentials are configured (az login or service principal)
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses Azure credentials configured via:
+  - Azure CLI (`az login`)
+  - Service Principal (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+  - Managed Identity (when running on Azure)
+
+## Getting Started
+
+1) Define a Cosmos DB account (save as cosmos.yaml):
+```yaml
+namespace: my-app
+
+cosmos-account:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "your-subscription-id"
+  resource_group_name: "my-resource-group"
+  account_name: "my-cosmos-account"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+  consistency_policy:
+    default_consistency_level: "Session"
+  backup_policy:
+    backup_type: "Continuous"
+    continuous_tier: "Continuous7Days"
+
+cosmos-database:
+  defines: azure-cosmosdb/database
+  subscription_id: "your-subscription-id"
+  resource_group_name: "my-resource-group"
+  database_account_name: "my-cosmos-account"
+  database_id: "my-database"
+  manual_throughput: 400
+  connections:
+    account:
+      runnable: my-app/cosmos-account
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - my-app/cosmos-account
+      timeout: 300
+```
+
+2) Create/update:
+```bash
+monk update my-app/cosmos-account
+monk update my-app/cosmos-database
+monk describe my-app/cosmos-account
+```
+
+## Multi-Region High Availability
+
+For production workloads requiring global distribution:
+
+```yaml
+ha-cosmos-account:
+  defines: azure-cosmosdb/database-account
+  subscription_id: "your-subscription-id"
+  resource_group_name: "production-rg"
+  account_name: "prod-cosmos-global"
+  locations:
+    - location_name: "East US"
+      failover_priority: 0
+      is_zone_redundant: true
+    - location_name: "West Europe"
+      failover_priority: 1
+    - location_name: "Southeast Asia"
+      failover_priority: 2
+  enable_automatic_failover: true
+  enable_multiple_write_locations: true
+  consistency_policy:
+    default_consistency_level: "BoundedStaleness"
+    max_staleness_prefix: 100000
+    max_interval_in_seconds: 300
+```
+
+## Backup & Restore Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View backup policy and earliest restore time |
+| `list-restorable-accounts` | List accounts available for restore |
+| `list-restorable-databases` | List databases that can be restored |
+| `list-restorable-containers` | List containers that can be restored |
+| `restore` | Create a new account from point-in-time backup |
+
+```bash
+# View backup configuration
+monk do my-app/cosmos-account/get-backup-info
+
+# List restorable accounts
+monk do my-app/cosmos-account/list-restorable-accounts
+
+# List restorable databases
+monk do my-app/cosmos-account/list-restorable-databases \
+  source_id="<instance-id>" location="East US"
+
+# Restore to a new account
+monk do my-app/cosmos-account/restore \
+  target_id="restored-cosmos" \
+  source_id="<instance-id>" \
+  location="East US" \
+  restore_timestamp="2024-12-01T10:00:00Z"
+```
+
+**Note:** Continuous backup enables self-service point-in-time restore. Periodic backup restore requires an Azure Support ticket.
+
+

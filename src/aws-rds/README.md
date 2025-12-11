@@ -311,6 +311,68 @@ monk do my-app/my-database/delete-snapshot snapshot_id="my-snapshot-id"
 - Only manual snapshots can be deleted
 - Automated snapshots are managed by the `backup_retention_period` setting
 
+### get-backup-info
+Display backup configuration and status information.
+
+```bash
+monk do my-app/my-database/get-backup-info
+```
+
+**Output includes:**
+- Backup retention period
+- Preferred backup window
+- Automated backup status
+- Latest restorable time
+
+### restore
+Restore a new RDS instance from a snapshot.
+
+```bash
+# Basic restore - creates new instance from snapshot
+monk do my-app/my-database/restore snapshot_id="my-snapshot" target_id="restored-db"
+
+# Restore with custom instance class
+monk do my-app/my-database/restore snapshot_id="my-snapshot" target_id="restored-db" instance_class="db.t3.medium"
+
+# Restore with full configuration
+monk do my-app/my-database/restore \
+  snapshot_id="my-snapshot" \
+  target_id="restored-db" \
+  instance_class="db.t3.medium" \
+  publicly_accessible=true \
+  multi_az=false \
+  storage_type="gp3"
+```
+
+**Required Parameters:**
+- `snapshot_id` - The snapshot identifier to restore from
+- `target_id` - The identifier for the new instance
+
+**Optional Parameters:**
+- `instance_class` - DB instance class (uses snapshot's original if not specified)
+- `port` - Database port
+- `availability_zone` - Availability zone for the new instance
+- `db_subnet_group_name` - DB subnet group name
+- `multi_az` - Enable Multi-AZ (true/false)
+- `publicly_accessible` - Enable public access (true/false)
+- `storage_type` - Storage type (gp2/gp3/io1)
+- `vpc_security_group_ids` - Comma-separated security group IDs
+
+**⚠️ Important:**
+- This creates a **NEW** RDS instance from the snapshot
+- The original instance is NOT affected
+- The new instance will have a new endpoint address
+- Instance creation may take several minutes
+- You may need to update your application configuration to use the new endpoint
+
+**Typical Restore Workflow:**
+1. Get backup info: `monk do my-app/my-database/get-backup-info`
+2. List available snapshots: `monk do my-app/my-database/list-snapshots`
+3. Review snapshot details: `monk do my-app/my-database/describe-snapshot snapshot_id="my-snapshot"`
+4. Restore to new instance: `monk do my-app/my-database/restore snapshot_id="my-snapshot" target_id="restored-db"`
+5. Check new instance status in AWS Console
+6. Update application configuration with new endpoint
+
 ## Lifecycle Management
 
 ### Creation

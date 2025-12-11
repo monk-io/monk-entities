@@ -3,7 +3,7 @@ cluster:
   defines: entity
   metadata:
     name: Cluster
-    version-hash: b5c32c0d4d26
+    version-hash: e9061ea345a0
   schema:
     secret_ref:
       type: string
@@ -74,11 +74,14 @@ cluster:
       description: SRV connection string
   lifecycle:
     sync: <<< cluster-sync.js
-    backup: ''
+    get-backup-info: ''
+    create-snapshot: ''
     list-snapshots: ''
     restore: ''
-    restore-status: ''
+    get-restore-status: ''
     list-restore-jobs: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
   checks:
     readiness:
       period: 30
