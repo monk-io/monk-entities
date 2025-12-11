@@ -126,6 +126,7 @@ resource-server:
         "client-id",
         "management-client-id-secret",
         "management-client-token-secret",
+        "management-api",
       ]
     domain:
       type: string
@@ -145,6 +146,9 @@ resource-server:
     management-client-token-secret:
       type: string
       description: "Secret for client Secret for Management API access"
+    management-api:
+      type: string
+      description: "Address for management API"
     scopes:
       type: array
       items:
