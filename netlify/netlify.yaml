@@ -25,19 +25,30 @@ deploy:
     node-version:
       env: NODE_VERSION
       type: string
-      value: 18 # one of 18, 20, 22, 23
+      value: 20
+      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24. Pick node version based on the project requirements, or leave unset for default (20).
     site-id:
       env: NETLIFY_SITE_ID
       type: string
-      value: example
+      value: ""
+      description: |
+        The Netlify site ID to deploy to.
+        Hint: inherit this runnable and use connection to netlify/site entity, then set this variable to:
+        site-id: <- connection-target("site") entity-state get-member("id")
     token:
       env: NETLIFY_AUTH_TOKEN
       type: string
       value: <- secret("default-netlify-pat")
+      description:  The Netlify Personal Access Token (PAT) used for authentication.
     deploy-dir:
       env: DEPLOY_DIR
       type: string
       value: /home/node/app/
+      description: The directory containing the files to deploy.
     pre-deploy:
       type: string
       value: <- `echo "pre-deploy script"`
+      description: |
+        A script to run before deployment.
+        Hint: you can override this variable to add custom pre-deploy steps, e.g. building the project.
+        You can include dev deps in install command in pre deploy, e.g. npm install --include=dev.
