@@ -1,0 +1,91 @@
+namespace: gcp
+firebase-hosting-site:
+  defines: entity
+  metadata:
+    name: FirebaseHostingSite
+    version-hash: bbbc90c1ac23
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        Site name/ID (must be unique within Firebase project)
+        The site will be accessible at {name}.web.app and {name}.firebaseapp.com
+    firebase_project:
+      type: string
+      description: |-
+        Firebase project ID (if different from GCP project)
+        Usually the same as the GCP project.
+    site_type:
+      type: string
+      enum:
+        - DEFAULT_SITE
+        - USER_SITE
+      description: |-
+        Site type
+        - DEFAULT_SITE: The default hosting site for the project
+        - USER_SITE: A custom additional hosting site
+      default: USER_SITE
+    app_id:
+      type: string
+      description: |-
+        App ID this site is associated with (optional)
+        Format: projects/{project}/webApps/{appId}
+    keep_on_delete:
+      type: boolean
+      description: Whether to keep the site on delete (don't destroy)
+      default: false
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Key-value labels for organizing sites
+      description: Key-value labels for organizing sites
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Full resource name
+    site_id:
+      type: string
+      description: Site ID
+    default_url:
+      type: string
+      description: 'Default URL for the site ({site}.web.app)'
+    site_type:
+      type: string
+      description: Site type
+    app_id:
+      type: string
+      description: Associated app ID
+    firebase_app_url:
+      type: string
+      description: 'Legacy Firebase app domain ({site}.firebaseapp.com)'
+  lifecycle:
+    sync: <<< firebase-hosting-site-sync.js
+    get: ''
+    list-channels: ''
+    list-releases: ''
+    list-versions: ''
+    list-domains: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

@@ -1,0 +1,175 @@
+namespace: gcp-cloudfunction-demo
+
+# =============================================================================
+# GCP Cloud Functions Gen 2 Example
+# =============================================================================
+#
+# This example demonstrates:
+# 1. Enabling required GCP APIs (cloudfunctions, cloudbuild, run, artifactregistry)
+# 2. Creating a service account for function execution
+# 3. Deploying a Cloud Function Gen 2 with HTTP trigger
+# 4. Running a client that invokes the function
+#
+# Prerequisites:
+# - GCP provider configured in Monk with appropriate permissions
+# - Project with billing enabled
+# - Function source code as a blob (or use inline example)
+#
+# Run with:
+#   monk load gcp-cloudfunction-demo/stack.yaml
+#   monk run gcp-cloudfunction-demo/function-app
+#
+# =============================================================================
+
+# Process group to run everything together
+function-app:
+  defines: process-group
+  runnable-list:
+    - enable-apis
+    - function-sa
+    - hello-function
+    - function-client
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+# Cloud Functions Gen 2 requires multiple APIs
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - cloudfunctions.googleapis.com
+    - cloudbuild.googleapis.com
+    - run.googleapis.com
+    - artifactregistry.googleapis.com
+  services:
+    apis-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create Service Account for Function
+# =============================================================================
+# Service account with invoker permissions
+
+function-sa:
+  defines: gcp/service-account
+  name: cloudfunction-invoker
+  display_name: Cloud Function Invoker
+  description: Service account for invoking cloud functions
+  roles:
+    - roles/cloudfunctions.invoker
+    - roles/run.invoker
+
+  services:
+    service-account:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudfunction-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Deploy Cloud Function Gen 2
+# =============================================================================
+# HTTP-triggered function that returns a greeting
+#
+# NOTE: This requires a blob named "hello-function-code" containing:
+#
+# index.js:
+#   exports.helloWorld = (req, res) => {
+#     const name = req.query.name || req.body?.name || 'World';
+#     res.send(`Hello, ${name}! From Cloud Functions Gen 2`);
+#   };
+#
+# package.json:
+#   {
+#     "name": "hello-function",
+#     "version": "1.0.0",
+#     "main": "index.js"
+#   }
+#
+# Upload blob with: monk blob upload hello-function-code ./function-code/
+
+hello-function:
+  defines: gcp/cloud-function
+  name: hello-world-gen2
+  location: us-central1
+  blob_name: hello-function-code
+  description: Example HTTP function that returns a greeting
+
+  build:
+    runtime: nodejs20
+    entry_point: helloWorld
+
+  service:
+    available_memory: 256Mi
+    timeout_seconds: 60
+    max_instance_count: 10
+    min_instance_count: 0
+    ingress_settings: ALLOW_ALL
+
+  labels:
+    environment: demo
+    managed-by: monk
+
+  services:
+    function:
+      protocol: https
+      address: <- entity-state get-member("url") default("")
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudfunction-demo/enable-apis
+        - gcp-cloudfunction-demo/function-sa
+      timeout: 600
+
+# =============================================================================
+# Step 4: Function Client
+# =============================================================================
+# Container that invokes the deployed function
+
+function-client:
+  defines: runnable
+
+  connections:
+    function:
+      runnable: gcp-cloudfunction-demo/hello-function
+      service: function
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudfunction-demo/hello-function
+      timeout: 900
+
+  variables:
+    function_url:
+      env: FUNCTION_URL
+      value: <- connection-target("function") entity-state get-member("url")
+      type: string
+
+  containers:
+    client:
+      image: curlimages/curl:latest
+      entrypoint: /bin/sh
+      bash: |
+        echo "Invoking Cloud Function at $FUNCTION_URL"
+        echo ""
+        echo "Test 1: Default greeting"
+        curl -s "$FUNCTION_URL"
+        echo ""
+        echo ""
+        echo "Test 2: Custom name via query param"
+        curl -s "$FUNCTION_URL?name=Monk"
+        echo ""
+        echo ""
+        echo "Test 3: Custom name via POST body"
+        curl -s -X POST "$FUNCTION_URL" \
+          -H "Content-Type: application/json" \
+          -d '{"name": "Cloud Functions Gen 2"}'
+        echo ""
+        echo ""
+        echo "Function tests completed!"

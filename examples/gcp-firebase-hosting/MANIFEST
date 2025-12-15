@@ -1,0 +1,3 @@
+REPO gcp-firebase-hosting-demo
+LOAD stack.yaml
+BLOBS site-content:site-content

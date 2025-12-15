@@ -174,6 +174,13 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
     }
     for (const table of tables) {
       cli.output(`Creating table: ${table.name}`);
+      let fields;
+      try {
+        fields = JSON.parse(table.schema);
+      } catch (error) {
+        cli.output(`Error parsing schema for table ${table.name}: ${error}`);
+        continue;
+      }
       const body = {
         tableReference: {
           projectId: this.projectId,
@@ -181,7 +188,7 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
           tableId: table.name
         },
         schema: {
-          fields: table.fields
+          fields
         }
       };
       if (table.description) {

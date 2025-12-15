@@ -1,0 +1,2 @@
+REPO gcp-cloudsql-demo
+LOAD stack.yaml

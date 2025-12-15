@@ -1,0 +1,3 @@
+REPO gcp-cloudfunction-demo
+LOAD stack.yaml
+BLOBS hello-function-code:function-code

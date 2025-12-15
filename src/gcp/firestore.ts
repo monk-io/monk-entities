@@ -1,0 +1,549 @@
+/**
+ * GCP Firestore Database Entity
+ *
+ * Creates and manages Cloud Firestore databases. Firestore is a flexible,
+ * scalable NoSQL cloud database for mobile, web, and server development.
+ *
+ * @see https://firebase.google.com/docs/firestore
+ * @see https://cloud.google.com/firestore/docs/reference/rest
+ */
+
+import { action, Args } from "monkec/base";
+import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
+import cli from "cli";
+import { FIRESTORE_API_URL, GcpRegion } from "./common.ts";
+
+/**
+ * Firestore database type
+ */
+export type FirestoreType =
+    /** Native Firestore mode (recommended for new projects) */
+    | "FIRESTORE_NATIVE"
+    /** Datastore mode (for Datastore compatibility) */
+    | "DATASTORE_MODE";
+
+/**
+ * Firestore concurrency mode
+ */
+export type FirestoreConcurrencyMode =
+    /** Optimistic concurrency control (default for Native mode) */
+    | "OPTIMISTIC"
+    /** Optimistic concurrency with entity groups (Datastore mode) */
+    | "OPTIMISTIC_WITH_ENTITY_GROUPS"
+    /** Pessimistic concurrency (not recommended) */
+    | "PESSIMISTIC";
+
+/**
+ * Firestore point-in-time recovery enablement
+ */
+export type FirestorePitrState =
+    /** PITR enabled */
+    | "ENABLED"
+    /** PITR disabled */
+    | "DISABLED";
+
+/**
+ * Firestore delete protection state
+ */
+export type FirestoreDeleteProtectionState =
+    /** Delete protection enabled */
+    | "DELETE_PROTECTION_ENABLED"
+    /** Delete protection disabled */
+    | "DELETE_PROTECTION_DISABLED";
+
+/**
+ * Firestore Database entity definition
+ * @interface FirestoreDefinition
+ */
+export interface FirestoreDefinition extends GcpEntityDefinition {
+    /**
+     * @description Database ID. Use "(default)" for the default database.
+     * Custom database IDs must be lowercase, start with a letter,
+     * and contain only letters, numbers, and hyphens.
+     * @default "(default)"
+     */
+    database_id?: string;
+
+    /**
+     * @description Location for the database
+     * Multi-region: "nam5" (US), "eur3" (Europe)
+     * Regional: us-central1, europe-west1, etc.
+     * @see GcpRegion
+     */
+    location: GcpRegion | "nam5" | "eur3";
+
+    /**
+     * @description Database type
+     * - FIRESTORE_NATIVE: Full Firestore functionality (recommended)
+     * - DATASTORE_MODE: Datastore compatibility mode
+     * @default FIRESTORE_NATIVE
+     */
+    type?: FirestoreType;
+
+    /**
+     * @description Concurrency mode for the database
+     * @default OPTIMISTIC for Native mode
+     */
+    concurrency_mode?: FirestoreConcurrencyMode;
+
+    /**
+     * @description Application tag for billing attribution
+     */
+    app_engine_integration_mode?: "ENABLED" | "DISABLED";
+
+    /**
+     * @description Point-in-time recovery configuration
+     * Enables recovery to any point in the last 7 days.
+     * @default DISABLED
+     */
+    point_in_time_recovery?: FirestorePitrState;
+
+    /**
+     * @description Delete protection for the database
+     * When enabled, database cannot be deleted without first disabling.
+     * @default DELETE_PROTECTION_DISABLED
+     */
+    delete_protection?: FirestoreDeleteProtectionState;
+
+    /**
+     * @description Whether to keep the database on delete
+     * @default false
+     */
+    keep_on_delete?: boolean;
+}
+
+/**
+ * Firestore Database entity state
+ * @interface FirestoreState
+ */
+export interface FirestoreState extends GcpEntityState {
+    /**
+     * @description Full resource name
+     */
+    name?: string;
+
+    /**
+     * @description Database ID
+     */
+    database_id?: string;
+
+    /**
+     * @description Location/region
+     */
+    location?: string;
+
+    /**
+     * @description Database type
+     */
+    type?: string;
+
+    /**
+     * @description Concurrency mode
+     */
+    concurrency_mode?: string;
+
+    /**
+     * @description Database creation time
+     */
+    create_time?: string;
+
+    /**
+     * @description Database update time
+     */
+    update_time?: string;
+
+    /**
+     * @description Key prefix for datastore mode
+     */
+    key_prefix?: string;
+
+    /**
+     * @description Database UID
+     */
+    uid?: string;
+
+    /**
+     * @description PITR state
+     */
+    point_in_time_recovery?: string;
+
+    /**
+     * @description Delete protection state
+     */
+    delete_protection?: string;
+
+    /**
+     * @description Earliest PITR recovery time
+     */
+    earliest_version_time?: string;
+}
+
+/**
+ * GCP Firestore Database Entity
+ *
+ * Manages Cloud Firestore databases which provide a flexible NoSQL document
+ * database with real-time synchronization, offline support, and scalability.
+ *
+ * ## Database Types
+ * - **FIRESTORE_NATIVE**: Full Firestore functionality including real-time
+ *   listeners, offline support, and rich querying. Recommended for new projects.
+ * - **DATASTORE_MODE**: Datastore compatibility mode for existing Datastore
+ *   applications. Cannot use Firestore client libraries in this mode.
+ *
+ * ## Locations
+ * - **Multi-region**: "nam5" (US), "eur3" (Europe) - highest availability
+ * - **Regional**: us-central1, europe-west1, etc. - lower latency, lower cost
+ *
+ * ## Secrets
+ * This entity does NOT write any secrets.
+ * Use a service account with appropriate roles for access.
+ *
+ * ## Dependencies
+ * Required APIs:
+ * - `firestore.googleapis.com`
+ *
+ * ## State Fields for Composition
+ * - `state.name` - Full resource name for IAM/access
+ * - `state.database_id` - Database ID for SDK configuration
+ * - `state.location` - Database location
+ * - `state.type` - Database type (Native vs Datastore mode)
+ *
+ * ## Composing with Other Entities
+ * - `gcp/service-account` - Create SA with `roles/datastore.user` or `roles/datastore.owner`
+ * - `gcp/service-usage` - Enable firestore.googleapis.com
+ * - `gcp/cloud-function` - Functions triggered by Firestore document changes
+ *
+ * @see https://firebase.google.com/docs/firestore
+ *
+ * @example Default database in Native mode
+ * ```yaml
+ * my-firestore:
+ *   defines: gcp/firestore
+ *   location: nam5  # US multi-region
+ * ```
+ *
+ * @example Regional database with PITR
+ * ```yaml
+ * prod-firestore:
+ *   defines: gcp/firestore
+ *   database_id: prod-db
+ *   location: us-central1
+ *   type: FIRESTORE_NATIVE
+ *   point_in_time_recovery: ENABLED
+ *   delete_protection: DELETE_PROTECTION_ENABLED
+ * ```
+ *
+ * @example Datastore mode database
+ * ```yaml
+ * datastore-db:
+ *   defines: gcp/firestore
+ *   database_id: legacy-db
+ *   location: us-central1
+ *   type: DATASTORE_MODE
+ * ```
+ *
+ * @example With service account for access
+ * ```yaml
+ * # Firestore database
+ * app-db:
+ *   defines: gcp/firestore
+ *   location: us-central1
+ *
+ * # Service account with Firestore access
+ * app-sa:
+ *   defines: gcp/service-account
+ *   name: my-app-firestore
+ *   roles:
+ *     - roles/datastore.user
+ *
+ * # Generate key for application
+ * app-sa-key:
+ *   defines: gcp/service-account-key
+ *   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+ *   secret: firestore-credentials
+ *   permitted-secrets:
+ *     firestore-credentials: true
+ *   connections:
+ *     sa:
+ *       runnable: gcp/service-account/app-sa
+ *       service: service-account
+ * ```
+ */
+export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
+
+    static readonly readiness = { period: 10, initialDelay: 5, attempts: 60 };
+
+    protected getEntityName(): string {
+        return `Firestore Database ${this.getDatabaseId()}`;
+    }
+
+    /**
+     * Get the database ID (defaults to "(default)")
+     */
+    private getDatabaseId(): string {
+        return this.definition.database_id || "(default)";
+    }
+
+    /**
+     * Get the base API URL for databases
+     */
+    private getBaseUrl(): string {
+        return `${FIRESTORE_API_URL}/projects/${this.projectId}/databases`;
+    }
+
+    /**
+     * Get full database resource URL
+     */
+    private getDatabaseUrl(): string {
+        return `${this.getBaseUrl()}/${this.getDatabaseId()}`;
+    }
+
+    /**
+     * Get database details from API
+     */
+    private getDatabase(): any | null {
+        return this.checkResourceExists(this.getDatabaseUrl());
+    }
+
+    /**
+     * Populate state from database response
+     */
+    private populateState(db: any): void {
+        this.state.name = db.name;
+        this.state.database_id = db.name?.split("/").pop();
+        this.state.location = db.locationId;
+        this.state.type = db.type;
+        this.state.concurrency_mode = db.concurrencyMode;
+        this.state.create_time = db.createTime;
+        this.state.update_time = db.updateTime;
+        this.state.key_prefix = db.keyPrefix;
+        this.state.uid = db.uid;
+        this.state.point_in_time_recovery = db.pointInTimeRecoveryEnablement;
+        this.state.delete_protection = db.deleteProtectionState;
+        this.state.earliest_version_time = db.earliestVersionTime;
+    }
+
+    /**
+     * Wait for database operation to complete
+     */
+    private waitForDatabaseOperation(operationName: string): any {
+        const operationUrl = `${FIRESTORE_API_URL}/${operationName}`;
+        return this.waitForOperation(operationUrl, 120, 10000); // 20 minutes max
+    }
+
+    override create(): void {
+        // Check if database already exists
+        const existing = this.getDatabase();
+
+        if (existing) {
+            cli.output(`Database ${this.getDatabaseId()} already exists, adopting...`);
+            this.state.existing = true;
+            this.populateState(existing);
+            return;
+        }
+
+        // Build request body
+        const body: any = {
+            locationId: this.definition.location,
+            type: this.definition.type || "FIRESTORE_NATIVE",
+        };
+
+        if (this.definition.concurrency_mode) {
+            body.concurrencyMode = this.definition.concurrency_mode;
+        }
+
+        if (this.definition.app_engine_integration_mode) {
+            body.appEngineIntegrationMode = this.definition.app_engine_integration_mode;
+        }
+
+        if (this.definition.point_in_time_recovery) {
+            body.pointInTimeRecoveryEnablement = this.definition.point_in_time_recovery;
+        }
+
+        if (this.definition.delete_protection) {
+            body.deleteProtectionState = this.definition.delete_protection;
+        }
+
+        // Create database
+        cli.output(`Creating Firestore database: ${this.getDatabaseId()} in ${this.definition.location}`);
+        const url = `${this.getBaseUrl()}?databaseId=${encodeURIComponent(this.getDatabaseId())}`;
+        const operation = this.post(url, body);
+
+        // Wait for operation if returned
+        if (operation?.name && operation.name.includes("operations")) {
+            cli.output(`Waiting for database creation...`);
+            this.waitForDatabaseOperation(operation.name);
+        }
+
+        // Get final database state
+        const db = this.getDatabase();
+        if (db) {
+            this.populateState(db);
+            this.state.existing = false;
+            cli.output(`Database ${this.getDatabaseId()} created in ${this.state.location}`);
+        }
+    }
+
+    override update(): void {
+        const existing = this.getDatabase();
+
+        if (!existing) {
+            cli.output("Database not found, creating...");
+            this.create();
+            return;
+        }
+
+        // Build update body with allowed fields
+        const body: any = {};
+        const updateMask: string[] = [];
+
+        if (this.definition.point_in_time_recovery) {
+            body.pointInTimeRecoveryEnablement = this.definition.point_in_time_recovery;
+            updateMask.push("pointInTimeRecoveryEnablement");
+        }
+
+        if (this.definition.delete_protection) {
+            body.deleteProtectionState = this.definition.delete_protection;
+            updateMask.push("deleteProtectionState");
+        }
+
+        if (this.definition.concurrency_mode) {
+            body.concurrencyMode = this.definition.concurrency_mode;
+            updateMask.push("concurrencyMode");
+        }
+
+        if (updateMask.length > 0) {
+            const url = `${this.getDatabaseUrl()}?updateMask=${updateMask.join(",")}`;
+            const operation = this.patch(url, body);
+
+            if (operation?.name && operation.name.includes("operations")) {
+                cli.output(`Waiting for database update...`);
+                this.waitForDatabaseOperation(operation.name);
+            }
+
+            const db = this.getDatabase();
+            if (db) {
+                this.populateState(db);
+            }
+            cli.output(`Database ${this.getDatabaseId()} updated`);
+        } else {
+            this.populateState(existing);
+            cli.output(`Database ${this.getDatabaseId()} unchanged`);
+        }
+    }
+
+    override delete(): void {
+        if (this.definition.keep_on_delete) {
+            cli.output(`Database ${this.getDatabaseId()} has keep_on_delete=true, skipping delete`);
+            return;
+        }
+
+        if (this.state.existing) {
+            cli.output(`Database ${this.getDatabaseId()} was not created by this entity, skipping delete`);
+            return;
+        }
+
+        const existing = this.getDatabase();
+        if (!existing) {
+            cli.output(`Database ${this.getDatabaseId()} does not exist`);
+            return;
+        }
+
+        // Check delete protection
+        if (existing.deleteProtectionState === "DELETE_PROTECTION_ENABLED") {
+            cli.output(`Database ${this.getDatabaseId()} has delete protection enabled. Disabling first...`);
+            this.patch(this.getDatabaseUrl() + "?updateMask=deleteProtectionState", {
+                deleteProtectionState: "DELETE_PROTECTION_DISABLED",
+            });
+        }
+
+        cli.output(`Deleting Firestore database: ${this.getDatabaseId()}`);
+        const operation = this.httpDelete(this.getDatabaseUrl());
+
+        if (operation?.name && operation.name.includes("operations")) {
+            cli.output(`Waiting for database deletion...`);
+            this.waitForDatabaseOperation(operation.name);
+        }
+
+        cli.output(`Database ${this.getDatabaseId()} deleted`);
+    }
+
+    override checkReadiness(): boolean {
+        const db = this.getDatabase();
+        if (!db) {
+            cli.output("Database not found");
+            return false;
+        }
+
+        this.populateState(db);
+        cli.output(`Database ${this.getDatabaseId()} is ready in ${this.state.location}`);
+        return true;
+    }
+
+    checkLiveness(): boolean {
+        return this.getDatabase() !== null;
+    }
+
+    @action("get")
+    getInfo(_args?: Args): void {
+        const db = this.getDatabase();
+        if (!db) {
+            throw new Error("Database not found");
+        }
+        cli.output(JSON.stringify(db, null, 2));
+    }
+
+    @action("list-indexes")
+    listIndexes(_args?: Args): void {
+        const url = `${this.getDatabaseUrl()}/collectionGroups/-/indexes`;
+        const result = this.get(url);
+        cli.output(JSON.stringify(result, null, 2));
+    }
+
+    @action("list-fields")
+    listFields(args?: Args): void {
+        const collectionGroup = args?.collection || "-";
+        const url = `${this.getDatabaseUrl()}/collectionGroups/${collectionGroup}/fields`;
+        const result = this.get(url);
+        cli.output(JSON.stringify(result, null, 2));
+    }
+
+    @action("export-documents")
+    exportDocuments(args?: Args): void {
+        if (!args?.output_uri_prefix) {
+            throw new Error("output_uri_prefix argument is required (gs://bucket/path)");
+        }
+
+        const url = `${this.getDatabaseUrl()}:exportDocuments`;
+        const body: any = {
+            outputUriPrefix: args.output_uri_prefix,
+        };
+
+        if (args.collection_ids) {
+            body.collectionIds = args.collection_ids.split(",").map((s: string) => s.trim());
+        }
+
+        const operation = this.post(url, body);
+        cli.output(`Export started: ${operation.name}`);
+        cli.output(`Output: ${args.output_uri_prefix}`);
+    }
+
+    @action("import-documents")
+    importDocuments(args?: Args): void {
+        if (!args?.input_uri_prefix) {
+            throw new Error("input_uri_prefix argument is required (gs://bucket/path)");
+        }
+
+        const url = `${this.getDatabaseUrl()}:importDocuments`;
+        const body: any = {
+            inputUriPrefix: args.input_uri_prefix,
+        };
+
+        if (args.collection_ids) {
+            body.collectionIds = args.collection_ids.split(",").map((s: string) => s.trim());
+        }
+
+        const operation = this.post(url, body);
+        cli.output(`Import started: ${operation.name}`);
+    }
+}

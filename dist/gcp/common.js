@@ -21,8 +21,12 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var common_exports = {};
 __export(common_exports, {
   BIGQUERY_API_URL: () => BIGQUERY_API_URL,
+  CLOUD_FUNCTIONS_API_URL: () => CLOUD_FUNCTIONS_API_URL,
+  CLOUD_RUN_API_URL: () => CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL: () => CLOUD_SQL_API_URL,
   CLOUD_STORAGE_API_URL: () => CLOUD_STORAGE_API_URL,
+  FIREBASE_HOSTING_API_URL: () => FIREBASE_HOSTING_API_URL,
+  FIRESTORE_API_URL: () => FIRESTORE_API_URL,
   IAM_API_URL: () => IAM_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL: () => SERVICE_USAGE_API_URL,
@@ -38,6 +42,10 @@ var CLOUD_STORAGE_API_URL = "https://storage.googleapis.com/storage/v1";
 var IAM_API_URL = "https://iam.googleapis.com/v1";
 var RESOURCE_MANAGER_API_URL = "https://cloudresourcemanager.googleapis.com/v1";
 var SERVICE_USAGE_API_URL = "https://serviceusage.googleapis.com/v1";
+var CLOUD_FUNCTIONS_API_URL = "https://cloudfunctions.googleapis.com/v2";
+var CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
+var FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
+var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 function getDefaultPort(databaseVersion) {
   if (databaseVersion.includes("MYSQL")) {
     return 3306;
@@ -69,8 +77,12 @@ function isOperationFailed(status) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BIGQUERY_API_URL,
+  CLOUD_FUNCTIONS_API_URL,
+  CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL,
   CLOUD_STORAGE_API_URL,
+  FIREBASE_HOSTING_API_URL,
+  FIRESTORE_API_URL,
   IAM_API_URL,
   RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL,

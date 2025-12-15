@@ -13,63 +13,8 @@ import cli from "cli";
 import {
     BIGQUERY_API_URL,
     BigQueryLocation,
-    BigQueryFieldType,
-    BigQueryFieldMode,
     BigQueryStorageBillingModel,
 } from "./common.ts";
-
-/**
- * BigQuery table field definition
- * @see https://cloud.google.com/bigquery/docs/schemas
- */
-export interface BigQueryField {
-    /**
-     * @description Field name (must be unique within the table/struct)
-     */
-    name: string;
-
-    /**
-     * @description Field data type
-     * @see BigQueryFieldType for valid values
-     */
-    type: BigQueryFieldType;
-
-    /**
-     * @description Field mode (NULLABLE, REQUIRED, or REPEATED)
-     * @default NULLABLE
-     */
-    mode?: BigQueryFieldMode;
-
-    /**
-     * @description Description of the field
-     */
-    description?: string;
-
-    /**
-     * @description Nested fields (required when type is RECORD/STRUCT)
-     */
-    fields?: BigQueryField[];
-
-    /**
-     * @description Maximum length for STRING or BYTES fields
-     */
-    maxLength?: number;
-
-    /**
-     * @description Precision for NUMERIC or BIGNUMERIC fields
-     */
-    precision?: number;
-
-    /**
-     * @description Scale for NUMERIC or BIGNUMERIC fields
-     */
-    scale?: number;
-
-    /**
-     * @description Default value expression for the field
-     */
-    defaultValueExpression?: string;
-}
 
 /**
  * BigQuery table definition for creating tables with a dataset
@@ -81,9 +26,23 @@ export interface BigQueryTableDefinition {
     name: string;
 
     /**
-     * @description Table schema fields
+     * @description Table schema as JSON string. Array of field objects with properties:
+     * - name (string, required): Field name
+     * - type (string, required): Data type (STRING, INTEGER, FLOAT, BOOLEAN, TIMESTAMP, DATE, TIME, DATETIME, BYTES, NUMERIC, BIGNUMERIC, GEOGRAPHY, JSON, RECORD/STRUCT)
+     * - mode (string, optional): NULLABLE (default), REQUIRED, or REPEATED
+     * - description (string, optional): Field description
+     * - fields (array, optional): Nested fields for RECORD/STRUCT types
+     * - maxLength (number, optional): Max length for STRING/BYTES
+     * - precision (number, optional): Precision for NUMERIC/BIGNUMERIC
+     * - scale (number, optional): Scale for NUMERIC/BIGNUMERIC
+     *
+     * @example Simple schema:
+     * '[{"name":"id","type":"STRING","mode":"REQUIRED"},{"name":"created","type":"TIMESTAMP"}]'
+     *
+     * @example Nested RECORD schema:
+     * '[{"name":"user","type":"RECORD","fields":[{"name":"id","type":"STRING"},{"name":"email","type":"STRING"}]}]'
      */
-    fields: BigQueryField[];
+    schema: string;
 
     /**
      * @description Table description
@@ -285,13 +244,22 @@ export interface BigQueryState extends GcpEntityState {
  *     [
  *       {
  *         "name": "page_views",
- *         "fields": [
- *           {"name": "event_id", "type": "STRING", "mode": "REQUIRED"},
- *           {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
- *           {"name": "user_id", "type": "STRING"},
- *           {"name": "page_url", "type": "STRING"},
- *           {"name": "metadata", "type": "JSON"}
- *         ]
+ *         "schema": "[{\"name\":\"event_id\",\"type\":\"STRING\",\"mode\":\"REQUIRED\"},{\"name\":\"timestamp\",\"type\":\"TIMESTAMP\",\"mode\":\"REQUIRED\"},{\"name\":\"user_id\",\"type\":\"STRING\"},{\"name\":\"page_url\",\"type\":\"STRING\"},{\"name\":\"metadata\",\"type\":\"JSON\"}]"
+ *       }
+ *     ]
+ * ```
+ *
+ * @example Dataset with nested RECORD schema
+ * ```yaml
+ * users-dataset:
+ *   defines: gcp/big-query
+ *   dataset: users
+ *   location: US
+ *   tables: |
+ *     [
+ *       {
+ *         "name": "profiles",
+ *         "schema": "[{\"name\":\"id\",\"type\":\"STRING\",\"mode\":\"REQUIRED\"},{\"name\":\"address\",\"type\":\"RECORD\",\"fields\":[{\"name\":\"street\",\"type\":\"STRING\"},{\"name\":\"city\",\"type\":\"STRING\"},{\"name\":\"zip\",\"type\":\"STRING\"}]}]"
  *       }
  *     ]
  * ```
@@ -472,6 +440,15 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
         for (const table of tables) {
             cli.output(`Creating table: ${table.name}`);
 
+            // Parse the schema JSON string to get fields array
+            let fields: any[];
+            try {
+                fields = JSON.parse(table.schema);
+            } catch (error) {
+                cli.output(`Error parsing schema for table ${table.name}: ${error}`);
+                continue;
+            }
+
             const body: any = {
                 tableReference: {
                     projectId: this.projectId,
@@ -479,7 +456,7 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
                     tableId: table.name,
                 },
                 schema: {
-                    fields: table.fields,
+                    fields: fields,
                 },
             };
 

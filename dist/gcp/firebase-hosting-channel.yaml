@@ -1,0 +1,98 @@
+namespace: gcp
+firebase-hosting-channel:
+  defines: entity
+  metadata:
+    name: FirebaseHostingChannel
+    version-hash: bbbc90c1ac23
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        Channel name/ID (e.g., "preview", "staging", "feature-xyz")
+        The channel URL will be {channel}--{site}.web.app
+    site:
+      type: string
+      description: |-
+        Site ID this channel belongs to
+        Should match a Firebase Hosting site name
+    ttl:
+      type: string
+      description: |-
+        Time-to-live duration for the channel
+        After this duration, the channel is automatically deleted.
+        Format: "{seconds}s" (e.g., "86400s" for 24 hours)
+      default: No expiration
+    retained_release_count:
+      type: number
+      description: Number of releases to retain for this channel
+      default: 10
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Key-value labels for organizing channels
+      description: Key-value labels for organizing channels
+    required:
+      - name
+      - site
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Full resource name
+    channel_id:
+      type: string
+      description: Channel ID
+    url:
+      type: string
+      description: Channel preview URL
+    create_time:
+      type: string
+      description: Channel creation time
+    update_time:
+      type: string
+      description: Channel update time
+    expire_time:
+      type: string
+      description: Channel expiration time (if TTL set)
+    retained_release_count:
+      type: number
+      description: Number of retained releases
+    release:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        type:
+          type: string
+        release_time:
+          type: string
+      additionalProperties: false
+      description: Current release information
+  lifecycle:
+    sync: <<< firebase-hosting-channel-sync.js
+    get: ''
+    list-releases: ''
+    clone-version: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

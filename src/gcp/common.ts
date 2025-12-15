@@ -26,6 +26,18 @@ export const RESOURCE_MANAGER_API_URL = "https://cloudresourcemanager.googleapis
 /** Service Usage API base URL */
 export const SERVICE_USAGE_API_URL = "https://serviceusage.googleapis.com/v1";
 
+/** Cloud Functions API v2 base URL */
+export const CLOUD_FUNCTIONS_API_URL = "https://cloudfunctions.googleapis.com/v2";
+
+/** Cloud Run API base URL */
+export const CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
+
+/** Firebase Hosting API base URL */
+export const FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
+
+/** Firestore API base URL */
+export const FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
+
 // =============================================================================
 // Common Enums
 // =============================================================================
@@ -452,6 +464,89 @@ export type PublicAccessPrevention =
     | "inherited"
     /** Public access is blocked at the bucket level */
     | "enforced";
+
+// =============================================================================
+// Cloud Functions Enums
+// =============================================================================
+
+/**
+ * Cloud Functions Gen 2 runtimes
+ * @see https://cloud.google.com/functions/docs/concepts/execution-environment
+ */
+export type CloudFunctionRuntime =
+    // Node.js
+    | "nodejs18"
+    | "nodejs20"
+    | "nodejs22"
+    // Python
+    | "python39"
+    | "python310"
+    | "python311"
+    | "python312"
+    // Go
+    | "go121"
+    | "go122"
+    // Java
+    | "java11"
+    | "java17"
+    | "java21"
+    // .NET
+    | "dotnet6"
+    | "dotnet8"
+    // Ruby
+    | "ruby32"
+    | "ruby33"
+    // PHP
+    | "php82"
+    | "php83";
+
+/**
+ * Cloud Functions ingress settings
+ * @see https://cloud.google.com/functions/docs/networking/network-settings
+ */
+export type CloudFunctionIngress =
+    /** Allow all traffic */
+    | "ALLOW_ALL"
+    /** Allow only internal traffic */
+    | "ALLOW_INTERNAL_ONLY"
+    /** Allow internal traffic and traffic from Cloud Load Balancing */
+    | "ALLOW_INTERNAL_AND_GCLB";
+
+/**
+ * Cloud Functions VPC egress settings
+ */
+export type CloudFunctionVpcEgress =
+    /** Route only private IP traffic through VPC connector */
+    | "PRIVATE_RANGES_ONLY"
+    /** Route all traffic through VPC connector */
+    | "ALL_TRAFFIC";
+
+/**
+ * Cloud Functions event trigger types
+ * @see https://cloud.google.com/functions/docs/calling
+ */
+export type CloudFunctionTriggerType =
+    /** HTTP trigger (default) */
+    | "http"
+    /** Pub/Sub trigger */
+    | "google.cloud.pubsub.topic.v1.messagePublished"
+    /** Cloud Storage triggers */
+    | "google.cloud.storage.object.v1.finalized"
+    | "google.cloud.storage.object.v1.deleted"
+    | "google.cloud.storage.object.v1.archived"
+    | "google.cloud.storage.object.v1.metadataUpdated"
+    /** Firestore triggers */
+    | "google.cloud.firestore.document.v1.created"
+    | "google.cloud.firestore.document.v1.updated"
+    | "google.cloud.firestore.document.v1.deleted"
+    | "google.cloud.firestore.document.v1.written"
+    /** Firebase Auth triggers */
+    | "google.firebase.auth.user.v1.created"
+    | "google.firebase.auth.user.v1.deleted"
+    /** Firebase Remote Config triggers */
+    | "google.firebase.remoteconfig.remoteConfig.v1.updated"
+    /** Cloud Scheduler (via Pub/Sub) */
+    | "google.cloud.scheduler.job.v1.executed";
 
 // =============================================================================
 // Helper Functions
