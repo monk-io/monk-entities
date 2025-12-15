@@ -25,15 +25,24 @@ deploy:
     project:
       env: VERCEL_PROJECT
       type: string
-      value: example
+      value: ""
+      description: |
+        The Vercel project name to deploy to.
+        Hint: inherit this runnable and use connection to vercel/project entity, then set this variable to:
+        project: <- connection-target("project") entity-state get-member("name")
     token:
       env: VERCEL_TOKEN
       type: string
       value: <- secret("default-vercel-token")
+      description: The Vercel token used for authentication.
     deploy-dir:
       env: DEPLOY_DIR
       type: string
       value: /home/node/app/
+      description: The directory containing the files to deploy.
     pre-deploy:
       type: string
       value: <- `echo "pre-deploy script"`
+      description: |
+        A script to run before deployment.
+        Hint: you can override this variable to add custom pre-deploy steps, e.g. building the project.
