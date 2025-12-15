@@ -16,7 +16,7 @@ cosmos-account:
     default_consistency_level: "Session"
   enable_automatic_failover: false
   enable_multiple_write_locations: false
-  public_network_access: "Disabled"  # Must be Enabled for MonkEC access from public IP
+  public_network_access: "Disabled" # Must be Enabled for MonkEC access from public IP
   primary_key_secret_ref: "cosmos-db-primary-key"
   secondary_key_secret_ref: "cosmos-db-secondary-key"
   tags:
@@ -89,42 +89,42 @@ cosmosdb-js-client:
     container:
       runnable: azure-cosmosdb-client-example/products-container
       service: data
-  
+
   depends:
     wait-for:
       runnables:
         - azure-cosmosdb-client-example/cosmos-account
         - azure-cosmosdb-client-example/ecommerce-database
         - azure-cosmosdb-client-example/products-container
-      timeout: 600 
-  
+      timeout: 600
+
   variables:
     cosmos_db_endpoint:
       env: COSMOS_DB_ENDPOINT
       value: <- connection-target("cosmos-account") entity-state get-member("document_endpoint")
       type: string
-    
+
     cosmos_db_primary_key:
       env: COSMOS_DB_PRIMARY_KEY
       value: <- secret("cosmos-db-primary-key")
       type: string
-    
+
     cosmos_db_database_id:
       env: COSMOS_DB_DATABASE_ID
       value: <- connection-target("database") entity get-member("database_id")
       type: string
-    
+
     cosmos_db_container_id:
       env: COSMOS_DB_CONTAINER_ID
       value: <- connection-target("container") entity get-member("container_id")
       type: string
-    
+
     # Client configuration
     operation_interval_ms:
       env: OPERATION_INTERVAL_MS
       value: "3000"
       type: string
-    
+
     max_operations:
       env: MAX_OPERATIONS
       value: "50"
@@ -148,7 +148,7 @@ cosmos-access-list:
       ignore_missing_vnet_service_endpoint: false
   # IP Firewall rules - allow access from specific public IPs or ranges
   ip_rules:
-    - ip_address_or_range: "95.67.123.30"  # MonkEC instance public IP
+    - ip_address_or_range: "95.67.123.30" # MonkEC instance public IP
     # Examples of other IP rules:
     # - ip_address_or_range: "203.0.113.0/24"  # Office network CIDR range
     # - ip_address_or_range: "198.51.100.42"   # Specific server IP
@@ -165,8 +165,8 @@ cosmos-access-list:
 
 # Complete example stack with account, database, container, and client
 example-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - azure-cosmosdb-client-example/cosmos-account
     - azure-cosmosdb-client-example/ecommerce-database
     - azure-cosmosdb-client-example/products-container
@@ -174,8 +174,8 @@ example-stack:
 
 # Secure stack with network access control (VNet + IP Firewall)
 secure-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - azure-cosmosdb-client-example/cosmos-account
     - azure-cosmosdb-client-example/cosmos-access-list
     - azure-cosmosdb-client-example/ecommerce-database

@@ -17,7 +17,7 @@ lambda-execution-policy:
         Resource:
           - "*"
   tags:
-    Owner: integration-test 
+    Owner: integration-test
   services:
     execution-policy:
       protocol: custom
@@ -142,8 +142,8 @@ lambda-container-function:
       timeout: 60
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-lambda-test/lambda-execution-policy
     - aws-lambda-test/lambda-execution-role
     - aws-lambda-test/lambda-function

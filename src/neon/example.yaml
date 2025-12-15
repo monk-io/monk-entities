@@ -130,15 +130,15 @@ web-app:
           contents: |
             const express = require('express');
             const { Pool } = require('pg');
-            
+
             const app = express();
             const port = 3000;
-            
+
             const pool = new Pool({
               connectionString: process.env.DATABASE_URL,
               ssl: true
             });
-            
+
             app.get('/', async (req, res) => {
               try {
                 const client = await pool.connect();
@@ -156,7 +156,7 @@ web-app:
                 });
               }
             });
-            
+
             app.listen(port, () => {
               console.log(`App listening at http://localhost:${port}`);
             });
@@ -168,10 +168,10 @@ web-app:
       host-port: 3000
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - examples/my-neon-project
     - examples/dev-branch
     - examples/dev-compute
     - examples/app-user
-    - examples/web-app 
+    - examples/web-app

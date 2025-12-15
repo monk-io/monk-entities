@@ -4,11 +4,11 @@ namespace: rds-client-demo
 # This demonstrates how to use an RDS instance created by the aws-rds entity
 
 rds-demo-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - mysql-database
     - mysql-client
-    - postgres-database  
+    - postgres-database
     - postgres-client
 
 # MySQL RDS Instance
@@ -19,10 +19,10 @@ mysql-database:
   variables:
     db-instance-identifier: demo-mysql-db
     region: us-east-1
-  
+
   # AWS Configuration
   region: us-east-1
-    
+
   # Database configuration
   db_instance_identifier: <- `${db-instance-identifier}`
   db_name: mydatabase
@@ -33,9 +33,9 @@ mysql-database:
   engine_version: "8.0"
   master_username: admin
   password_secret_ref: <- `${db-instance-identifier}-master-password`
-  
+
   # Network and security
-  publicly_accessible: false  # Enable public access for demo
+  publicly_accessible: false # Enable public access for demo
 
   # Auto-create security group in default VPC (no vpc_id specified)
   auto_create_security_group: true
@@ -44,28 +44,28 @@ mysql-database:
   # # Allow access from specific security groups by name
   # allowed_security_group_names:
   #   - "test-rds" # AWS node security group (node name)
-  #   - "test-rds2" 
+  #   - "test-rds2"
   # # allowed_cidr_blocks:
   # #   - "0.0.0.0/0"
-  
+
   # Backup and maintenance
   backup_retention_period: 7
   backup_window: "03:00-04:00"
   maintenance_window: "sun:04:00-sun:05:00"
   auto_minor_version_upgrade: true
-  
+
   # Performance and monitoring
-  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
-  performance_insights_enabled: false  # Not supported on db.t3.micro
+  monitoring_interval: 0 # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false # Not supported on db.t3.micro
   enabled_cloudwatch_logs_exports:
     - error
     - general
     - slow-query
-  
+
   # Deletion protection
   skip_final_snapshot: true
   deletion_protection: false
-  
+
   tags:
     Environment: demo
     Application: rds-client
@@ -109,7 +109,7 @@ mysql-client:
       env: DB_PASSWORD
       value: <- secret($mysql_password_secret)
       type: string
-  
+
   containers:
     client:
       image: docker.io/imanachyn/rds-client:v1
@@ -138,7 +138,7 @@ mysql-access-list:
         - rds-client-demo/mysql-client
       timeout: 600
 
-# PostgreSQL RDS Instance  
+# PostgreSQL RDS Instance
 postgres-database:
   defines: aws-rds/rds-instance
   permitted-secrets:
@@ -146,10 +146,10 @@ postgres-database:
   variables:
     db-instance-identifier: demo-postgres-db
     region: us-east-1
-  
+
   # AWS Configuration
   region: us-east-1
-    
+
   # Database configuration
   db_instance_identifier: <- `${db-instance-identifier}`
   db_name: mydatabase
@@ -160,29 +160,29 @@ postgres-database:
   engine_version: "15"
   master_username: postgres
   password_secret_ref: <- `${db-instance-identifier}-master-password`
-  
+
   # Network and security
   publicly_accessible: true
   auto_create_security_group: true
   security_group_name: postgres-database-sg
   security_group_description: "PostgreSQL Database Security Group"
-  
+
   # Backup and maintenance
   backup_retention_period: 7
   backup_window: "03:00-04:00"
   maintenance_window: "sun:04:00-sun:05:00"
   auto_minor_version_upgrade: true
-  
+
   # Performance and monitoring
-  monitoring_interval: 0  # Disable enhanced monitoring (requires IAM role)
-  performance_insights_enabled: false  # Not supported on db.t3.micro
+  monitoring_interval: 0 # Disable enhanced monitoring (requires IAM role)
+  performance_insights_enabled: false # Not supported on db.t3.micro
   enabled_cloudwatch_logs_exports:
     - postgresql
-  
+
   # Deletion protection
   skip_final_snapshot: true
   deletion_protection: false
-  
+
   tags:
     Environment: demo
     Application: rds-client
@@ -226,7 +226,7 @@ postgres-client:
       env: DB_PASSWORD
       value: <- secret($postgres_password_secret)
       type: string
-  
+
   containers:
     client:
       image: docker.io/imanachyn/rds-client:v1
@@ -236,7 +236,7 @@ postgres-client:
         - DB_TIMEOUT=10000
         - OPERATION_INTERVAL_MS=10000
         - SAMPLE_TABLE_NAME=demo_users
-        - SAMPLE_RECORDS_COUNT=5 
+        - SAMPLE_RECORDS_COUNT=5
 
 postgres-access-list:
   defines: aws-rds/rds-access-list

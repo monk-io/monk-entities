@@ -98,7 +98,7 @@ protected-api:
         - auth0-example/my-auth0-api
 
 stack:
-  defines: process-group
+  defines: group
   members:
     - auth0-example/my-auth0-app
     - auth0-example/my-auth0-api

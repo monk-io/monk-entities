@@ -6,7 +6,7 @@ test-queue:
   queue_name: test-sqs-queue
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 1209600  # 14 days
+  message_retention_period: 1209600 # 14 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 60
   fifo_queue: false
@@ -37,40 +37,40 @@ sqs-worker:
       env: SQS_QUEUE_URL
       value: <- connection-target("queue") entity-state get-member("queue_url")
       type: string
-    
+
     # AWS Region from connected queue
     aws_region:
       env: AWS_REGION
       value: "us-east-1"
       type: string
-    
+
     # Optional: AWS credentials from secrets (if not using IAM roles)
     aws_access_key_id:
       env: AWS_ACCESS_KEY_ID
       value: <- secret("aws-access-key-id")
       type: string
-    
+
     aws_secret_access_key:
       env: AWS_SECRET_ACCESS_KEY
       value: <- secret("aws-secret-access-key")
       type: string
-    
+
     # Worker configuration (optional)
     max_messages:
       env: MAX_MESSAGES
       value: "10"
       type: string
-    
+
     wait_time_seconds:
       env: WAIT_TIME_SECONDS
       value: "20"
       type: string
-    
+
     visibility_timeout_seconds:
       env: VISIBILITY_TIMEOUT_SECONDS
       value: "30"
       type: string
-    
+
     polling_interval_ms:
       env: POLLING_INTERVAL_MS
       value: "1000"
@@ -82,11 +82,10 @@ sqs-worker:
 
 # Complete example stack with queue and worker (manual credential setup)
 example-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - sqs-example/test-queue
-    - sqs-example/sqs-worker 
-
+    - sqs-example/sqs-worker
 # ========================================
 # ENHANCED EXAMPLES WITH AUTOMATIC IAM SETUP
 # ========================================
@@ -99,7 +98,7 @@ example-stack:
 #    - Simpler setup, but uses long-lived credentials
 #    - Good for: Development, simple production workloads
 #
-# 2. ASSUME ROLE PATTERN (sqs-worker-assume-role.yaml)  
+# 2. ASSUME ROLE PATTERN (sqs-worker-assume-role.yaml)
 #    - Creates minimal IAM user + service role
 #    - Uses temporary credentials via AssumeRole
 #    - More secure with automatic credential rotation
@@ -108,4 +107,4 @@ example-stack:
 # To use enhanced examples:
 # monk load sqs-worker-direct-access.yaml
 # monk load sqs-worker-assume-role.yaml
-# ======================================== 
+# ========================================

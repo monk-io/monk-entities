@@ -1,3 +1,0 @@
-REPO hosting
-LOAD hosting.yaml
-RESOURCES site-sync.js site-channel-sync.js

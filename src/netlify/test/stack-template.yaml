@@ -56,8 +56,8 @@ deploy:
         </html>
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - netlify-test/site
     - netlify-test/account
     - netlify-test/deploy
@@ -91,7 +91,7 @@ test-connection:
         echo "Testing Netlify connections..."
         echo "Site ID: $SITE_ID"
         echo "Site URL: $SITE_URL"
-        
+
         # Test site accessibility
         echo "Testing site accessibility..."
         curl -v "$SITE_URL"

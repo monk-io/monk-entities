@@ -23,8 +23,8 @@ namespace: gcp-cloudfunction-demo
 
 # Process group to run everything together
 function-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - function-sa
     - hello-function
@@ -116,8 +116,7 @@ hello-function:
 
   services:
     function:
-      protocol: https
-      address: <- entity-state get-member("url") default("")
+      protocol: custom
 
   depends:
     wait-for:

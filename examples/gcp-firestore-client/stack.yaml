@@ -24,8 +24,8 @@ namespace: gcp-firestore-demo
 
 # Process group to run everything together
 firestore-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - firestore-db
     - firestore-sa
@@ -52,7 +52,7 @@ enable-apis:
 
 firestore-db:
   defines: gcp/firestore
-  location: nam5  # US multi-region for high availability
+  location: nam5 # US multi-region for high availability
   type: FIRESTORE_NATIVE
   point_in_time_recovery: DISABLED
   delete_protection: DELETE_PROTECTION_DISABLED
@@ -77,7 +77,7 @@ firestore-sa:
   display_name: Firestore Client
   description: Service account for Firestore database access
   roles:
-    - roles/datastore.user  # Read/write to Firestore
+    - roles/datastore.user # Read/write to Firestore
 
   services:
     service-account:

@@ -66,7 +66,7 @@ gsi-table:
     Features: gsi-streams
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-dynamo-db-advanced-test/provisioned-table
-    - aws-dynamo-db-advanced-test/gsi-table 
+    - aws-dynamo-db-advanced-test/gsi-table

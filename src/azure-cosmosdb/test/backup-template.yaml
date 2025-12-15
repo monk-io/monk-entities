@@ -71,9 +71,8 @@ backup-container:
 
 # Stack Definition
 backup-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - azure-cosmosdb-backup-test/backup-account
     - azure-cosmosdb-backup-test/backup-database
     - azure-cosmosdb-backup-test/backup-container
-

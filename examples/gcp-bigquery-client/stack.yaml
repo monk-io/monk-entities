@@ -23,8 +23,8 @@ namespace: gcp-bigquery-demo
 
 # Process group to run everything together
 bigquery-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - analytics-dataset
     - analytics-sa

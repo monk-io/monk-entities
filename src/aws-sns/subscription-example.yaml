@@ -84,8 +84,7 @@ email-subscription:
 
 # Stack
 subscription-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - sns-subscription-demo/my-topic
     - sns-subscription-demo/email-subscription
-

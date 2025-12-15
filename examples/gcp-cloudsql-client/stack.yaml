@@ -23,8 +23,8 @@ namespace: gcp-cloudsql-demo
 
 # Process group to run everything together
 cloudsql-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - postgres-instance
     - app-database

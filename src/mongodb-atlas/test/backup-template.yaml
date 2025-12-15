@@ -21,10 +21,10 @@ backup-cluster:
   project_id: <- connection-target("project") entity-state get-member("id")
   provider: AWS
   region: US_WEST_2
-  instance_size: M10  # M10 required for backup operations
+  instance_size: M10 # M10 required for backup operations
   secret_ref: mongodb-atlas-token
   allow_ips:
-    - 0.0.0.0/0  # Allow all IPs for testing
+    - 0.0.0.0/0 # Allow all IPs for testing
   permitted-secrets:
     mongodb-atlas-token: true
   services:
@@ -70,9 +70,8 @@ backup-cluster:
 # Stack Definition
 
 backup-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - mongodb-backup-test/backup-project
     - mongodb-backup-test/backup-cluster
     # - mongodb-backup-test/backup-shared-cluster  # Uncomment for validation testing
-

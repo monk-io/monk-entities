@@ -1,0 +1,92 @@
+namespace: firebase
+
+deploy:
+  defines: runnable
+  permitted-secrets:
+    default-gcp-service-account: true
+  containers:
+    deploy:
+      image: monkimages.azurecr.io/firebase-build
+      image-tag: <- $node-version
+      restart: no
+      bash: /tmp/init.sh
+#      paths:
+#        - <- `blobs://example:/home/node/app`
+  files:
+    init:
+      container: deploy
+      path: /tmp/init.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        {{ v "pre-deploy" }}
+        cd $DEPLOY_DIR
+        firebase deploy --only hosting:$FIREBASE_SITE --project $GCP_PROJECT --non-interactive --message "Deployed via Monk"
+  variables:
+    node-version:
+      env: NODE_VERSION
+      type: string
+      value: 20
+      description: |
+        The Node.js version to use for the build environment.
+        Available versions: 18, 20, 22, 24.
+        Pick node version based on the project requirements, or leave unset for default (20).
+    site-id:
+      env: FIREBASE_SITE
+      type: string
+      value: ""
+      description: |
+        The Firebase Hosting site ID to deploy to.
+        This is the site identifier, not the full URL.
+
+        Hint: inherit this runnable and use connection to gcp/firebase-hosting-site entity, then set this variable to:
+        site-id: <- connection-target("site") entity-state get-member("site_id")
+    project:
+      env: GCP_PROJECT
+      type: string
+      value: <- provider("gcp") get-member("project")
+      description: |
+        The GCP project ID where the Firebase Hosting site is located.
+        Defaults to the project from the GCP provider.
+
+        Hint: usually you don't need to set this, it's automatically resolved from the provider.
+    deploy-dir:
+      env: DEPLOY_DIR
+      type: string
+      value: /home/node/app/
+      description: |
+        The directory containing the files to deploy.
+        This should include:
+        - firebase.json (hosting configuration)
+        - public/ directory (or whatever "public" is set to in firebase.json)
+
+        Example firebase.json:
+        {
+          "hosting": {
+            "public": "public",
+            "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+          }
+        }
+    pre-deploy:
+      type: string
+      value: <- `echo "pre-deploy script"`
+      description: |
+        A script to run before deployment.
+
+        Hint: you can override this variable to add custom pre-deploy steps, e.g. building the project.
+        You can include dev deps in install command in pre deploy, e.g. npm install --include=dev.
+
+        Example:
+        pre-deploy: <- `cd /home/node/app && npm install --include=dev && npm run build`
+    channel:
+      env: FIREBASE_CHANNEL
+      type: string
+      value: ""
+      description: |
+        Optional: Deploy to a specific preview channel instead of production.
+        Leave empty to deploy to production (live channel).
+
+        Set to a channel ID to deploy a preview:
+        channel: <- connection-target("channel") entity-state get-member("channel_id")
+
+        Preview deployments get unique URLs and don't affect production.

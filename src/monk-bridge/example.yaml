@@ -124,13 +124,11 @@ curl-group-balancer:
         curl -sv --max-time 5 "http://${GROUP_ADDR}:${GROUP_PORT}" || true
 
 stack-sample:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - monk-bridge-example/cluster-sample
     - monk-bridge-example/runnable-sample
     - monk-bridge-example/group-sample
     - monk-bridge-example/curl-runnable-endpoint
     - monk-bridge-example/curl-cluster-balancer
     - monk-bridge-example/curl-group-balancer
-
-

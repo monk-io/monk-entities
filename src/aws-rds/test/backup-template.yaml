@@ -16,7 +16,7 @@ backup-mysql-instance:
   port: 3306
   storage_type: gp2
   auto_minor_version_upgrade: true
-  backup_retention_period: 7  # Enable automated backups
+  backup_retention_period: 7 # Enable automated backups
   preferred_backup_window: "05:00-06:00"
   preferred_maintenance_window: "sun:06:00-sun:07:00"
   publicly_accessible: false
@@ -32,7 +32,6 @@ backup-mysql-instance:
 
 # Stack Definition
 backup-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-rds-backup-test/backup-mysql-instance
-

@@ -7,15 +7,15 @@ test-basic-distribution:
   comment: "Test CloudFront distribution - basic S3 origin"
   enabled: true
   default_root_object: "index.html"
-  
+
   origins:
     - id: "test-s3-origin"
-      domain_name: "example.com"  # Using example.com for testing
+      domain_name: "example.com" # Using example.com for testing
       custom_origin_config:
         http_port: 80
         https_port: 443
         origin_protocol_policy: "https-only"
-  
+
   default_cache_behavior:
     target_origin_id: "test-s3-origin"
     viewer_protocol_policy: "redirect-to-https"
@@ -43,10 +43,10 @@ test-custom-origin-distribution:
   region: us-east-1
   comment: "Test CloudFront distribution - custom origin with cache behaviors"
   enabled: true
-  
+
   origins:
     - id: "test-api-origin"
-      domain_name: "httpbin.org"  # Using httpbin.org for testing
+      domain_name: "httpbin.org" # Using httpbin.org for testing
       origin_path: ""
       custom_origin_config:
         http_port: 80
@@ -57,14 +57,14 @@ test-custom-origin-distribution:
         origin_keep_alive_timeout: 5
       connection_attempts: 3
       connection_timeout: 10
-    
+
     - id: "test-static-origin"
       domain_name: "example.com"
       custom_origin_config:
         http_port: 80
         https_port: 443
         origin_protocol_policy: "https-only"
-  
+
   default_cache_behavior:
     target_origin_id: "test-static-origin"
     viewer_protocol_policy: "redirect-to-https"
@@ -81,7 +81,8 @@ test-custom-origin-distribution:
     - path_pattern: "/api/*"
       target_origin_id: "test-api-origin"
       viewer_protocol_policy: "https-only"
-      allowed_methods: ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      allowed_methods:
+        ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
       cached_methods: ["GET", "HEAD"]
       forward_cookies: "none"
       forward_query_string: true
@@ -106,7 +107,7 @@ test-custom-origin-distribution:
 
 # Test stack for AWS CloudFront distributions
 cloudfront-test-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-cloudfront-test/test-basic-distribution
     - aws-cloudfront-test/test-custom-origin-distribution

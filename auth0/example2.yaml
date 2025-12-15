@@ -2,7 +2,7 @@ namespace: auth0-example
 
 my-auth0-app:
   defines: auth0/application
-  domain: "my-tenant.auth0.com"  # Replace with Auth0 domain
+  domain: "my-tenant.auth0.com" # Replace with Auth0 domain
   app-name: "Sergey Web App 6"
   description: "My Auth0 application"
   app-type: "regular_web"
@@ -14,7 +14,7 @@ my-auth0-app:
   allowed-origins:
     - <- "https://" connection-domain-name("api") concat-all
   management-client-id-secret: auth0-management-my-client-id # Client ID for Management API
-  management-client-token-secret: auth0-management-my-app-token-secret  # Client Secret for Management API
+  management-client-token-secret: auth0-management-my-app-token-secret # Client Secret for Management API
   management-api: "https://dev-f8y0exae.auth0.com"
   permitted-secrets:
     auth0-management-my-client-id: true
@@ -58,7 +58,6 @@ front-backend:
       port: 80
       protocol: custom
 
-
 service-backend:
   defines: runnable
   containers:
@@ -91,7 +90,7 @@ service-backend:
         - auth0-example/my-auth0-app
 
 stack2:
-  defines: process-group
+  defines: group
   members:
     - auth0-example/front-backend
     - auth0-example/my-auth0-app

@@ -2,8 +2,8 @@
 # This template creates test entities for the RDS Access integration tests
 
 aws-rds-access-test:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - test-mysql-access
     - test-postgres-access
 

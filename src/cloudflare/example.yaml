@@ -27,7 +27,7 @@ example-record:
       timeout: 60
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - cloudflare-examples/nginx
     - cloudflare-examples/example-record

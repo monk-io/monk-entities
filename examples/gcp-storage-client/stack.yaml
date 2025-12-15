@@ -23,8 +23,8 @@ namespace: gcp-storage-demo
 
 # Process group to run everything together
 storage-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - data-bucket
     - storage-sa

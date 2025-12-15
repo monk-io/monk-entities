@@ -18,7 +18,6 @@ agent:
     data:
       protocol: custom
 
-
 app-user:
   defines: runnable
   containers:
@@ -29,7 +28,7 @@ app-user:
   depends:
     wait-for:
       runnables:
-        -  do-agent-example/agent
+        - do-agent-example/agent
       timeout: 120
   variables:
     defines: variables
@@ -46,9 +45,8 @@ app-user:
       runnable: do-agent-example/agent
       service: data
 
-
 stack:
-  defines: process-group
+  defines: group
   members:
     - do-agent-example/agent
     - do-agent-example/app-user

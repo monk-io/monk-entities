@@ -23,8 +23,8 @@ namespace: gcp-firebase-hosting-demo
 
 # Process group to run everything together
 hosting-app:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - enable-apis
     - hosting-site
     - preview-channel
@@ -58,8 +58,7 @@ hosting-site:
 
   services:
     site:
-      protocol: https
-      address: <- entity-state get-member("default_url") default("")
+      protocol: custom
 
   depends:
     wait-for:
@@ -77,7 +76,7 @@ preview-channel:
   defines: gcp/firebase-hosting-channel
   name: preview
   site: <- connection-target("site") entity-state get-member("site_id")
-  ttl: "604800s"  # 7 days
+  ttl: "604800s" # 7 days
   retained_release_count: 3
 
   labels:
@@ -86,8 +85,7 @@ preview-channel:
 
   services:
     channel:
-      protocol: https
-      address: <- entity-state get-member("url") default("")
+      protocol: custom
 
   connections:
     site:
@@ -103,23 +101,22 @@ preview-channel:
 # =============================================================================
 # Step 4: Deploy Site Content (Builder Pattern)
 # =============================================================================
-# Uses Firebase CLI in a container to deploy content from blob
+# Uses the firebase/deploy builder template to deploy content from blob
 #
-# NOTE: This requires:
-# 1. A blob named "site-content" with your static files
-# 2. A firebase.json in the blob root:
-#    {
-#      "hosting": {
-#        "public": "public",
-#        "ignore": ["firebase.json", "**/.*"]
-#      }
-#    }
-# 3. Your static files in public/ directory
+# The firebase/deploy builder provides:
+# - Firebase CLI pre-installed in the container
+# - Configurable site-id, project, and deploy-dir
+# - Pre-deploy hook for build steps
+# - Optional channel deployment for previews
 #
-# Upload blob with: monk blob upload site-content ./my-site/
+# Your blob should contain:
+# 1. firebase.json (hosting configuration)
+# 2. public/ directory with static files
+#
+# See firebase/hosting/deploy.yaml for full variable documentation.
 
 deploy-site:
-  defines: runnable
+  inherits: firebase/deploy
 
   connections:
     site:
@@ -136,109 +133,16 @@ deploy-site:
         - gcp-firebase-hosting-demo/preview-channel
       timeout: 600
 
-  variables:
-    site_id:
-      env: FIREBASE_SITE
-      value: <- connection-target("site") entity-state get-member("site_id")
-      type: string
-    site_url:
-      env: SITE_URL
-      value: <- connection-target("site") entity-state get-member("default_url")
-      type: string
-    preview_url:
-      env: PREVIEW_URL
-      value: <- connection-target("channel") entity-state get-member("url")
-      type: string
-    gcp_project:
-      env: GCP_PROJECT
-      value: <- provider("gcp") get-member("project")
-      type: string
-
   containers:
-    deployer:
-      image: node:20-slim
+    deploy:
       paths:
         # Mount site content from blob
-        - <- `blobs://site-content:/app/site`
-      bash: |
-        echo "========================================"
-        echo "Firebase Hosting Deployment"
-        echo "========================================"
-        echo "Site ID: $FIREBASE_SITE"
-        echo "Production URL: $SITE_URL"
-        echo "Preview URL: $PREVIEW_URL"
-        echo "Project: $GCP_PROJECT"
-        echo ""
+        - <- `blobs://site-content:/home/node/app`
 
-        # Install Firebase CLI
-        echo "Installing Firebase CLI..."
-        npm install -g firebase-tools
-
-        cd /app/site
-
-        # Create firebase.json if not exists
-        if [ ! -f firebase.json ]; then
-          echo "Creating default firebase.json..."
-          cat > firebase.json << 'EOF'
-        {
-          "hosting": {
-            "site": "${FIREBASE_SITE}",
-            "public": "public",
-            "ignore": [
-              "firebase.json",
-              "**/.*",
-              "**/node_modules/**"
-            ],
-            "rewrites": [
-              {
-                "source": "**",
-                "destination": "/index.html"
-              }
-            ]
-          }
-        }
-        EOF
-        fi
-
-        # Create sample content if public/ doesn't exist
-        if [ ! -d public ]; then
-          echo "Creating sample content..."
-          mkdir -p public
-          cat > public/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Monk Firebase Hosting Demo</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                   max-width: 800px; margin: 50px auto; padding: 20px; }
-            h1 { color: #1a73e8; }
-            .info { background: #f5f5f5; padding: 15px; border-radius: 8px; }
-          </style>
-        </head>
-        <body>
-          <h1>Hello from Firebase Hosting!</h1>
-          <p>This site was deployed using Monk entities.</p>
-          <div class="info">
-            <h3>Deployment Info</h3>
-            <p>Deployed at: <script>document.write(new Date().toISOString())</script></p>
-          </div>
-        </body>
-        </html>
-        EOF
-        fi
-
-        echo ""
-        echo "Deploying to preview channel..."
-        firebase deploy --only hosting:$FIREBASE_SITE \
-          --project $GCP_PROJECT \
-          --non-interactive \
-          --message "Deployed via Monk"
-
-        echo ""
-        echo "========================================"
-        echo "Deployment Complete!"
-        echo "========================================"
-        echo "Production: $SITE_URL"
-        echo "Preview: $PREVIEW_URL"
-        echo "========================================"
+  variables:
+    # Connect to the hosting site entity to get the site ID
+    site-id: <- connection-target("site") entity-state get-member("site_id")
+    # Optional: deploy to preview channel instead of production
+    # channel: <- connection-target("channel") entity-state get-member("channel_id")
+    # Pre-deploy hook (optional): add build steps here
+    pre-deploy: <- `echo "Deploying Firebase Hosting site..."`
