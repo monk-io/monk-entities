@@ -53,9 +53,8 @@ test-subscription:
 
 # Test stack
 simple-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - sns-simple-test/test-topic
     - sns-simple-test/test-queue
     - sns-simple-test/test-subscription
-

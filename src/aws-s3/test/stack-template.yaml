@@ -69,8 +69,8 @@ test-advanced-bucket:
     Purpose: advanced-features-testing
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-s3-test/test-basic-bucket
     - aws-s3-test/test-versioned-bucket
-    - aws-s3-test/test-advanced-bucket 
+    - aws-s3-test/test-advanced-bucket

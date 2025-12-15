@@ -10,7 +10,7 @@ test-queue:
   queue_name: test-sqs-queue-direct
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 1209600  # 14 days
+  message_retention_period: 1209600 # 14 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 60
   fifo_queue: false
@@ -37,7 +37,7 @@ sqs-worker-policy:
           - sqs:DeleteMessage
           - sqs:GetQueueAttributes
           - sqs:GetQueueUrl
-        Resource: 
+        Resource:
           - <- connection-target("queue") entity-state get-member("queue_arn")
       - Effect: Allow
         Action:
@@ -113,40 +113,40 @@ sqs-worker:
       env: SQS_QUEUE_URL
       value: <- connection-target("queue") entity-state get-member("queue_url")
       type: string
-    
+
     # AWS Region
     aws_region:
       env: AWS_REGION
       value: "us-east-1"
       type: string
-    
+
     # AWS Credentials (automatically generated)
     aws_access_key_id:
       env: AWS_ACCESS_KEY_ID
       value: <- secret("sqs-worker-direct-access-key-id")
       type: string
-    
+
     aws_secret_access_key:
       env: AWS_SECRET_ACCESS_KEY
       value: <- secret("sqs-worker-direct-secret-access-key")
       type: string
-    
+
     # Worker configuration
     max_messages:
       env: MAX_MESSAGES
       value: "10"
       type: string
-    
+
     wait_time_seconds:
       env: WAIT_TIME_SECONDS
       value: "20"
       type: string
-    
+
     visibility_timeout_seconds:
       env: VISIBILITY_TIMEOUT_SECONDS
       value: "30"
       type: string
-    
+
     polling_interval_ms:
       env: POLLING_INTERVAL_MS
       value: "1000"
@@ -158,9 +158,9 @@ sqs-worker:
 
 # Complete example stack
 direct-access-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - sqs-example-direct/test-queue
-    - sqs-example-direct/sqs-worker-policy  
+    - sqs-example-direct/sqs-worker-policy
     - sqs-example-direct/sqs-worker-user
     - sqs-example-direct/sqs-worker

@@ -1,0 +1,282 @@
+namespace: gcp-firestore-demo
+
+# =============================================================================
+# GCP Firestore Database Example
+# =============================================================================
+#
+# This example demonstrates:
+# 1. Enabling Firestore API
+# 2. Creating a Firestore database in Native mode
+# 3. Creating a service account with Firestore access
+# 4. Generating service account key for application access
+# 5. Running a Node.js client that performs CRUD operations
+#
+# Prerequisites:
+# - GCP provider configured in Monk with appropriate permissions
+# - Project with billing enabled
+# - No existing default Firestore database (or use custom database_id)
+#
+# Run with:
+#   monk load gcp-firestore-demo/stack.yaml
+#   monk run gcp-firestore-demo/firestore-app
+#
+# =============================================================================
+
+# Process group to run everything together
+firestore-app:
+  defines: group
+  members:
+    - enable-apis
+    - firestore-db
+    - firestore-sa
+    - firestore-key
+    - firestore-client
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - firestore.googleapis.com
+    - iam.googleapis.com
+  services:
+    apis-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create Firestore Database
+# =============================================================================
+# Creates default Firestore database in Native mode (recommended)
+
+firestore-db:
+  defines: gcp/firestore
+  location: nam5 # US multi-region for high availability
+  type: FIRESTORE_NATIVE
+  point_in_time_recovery: DISABLED
+  delete_protection: DELETE_PROTECTION_DISABLED
+
+  services:
+    database:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Service Account for Firestore Access
+# =============================================================================
+
+firestore-sa:
+  defines: gcp/service-account
+  name: firestore-client
+  display_name: Firestore Client
+  description: Service account for Firestore database access
+  roles:
+    - roles/datastore.user # Read/write to Firestore
+
+  services:
+    service-account:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 4: Generate Service Account Key
+# =============================================================================
+# Creates a key and stores it in Monk secrets for application use
+
+firestore-key:
+  defines: gcp/service-account-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  secret: firestore-sa-key
+
+  # REQUIRED: Allow entity to write key to this secret
+  permitted-secrets:
+    firestore-sa-key: true
+
+  services:
+    key:
+      protocol: custom
+
+  connections:
+    sa:
+      runnable: gcp-firestore-demo/firestore-sa
+      service: service-account
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-demo/firestore-sa
+      timeout: 300
+
+# =============================================================================
+# Step 5: Firestore Client Application
+# =============================================================================
+# Node.js application that connects to Firestore and performs CRUD operations
+
+firestore-client:
+  defines: runnable
+
+  # Allow reading the service account key secret
+  permitted-secrets:
+    firestore-sa-key: true
+
+  connections:
+    database:
+      runnable: gcp-firestore-demo/firestore-db
+      service: database
+    key:
+      runnable: gcp-firestore-demo/firestore-key
+      service: key
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-demo/firestore-db
+        - gcp-firestore-demo/firestore-key
+      timeout: 600
+
+  variables:
+    gcp_project:
+      env: GCP_PROJECT
+      value: <- provider("gcp") get-member("project")
+      type: string
+    database_id:
+      env: DATABASE_ID
+      value: <- connection-target("database") entity-state get-member("database_id") default("(default)")
+      type: string
+    sa_key:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("firestore-sa-key")
+      type: string
+
+  containers:
+    client:
+      image: node:20-slim
+      bash: |
+        echo "========================================"
+        echo "Firestore Client Demo"
+        echo "========================================"
+        echo "Project: $GCP_PROJECT"
+        echo "Database: $DATABASE_ID"
+        echo ""
+
+        # Write credentials to file
+        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/sa-key.json
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+
+        # Create Node.js application
+        mkdir -p /app && cd /app
+
+        # Initialize package.json
+        cat > package.json << 'EOF'
+        {
+          "name": "firestore-client",
+          "version": "1.0.0",
+          "type": "module",
+          "dependencies": {
+            "@google-cloud/firestore": "^7.0.0"
+          }
+        }
+        EOF
+
+        # Install dependencies
+        echo "Installing dependencies..."
+        npm install --silent
+
+        # Create client application
+        cat > index.js << 'EOF'
+        import { Firestore } from '@google-cloud/firestore';
+
+        const projectId = process.env.GCP_PROJECT;
+        const databaseId = process.env.DATABASE_ID || '(default)';
+
+        console.log(`Connecting to Firestore: ${projectId}/${databaseId}`);
+
+        const firestore = new Firestore({
+          projectId: projectId,
+          databaseId: databaseId,
+        });
+
+        async function main() {
+          const usersCollection = firestore.collection('demo-users');
+
+          console.log('\n--- CREATE ---');
+          // Create documents
+          const users = [
+            { name: 'Alice', email: 'alice@example.com', age: 30, created: new Date() },
+            { name: 'Bob', email: 'bob@example.com', age: 25, created: new Date() },
+            { name: 'Charlie', email: 'charlie@example.com', age: 35, created: new Date() },
+          ];
+
+          for (const user of users) {
+            const docRef = await usersCollection.add(user);
+            console.log(`Created user ${user.name} with ID: ${docRef.id}`);
+          }
+
+          console.log('\n--- READ ALL ---');
+          // Read all documents
+          const snapshot = await usersCollection.get();
+          console.log(`Found ${snapshot.size} users:`);
+          snapshot.forEach(doc => {
+            console.log(`  ${doc.id}: ${JSON.stringify(doc.data())}`);
+          });
+
+          console.log('\n--- QUERY ---');
+          // Query documents
+          const querySnapshot = await usersCollection
+            .where('age', '>=', 30)
+            .orderBy('age')
+            .get();
+          console.log(`Users age >= 30:`);
+          querySnapshot.forEach(doc => {
+            const data = doc.data();
+            console.log(`  ${data.name} (age: ${data.age})`);
+          });
+
+          console.log('\n--- UPDATE ---');
+          // Update a document
+          const firstDoc = snapshot.docs[0];
+          await firstDoc.ref.update({
+            age: firstDoc.data().age + 1,
+            updated: new Date()
+          });
+          console.log(`Updated ${firstDoc.data().name}'s age`);
+
+          // Read updated document
+          const updated = await firstDoc.ref.get();
+          console.log(`  New data: ${JSON.stringify(updated.data())}`);
+
+          console.log('\n--- DELETE ---');
+          // Delete all demo documents
+          const batch = firestore.batch();
+          snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+          });
+          await batch.commit();
+          console.log(`Deleted ${snapshot.size} demo users`);
+
+          console.log('\n--- DONE ---');
+          console.log('Firestore operations completed successfully!');
+        }
+
+        main().catch(console.error);
+        EOF
+
+        # Run the application
+        echo ""
+        echo "Running Firestore client..."
+        echo ""
+        node index.js
+
+        # Cleanup credentials
+        rm /tmp/sa-key.json

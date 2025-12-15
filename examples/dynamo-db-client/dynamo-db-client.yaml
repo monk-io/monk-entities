@@ -5,22 +5,22 @@ users-table:
   defines: aws-dynamo-db/dynamo-db-table
   region: us-east-1
   table_name: users-table
-  
+
   # Primary key: simple hash key on 'id'
   attribute_definitions!0:
     AttributeName: id
     AttributeType: S
-  
+
   key_schema!0:
     AttributeName: id
     KeyType: HASH
-  
+
   # Use pay-per-request billing for variable workloads
   billing_mode: PAY_PER_REQUEST
-  
+
   # Enable point-in-time recovery for production
   point_in_time_recovery_enabled: true
-  
+
   # Add tags for management
   tags:
     Environment: example
@@ -36,48 +36,48 @@ dynamo-db-client:
     permitted-secrets:
       aws-access-key-id: true
       aws-secret-access-key: true
-  
+
   connections:
     database:
       runnable: dynamodb-example/users-table
       service: table
-  
+
   depends:
     wait-for:
       runnables:
         - dynamodb-example/users-table
-      timeout: 300  # DynamoDB tables can take time to become ACTIVE
-  
+      timeout: 300 # DynamoDB tables can take time to become ACTIVE
+
   variables:
     # Required: DynamoDB Table Name from connected table
     dynamodb_table_name:
       env: DYNAMODB_TABLE_NAME
       value: <- connection-target("database") entity-state get-member("table_name")
       type: string
-    
+
     # AWS Region from connected table
     aws_region:
       env: AWS_REGION
       value: "us-east-1"
       type: string
-    
+
     # Optional: AWS credentials from secrets (if not using IAM roles)
     aws_access_key_id:
       env: AWS_ACCESS_KEY_ID
       value: <- secret("aws-access-key-id")
       type: string
-    
+
     aws_secret_access_key:
       env: AWS_SECRET_ACCESS_KEY
       value: <- secret("aws-secret-access-key")
       type: string
-    
+
     # Client configuration
     operation_interval_ms:
       env: OPERATION_INTERVAL_MS
       value: "3000"
       type: string
-    
+
     max_operations:
       env: MAX_OPERATIONS
       value: "100"
@@ -89,7 +89,7 @@ dynamo-db-client:
 
 # Complete example stack with table and client
 example-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - dynamodb-example/users-table
-    - dynamodb-example/dynamo-db-client 
+    - dynamodb-example/dynamo-db-client

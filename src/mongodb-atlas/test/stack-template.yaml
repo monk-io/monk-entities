@@ -22,7 +22,7 @@ dev-cluster:
   instance_size: M0
   secret_ref: mongodb-atlas-token
   allow_ips:
-    - 0.0.0.0/0  # Allow all IPs for testing
+    - 0.0.0.0/0 # Allow all IPs for testing
   permitted-secrets:
     mongodb-atlas-token: true
   services:
@@ -64,8 +64,8 @@ dev-user:
 # Stack Definitions - Process Groups
 
 dev-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - mongodb-test-stack/dev-project
     - mongodb-test-stack/dev-cluster
     - mongodb-test-stack/dev-user
@@ -114,7 +114,7 @@ dev-connection-test:
       bash: |
         echo "Testing MongoDB Atlas DEVELOPMENT connection..."
         echo "Connection String: $MONGODB_CONNECTION_WITH_AUTH"
-        
+
         # Test connection using mongosh
         mongosh "$MONGODB_CONNECTION_WITH_AUTH" --eval "
           print('Connected to MongoDB Atlas DEVELOPMENT successfully!');

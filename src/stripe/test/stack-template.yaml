@@ -57,7 +57,6 @@ price:
     data:
       protocol: custom
 
-
 consumer:
   defines: runnable
   permitted-secrets:
@@ -131,11 +130,10 @@ consumer:
         echo "Stripe envs resolved"
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - stripe-test/creds
     - stripe-test/webhook
     - stripe-test/product
     - stripe-test/price
     - stripe-test/consumer
-

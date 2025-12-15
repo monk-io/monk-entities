@@ -126,12 +126,12 @@ ses-sender-demo:
       image: alpine:latest
       bash: |
         set -e
-        
+
         echo "Installing curl..."
         apk add --no-cache curl
-        
+
         echo "Sending email via SMTP..."
-        
+
         # SMTP server details
         SMTP_HOST="email-smtp.${AWS_REGION}.amazonaws.com"
         SMTP_PORT="587"
@@ -139,16 +139,16 @@ ses-sender-demo:
         TO_EMAIL="recipient@example.com"
         SUBJECT="Test Email from Monk SES Demo"
         BODY="This is a test email sent from Monk using AWS SES SMTP interface."
-        
+
         # Create email message
         cat > /tmp/email.txt << 'EMAILEOF'
         From: ${FROM_EMAIL}
         To: ${TO_EMAIL}
         Subject: ${SUBJECT}
-        
+
         ${BODY}
         EMAILEOF
-        
+
         # Send email using curl
         curl -v --ssl-reqd \
           --url "smtp://${SMTP_HOST}:${SMTP_PORT}" \
@@ -156,10 +156,10 @@ ses-sender-demo:
           --mail-from "${FROM_EMAIL}" \
           --mail-rcpt "${TO_EMAIL}" \
           --upload-file /tmp/email.txt
-        
+
         echo "Email sent successfully!"
         echo "Check your inbox at ${TO_EMAIL}"
-        
+
         # Exit after sending
         exit 0
   variables:
@@ -178,11 +178,11 @@ ses-sender-demo:
 
 # Stack that runs everything together
 direct-access-stack:
-  defines: process-group
+  defines: group
   metadata:
     name: SES Direct Access Stack
     description: Complete SES sender setup with IAM and email sending demo
-  runnable-list:
+  members:
     - ses-example-direct/ses-sender-group
     - ses-example-direct/ses-sender-policy
     - ses-example-direct/ses-sender-user
@@ -190,4 +190,3 @@ direct-access-stack:
     - ses-example-direct/sender-email
     - ses-example-direct/sender-domain
     - ses-example-direct/ses-sender-demo
-

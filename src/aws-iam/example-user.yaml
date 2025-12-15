@@ -107,15 +107,15 @@ service-execution-role:
 
 # Complete AssumeRole Example Stack
 assume-role-example-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-iam-user-examples/cross-account-assume-policy
     - aws-iam-user-examples/assume-role-user
     - aws-iam-user-examples/service-execution-role
 
 # Basic User Example Stack
 basic-user-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-iam-user-examples/basic-app-user
     - aws-iam-user-examples/s3-access-user

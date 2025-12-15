@@ -28,37 +28,37 @@ nextjs-auth-app:
     supabase:
       runnable: supabase-auth-next-app-example/supabase-project
       service: data
-  
+
   depends:
     wait-for:
       runnables:
         - supabase-auth-next-app-example/supabase-project
       timeout: 600
-  
+
   variables:
     # Supabase configuration - these are used by the Next.js app
     next-public-supabase-url:
       env: NEXT_PUBLIC_SUPABASE_URL
       value: <- "https://" connection-target("supabase") entity-state get-member("id") ".supabase.co" concat-all
       type: string
-    
+
     next-public-supabase-publishable-key:
       env: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
       value: <- secret("supabase-anon-key")
       type: string
-    
+
     # Optional: Service role key for server-side operations (if needed)
     supabase-service-role-key:
       env: SUPABASE_SERVICE_ROLE_KEY
       value: <- secret("supabase-service-key")
       type: string
-    
+
     # Next.js configuration
     node-env:
       env: NODE_ENV
       value: "development"
       type: string
-    
+
     port:
       env: PORT
       value: "3000"
@@ -72,7 +72,7 @@ nextjs-auth-app:
 
 # Complete example stack with Supabase project and Next.js app
 example-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - supabase-auth-next-app-example/supabase-project
     - supabase-auth-next-app-example/nextjs-auth-app

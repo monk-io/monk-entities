@@ -1,0 +1,337 @@
+namespace: gcp
+cloud-function:
+  defines: entity
+  metadata:
+    name: CloudFunction
+    version-hash: 1a2c7246f95f
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        Function name (must be unique within project/region)
+        Names must be 1-63 characters, start with a letter, and contain only
+        lowercase letters, numbers, and hyphens.
+    location:
+      type: string
+      enum:
+        - africa-south1
+        - asia-east1
+        - asia-east2
+        - asia-northeast1
+        - asia-northeast2
+        - asia-northeast3
+        - asia-south1
+        - asia-south2
+        - asia-southeast1
+        - asia-southeast2
+        - australia-southeast1
+        - australia-southeast2
+        - europe-central2
+        - europe-north1
+        - europe-southwest1
+        - europe-west1
+        - europe-west2
+        - europe-west3
+        - europe-west4
+        - europe-west6
+        - europe-west8
+        - europe-west9
+        - europe-west10
+        - europe-west12
+        - me-central1
+        - me-central2
+        - me-west1
+        - northamerica-northeast1
+        - northamerica-northeast2
+        - northamerica-south1
+        - us-central1
+        - us-south1
+        - us-east1
+        - us-east4
+        - us-east5
+        - us-west1
+        - us-west2
+        - us-west3
+        - us-west4
+        - southamerica-east1
+        - southamerica-west1
+      description: GCP region for the function
+    blob_name:
+      type: string
+      description: |-
+        Name of the blob containing the function source code
+        The blob will be zipped and uploaded to GCS for deployment.
+    build:
+      type: object
+      properties:
+        runtime:
+          type: string
+          enum:
+            - nodejs18
+            - nodejs20
+            - nodejs22
+            - python39
+            - python310
+            - python311
+            - python312
+            - go121
+            - go122
+            - java11
+            - java17
+            - java21
+            - dotnet6
+            - dotnet8
+            - ruby32
+            - ruby33
+            - php82
+            - php83
+          description: 'Runtime for the function (e.g., "nodejs20", "python311", "go122")'
+        entry_point:
+          type: string
+          description: Function entry point name
+          default: Function name matching the file export
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+            description: Build environment variables
+          description: Build environment variables
+        docker_repository:
+          type: string
+          description: >-
+            Docker repository for storing built images
+
+            Format:
+            projects/{project}/locations/{location}/repositories/{repository}
+        worker_pool:
+          type: string
+          description: |-
+            Worker pool for builds
+            Format: projects/{project}/locations/{location}/workerPools/{pool}
+      required:
+        - runtime
+      additionalProperties: false
+      description: 'Build configuration (runtime, entry point)'
+    service:
+      type: object
+      properties:
+        max_instance_count:
+          type: number
+          description: Maximum number of concurrent instances
+          default: 100
+        min_instance_count:
+          type: number
+          description: Minimum number of instances (for reduced cold starts)
+          default: 0
+        available_memory:
+          type: string
+          description: 'Memory available to the function (e.g., "256Mi", "1Gi", "2Gi")'
+          default: 256Mi
+        timeout_seconds:
+          type: number
+          description: Maximum request timeout in seconds (1-3600)
+          default: 60
+        available_cpu:
+          type: string
+          description: 'Available CPU (e.g., "1", "2", "4" or fractional like "0.083")'
+        max_instance_request_concurrency:
+          type: number
+          description: Maximum concurrent requests per instance (1-1000)
+          default: 1
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+            description: Environment variables for the function
+          description: Environment variables for the function
+        secret_environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+            description: >-
+              Secret environment variables
+
+              Maps env var names to secret references
+              (projects/{project}/secrets/{secret}/versions/{version})
+          description: >-
+            Secret environment variables
+
+            Maps env var names to secret references
+            (projects/{project}/secrets/{secret}/versions/{version})
+        vpc_connector:
+          type: string
+          description: >-
+            VPC connector for VPC access
+
+            Format:
+            projects/{project}/locations/{location}/connectors/{connector}
+        vpc_connector_egress_settings:
+          type: string
+          enum:
+            - PRIVATE_RANGES_ONLY
+            - ALL_TRAFFIC
+          description: VPC connector egress settings
+        ingress_settings:
+          type: string
+          enum:
+            - ALLOW_ALL
+            - ALLOW_INTERNAL_ONLY
+            - ALLOW_INTERNAL_AND_GCLB
+          description: Ingress settings
+          default: ALLOW_ALL
+        service_account_email:
+          type: string
+          description: Service account email for function execution
+        all_traffic_on_latest_revision:
+          type: boolean
+          description: Whether all traffic should be routed through VPC
+      additionalProperties: false
+      description: 'Service configuration (memory, timeout, scaling)'
+    event_trigger:
+      type: object
+      properties:
+        event_type:
+          type: string
+          enum:
+            - http
+            - google.cloud.pubsub.topic.v1.messagePublished
+            - google.cloud.storage.object.v1.finalized
+            - google.cloud.storage.object.v1.deleted
+            - google.cloud.storage.object.v1.archived
+            - google.cloud.storage.object.v1.metadataUpdated
+            - google.cloud.firestore.document.v1.created
+            - google.cloud.firestore.document.v1.updated
+            - google.cloud.firestore.document.v1.deleted
+            - google.cloud.firestore.document.v1.written
+            - google.firebase.auth.user.v1.created
+            - google.firebase.auth.user.v1.deleted
+            - google.firebase.remoteconfig.remoteConfig.v1.updated
+            - google.cloud.scheduler.job.v1.executed
+          description: Event type that triggers the function
+        pubsub_topic:
+          type: string
+          description: |-
+            Pub/Sub topic (for Pub/Sub triggers)
+            Format: projects/{project}/topics/{topic}
+        event_filters:
+          type: object
+          additionalProperties:
+            type: string
+            description: |-
+              Event filters for filtering events
+              Key-value pairs like bucket: my-bucket for storage triggers
+          description: |-
+            Event filters for filtering events
+            Key-value pairs like bucket: my-bucket for storage triggers
+        event_filters_path_pattern:
+          type: object
+          additionalProperties:
+            type: string
+            description: |-
+              Event filters with path patterns
+              For document path patterns in Firestore triggers
+          description: |-
+            Event filters with path patterns
+            For document path patterns in Firestore triggers
+        retry_policy:
+          type: string
+          enum:
+            - RETRY_POLICY_UNSPECIFIED
+            - RETRY_POLICY_DO_NOT_RETRY
+            - RETRY_POLICY_RETRY
+          description: Retry policy on event failure
+          default: RETRY_POLICY_DO_NOT_RETRY
+        service_account_email:
+          type: string
+          description: Service account email for trigger identity
+        channel:
+          type: string
+          description: Channel for 3rd-party event providers
+      required:
+        - event_type
+      additionalProperties: false
+      description: |-
+        Event trigger configuration (for non-HTTP functions)
+        If not specified, function is HTTP-triggered.
+    description:
+      type: string
+      description: Description of the function
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Key-value labels for organizing functions
+      description: Key-value labels for organizing functions
+    kms_key_name:
+      type: string
+      description: >-
+        KMS key for customer-managed encryption
+
+        Format:
+        projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
+    required:
+      - name
+      - location
+      - blob_name
+      - build
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Function name
+    resource_name:
+      type: string
+      description: Full resource name
+    state:
+      type: string
+      description: 'Function state (ACTIVE, FAILED, DEPLOYING, etc.)'
+    url:
+      type: string
+      description: Function HTTPS endpoint URL (for HTTP triggers)
+    service:
+      type: string
+      description: Cloud Run service name
+    create_time:
+      type: string
+      description: Creation timestamp
+    update_time:
+      type: string
+      description: Last update timestamp
+    build_id:
+      type: string
+      description: Build ID of the current deployment
+    generation:
+      type: string
+      description: Current generation/version
+    service_url:
+      type: string
+      description: Underlying Cloud Run service URL
+  lifecycle:
+    sync: <<< cloud-function-sync.js
+    get: ''
+    get-iam-policy: ''
+    set-iam-policy: ''
+    test-iam-permissions: ''
+    invoke: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - http
+    - blobs
+    - gcp/common

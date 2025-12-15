@@ -103,8 +103,8 @@ wordpress:
       image: docker.io/library/wordpress
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - gcp/enable-apis
     - gcp/myinstance
     - gcp/mydb

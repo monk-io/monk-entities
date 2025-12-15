@@ -3,8 +3,8 @@ namespace: azure-cosmosdb-example
 # Example 1: Basic single-region Cosmos DB setup
 basic-cosmos-setup:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "my-resource-group"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
   account_name: "my-basic-cosmos"
   locations:
     - location_name: "East US"
@@ -23,8 +23,8 @@ basic-cosmos-setup:
 # Example 2: Production multi-region setup with high availability
 production-cosmos-ha:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
   account_name: "prod-cosmos-ha"
   locations:
     - location_name: "East US"
@@ -53,8 +53,8 @@ production-cosmos-ha:
 # Example 3: MongoDB API Cosmos DB
 mongodb-cosmos:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "mongodb-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "mongodb-rg" # Replace with your resource group
   account_name: "my-mongodb-cosmos"
   account_kind: "MongoDB"
   locations:
@@ -74,8 +74,8 @@ mongodb-cosmos:
 # Example 4: Cosmos DB with secret population for access keys
 secure-cosmos-with-secrets:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "secure-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "secure-rg" # Replace with your resource group
   account_name: "secure-cosmos-db"
   locations:
     - location_name: "East US"
@@ -101,9 +101,9 @@ secure-cosmos-with-secrets:
 # Example 5: Database with manual throughput
 ecommerce-database:
   defines: azure-cosmosdb/database
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "my-resource-group"  # Replace with your resource group
-  database_account_name: "my-basic-cosmos"  # Must match an existing account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  database_account_name: "my-basic-cosmos" # Must match an existing account
   database_id: "ecommerce"
   manual_throughput: 400
   tags:
@@ -114,9 +114,9 @@ ecommerce-database:
 # Example 5: Database with autoscale throughput
 analytics-database:
   defines: azure-cosmosdb/database
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
-  database_account_name: "prod-cosmos-ha"  # Must match an existing account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
+  database_account_name: "prod-cosmos-ha" # Must match an existing account
   database_id: "analytics"
   autoscale_settings:
     max_throughput: 4000
@@ -128,9 +128,9 @@ analytics-database:
 # Example 6: High-throughput production database
 user-data-database:
   defines: azure-cosmosdb/database
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
-  database_account_name: "prod-cosmos-ha"  # Must match an existing account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
+  database_account_name: "prod-cosmos-ha" # Must match an existing account
   database_id: "user-data"
   autoscale_settings:
     max_throughput: 20000
@@ -142,8 +142,8 @@ user-data-database:
 # Example 7: Basic container with manual throughput
 products-container:
   defines: azure-cosmosdb/container
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "my-resource-group"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
   database_account_name: "my-basic-cosmos"
   database_id: "ecommerce"
   container_id: "products"
@@ -159,8 +159,8 @@ products-container:
 # Example 8: Container with autoscale and custom partition key
 orders-container:
   defines: azure-cosmosdb/container
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "my-resource-group"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
   database_account_name: "my-basic-cosmos"
   database_id: "ecommerce"
   container_id: "orders"
@@ -169,7 +169,7 @@ orders-container:
     kind: "Hash"
   autoscale_settings:
     max_throughput: 4000
-  default_ttl: 2592000  # 30 days in seconds
+  default_ttl: 2592000 # 30 days in seconds
   tags:
     Environment: "Development"
     Purpose: "ECommerce"
@@ -178,8 +178,8 @@ orders-container:
 # Example 9: Production container with advanced configuration
 users-container:
   defines: azure-cosmosdb/container
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha"
   database_id: "user-data"
   container_id: "users"
@@ -208,8 +208,8 @@ users-container:
 # Example 10: Analytics container with time-series data
 events-container:
   defines: azure-cosmosdb/container
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha"
   database_id: "analytics"
   container_id: "events"
@@ -217,7 +217,7 @@ events-container:
     paths: ["/eventType", "/date"]
     kind: "Hash"
   manual_throughput: 1000
-  default_ttl: 7776000  # 90 days in seconds
+  default_ttl: 7776000 # 90 days in seconds
   conflict_resolution_policy:
     mode: "LastWriterWins"
     conflictResolutionPath: "/_ts"
@@ -348,8 +348,8 @@ mongodb-app:
 
 # Example 10: Stack with multiple databases for microservices
 microservices-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     # Infrastructure
     - azure-cosmosdb-example/basic-cosmos-setup
     - azure-cosmosdb-example/ecommerce-database
@@ -388,8 +388,8 @@ cosmos-continuous-backup-7day:
 # Production-grade backup with extended restore window
 cosmos-continuous-backup-30day:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "production-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
   account_name: "cosmos-backup-30day"
   locations:
     - location_name: "East US"
@@ -414,8 +414,8 @@ cosmos-continuous-backup-30day:
 # Traditional backup mode with configurable interval
 cosmos-periodic-backup:
   defines: azure-cosmosdb/database-account
-  subscription_id: "12345678-1234-1234-1234-123456789012"  # Replace with your subscription ID
-  resource_group_name: "backup-demo-rg"  # Replace with your resource group
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "backup-demo-rg" # Replace with your resource group
   account_name: "cosmos-periodic-backup"
   locations:
     - location_name: "Central US"
@@ -425,9 +425,9 @@ cosmos-periodic-backup:
   # Periodic backup with custom schedule
   backup_policy:
     backup_type: "Periodic"
-    periodic_interval_minutes: 120  # Backup every 2 hours
-    periodic_retention_hours: 48    # Keep backups for 48 hours
-    backup_storage_redundancy: "Zone"  # Zone-redundant storage
+    periodic_interval_minutes: 120 # Backup every 2 hours
+    periodic_retention_hours: 48 # Keep backups for 48 hours
+    backup_storage_redundancy: "Zone" # Zone-redundant storage
   tags:
     Environment: "Staging"
     BackupType: "Periodic"
@@ -436,6 +436,6 @@ cosmos-periodic-backup:
 # Example 14: Full backup demo stack
 # Use this to test backup/restore actions
 backup-demo-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - azure-cosmosdb-example/cosmos-continuous-backup-7day

@@ -2,8 +2,8 @@ namespace: aws-rds-test
 
 # Basic test stack for AWS RDS
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-rds-test/test-mysql-instance
     - aws-rds-test/test-postgres-instance
 
@@ -31,7 +31,7 @@ test-mysql-instance:
     Environment: test
     Application: monkec-test
     ManagedBy: monk
-    
+
 test-postgres-instance:
   defines: aws-rds/rds-instance
   region: us-east-1
@@ -55,4 +55,4 @@ test-postgres-instance:
   tags:
     Environment: test
     Application: monkec-test
-    ManagedBy: monk 
+    ManagedBy: monk

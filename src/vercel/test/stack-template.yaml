@@ -127,8 +127,8 @@ deploy:
         </html>
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - vercel-test/project
     - vercel-test/deploy
 
@@ -166,7 +166,7 @@ test-connection:
         echo "Testing Vercel connections..."
         echo "Project ID: $PROJECT_ID"
         echo "Project Name: $PROJECT_NAME"
-        
+
         # Test project accessibility via Vercel API
         echo "Testing project accessibility..."
         curl -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -178,17 +178,17 @@ test-connection:
         PROJECT_RESPONSE=$(curl -H "Authorization: Bearer $VERCEL_TOKEN" \
              "https://api.vercel.com/v9/projects/$PROJECT_ID" \
              -s)
-        
+
         echo "Project response: $PROJECT_RESPONSE"
-        
+
         # Extract production alias from targets.production.alias
         PRODUCTION_ALIAS=$(echo "$PROJECT_RESPONSE" | grep -o '"targets":{"production":{"alias":\["[^"]*"' | head -1 | sed 's/.*"alias":\["//;s/"//')
-        
+
         if [ -z "$PRODUCTION_ALIAS" ]; then
           # Try alternative pattern for production alias
           PRODUCTION_ALIAS=$(echo "$PROJECT_RESPONSE" | grep -o '"production":{"alias":\["[^"]*"' | head -1 | sed 's/.*"alias":\["//;s/"//')
         fi
-        
+
         if [ -z "$PRODUCTION_ALIAS" ]; then
           # Fallback to deployment URL if no production alias found
           DEPLOYMENT_URL=$(echo "$PROJECT_RESPONSE" | grep -o '"url":"[^"]*"' | head -1 | sed 's/"url":"//;s/"//')
@@ -208,19 +208,19 @@ test-connection:
           # Use production alias with https
           DEPLOYMENT_URL_TO_TEST="https://$PRODUCTION_ALIAS"
         fi
-        
+
         if [ -z "$DEPLOYMENT_URL_TO_TEST" ]; then
           echo "❌ No deployment URL or production alias found in project response"
           echo "Response content: $PROJECT_RESPONSE"
           exit 1
         fi
-        
+
         echo "Deployment URL: $DEPLOYMENT_URL_TO_TEST"
-        
+
         # Test the deployed URL
         echo "Testing deployed URL..."
         RESPONSE=$(curl -s "$DEPLOYMENT_URL_TO_TEST")
-        
+
         if [ $? -eq 0 ]; then
           echo "✅ HTTP request successful"
           echo "Response content (first 500 chars):"
@@ -250,4 +250,4 @@ test-connection:
           exit 1
         fi
 
-        echo "Connection test completed successfully" 
+        echo "Connection test completed successfully"

@@ -30,9 +30,7 @@ record:
       timeout: 60
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - cloudflare-test/zone
     - cloudflare-test/record
-
-

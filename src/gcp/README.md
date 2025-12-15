@@ -1,0 +1,360 @@
+# GCP Entities
+
+Google Cloud Platform entities for MonkEC. This package provides TypeScript-based entities for managing GCP resources with full type safety, idempotency, and comprehensive testing.
+
+## Available Entities
+
+| Entity | Description |
+|--------|-------------|
+| `gcp/service-usage` | Enable GCP APIs for a project |
+| `gcp/cloud-sql-instance` | Cloud SQL database instances (PostgreSQL, MySQL, SQL Server) |
+| `gcp/cloud-sql-database` | Databases within Cloud SQL instances |
+| `gcp/cloud-sql-user` | Database users with password management |
+| `gcp/big-query` | BigQuery datasets and tables |
+| `gcp/cloud-storage` | Cloud Storage buckets |
+| `gcp/service-account` | Service accounts with IAM role bindings |
+| `gcp/service-account-key` | Service account keys stored in Monk secrets |
+
+## Prerequisites
+
+1. **GCP Project**: A GCP project with billing enabled
+2. **Authentication**: Configure GCP credentials via one of:
+   - `gcloud auth application-default login`
+   - Service account key file via `GOOGLE_APPLICATION_CREDENTIALS`
+   - Workload Identity (in GKE)
+3. **APIs Enabled**: Enable required APIs using the `service-usage` entity
+
+## Quick Start
+
+### 1. Build the Entity Package
+
+```bash
+# From repo root
+./build.sh gcp
+
+# Or manually
+INPUT_DIR=./src/gcp/ OUTPUT_DIR=./dist/gcp/ ./monkec.sh compile
+```
+
+### 2. Load the Entities
+
+```bash
+monk load dist/gcp/MANIFEST
+```
+
+### 3. Create Your Stack
+
+```yaml
+namespace: my-app
+
+# Enable required APIs first
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - storage.googleapis.com
+
+# Create a Cloud SQL instance
+my-postgres:
+  defines: gcp/cloud-sql-instance
+  name: my-app-db
+  database_version: POSTGRES_14
+  tier: db-f1-micro
+  region: us-central1
+  allow_all: true
+  depends:
+    wait-for:
+      runnables:
+        - my-app/enable-apis
+      timeout: 300
+
+# Create a database
+my-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: production
+  connections:
+    instance:
+      runnable: my-app/my-postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - my-app/my-postgres
+      timeout: 600
+```
+
+### 4. Deploy
+
+```bash
+monk load my-stack.yaml
+monk run my-app
+```
+
+## Entity Reference
+
+### service-usage
+
+Enable GCP APIs for your project.
+
+```yaml
+enable-apis:
+  defines: gcp/service-usage
+  # Single API
+  name: sqladmin.googleapis.com
+  # Or multiple APIs (batch mode)
+  apis:
+    - sqladmin.googleapis.com
+    - bigquery.googleapis.com
+    - storage.googleapis.com
+  # Optional: override project
+  project: my-project-id
+```
+
+### cloud-sql-instance
+
+Create and manage Cloud SQL database instances.
+
+```yaml
+my-postgres:
+  defines: gcp/cloud-sql-instance
+  name: my-instance                    # Required: instance name
+  database_version: POSTGRES_14        # Default: POSTGRES_14
+  tier: db-f1-micro                    # Default: db-f1-micro
+  region: us-central1                  # Default: us-central1
+  allow_all: false                     # Default: false (allow 0.0.0.0/0)
+  root_password: ""                    # Optional: set root password
+  deletion_protection: false           # Default: false
+  storage_type: PD_SSD                 # Default: PD_SSD
+  storage_size_gb: 10                  # Default: 10
+  storage_auto_resize: true            # Default: true
+  availability_type: ZONAL             # Default: ZONAL (or REGIONAL)
+  backup_start_time: "03:00"           # Optional: enable backups
+  point_in_time_recovery_enabled: false # Default: false
+  services:
+    instance:
+      protocol: tcp
+      address: <- entity-state get-member("address") default("")
+      port: <- entity-state get-member("port") default(5432) to-int
+```
+
+**Supported Database Versions:**
+- PostgreSQL: `POSTGRES_9_6` through `POSTGRES_16`
+- MySQL: `MYSQL_5_6`, `MYSQL_5_7`, `MYSQL_8_0`
+- SQL Server: `SQLSERVER_2017_*`, `SQLSERVER_2019_*`
+
+**Actions:**
+- `get-info`: Get instance details
+- `restart`: Restart the instance
+- `stop`: Stop the instance
+- `start`: Start the instance
+
+### cloud-sql-database
+
+Create databases within a Cloud SQL instance.
+
+```yaml
+my-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: myapp_production               # Required: database name
+  charset: UTF8                        # Optional: character set
+  collation: en_US.UTF8                # Optional: collation
+  connections:
+    instance:
+      runnable: my-namespace/my-instance
+      service: instance
+```
+
+### cloud-sql-user
+
+Create database users with automatic password management.
+
+```yaml
+my-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: app_user                       # Required: username
+  password_secret: my-db-password      # Required: secret name for password
+  host: "%"                            # Optional: host restriction (MySQL)
+  type: BUILT_IN                       # Default: BUILT_IN
+  permitted-secrets:
+    my-db-password: true
+  connections:
+    instance:
+      runnable: my-namespace/my-instance
+      service: instance
+```
+
+The password is automatically generated if the secret doesn't exist.
+
+### big-query
+
+Create and manage BigQuery datasets.
+
+```yaml
+my-dataset:
+  defines: gcp/big-query
+  dataset: analytics_data              # Required: dataset ID
+  location: US                         # Default: US
+  description: My analytics dataset    # Optional
+  default_table_expiration_ms: 86400000 # Optional: 24 hours
+  labels:                              # Optional
+    environment: production
+  tables: |                            # Optional: JSON array of tables
+    [
+      {
+        "name": "events",
+        "fields": [
+          {"name": "id", "type": "STRING"},
+          {"name": "timestamp", "type": "TIMESTAMP"},
+          {"name": "data", "type": "JSON"}
+        ]
+      }
+    ]
+```
+
+**Actions:**
+- `get`: Get dataset details
+- `list-tables`: List all tables in the dataset
+- `create-table`: Create a new table (args: name, schema)
+- `delete-table`: Delete a table (args: name)
+
+### cloud-storage
+
+Create and manage Cloud Storage buckets.
+
+```yaml
+my-bucket:
+  defines: gcp/cloud-storage
+  name: globally-unique-bucket-name    # Required: must be globally unique
+  location: US                         # Default: US
+  storage_class: STANDARD              # Default: STANDARD
+  uniform_bucket_level_access: true    # Default: true
+  versioning_enabled: false            # Default: false
+  predefined_acl: private              # Optional
+  labels:                              # Optional
+    environment: production
+  lifecycle_rules: |                   # Optional: JSON array
+    [
+      {
+        "action": {"type": "Delete"},
+        "condition": {"age": 365}
+      }
+    ]
+  cors: |                              # Optional: JSON array
+    [
+      {
+        "origin": ["*"],
+        "method": ["GET"],
+        "maxAgeSeconds": 3600
+      }
+    ]
+```
+
+**Actions:**
+- `get`: Get bucket details
+- `list-objects`: List objects (args: prefix, max_results)
+
+### service-account
+
+Create service accounts with IAM role bindings.
+
+```yaml
+my-sa:
+  defines: gcp/service-account
+  name: my-app-sa                      # Required: account ID
+  display_name: My App Service Account # Optional
+  description: Service account for... # Optional
+  roles:                               # Optional: project-level roles
+    - roles/cloudsql.client
+    - roles/storage.objectViewer
+```
+
+**Actions:**
+- `get-info`: Get service account details
+- `enable`: Enable the service account
+- `disable`: Disable the service account
+
+### service-account-key
+
+Create service account keys and store in Monk secrets.
+
+```yaml
+my-sa-key:
+  defines: gcp/service-account-key
+  secret: my-sa-credentials            # Required: secret name
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  key_type: TYPE_GOOGLE_CREDENTIALS_FILE # Default
+  key_algorithm: KEY_ALG_RSA_2048      # Default
+  permitted-secrets:
+    my-sa-credentials: true
+  connections:
+    sa:
+      runnable: my-namespace/my-sa
+      service: service-account
+```
+
+## Idempotency
+
+All GCP entities are idempotent:
+
+- **Create**: If a resource already exists, it will be "adopted" and marked as `existing: true` in state
+- **Delete**: Resources marked as `existing` won't be deleted (they weren't created by this entity)
+- **Update**: Safe to run multiple times; only necessary changes are applied
+
+## State Management
+
+Each entity tracks important state information:
+
+```yaml
+# Example state for cloud-sql-instance
+state:
+  address: "34.123.45.67"
+  port: 5432
+  connection_name: "project:region:instance"
+  existing: false
+  database_version: "POSTGRES_14"
+```
+
+Access state values in other entities:
+
+```yaml
+other-entity:
+  db_host: <- connection-target("db") entity-state get-member("address")
+```
+
+## Error Handling
+
+Entities provide clear error messages and handle common failure scenarios:
+
+- API rate limiting (retry with backoff)
+- Resource not found (graceful handling)
+- Permission denied (clear error message)
+- Operation timeout (configurable timeouts)
+
+## Testing
+
+Run tests for the GCP entities:
+
+```bash
+# Set up environment
+cp src/gcp/test/env.example src/gcp/test/.env
+# Edit .env with your GCP credentials
+
+# Run tests
+sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose
+```
+
+## Best Practices
+
+1. **Always enable APIs first** using `service-usage` entity
+2. **Use dependencies** (`depends.wait-for`) to ensure proper ordering
+3. **Use connections** to pass resource references between entities
+4. **Store secrets** using `permitted-secrets` for passwords and keys
+5. **Use idempotent names** that won't conflict with other projects
+6. **Set appropriate timeouts** for long-running operations
+
+## Contributing
+
+See the main [README.md](../../README.md) for contribution guidelines.

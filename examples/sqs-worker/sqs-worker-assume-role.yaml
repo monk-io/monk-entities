@@ -10,7 +10,7 @@ test-queue:
   queue_name: test-sqs-queue-assume-role
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 1209600  # 14 days
+  message_retention_period: 1209600 # 14 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 60
   fifo_queue: false
@@ -28,7 +28,7 @@ sqs-worker-service-role:
   region: us-east-1
   role_name: SQSWorkerServiceRole
   role_description: "Service role with SQS permissions for worker application"
-  max_session_duration: 3600  # 1 hour sessions
+  max_session_duration: 3600 # 1 hour sessions
   assume_role_policy_document:
     Version: "2012-10-17"
     Statement:
@@ -76,7 +76,7 @@ sqs-worker-service-policy:
           - sqs:DeleteMessage
           - sqs:GetQueueAttributes
           - sqs:GetQueueUrl
-        Resource: 
+        Resource:
           - <- connection-target("queue") entity-state get-member("queue_arn")
       - Effect: Allow
         Action:
@@ -97,7 +97,6 @@ sqs-worker-service-policy:
   tags:
     Purpose: sqs-worker-service-access
     Type: assume-role
-
 
 # AssumeRole policy for the minimal user
 sqs-assume-role-policy:
@@ -176,62 +175,62 @@ sqs-worker:
       env: SQS_QUEUE_URL
       value: <- connection-target("queue") entity-state get-member("queue_url")
       type: string
-    
+
     # AWS Region
     aws_region:
       env: AWS_REGION
       value: "us-east-1"
       type: string
-    
+
     # Base user credentials (minimal permissions)
     aws_access_key_id:
       env: AWS_ACCESS_KEY_ID
       value: <- secret("sqs-assume-role-access-key-id")
       type: string
-    
+
     aws_secret_access_key:
       env: AWS_SECRET_ACCESS_KEY
       value: <- secret("sqs-assume-role-secret-access-key")
       type: string
-    
+
     # Role to assume for actual SQS work
     aws_role_arn:
       env: AWS_ROLE_ARN
       value: <- connection-target("service-role") entity-state get-member("role_arn")
       type: string
-    
+
     aws_role_session_name:
       env: AWS_ROLE_SESSION_NAME
       value: "sqs-worker-session"
       type: string
-    
+
     aws_external_id:
       env: AWS_EXTERNAL_ID
       value: "sqs-worker-external-id"
       type: string
-    
+
     # Session duration (in seconds)
     aws_role_duration:
       env: AWS_ROLE_DURATION
       value: "3600"
       type: string
-    
+
     # Worker configuration
     max_messages:
       env: MAX_MESSAGES
       value: "10"
       type: string
-    
+
     wait_time_seconds:
       env: WAIT_TIME_SECONDS
       value: "20"
       type: string
-    
+
     visibility_timeout_seconds:
       env: VISIBILITY_TIMEOUT_SECONDS
       value: "30"
       type: string
-    
+
     polling_interval_ms:
       env: POLLING_INTERVAL_MS
       value: "1000"
@@ -246,15 +245,15 @@ sqs-worker:
 
 # Complete example stack
 assume-role-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     # Independent entities first
     - sqs-example-assume-role/test-queue
     - sqs-example-assume-role/sqs-worker-service-policy
     - sqs-example-assume-role/sqs-assume-role-policy
     # User depends on assume-role-policy
     - sqs-example-assume-role/sqs-assume-user
-    # Service role depends on user and service-policy  
+    # Service role depends on user and service-policy
     - sqs-example-assume-role/sqs-worker-service-role
     # Worker depends on everything
     - sqs-example-assume-role/sqs-worker

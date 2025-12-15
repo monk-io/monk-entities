@@ -6,7 +6,7 @@ test-queue:
   queue_name: test-sqs-queue
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 1209600  # 14 days
+  message_retention_period: 1209600 # 14 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 60
   fifo_queue: false
@@ -22,7 +22,7 @@ test-fifo-queue:
   queue_name: test-sqs-fifo-queue
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 1209600  # 14 days
+  message_retention_period: 1209600 # 14 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 30
   fifo_queue: true
@@ -31,14 +31,14 @@ test-fifo-queue:
   tags:
     Environment: test
     Owner: integration-test
-    QueueType: fifo 
+    QueueType: fifo
 
 # Dead Letter Queue - Created first, exposes ARN via service
 test-dlq:
   defines: aws-sqs/sqs-queue
   region: us-east-1
   queue_name: test-dlq
-  message_retention_period: 1209600  # 14 days - longer retention for failed messages
+  message_retention_period: 1209600 # 14 days - longer retention for failed messages
   visibility_timeout: 60
   fifo_queue: false
   sqs_managed_sse_enabled: true
@@ -57,7 +57,7 @@ test-queue-with-dlq:
   queue_name: test-queue-with-dlq
   delay_seconds: 0
   maximum_message_size: 262144
-  message_retention_period: 345600  # 4 days
+  message_retention_period: 345600 # 4 days
   receive_message_wait_time_seconds: 20
   visibility_timeout: 30
   fifo_queue: false
@@ -81,8 +81,8 @@ test-queue-with-dlq:
       timeout: 60
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - aws-sqs-test/test-queue
     - aws-sqs-test/test-fifo-queue
     - aws-sqs-test/test-dlq

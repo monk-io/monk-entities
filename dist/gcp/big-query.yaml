@@ -1,0 +1,168 @@
+namespace: gcp
+big-query:
+  defines: entity
+  metadata:
+    name: BigQuery
+    version-hash: 1a2c7246f95f
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    dataset:
+      type: string
+      description: |-
+        Dataset ID (must be unique within the project).
+        Must contain only letters, numbers, and underscores.
+    description:
+      type: string
+      description: Human-readable description for the dataset
+    default_table_expiration_ms:
+      type: number
+      description: |-
+        Default table expiration time in milliseconds.
+        Tables created in this dataset will expire after this duration.
+    default_partition_expiration_ms:
+      type: number
+      description: |-
+        Default partition expiration time in milliseconds.
+        Partitions older than this will be automatically deleted.
+    location:
+      type: string
+      enum:
+        - US
+        - EU
+        - us-central1
+        - us-east1
+        - us-east4
+        - us-east5
+        - us-south1
+        - us-west1
+        - us-west2
+        - us-west3
+        - us-west4
+        - northamerica-northeast1
+        - northamerica-northeast2
+        - northamerica-south1
+        - southamerica-east1
+        - southamerica-west1
+        - europe-central2
+        - europe-north1
+        - europe-north2
+        - europe-southwest1
+        - europe-west1
+        - europe-west2
+        - europe-west3
+        - europe-west4
+        - europe-west6
+        - europe-west8
+        - europe-west9
+        - europe-west10
+        - europe-west12
+        - asia-east1
+        - asia-east2
+        - asia-northeast1
+        - asia-northeast2
+        - asia-northeast3
+        - asia-south1
+        - asia-south2
+        - asia-southeast1
+        - asia-southeast2
+        - australia-southeast1
+        - australia-southeast2
+        - me-central1
+        - me-central2
+        - me-west1
+        - africa-south1
+      description: >-
+        Location for the dataset.
+
+        Use multi-regions (US, EU) for high availability or regional locations
+        for data residency.
+      default: US
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Key-value labels for organizing and filtering datasets
+      description: Key-value labels for organizing and filtering datasets
+    tables:
+      type: string
+      description: |-
+        JSON string defining tables to create with the dataset.
+        Array of BigQueryTableDefinition objects.
+    storage_billing_model:
+      type: string
+      enum:
+        - LOGICAL
+        - PHYSICAL
+        - STORAGE_BILLING_MODEL_UNSPECIFIED
+      description: |-
+        Storage billing model for the dataset.
+        LOGICAL: Billed on uncompressed size, time travel included.
+        PHYSICAL: Billed on compressed size, time travel charged separately.
+      default: LOGICAL
+    max_time_travel_hours:
+      type: number
+      description: >-
+        Maximum time travel duration in hours (168 to 168*7 = 1176). Default is
+        168 hours (7 days).
+
+        Only applicable when storage_billing_model is PHYSICAL.
+      default: 168
+    is_case_insensitive:
+      type: boolean
+      description: Enable case-insensitive table names
+      default: false
+    default_collation:
+      type: string
+      description: >-
+        Default collation for STRING fields (e.g., "und:ci" for
+        case-insensitive)
+    required:
+      - dataset
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    dataset_id:
+      type: string
+      description: Dataset ID
+    dataset_reference:
+      type: string
+      description: 'Full dataset reference (project:dataset)'
+    self_link:
+      type: string
+      description: Self-link URL for the dataset
+    location:
+      type: string
+      description: 'Dataset location (e.g., US, EU, us-central1)'
+    creation_time:
+      type: string
+      description: Dataset creation timestamp (milliseconds since epoch)
+    last_modified_time:
+      type: string
+      description: Last modified timestamp (milliseconds since epoch)
+    storage_billing_model:
+      type: string
+      description: Current storage billing model
+  lifecycle:
+    sync: <<< big-query-sync.js
+    get: ''
+    list-tables: ''
+    create-table: ''
+    delete-table: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

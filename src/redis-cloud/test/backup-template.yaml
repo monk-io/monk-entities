@@ -112,13 +112,13 @@ backup-pro-database:
 # Stack Definitions
 
 essentials-backup-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - redis-cloud-backup-test/backup-subscription
     - redis-cloud-backup-test/backup-essentials-database
 
 pro-backup-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - redis-cloud-backup-test/pro-backup-subscription
     - redis-cloud-backup-test/backup-pro-database

@@ -104,8 +104,8 @@ redis-client:
       entrypoint: sleep 36000
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - redis-cloud-example/redis-client
     - redis-cloud-example/redis-database
     - redis-cloud-example/redis-subscription

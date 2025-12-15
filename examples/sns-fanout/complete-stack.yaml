@@ -22,7 +22,7 @@ orders-queue:
   defines: aws-sqs/sqs-queue
   region: us-east-1
   queue_name: orders-queue
-  message_retention_period: 345600  # 4 days
+  message_retention_period: 345600 # 4 days
   visibility_timeout: 30
   sqs_managed_sse_enabled: true
   services:
@@ -37,7 +37,7 @@ payments-queue:
   defines: aws-sqs/sqs-queue
   region: us-east-1
   queue_name: payments-queue
-  message_retention_period: 345600  # 4 days
+  message_retention_period: 345600 # 4 days
   visibility_timeout: 30
   sqs_managed_sse_enabled: true
   services:
@@ -52,7 +52,7 @@ priority-queue:
   defines: aws-sqs/sqs-queue
   region: us-east-1
   queue_name: priority-queue
-  message_retention_period: 345600  # 4 days
+  message_retention_period: 345600 # 4 days
   visibility_timeout: 30
   sqs_managed_sse_enabled: true
   services:
@@ -143,7 +143,7 @@ email-subscription:
   region: us-east-1
   topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
   protocol: email
-  endpoint: admin@example.com  # TODO: Change this to your email!
+  endpoint: admin@example.com # TODO: Change this to your email!
   filter_policy: |
     {
       "priority": ["critical"],
@@ -179,7 +179,7 @@ event-publisher:
       env: TOPIC_ARN
       value: <- connection-target("topic") entity-state get-member("topic_arn")
       type: string
-    
+
     aws_region:
       env: AWS_REGION
       value: "us-east-1"
@@ -190,28 +190,28 @@ event-publisher:
       image: alpine:latest
       bash: |
         set -e
-        
+
         echo "📤 Event Publisher Starting..."
         echo "Installing dependencies..."
-        
+
         apk add --no-cache python3 py3-pip > /dev/null 2>&1
         pip3 install --no-cache-dir boto3 --break-system-packages > /dev/null 2>&1
-        
+
         echo ""
         echo "Publishing test events to SNS topic..."
         echo "Topic ARN: $TOPIC_ARN"
         echo ""
-        
+
         python3 << 'PYEOF'
         import boto3
         import json
         import time
         from datetime import datetime
         import os
-        
+
         sns = boto3.client('sns', region_name=os.environ['AWS_REGION'])
         topic_arn = os.environ['TOPIC_ARN']
-        
+
         def publish_event(event_type, priority="normal", data=None):
             message = {
                 "timestamp": datetime.now().isoformat(),
@@ -241,38 +241,38 @@ event-publisher:
             
             print(f"✅ Published: {event_type} (priority: {priority}) - MessageId: {response['MessageId']}")
             return response
-        
+
         print("Publishing test events...")
         print("")
-        
+
         # Order events (will go to orders-queue and priority-queue)
         print("1️⃣  Order Events:")
         publish_event('order_created', 'normal', {'order_id': 'ORD-001', 'amount': 99.99})
         time.sleep(0.5)
         publish_event('order_shipped', 'normal', {'order_id': 'ORD-001', 'tracking': 'TRK-123'})
         time.sleep(0.5)
-        
+
         # Payment events (will go to payments-queue and priority-queue)
         print("")
         print("2️⃣  Payment Events:")
         publish_event('payment_received', 'normal', {'payment_id': 'PAY-001', 'amount': 99.99})
         time.sleep(0.5)
-        
+
         # Critical payment failure (will go to payments-queue, priority-queue, AND email)
         print("")
         print("3️⃣  Critical Event:")
         publish_event('payment_failed', 'critical', {'payment_id': 'PAY-002', 'error': 'insufficient_funds'})
         time.sleep(0.5)
-        
+
         # Cancelled order (will go to orders-queue, priority-queue, AND email)
         publish_event('order_cancelled', 'critical', {'order_id': 'ORD-002', 'reason': 'customer_request'})
         time.sleep(0.5)
-        
+
         # Refund (will go to payments-queue and priority-queue)
         print("")
         print("4️⃣  Refund Event:")
         publish_event('refund_processed', 'normal', {'refund_id': 'REF-001', 'amount': 99.99})
-        
+
         print("")
         print("✅ All events published successfully!")
         print("")
@@ -285,8 +285,8 @@ event-publisher:
 
 # Complete stack
 fanout-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - sns-fanout/events-topic
     - sns-fanout/orders-queue
     - sns-fanout/payments-queue
@@ -296,4 +296,3 @@ fanout-stack:
     - sns-fanout/priority-subscription
     - sns-fanout/email-subscription
     - sns-fanout/event-publisher
-

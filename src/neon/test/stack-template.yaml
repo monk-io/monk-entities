@@ -132,8 +132,8 @@ dev-compute:
 # Stack Definition - Process Group
 
 dev-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - neon-test-stack/dev-project
     - neon-test-stack/dev-branch
     - neon-test-stack/dev-role
@@ -196,22 +196,22 @@ dev-connection-test:
         echo "Password: [HIDDEN]"
         echo "Database: $DB_NAME"
         echo "Connection URL: $DATABASE_URL"
-        
+
         # Debug: Check if variables are set
         echo "DEBUG: DB_HOST is set: $([ -n "$DB_HOST" ] && echo "YES" || echo "NO")"
         echo "DEBUG: DB_USER is set: $([ -n "$DB_USER" ] && echo "YES" || echo "NO")"
         echo "DEBUG: DB_PASSWORD is set: $([ -n "$DB_PASSWORD" ] && echo "YES" || echo "NO")"
         echo "DEBUG: DB_NAME is set: $([ -n "$DB_NAME" ] && echo "YES" || echo "NO")"
         echo "DEBUG: DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo "YES" || echo "NO")"
-        
+
         # Install psql client
         apk add --no-cache postgresql17-client
-        
+
         # Test connection using psql
         PGPASSWORD="$DB_PASSWORD" psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require" -c "
           SELECT version();
         "
-        
+
         if [ $? -eq 0 ]; then
           echo "Connected to Neon Postgres successfully!"
           

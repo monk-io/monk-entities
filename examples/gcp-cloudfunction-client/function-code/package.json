@@ -1,0 +1,15 @@
+{
+  "name": "hello-function",
+  "version": "1.0.0",
+  "description": "Example HTTP Cloud Function for Monk GCP demo",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=helloWorld"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

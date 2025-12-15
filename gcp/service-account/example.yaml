@@ -4,9 +4,9 @@ myacc:
   defines: gcp/service-account
   name: testmyacc
   roles:
-  - roles/viewer
-  - roles/storage.objectAdmin
-  - roles/pubsub.serviceAgent
+    - roles/viewer
+    - roles/storage.objectAdmin
+    - roles/pubsub.serviceAgent
 
 mykey:
   defines: gcp/service-account-key
@@ -48,8 +48,8 @@ work:
       bash: env && sleep 10m
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - gcp/myacc
     - gcp/mykey
     - gcp/work

@@ -1,0 +1,169 @@
+# GCP Entities Test Stack Template
+#
+# This template defines test resources for GCP entity integration tests.
+# Resource names include a test suffix to avoid conflicts.
+
+namespace: gcp-test
+
+# =============================================================================
+# Service Usage - Enable APIs
+# =============================================================================
+
+test-enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - bigquery.googleapis.com
+    - storage.googleapis.com
+    - iam.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# =============================================================================
+# Cloud SQL Instance
+# =============================================================================
+
+test-sql-instance:
+  defines: gcp/cloud-sql-instance
+  name: test-postgres-instance
+  database_version: POSTGRES_14
+  tier: db-f1-micro
+  region: us-central1
+  allow_all: true
+  storage_size_gb: 10
+  services:
+    instance:
+      protocol: tcp
+      address: <- entity-state get-member("address") default("")
+      port: <- entity-state get-member("port") default(5432) to-int
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Cloud SQL Database
+# =============================================================================
+
+test-sql-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: test_database
+  services:
+    db:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-test/test-sql-instance
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-sql-instance
+      timeout: 600
+
+# =============================================================================
+# Cloud SQL User
+# =============================================================================
+
+test-sql-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: test_user
+  password_secret: test-db-password
+  permitted-secrets:
+    test-db-password: true
+  services:
+    user:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-test/test-sql-instance
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-sql-instance
+      timeout: 600
+
+# =============================================================================
+# BigQuery Dataset
+# =============================================================================
+
+test-bigquery:
+  defines: gcp/big-query
+  dataset: test_dataset
+  location: US
+  description: Test dataset for GCP entities
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Cloud Storage Bucket
+# =============================================================================
+
+test-storage:
+  defines: gcp/cloud-storage
+  name: gcp-test-bucket-monkec-unique
+  location: US
+  storage_class: STANDARD
+  uniform_bucket_level_access: true
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Service Account
+# =============================================================================
+
+test-service-account:
+  defines: gcp/service-account
+  name: test-monkec-sa
+  display_name: Test Service Account
+  description: Service account for MonkEC testing
+  roles:
+    - roles/viewer
+  services:
+    service-account:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Service Account Key
+# =============================================================================
+
+test-service-account-key:
+  defines: gcp/service-account-key
+  secret: test-sa-credentials
+  service_account_id: <- connection-target("service-account") entity-state get-member("unique_id")
+  permitted-secrets:
+    test-sa-credentials: true
+  services:
+    key:
+      protocol: custom
+  connections:
+    service-account:
+      runnable: gcp-test/test-service-account
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-service-account
+      timeout: 60

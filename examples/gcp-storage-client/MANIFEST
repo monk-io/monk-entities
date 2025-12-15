@@ -1,0 +1,2 @@
+REPO gcp-storage-demo
+LOAD stack.yaml

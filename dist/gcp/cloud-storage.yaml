@@ -1,0 +1,221 @@
+namespace: gcp
+cloud-storage:
+  defines: entity
+  metadata:
+    name: CloudStorage
+    version-hash: 1a2c7246f95f
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        Bucket name (must be globally unique).
+        Names must be 3-63 characters, start with a letter or number,
+        and contain only lowercase letters, numbers, hyphens, and underscores.
+    location:
+      type: string
+      enum:
+        - US
+        - EU
+        - ASIA
+        - NAM4
+        - EUR4
+        - EUR5
+        - EUR7
+        - EUR8
+        - ASIA1
+        - africa-south1
+        - asia-east1
+        - asia-east2
+        - asia-northeast1
+        - asia-northeast2
+        - asia-northeast3
+        - asia-south1
+        - asia-south2
+        - asia-southeast1
+        - asia-southeast2
+        - australia-southeast1
+        - australia-southeast2
+        - europe-central2
+        - europe-north1
+        - europe-southwest1
+        - europe-west1
+        - europe-west2
+        - europe-west3
+        - europe-west4
+        - europe-west6
+        - europe-west8
+        - europe-west9
+        - europe-west10
+        - europe-west12
+        - me-central1
+        - me-central2
+        - me-west1
+        - northamerica-northeast1
+        - northamerica-northeast2
+        - northamerica-south1
+        - us-central1
+        - us-south1
+        - us-east1
+        - us-east4
+        - us-east5
+        - us-west1
+        - us-west2
+        - us-west3
+        - us-west4
+        - southamerica-east1
+        - southamerica-west1
+      description: |-
+        Location for the bucket.
+        - Multi-regions: US, EU, ASIA (highest availability)
+        - Dual-regions: NAM4, EUR4, ASIA1 (cross-region redundancy)
+        - Regions: us-central1, europe-west1, etc. (lowest latency)
+      default: US
+    storage_class:
+      type: string
+      enum:
+        - STANDARD
+        - NEARLINE
+        - COLDLINE
+        - ARCHIVE
+      description: |-
+        Storage class for the bucket.
+        - STANDARD: Frequently accessed data, highest performance
+        - NEARLINE: Data accessed < once per month (30-day minimum)
+        - COLDLINE: Data accessed < once per quarter (90-day minimum)
+        - ARCHIVE: Data accessed < once per year (365-day minimum)
+      default: STANDARD
+    predefined_acl:
+      type: string
+      enum:
+        - authenticatedRead
+        - bucketOwnerFullControl
+        - bucketOwnerRead
+        - private
+        - projectPrivate
+        - publicRead
+        - publicReadWrite
+      description: |-
+        Predefined ACL applied when creating the bucket.
+        Use uniform_bucket_level_access instead for new buckets.
+    predefined_default_object_acl:
+      type: string
+      enum:
+        - authenticatedRead
+        - bucketOwnerFullControl
+        - bucketOwnerRead
+        - private
+        - projectPrivate
+        - publicRead
+        - publicReadWrite
+      description: Default ACL for objects created in this bucket
+    versioning_enabled:
+      type: boolean
+      description: |-
+        Enable object versioning.
+        Keeps previous versions of objects when overwritten or deleted.
+      default: false
+    uniform_bucket_level_access:
+      type: boolean
+      description: |-
+        Enable uniform bucket-level access (recommended).
+        When enabled, ACLs are disabled and only IAM controls access.
+      default: true
+    public_access_prevention:
+      type: string
+      enum:
+        - inherited
+        - enforced
+      description: |-
+        Public access prevention setting.
+        - inherited: Public access allowed (subject to ACLs/IAM)
+        - enforced: Public access blocked at bucket level
+      default: inherited
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Key-value labels for organizing buckets
+      description: Key-value labels for organizing buckets
+    lifecycle_rules:
+      type: string
+      description: |-
+        Lifecycle rules as JSON string.
+        Array of LifecycleRule objects for automatic object management.
+    cors:
+      type: string
+      description: |-
+        CORS configuration as JSON string.
+        Array of CorsConfiguration objects for cross-origin access.
+    default_event_based_hold:
+      type: boolean
+      description: Default event-based hold on new objects
+      default: false
+    retention_period_seconds:
+      type: number
+      description: Retention period in seconds for object retention policy
+    requester_pays:
+      type: boolean
+      description: Enable requester pays (requesters pay for data access)
+      default: false
+    kms_key_name:
+      type: string
+      description: >-
+        Custom Cloud KMS key for bucket encryption
+
+        Format:
+        projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Bucket name
+    id:
+      type: string
+      description: Bucket ID (project number + bucket name)
+    self_link:
+      type: string
+      description: Self-link URL for the bucket
+    location:
+      type: string
+      description: 'Bucket location (e.g., US, EU, us-central1)'
+    storage_class:
+      type: string
+      description: 'Storage class (STANDARD, NEARLINE, COLDLINE, ARCHIVE)'
+    time_created:
+      type: string
+      description: Bucket creation timestamp (RFC3339)
+    updated:
+      type: string
+      description: Last update timestamp (RFC3339)
+    versioning_enabled:
+      type: boolean
+      description: Whether versioning is enabled
+    gs_uri:
+      type: string
+      description: 'GCS URI for the bucket (gs://bucket-name)'
+  lifecycle:
+    sync: <<< cloud-storage-sync.js
+    get: ''
+    list-objects: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

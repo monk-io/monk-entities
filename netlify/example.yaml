@@ -109,8 +109,8 @@ frontend:
       yarn build-app && \
 
 stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - netlify-example/postgres
     - netlify-example/backend
     - netlify-example/nginx

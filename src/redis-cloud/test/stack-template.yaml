@@ -116,8 +116,6 @@ essentials-database-with-backup:
         - redis-cloud-example/essentials-subscription-with-backup
       timeout: 60
 
-
-
 # Pro Database - Advanced features testing
 dev-pro-database:
   defines: redis-cloud/pro-database
@@ -133,7 +131,7 @@ dev-pro-database:
   replication: false
   password_secret_ref: redis-cloud-dev-pro-password
   source_ip:
-    - 0.0.0.0/0  # Allow all IPs for testing
+    - 0.0.0.0/0 # Allow all IPs for testing
   enable_tls: false
   account_key_secret: redis-cloud-account-key
   user_key_secret: redis-cloud-user-key
@@ -154,20 +152,18 @@ dev-pro-database:
         - redis-cloud-example/pro-subscription
       timeout: 300
 
-
 # Stack Definitions - Process Groups
 
 essentials-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - redis-cloud-example/essentials-subscription
     - redis-cloud-example/essentials-database
     - redis-cloud-example/essentials-connection-test
 
-
 pro-stack:
-  defines: process-group
-  runnable-list:
+  defines: group
+  members:
     - redis-cloud-example/pro-subscription
 
 essentials-connection-test:
@@ -219,10 +215,10 @@ essentials-connection-test:
         echo "Testing Redis Cloud Essentials connection..."
         echo "Host: $REDIS_HOST"
         echo "Port: $REDIS_PORT"
-        
+
         # Test connection using redis-cli
         redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning ping
-        
+
         if [ $? -eq 0 ]; then
           echo "✅ Connected to Redis Cloud Essentials successfully!"
           echo "✅ Redis Cloud Essentials test completed successfully!"
@@ -260,21 +256,21 @@ dev-pro-connection-test:
       bash: |
         echo "Testing Redis Cloud Pro connection..."
         echo "Endpoint: $REDIS_ENDPOINT"
-        
+
         # Extract host and port from endpoint
         REDIS_HOST=$(echo "$REDIS_ENDPOINT" | cut -d':' -f1)
         REDIS_PORT=$(echo "$REDIS_ENDPOINT" | cut -d':' -f2)
-        
+
         echo "Host: $REDIS_HOST"
         echo "Port: $REDIS_PORT"
-        
+
         # Test connection using redis-cli
         redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning ping
-        
+
         if [ $? -eq 0 ]; then
           echo "✅ Connected to Redis Cloud Pro successfully!"
           echo "✅ Redis Cloud Pro test completed successfully!"
         else
           echo "❌ Failed to connect to Redis Cloud Pro"
           exit 1
-        fi 
+        fi

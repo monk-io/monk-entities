@@ -1,0 +1,7 @@
+namespace: gcp
+
+common:
+  defines: module
+  metadata:
+    version-hash: 1a2c7246f95f
+  source: <<< common.js

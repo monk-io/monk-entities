@@ -1,0 +1,181 @@
+namespace: gcp
+firestore:
+  defines: entity
+  metadata:
+    name: Firestore
+    version-hash: 1a2c7246f95f
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    database_id:
+      type: string
+      description: |-
+        Database ID. Use "(default)" for the default database.
+        Custom database IDs must be lowercase, start with a letter,
+        and contain only letters, numbers, and hyphens.
+      default: (default)
+    location:
+      anyOf:
+        - type: string
+          enum:
+            - africa-south1
+            - asia-east1
+            - asia-east2
+            - asia-northeast1
+            - asia-northeast2
+            - asia-northeast3
+            - asia-south1
+            - asia-south2
+            - asia-southeast1
+            - asia-southeast2
+            - australia-southeast1
+            - australia-southeast2
+            - europe-central2
+            - europe-north1
+            - europe-southwest1
+            - europe-west1
+            - europe-west2
+            - europe-west3
+            - europe-west4
+            - europe-west6
+            - europe-west8
+            - europe-west9
+            - europe-west10
+            - europe-west12
+            - me-central1
+            - me-central2
+            - me-west1
+            - northamerica-northeast1
+            - northamerica-northeast2
+            - northamerica-south1
+            - us-central1
+            - us-south1
+            - us-east1
+            - us-east4
+            - us-east5
+            - us-west1
+            - us-west2
+            - us-west3
+            - us-west4
+            - southamerica-east1
+            - southamerica-west1
+        - type: string
+          const: nam5
+        - type: string
+          const: eur3
+      description: |-
+        Location for the database
+        Multi-region: "nam5" (US), "eur3" (Europe)
+        Regional: us-central1, europe-west1, etc.
+    type:
+      type: string
+      enum:
+        - FIRESTORE_NATIVE
+        - DATASTORE_MODE
+      description: |-
+        Database type
+        - FIRESTORE_NATIVE: Full Firestore functionality (recommended)
+        - DATASTORE_MODE: Datastore compatibility mode
+      default: FIRESTORE_NATIVE
+    concurrency_mode:
+      type: string
+      enum:
+        - OPTIMISTIC
+        - OPTIMISTIC_WITH_ENTITY_GROUPS
+        - PESSIMISTIC
+      description: Concurrency mode for the database
+      default: OPTIMISTIC for Native mode
+    app_engine_integration_mode:
+      type: string
+      enum:
+        - ENABLED
+        - DISABLED
+      description: Application tag for billing attribution
+    point_in_time_recovery:
+      type: string
+      enum:
+        - ENABLED
+        - DISABLED
+      description: |-
+        Point-in-time recovery configuration
+        Enables recovery to any point in the last 7 days.
+      default: DISABLED
+    delete_protection:
+      type: string
+      enum:
+        - DELETE_PROTECTION_ENABLED
+        - DELETE_PROTECTION_DISABLED
+      description: |-
+        Delete protection for the database
+        When enabled, database cannot be deleted without first disabling.
+      default: DELETE_PROTECTION_DISABLED
+    keep_on_delete:
+      type: boolean
+      description: Whether to keep the database on delete
+      default: false
+    required:
+      - location
+      - concurrency_mode
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Full resource name
+    database_id:
+      type: string
+      description: Database ID
+    location:
+      type: string
+      description: Location/region
+    type:
+      type: string
+      description: Database type
+    concurrency_mode:
+      type: string
+      description: Concurrency mode
+    create_time:
+      type: string
+      description: Database creation time
+    update_time:
+      type: string
+      description: Database update time
+    key_prefix:
+      type: string
+      description: Key prefix for datastore mode
+    uid:
+      type: string
+      description: Database UID
+    point_in_time_recovery:
+      type: string
+      description: PITR state
+    delete_protection:
+      type: string
+      description: Delete protection state
+    earliest_version_time:
+      type: string
+      description: Earliest PITR recovery time
+  lifecycle:
+    sync: <<< firestore-sync.js
+    get: ''
+    list-indexes: ''
+    list-fields: ''
+    export-documents: ''
+    import-documents: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

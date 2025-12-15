@@ -1,0 +1,2 @@
+REPO gcp-bigquery-demo
+LOAD stack.yaml
