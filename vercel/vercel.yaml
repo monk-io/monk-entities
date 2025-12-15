@@ -46,3 +46,4 @@ deploy:
       description: |
         A script to run before deployment.
         Hint: you can override this variable to add custom pre-deploy steps, e.g. building the project.
+        You can include dev deps in install command in pre deploy, e.g. npm install --include=dev.

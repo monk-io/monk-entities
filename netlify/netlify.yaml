@@ -26,7 +26,7 @@ deploy:
       env: NODE_VERSION
       type: string
       value: 20
-      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24.
+      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24. Pick node version based on the project requirements, or leave unset for default (20).
     site-id:
       env: NETLIFY_SITE_ID
       type: string
@@ -51,3 +51,4 @@ deploy:
       description: |
         A script to run before deployment.
         Hint: you can override this variable to add custom pre-deploy steps, e.g. building the project.
+        You can include dev deps in install command in pre deploy, e.g. npm install --include=dev.
