@@ -68,11 +68,35 @@ function parseGcpError(response) {
   }
   return response.body;
 }
-function isOperationDone(status) {
-  return status === "DONE" || status === "finished" || status === "completed";
+function isOperationDone(operation) {
+  if (operation === void 0 || operation === null) {
+    return false;
+  }
+  if (typeof operation === "object") {
+    if (operation.done === true) {
+      return true;
+    }
+    if (operation.status) {
+      return operation.status === "DONE" || operation.status === "finished" || operation.status === "completed";
+    }
+    return false;
+  }
+  return operation === "DONE" || operation === "finished" || operation === "completed";
 }
-function isOperationFailed(status) {
-  return status === "FAILED" || status === "failed" || status === "error";
+function isOperationFailed(operation) {
+  if (operation === void 0 || operation === null) {
+    return false;
+  }
+  if (typeof operation === "object") {
+    if (operation.done === true && operation.error) {
+      return true;
+    }
+    if (operation.status) {
+      return operation.status === "FAILED" || operation.status === "failed" || operation.status === "error";
+    }
+    return false;
+  }
+  return operation === "FAILED" || operation === "failed" || operation === "error";
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

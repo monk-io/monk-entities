@@ -3,7 +3,7 @@ big-query:
   defines: entity
   metadata:
     name: BigQuery
-    version-hash: bbbc90c1ac23
+    version-hash: 60073a5fb197
   schema:
     project:
       type: string
@@ -103,10 +103,12 @@ big-query:
       default: LOGICAL
     max_time_travel_hours:
       type: number
-      description: |-
-        Maximum time travel duration in hours (168 to 168*7 = 1176).
+      description: >-
+        Maximum time travel duration in hours (168 to 168*7 = 1176). Default is
+        168 hours (7 days).
+
         Only applicable when storage_billing_model is PHYSICAL.
-      default: 168 (7 days)
+      default: 168
     is_case_insensitive:
       type: boolean
       description: Enable case-insensitive table names
@@ -118,7 +120,6 @@ big-query:
         case-insensitive)
     required:
       - dataset
-      - max_time_travel_hours
   state-schema:
     existing:
       type: boolean

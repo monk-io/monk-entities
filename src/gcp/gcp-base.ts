@@ -201,17 +201,18 @@ export abstract class GcpEntity<
 
                 const operation = JSON.parse(response.body);
 
-                if (isOperationDone(operation.status)) {
+                if (isOperationDone(operation)) {
                     cli.output(`Operation completed successfully`);
                     return operation;
                 }
 
-                if (isOperationFailed(operation.status)) {
+                if (isOperationFailed(operation)) {
                     const errorMsg = operation.error?.message || "Unknown error";
                     throw new Error(`Operation failed: ${errorMsg}`);
                 }
 
-                cli.output(`Waiting for operation to complete... (${operation.status})`);
+                const statusInfo = operation.status || (operation.done === false ? "in progress" : "unknown");
+                cli.output(`Waiting for operation to complete... (${statusInfo})`);
             } catch (error) {
                 if (error instanceof Error && error.message.includes("Operation failed")) {
                     throw error;

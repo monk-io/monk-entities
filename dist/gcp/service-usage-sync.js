@@ -133,13 +133,14 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
         return false;
       }
       const operation = JSON.parse(response.body);
-      if (isOperationDone(operation.status)) {
+      if (isOperationDone(operation)) {
         cli.output("API enablement operation completed");
         this.state.ready = true;
         this.state.operation = void 0;
         return true;
       }
-      cli.output(`Operation status: ${operation.status}`);
+      const statusInfo = operation.status || (operation.done === false ? "in progress" : "unknown");
+      cli.output(`Operation status: ${statusInfo}`);
       return false;
     }
     if (this.definition.apis && this.definition.apis.length > 0) {

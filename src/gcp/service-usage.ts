@@ -358,14 +358,15 @@ export class ServiceUsage extends MonkEntity<ServiceUsageDefinition, ServiceUsag
 
             const operation = JSON.parse(response.body);
 
-            if (isOperationDone(operation.status)) {
+            if (isOperationDone(operation)) {
                 cli.output("API enablement operation completed");
                 this.state.ready = true;
                 this.state.operation = undefined;
                 return true;
             }
 
-            cli.output(`Operation status: ${operation.status}`);
+            const statusInfo = operation.status || (operation.done === false ? "in progress" : "unknown");
+            cli.output(`Operation status: ${statusInfo}`);
             return false;
         }
 

@@ -76,13 +76,17 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
    * Get dataset details from API
    */
   getDataset() {
-    return this.checkResourceExists(`${this.apiUrl}/datasets/${this.definition.dataset}`);
+    return this.checkResourceExists(
+      `${this.apiUrl}/datasets/${this.definition.dataset}`
+    );
   }
   /**
    * List tables in the dataset
    */
   listTables() {
-    return this.get(`${this.apiUrl}/datasets/${this.definition.dataset}/tables`);
+    return this.get(
+      `${this.apiUrl}/datasets/${this.definition.dataset}/tables`
+    );
   }
   /**
    * Delete all tables in the dataset
@@ -94,14 +98,18 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
       for (const table of tableList.tables) {
         const tableId = table.tableReference.tableId;
         cli.output(`Deleting table: ${tableId}`);
-        this.httpDelete(`${this.apiUrl}/datasets/${this.definition.dataset}/tables/${tableId}`);
+        this.httpDelete(
+          `${this.apiUrl}/datasets/${this.definition.dataset}/tables/${tableId}`
+        );
       }
     }
   }
   create() {
     const existing = this.getDataset();
     if (existing) {
-      cli.output(`Dataset ${this.definition.dataset} already exists, adopting...`);
+      cli.output(
+        `Dataset ${this.definition.dataset} already exists, adopting...`
+      );
       this.state.existing = true;
       this.state.dataset_id = existing.datasetReference.datasetId;
       this.state.dataset_reference = `${this.projectId}:${existing.datasetReference.datasetId}`;
@@ -208,7 +216,10 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
           fields: table.clusteringFields
         };
       }
-      this.post(`${this.apiUrl}/datasets/${this.definition.dataset}/tables`, body);
+      this.post(
+        `${this.apiUrl}/datasets/${this.definition.dataset}/tables`,
+        body
+      );
       cli.output(`Table ${table.name} created`);
     }
   }
@@ -240,7 +251,9 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
   }
   delete() {
     if (this.state.existing) {
-      cli.output(`Dataset ${this.definition.dataset} was not created by this entity, skipping delete`);
+      cli.output(
+        `Dataset ${this.definition.dataset} was not created by this entity, skipping delete`
+      );
       return;
     }
     const existing = this.getDataset();
@@ -266,7 +279,9 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
     this.state.creation_time = dataset.creationTime;
     this.state.last_modified_time = dataset.lastModifiedTime;
     this.state.storage_billing_model = dataset.storageBillingModel;
-    cli.output(`Dataset ${this.definition.dataset} is ready in ${dataset.location}`);
+    cli.output(
+      `Dataset ${this.definition.dataset} is ready in ${dataset.location}`
+    );
     return true;
   }
   checkLiveness() {
@@ -298,14 +313,19 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
         fields
       }
     };
-    this.post(`${this.apiUrl}/datasets/${this.definition.dataset}/tables`, body);
+    this.post(
+      `${this.apiUrl}/datasets/${this.definition.dataset}/tables`,
+      body
+    );
     cli.output(`Table ${args.name} created`);
   }
   deleteTable(args) {
     if (!args?.name) {
       throw new Error("Required argument: name");
     }
-    this.httpDelete(`${this.apiUrl}/datasets/${this.definition.dataset}/tables/${args.name}`);
+    this.httpDelete(
+      `${this.apiUrl}/datasets/${this.definition.dataset}/tables/${args.name}`
+    );
     cli.output(`Table ${args.name} deleted`);
   }
 };

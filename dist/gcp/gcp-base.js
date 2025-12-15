@@ -53,11 +53,35 @@ function parseGcpError(response) {
   }
   return response.body;
 }
-function isOperationDone(status) {
-  return status === "DONE" || status === "finished" || status === "completed";
+function isOperationDone(operation) {
+  if (operation === void 0 || operation === null) {
+    return false;
+  }
+  if (typeof operation === "object") {
+    if (operation.done === true) {
+      return true;
+    }
+    if (operation.status) {
+      return operation.status === "DONE" || operation.status === "finished" || operation.status === "completed";
+    }
+    return false;
+  }
+  return operation === "DONE" || operation === "finished" || operation === "completed";
 }
-function isOperationFailed(status) {
-  return status === "FAILED" || status === "failed" || status === "error";
+function isOperationFailed(operation) {
+  if (operation === void 0 || operation === null) {
+    return false;
+  }
+  if (typeof operation === "object") {
+    if (operation.done === true && operation.error) {
+      return true;
+    }
+    if (operation.status) {
+      return operation.status === "FAILED" || operation.status === "failed" || operation.status === "error";
+    }
+    return false;
+  }
+  return operation === "FAILED" || operation === "failed" || operation === "error";
 }
 
 // input/gcp/gcpBase.ts
@@ -180,15 +204,16 @@ var GcpEntity = class extends import_base.MonkEntity {
           throw new Error(parseGcpError(response));
         }
         const operation = JSON.parse(response.body);
-        if (isOperationDone(operation.status)) {
+        if (isOperationDone(operation)) {
           import_cli.default.output(`Operation completed successfully`);
           return operation;
         }
-        if (isOperationFailed(operation.status)) {
+        if (isOperationFailed(operation)) {
           const errorMsg = operation.error?.message || "Unknown error";
           throw new Error(`Operation failed: ${errorMsg}`);
         }
-        import_cli.default.output(`Waiting for operation to complete... (${operation.status})`);
+        const statusInfo = operation.status || (operation.done === false ? "in progress" : "unknown");
+        import_cli.default.output(`Waiting for operation to complete... (${statusInfo})`);
       } catch (error) {
         if (error instanceof Error && error.message.includes("Operation failed")) {
           throw error;

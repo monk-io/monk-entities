@@ -585,17 +585,55 @@ export function parseGcpError(response: { error?: string; body: string }): strin
 }
 
 /**
- * Check if an operation is complete
+ * Check if an operation is complete.
+ * Supports both standard GCP LRO pattern (done boolean) and legacy status string.
+ *
+ * @param operation - The operation object or status string
+ * @returns true if the operation is complete
  */
-export function isOperationDone(status: string): boolean {
-    return status === "DONE" || status === "finished" || status === "completed";
+export function isOperationDone(operation: { done?: boolean; status?: string } | string | undefined): boolean {
+    if (operation === undefined || operation === null) {
+        return false;
+    }
+    // Standard GCP LRO pattern uses a boolean 'done' field
+    if (typeof operation === "object") {
+        if (operation.done === true) {
+            return true;
+        }
+        // Fall back to status string for APIs that use it (e.g., Cloud SQL)
+        if (operation.status) {
+            return operation.status === "DONE" || operation.status === "finished" || operation.status === "completed";
+        }
+        return false;
+    }
+    // Legacy: direct status string
+    return operation === "DONE" || operation === "finished" || operation === "completed";
 }
 
 /**
- * Check if an operation failed
+ * Check if an operation failed.
+ * Supports both standard GCP LRO pattern (error object) and legacy status string.
+ *
+ * @param operation - The operation object or status string
+ * @returns true if the operation failed
  */
-export function isOperationFailed(status: string): boolean {
-    return status === "FAILED" || status === "failed" || status === "error";
+export function isOperationFailed(operation: { done?: boolean; error?: any; status?: string } | string | undefined): boolean {
+    if (operation === undefined || operation === null) {
+        return false;
+    }
+    // Standard GCP LRO pattern: done is true but has an error object
+    if (typeof operation === "object") {
+        if (operation.done === true && operation.error) {
+            return true;
+        }
+        // Fall back to status string for APIs that use it
+        if (operation.status) {
+            return operation.status === "FAILED" || operation.status === "failed" || operation.status === "error";
+        }
+        return false;
+    }
+    // Legacy: direct status string
+    return operation === "FAILED" || operation === "failed" || operation === "error";
 }
 
 // =============================================================================
@@ -604,16 +642,32 @@ export function isOperationFailed(status: string): boolean {
 
 /**
  * GCP Operation response (for long-running operations)
+ *
+ * Standard GCP LRO pattern uses 'done' boolean field.
+ * Some APIs (e.g., Cloud SQL) also use a 'status' string field.
+ * @see https://cloud.google.com/service-usage/docs/reference/rest/v1/operations
  */
 export interface GcpOperation {
+    /** Full resource name of the operation */
     name: string;
-    status: string;
+    /** Standard LRO completion indicator */
+    done?: boolean;
+    /** Legacy status field used by some APIs (e.g., Cloud SQL) */
+    status?: string;
+    /** Metadata about the operation */
+    metadata?: any;
+    /** Operation type (used by some APIs) */
     operationType?: string;
+    /** Target resource ID (used by some APIs) */
     targetId?: string;
+    /** Error details if the operation failed */
     error?: {
         code: number;
         message: string;
+        details?: any[];
     };
+    /** Response payload when operation completes successfully */
+    response?: any;
 }
 
 /**

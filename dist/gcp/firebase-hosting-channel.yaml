@@ -3,7 +3,7 @@ firebase-hosting-channel:
   defines: entity
   metadata:
     name: FirebaseHostingChannel
-    version-hash: bbbc90c1ac23
+    version-hash: 60073a5fb197
   schema:
     project:
       type: string
