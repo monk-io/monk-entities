@@ -11,14 +11,14 @@
         "secret": "./src/lib/builtins/secret.d.ts",
         "vars": "./src/lib/builtins/vars.d.ts",
         "fs": "./src/lib/builtins/fs.d.ts",
-        "aws": "./src/lib/builtins/aws.d.ts",
-        "azure": "./src/lib/builtins/azure.d.ts",
-        "gcp": "./src/lib/builtins/gcp.d.ts",
+        "cloud/aws": "./src/lib/builtins/aws.d.ts",
+        "cloud/azure": "./src/lib/builtins/azure.d.ts",
+        "cloud/gcp": "./src/lib/builtins/gcp.d.ts",
         "blobs": "./src/lib/builtins/blobs.d.ts",
         "parser": "./src/lib/builtins/parser.d.ts",
         "helpers": "./src/lib/builtins/helpers.d.ts",
         "crypto": "./src/lib/builtins/crypto.d.ts",
-        "digitalocean": "./src/lib/builtins/digitalocean.d.ts",
+        "cloud/digitalocean": "./src/lib/builtins/digitalocean.d.ts",
         "monkrpc": "./src/lib/builtins/monkrpc.d.ts"
     },
     "tasks": {
