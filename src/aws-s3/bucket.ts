@@ -1,8 +1,7 @@
 import { AWSS3Entity, AWSS3Definition, AWSS3State } from "./base.ts";
-import * as MonkecBase from "monkec/base";
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import aws from "cloud/aws";
-const action = MonkecBase.action;
 import {
     validateBucketName,
     DEFAULT_BUCKET_CONFIG,
@@ -294,7 +293,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     // Custom actions
 
     @action()
-    getBucketInfo(_args?: MonkecBase.Args): void {
+    getBucketInfo(_args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
@@ -316,7 +315,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     @action()
-    listObjects(args?: MonkecBase.Args): void {
+    listObjects(args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
@@ -349,7 +348,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     @action()
-    generatePresignedUrl(args?: MonkecBase.Args): void {
+    generatePresignedUrl(args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
@@ -378,7 +377,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     @action()
-    emptyBucket(_args?: MonkecBase.Args): void {
+    emptyBucket(_args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
@@ -421,7 +420,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     @action()
-    getBucketStatistics(_args?: MonkecBase.Args): void {
+    getBucketStatistics(_args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
@@ -466,7 +465,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     @action()
-    getWebsiteInfo(_args?: MonkecBase.Args): void {
+    getWebsiteInfo(_args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }

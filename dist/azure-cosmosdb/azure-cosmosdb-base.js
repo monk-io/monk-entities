@@ -37,7 +37,7 @@ __export(azure_cosmosdb_base_exports, {
 module.exports = __toCommonJS(azure_cosmosdb_base_exports);
 var import_base = require("monkec/base");
 var import_cli = __toESM(require("cli"));
-var azure = require("cloud/azure");
+var import_azure = __toESM(require("cloud/azure"));
 var AzureCosmosDBEntity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -72,19 +72,19 @@ var AzureCosmosDBEntity = class extends import_base.MonkEntity {
     let response;
     switch (method.toUpperCase()) {
       case "GET":
-        response = azure.get(url, { headers });
+        response = import_azure.default.get(url, { headers });
         break;
       case "PUT":
-        response = azure.put(url, { headers, body: bodyString });
+        response = import_azure.default.put(url, { headers, body: bodyString });
         break;
       case "POST":
-        response = azure.post(url, { headers, body: bodyString });
+        response = import_azure.default.post(url, { headers, body: bodyString });
         break;
       case "DELETE":
-        response = azure.delete(url, { headers });
+        response = import_azure.default.delete(url, { headers });
         break;
       case "PATCH":
-        response = azure.put(url, { headers, body: bodyString });
+        response = import_azure.default.put(url, { headers, body: bodyString });
         break;
       default:
         throw new Error(`Unsupported HTTP method: ${method}`);

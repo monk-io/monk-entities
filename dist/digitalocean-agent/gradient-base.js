@@ -38,7 +38,7 @@ module.exports = __toCommonJS(gradient_base_exports);
 var import_base = require("monkec/base");
 var import_cli = __toESM(require("cli"));
 var import_secret = __toESM(require("secret"));
-var digitalocean = require("cloud/digitalocean");
+var import_digitalocean = __toESM(require("cloud/digitalocean"));
 var GradientAgentBase = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -71,7 +71,7 @@ var GradientAgentBase = class extends import_base.MonkEntity {
     if (body !== void 0) {
       options.body = typeof body === "string" ? body : JSON.stringify(body);
     }
-    const resp = digitalocean.do(url, options);
+    const resp = import_digitalocean.default.do(url, options);
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw new Error(`Gradient agent ${method} ${fullPath} failed: ${resp.statusCode} ${resp.status} - ${resp.body || ""}`);
     }

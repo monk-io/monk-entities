@@ -1,7 +1,6 @@
 import { DOSpacesS3Entity, DOSpacesS3DefinitionBase, DOSpacesS3StateBase } from "./do-s3-base.ts";
 import cli from "cli";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 
 export interface SpacesBucketDefinition extends DOSpacesS3DefinitionBase {
     /** @description Space (bucket) name */
@@ -143,7 +142,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
     // --- Actions parity with aws-s3 ---
 
     @action()
-    getBucketInfo(_args?: MonkecBase.Args): void {
+    getBucketInfo(_args?: Args): void {
         const bucketName = this.getBucketName();
         try {
             const location = this.getBucketLocation(bucketName);
@@ -160,7 +159,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
     }
 
     @action()
-    listObjects(args?: MonkecBase.Args): void {
+    listObjects(args?: Args): void {
         const bucketName = this.getBucketName();
         const prefix = args?.prefix as string || '';
         const maxKeys = parseInt(args?.max_keys as string || '1000', 10);
@@ -180,7 +179,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
     }
 
     @action()
-    generatePresignedUrl(args?: MonkecBase.Args): void {
+    generatePresignedUrl(args?: Args): void {
         const bucketName = this.getBucketName();
         const objectKey = args?.object_key as string;
         const method = args?.method as string || 'GET';
@@ -200,7 +199,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
     }
 
     @action()
-    emptyBucket(_args?: MonkecBase.Args): void {
+    emptyBucket(_args?: Args): void {
         const bucketName = this.getBucketName();
         try {
             let deleted = 0;
@@ -222,7 +221,7 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
     }
 
     @action()
-    getBucketStatistics(_args?: MonkecBase.Args): void {
+    getBucketStatistics(_args?: Args): void {
         const bucketName = this.getBucketName();
         try {
             let totalObjects = 0;

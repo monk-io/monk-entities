@@ -53,10 +53,10 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 const base = require("mongodb-atlas/base");
 const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
 const cli = require("cli");
-const MonkecBase = require("monkec/base");
-var action2 = MonkecBase.action;
+const base = require("monkec/base");
+const action = base.action;
 var _deleteSnapshot_dec, _describeSnapshot_dec, _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
-var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _restoreCluster_dec = [action2("restore")], _getRestoreStatus_dec = [action2("get-restore-status")], _listRestoreJobs_dec = [action2("list-restore-jobs")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _a) {
+var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _restoreCluster_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _listRestoreJobs_dec = [action("list-restore-jobs")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

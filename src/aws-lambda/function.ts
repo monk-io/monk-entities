@@ -1,6 +1,5 @@
 import { AWSLambdaEntity, AWSLambdaDefinition, AWSLambdaState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 
 // AWS Lambda API interfaces (internal to this file)
@@ -632,7 +631,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
 
     // Custom actions using @action decorator
     @action("invoke")
-    invoke(args?: MonkecBase.Args): void {
+    invoke(args?: Args): void {
         if (!this.state.function_name) {
             throw new Error("Function does not exist, cannot invoke");
         }
@@ -656,7 +655,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     @action("get-logs")
-    getLogs(_args?: MonkecBase.Args): void {
+    getLogs(_args?: Args): void {
         if (!this.state.function_name) {
             throw new Error("Function does not exist, cannot get logs");
         }
@@ -668,7 +667,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     }
 
     @action("update-code")
-    updateCode(_args?: MonkecBase.Args): void {
+    updateCode(_args?: Args): void {
         if (!this.state.function_name) {
             throw new Error("Function does not exist, cannot update code");
         }

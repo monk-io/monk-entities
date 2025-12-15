@@ -1,6 +1,5 @@
 import { AWSSESEntity, AWSSESDefinition, AWSSESState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import type { SESConfigurationSet as SESConfigurationSetResponse } from "./common.ts";
 
@@ -258,7 +257,7 @@ export class SESConfigurationSet extends AWSSESEntity<SESConfigurationSetDefinit
     // Custom Actions
 
     @action("get-info")
-    getInfo(_args?: MonkecBase.Args): void {
+    getInfo(_args?: Args): void {
         if (!this.state.configuration_set_name) {
             throw new Error("Configuration set not created yet");
         }
@@ -301,7 +300,7 @@ export class SESConfigurationSet extends AWSSESEntity<SESConfigurationSetDefinit
     }
 
     @action("enable-sending")
-    enableSending(_args?: MonkecBase.Args): void {
+    enableSending(_args?: Args): void {
         if (!this.state.configuration_set_name) {
             throw new Error("Configuration set not created yet");
         }
@@ -322,7 +321,7 @@ export class SESConfigurationSet extends AWSSESEntity<SESConfigurationSetDefinit
     }
 
     @action("disable-sending")
-    disableSending(_args?: MonkecBase.Args): void {
+    disableSending(_args?: Args): void {
         if (!this.state.configuration_set_name) {
             throw new Error("Configuration set not created yet");
         }

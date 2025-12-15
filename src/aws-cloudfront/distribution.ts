@@ -1,8 +1,7 @@
 import { AWSCloudFrontEntity, AWSCloudFrontDefinition, AWSCloudFrontState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import aws from "cloud/aws";
-const action = MonkecBase.action;
 import {
     validateDistributionConfig,
     buildDistributionConfig,
@@ -407,7 +406,7 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
     // Custom actions
 
     @action("get-distribution-info")
-    getDistributionInfo(_args?: MonkecBase.Args): void {
+    getDistributionInfo(_args?: Args): void {
         if (!this.state.distribution_id) {
             cli.output('Distribution not created yet');
             throw new Error('Distribution not created yet');
@@ -444,7 +443,7 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
      * This rebuilds the config using the same structure as CreateDistribution
      */
     @action("get-distribution-config")
-    getDistributionConfig(_args?: MonkecBase.Args): void {
+    getDistributionConfig(_args?: Args): void {
         if (!this.state.distribution_id) {
             cli.output('Distribution not created yet');
             throw new Error('Distribution not created yet');
@@ -468,7 +467,7 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
 
 
     @action("create-invalidation")
-    createInvalidation(args?: MonkecBase.Args): void {
+    createInvalidation(args?: Args): void {
         if (!this.state.distribution_id) {
             cli.output('Distribution not created yet');
             throw new Error('Distribution not created yet');
@@ -503,7 +502,7 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
     }
 
     @action("list-invalidations")
-    listInvalidations(_args?: MonkecBase.Args): void {
+    listInvalidations(_args?: Args): void {
         if (!this.state.distribution_id) {
             cli.output('Distribution not created yet');
             throw new Error('Distribution not created yet');

@@ -1,6 +1,5 @@
 import { AWSRDSEntity, AWSRDSDefinition, AWSRDSState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import secret from "secret";
 import {
@@ -263,7 +262,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     
 
     @action("get-instance-info")
-    getInstanceInfo(_args?: MonkecBase.Args): void {
+    getInstanceInfo(_args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         try {
@@ -344,7 +343,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     }
 
     @action("update-password")
-    updatePassword(_args?: MonkecBase.Args): void {
+    updatePassword(_args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         try {
@@ -401,7 +400,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      * - monk do namespace/instance get-backup-info
      */
     @action("get-backup-info")
-    getBackupInfo(_args?: MonkecBase.Args): void {
+    getBackupInfo(_args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         cli.output(`==================================================`);
@@ -474,7 +473,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - description: Description tag for the snapshot
      */
     @action("create-snapshot")
-    createSnapshot(args?: MonkecBase.Args): void {
+    createSnapshot(args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         cli.output(`==================================================`);
@@ -543,7 +542,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - snapshot_type: Filter by type: 'manual', 'automated', or 'shared' (default: all)
      */
     @action("list-snapshots")
-    listSnapshots(args?: MonkecBase.Args): void {
+    listSnapshots(args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         cli.output(`==================================================`);
@@ -630,7 +629,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - snapshot_id: The snapshot identifier to describe
      */
     @action("describe-snapshot")
-    describeSnapshot(args?: MonkecBase.Args): void {
+    describeSnapshot(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`Describing backup snapshot`);
         cli.output(`==================================================`);
@@ -713,7 +712,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - snapshot_id: The snapshot identifier to delete
      */
     @action("delete-snapshot")
-    deleteSnapshot(args?: MonkecBase.Args): void {
+    deleteSnapshot(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`⚠️  DELETE SNAPSHOT - READ CAREFULLY!`);
         cli.output(`==================================================`);
@@ -815,7 +814,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - vpc_security_group_ids: Comma-separated security group IDs (optional)
      */
     @action("restore")
-    restoreFromSnapshot(args?: MonkecBase.Args): void {
+    restoreFromSnapshot(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`🔄 RESTORE RDS INSTANCE FROM SNAPSHOT`);
         cli.output(`==================================================`);
@@ -986,7 +985,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
      *   - instance_id: The identifier of the restored instance to check
      */
     @action("get-restore-status")
-    getRestoreStatus(args?: MonkecBase.Args): void {
+    getRestoreStatus(args?: Args): void {
         cli.output(`==================================================`);
         cli.output(`🔄 RESTORE STATUS CHECK`);
         cli.output(`==================================================`);
@@ -1083,7 +1082,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     }
 
     @action("get-connection-info")
-    getConnectionInfo(_args?: MonkecBase.Args): void {
+    getConnectionInfo(_args?: Args): void {
         const dbInstanceIdentifier = this.getDBInstanceIdentifier();
         
         try {

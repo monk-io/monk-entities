@@ -1,7 +1,6 @@
 import { AWSSQSEntity, AWSSQSDefinition, AWSSQSState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
+import { action, Args } from "monkec/base";
 import cli from "cli";
-const action = MonkecBase.action;
 import {
     QueueAttributes,
     SQSMessage,
@@ -220,7 +219,7 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
 
     
     @action("send-message")
-    sendMessageAction(args?: MonkecBase.Args): void {
+    sendMessageAction(args?: Args): void {
         const body = args?.body || args?.message;
         if (!body) {
             throw new Error("Message body is required");
@@ -245,7 +244,7 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
     }
 
     @action("receive-messages")
-    receiveMessagesAction(args?: MonkecBase.Args): void {
+    receiveMessagesAction(args?: Args): void {
         const maxMessages = args?.maxMessages ? Math.min(parseInt(args.maxMessages), 10) : 1;
         const waitTimeSeconds = args?.waitTimeSeconds ? parseInt(args.waitTimeSeconds) : 0;
 

@@ -1,13 +1,6 @@
-// @ts-nocheck
 import cli from "cli";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
-// Use DigitalOcean client like in digitalocean-spaces
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const require: any;
-// @ts-ignore
-const digitalocean = require("cloud/digitalocean");
-// @ts-ignore
+import { action, Args, MonkEntity } from "monkec/base";
+import digitalocean from "cloud/digitalocean";
 
 /**
  * Available model nodes on DigitalOcean GenAI platform.
@@ -101,7 +94,7 @@ export interface DOAgentState {
     endpoint_api_key?: string;
 }
 
-export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState> {
+export class Agent extends MonkEntity<DOAgentDefinition, DOAgentState> {
     protected getEntityName(): string { return "digitalocean-agent/agent"; }
 
     private httpPost(path: string, body: any): any {
@@ -344,14 +337,14 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     checkLiveness(): boolean { return this.checkReadiness(); }
     
     @action()
-    get(_args?: MonkecBase.Args): void {
+    get(_args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const data = this.httpGet(`/v2/gen-ai/agents/${this.state.id}`);
         cli.output(JSON.stringify(data, null, 2));
     }
 
     @action()
-    setGuardrails(args?: MonkecBase.Args): void {
+    setGuardrails(args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const raw = (args?.guardrail_uuids as string) || "";
         const guardrailUuids = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -362,7 +355,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    setKnowledgeBases(args?: MonkecBase.Args): void {
+    setKnowledgeBases(args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const raw = (args?.knowledge_base_uuids as string) || (args?.knowledge_base_uuid as string) || "";
         const kbUuids = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -373,7 +366,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    createApiKey(args?: MonkecBase.Args): void {
+    createApiKey(args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const name = (args?.name as string) || (args?._?.[0] as string) || undefined;
         const body: any = { agent_uuid: this.state.id };
@@ -386,7 +379,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    revokeApiKey(args?: MonkecBase.Args): void {
+    revokeApiKey(args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const keyUuid = args?.api_key_uuid as string;
         if (!keyUuid) throw new Error("api_key_uuid is required");
@@ -395,7 +388,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    deleteApiKey(args?: MonkecBase.Args): void {
+    deleteApiKey(args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const keyUuid = (args?.api_key_uuid as string) || (args?._?.[0] as string);
         if (!keyUuid) throw new Error("api_key_uuid is required");
@@ -404,14 +397,14 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    listApiKeys(_args?: MonkecBase.Args): void {
+    listApiKeys(_args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const data = this.httpGet(this.getApiKeysBasePath());
         cli.output(JSON.stringify(data, null, 2));
     }
 
     @action()
-    deploy(_args?: MonkecBase.Args): void {
+    deploy(_args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         const body: any = {};
         if (this.definition.public_endpoint) {
@@ -428,7 +421,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    makePublic(_args?: MonkecBase.Args): void {
+    makePublic(_args?: Args): void {
         if (!this.state.id) throw new Error("Agent id missing in state");
         // Temporarily enforce public deployment
         (this.definition as any).public_endpoint = true;
@@ -445,7 +438,7 @@ export class Agent extends MonkecBase.MonkEntity<DOAgentDefinition, DOAgentState
     }
 
     @action()
-    models(_args?: MonkecBase.Args): void {
+    models(_args?: Args): void {
         const data = this.httpGet("/v2/gen-ai/models");
         cli.output(JSON.stringify(data, null, 2));
     }

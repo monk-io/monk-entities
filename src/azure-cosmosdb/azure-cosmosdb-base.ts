@@ -1,11 +1,6 @@
 import { MonkEntity } from "monkec/base";
 import cli from "cli";
-
-// Use runtime require to avoid TS type resolution for cloud/azure
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const require: any;
-// @ts-ignore
-const azure = require("cloud/azure");
+import azure from "cloud/azure";
 
 /**
  * Azure API response interface (matches cloud/azure module response)

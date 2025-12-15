@@ -52,7 +52,8 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-rds/instance.ts
 const base = require("aws-rds/base");
 const AWSRDSEntity = base.AWSRDSEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const secret = require("secret");
 const common = require("aws-rds/common");
@@ -61,9 +62,8 @@ const validateStorageSize = common.validateStorageSize;
 const buildCreateInstanceParams = common.buildCreateInstanceParams;
 const buildModifyInstanceParams = common.buildModifyInstanceParams;
 const formatInstanceState = common.formatInstanceState;
-var action2 = MonkecBase.action;
 var _getConnectionInfo_dec, _getRestoreStatus_dec, _restoreFromSnapshot_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
-var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action2("get-instance-info")], _updatePassword_dec = [action2("update-password")], _getBackupInfo_dec = [action2("get-backup-info")], _createSnapshot_dec = [action2("create-snapshot")], _listSnapshots_dec = [action2("list-snapshots")], _describeSnapshot_dec = [action2("describe-snapshot")], _deleteSnapshot_dec = [action2("delete-snapshot")], _restoreFromSnapshot_dec = [action2("restore")], _getRestoreStatus_dec = [action2("get-restore-status")], _getConnectionInfo_dec = [action2("get-connection-info")], _a) {
+var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action("get-instance-info")], _updatePassword_dec = [action("update-password")], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _restoreFromSnapshot_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _getConnectionInfo_dec = [action("get-connection-info")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

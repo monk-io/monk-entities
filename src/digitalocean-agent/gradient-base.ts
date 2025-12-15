@@ -1,11 +1,7 @@
 import { MonkEntity } from "monkec/base";
 import cli from "cli";
 import secret from "secret";
-// Use the same DigitalOcean client style as digitalocean-spaces
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const require: any;
-// @ts-ignore
-const digitalocean = require("cloud/digitalocean");
+import digitalocean from "cloud/digitalocean";
 
 export interface GradientAgentDefinitionBase {
     /** @description Secret name with Gradient Agent endpoint URL */

@@ -3,11 +3,6 @@ import cli from "cli";
 import http from "http";
 import crypto from "crypto";
 
-// Use runtime require to avoid TS type resolution for cloud/azure
-declare const require: (module: string) => unknown;
-// @ts-ignore: Runtime provided module, no type definitions available  
-const _azure = require("cloud/azure");
-
 /**
  * @description Defines the desired state for an Azure Cosmos DB Database.
  */

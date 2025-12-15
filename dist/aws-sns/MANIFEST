@@ -1,5 +1,5 @@
 REPO aws-sns
-VERSION_HASH e5180a8db1ca
+VERSION_HASH 1e1e6bcfd13f
 namespace: aws-sns
 topic:
   defines: entity
@@ -11,4 +11,4 @@ sns-subscription:
   defines: entity
   source: sns-subscription.yaml
 LOAD sns-topic.yaml common.yaml sns-subscription.yaml base.yaml
-RESOURCES sns-topic-sync.js sns-subscription-sync.js base.js common.js
+RESOURCES sns-subscription-sync.js base.js sns-topic-sync.js common.js

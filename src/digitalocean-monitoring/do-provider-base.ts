@@ -1,8 +1,5 @@
 import { MonkEntity } from "monkec/base";
-// Use runtime require to avoid TS type resolution for cloud/digitalocean
-declare const require: any;
-// @ts-ignore
-const digitalocean = require("cloud/digitalocean");
+import digitalocean from "cloud/digitalocean";
 import cli from "cli";
 
 export interface DOMonitoringDefinitionBase {

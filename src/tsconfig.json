@@ -13,9 +13,5 @@
       "monkec/http-client": ["./lib/modules/http-client.d.ts"]
     }
   },
-  "include": [
-    "./lib/builtins/**/*",
-    "./**/*.ts",
-    "./**/*.d.ts"
-  ]
+  "include": ["./lib/builtins/**/*", "./**/*.ts", "./**/*.d.ts"]
 }

@@ -1,8 +1,7 @@
 import secret from "secret";
 import cli from "cli";
 import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action } from "monkec/base";
 
 /**
  * Client TLS certificate specification
