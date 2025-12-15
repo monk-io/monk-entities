@@ -1,0 +1,225 @@
+# GCP Entities Integration Test Suite
+#
+# This test suite verifies the complete lifecycle of GCP entities.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose
+
+name: GCP Entities Integration Test
+description: Complete integration test for all GCP entities
+timeout: 900000  # 15 minutes - Cloud SQL takes time
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load test stack template
+    action: load
+    target: test/stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Service Usage Tests
+  # =========================================================================
+  - name: Enable GCP APIs
+    action: run
+    target: gcp-test/test-enable-apis
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-enable-apis"
+
+  - name: Wait for APIs to be enabled
+    action: wait
+    target: gcp-test/test-enable-apis
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  # =========================================================================
+  # BigQuery Tests (fast, run first)
+  # =========================================================================
+  - name: Create BigQuery dataset
+    action: run
+    target: gcp-test/test-bigquery
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-bigquery"
+
+  - name: Wait for BigQuery dataset to be ready
+    action: wait
+    target: gcp-test/test-bigquery
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test BigQuery get action
+    action: action
+    target: gcp-test/test-bigquery
+    actionName: get
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Cloud Storage Tests
+  # =========================================================================
+  - name: Create Cloud Storage bucket
+    action: run
+    target: gcp-test/test-storage
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-storage"
+
+  - name: Wait for Cloud Storage bucket to be ready
+    action: wait
+    target: gcp-test/test-storage
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test Cloud Storage get action
+    action: action
+    target: gcp-test/test-storage
+    actionName: get
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Service Account Tests
+  # =========================================================================
+  - name: Create service account
+    action: run
+    target: gcp-test/test-service-account
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-service-account"
+
+  - name: Wait for service account to be ready
+    action: wait
+    target: gcp-test/test-service-account
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Create service account key
+    action: run
+    target: gcp-test/test-service-account-key
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-service-account-key"
+
+  - name: Wait for service account key to be ready
+    action: wait
+    target: gcp-test/test-service-account-key
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  # =========================================================================
+  # Cloud SQL Tests (slowest, run last)
+  # =========================================================================
+  - name: Create Cloud SQL instance
+    action: run
+    target: gcp-test/test-sql-instance
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-sql-instance"
+
+  - name: Wait for Cloud SQL instance to be ready
+    action: wait
+    target: gcp-test/test-sql-instance
+    waitFor:
+      condition: ready
+      timeout: 600000  # 10 minutes for instance creation
+
+  - name: Test Cloud SQL get-info action
+    action: action
+    target: gcp-test/test-sql-instance
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Create Cloud SQL database
+    action: run
+    target: gcp-test/test-sql-database
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-sql-database"
+
+  - name: Wait for Cloud SQL database to be ready
+    action: wait
+    target: gcp-test/test-sql-database
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Create Cloud SQL user
+    action: run
+    target: gcp-test/test-sql-user
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-sql-user"
+
+  - name: Wait for Cloud SQL user to be ready
+    action: wait
+    target: gcp-test/test-sql-user
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+cleanup:
+  # Delete in reverse dependency order
+  - name: Delete Cloud SQL user
+    action: delete
+    target: gcp-test/test-sql-user
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud SQL database
+    action: delete
+    target: gcp-test/test-sql-database
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud SQL instance
+    action: delete
+    target: gcp-test/test-sql-instance
+    expect:
+      exitCode: 0
+
+  - name: Delete service account key
+    action: delete
+    target: gcp-test/test-service-account-key
+    expect:
+      exitCode: 0
+
+  - name: Delete service account
+    action: delete
+    target: gcp-test/test-service-account
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud Storage bucket
+    action: delete
+    target: gcp-test/test-storage
+    expect:
+      exitCode: 0
+
+  - name: Delete BigQuery dataset
+    action: delete
+    target: gcp-test/test-bigquery
+    expect:
+      exitCode: 0

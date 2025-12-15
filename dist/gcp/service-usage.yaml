@@ -1,0 +1,55 @@
+namespace: gcp
+service-usage:
+  defines: entity
+  metadata:
+    name: ServiceUsage
+    version-hash: d6e642c8d83b
+  schema:
+    name:
+      type: string
+      description: |-
+        Single API name to enable.
+        Use this for enabling just one API.
+        Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com")
+    apis:
+      type: array
+      items:
+        type: string
+      description: |-
+        Array of API names to batch enable.
+        Use this for enabling multiple APIs efficiently.
+        APIs are enabled concurrently in a single operation.
+    project:
+      type: string
+      description: |-
+        Override the GCP project ID.
+        If not specified, uses the project from environment/credentials.
+  state-schema:
+    ready:
+      type: boolean
+      description: Indicates if all requested APIs are enabled and ready
+    operation:
+      type: string
+      description: Operation name for tracking async enable operation
+    enabled_apis:
+      type: array
+      items:
+        type: string
+      description: List of APIs that were enabled by this entity
+    existing:
+      type: boolean
+      description: Indicates if APIs were already enabled (adopted)
+  lifecycle:
+    sync: <<< service-usage-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - cloud/gcp
+    - cli
+    - gcp/common

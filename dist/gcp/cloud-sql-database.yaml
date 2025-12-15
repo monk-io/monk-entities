@@ -1,0 +1,51 @@
+namespace: gcp
+cloud-sql-database:
+  defines: entity
+  metadata:
+    name: CloudSqlDatabase
+    version-hash: d6e642c8d83b
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    instance:
+      type: string
+      description: Name of the parent Cloud SQL instance
+    name:
+      type: string
+      description: Name of the database to create
+    charset:
+      type: string
+      description: 'Character set for the database (e.g., UTF8)'
+    collation:
+      type: string
+      description: Collation for the database
+    required:
+      - instance
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Name of the database
+    self_link:
+      type: string
+      description: Self-link URL
+  lifecycle:
+    sync: <<< cloud-sql-database-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - gcp/gcp-base
+    - cli
+    - gcp/common

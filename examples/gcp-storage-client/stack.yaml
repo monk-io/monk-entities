@@ -1,0 +1,255 @@
+namespace: gcp-storage-demo
+
+# =============================================================================
+# GCP Cloud Storage with Service Account Example
+# =============================================================================
+#
+# This example demonstrates:
+# 1. Enabling required GCP APIs (storage, iam)
+# 2. Creating a Cloud Storage bucket
+# 3. Creating a service account with storage roles
+# 4. Creating a service account key (stored in secret)
+# 5. Running a client application that uploads/downloads files
+#
+# Prerequisites:
+# - GCP provider configured in Monk with appropriate permissions
+# - Project with billing enabled
+#
+# Run with:
+#   monk load gcp-storage-demo/stack.yaml
+#   monk run gcp-storage-demo/storage-app
+#
+# =============================================================================
+
+# Process group to run everything together
+storage-app:
+  defines: process-group
+  runnable-list:
+    - enable-apis
+    - data-bucket
+    - storage-sa
+    - storage-sa-key
+    - gcs-client
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - storage.googleapis.com
+    - iam.googleapis.com
+  services:
+    api-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create Cloud Storage Bucket
+# =============================================================================
+# Creates a bucket with versioning and lifecycle rules
+
+data-bucket:
+  defines: gcp/cloud-storage
+  # Bucket names must be globally unique - add a unique suffix in practice
+  name: monk-demo-storage-bucket
+  location: US
+  storage_class: STANDARD
+
+  # Enable versioning for data protection
+  versioning_enabled: true
+
+  # Use uniform bucket-level access (recommended)
+  uniform_bucket_level_access: true
+
+  # Prevent public access
+  public_access_prevention: enforced
+
+  # Labels for organization
+  labels:
+    environment: demo
+    managed-by: monk
+
+  # Lifecycle rules - transition to cheaper storage over time
+  lifecycle_rules: |
+    [
+      {"action":{"type":"SetStorageClass","storageClass":"NEARLINE"},"condition":{"age":30}},
+      {"action":{"type":"SetStorageClass","storageClass":"COLDLINE"},"condition":{"age":90}},
+      {"action":{"type":"Delete"},"condition":{"age":365}}
+    ]
+
+  services:
+    bucket:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-storage-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Service Account
+# =============================================================================
+# Service account with storage admin role for the application
+
+storage-sa:
+  defines: gcp/service-account
+  name: demo-storage-app
+  display_name: Demo Storage Application
+  description: Service account for storage demo application
+
+  # Grant storage admin role at project level
+  # In production, use bucket-level IAM for least privilege
+  roles:
+    - roles/storage.objectAdmin
+
+  services:
+    service-account:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-storage-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 4: Create Service Account Key
+# =============================================================================
+# Generates credentials and stores them in a Monk secret
+# IMPORTANT: permitted-secrets is required!
+
+storage-sa-key:
+  defines: gcp/service-account-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  secret: demo-gcs-credentials
+
+  # REQUIRED: Allow entity to write credentials to this secret
+  permitted-secrets:
+    demo-gcs-credentials: true
+
+  services:
+    key:
+      protocol: custom
+
+  connections:
+    sa:
+      runnable: gcp-storage-demo/storage-sa
+      service: service-account
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-storage-demo/storage-sa
+      timeout: 120
+
+# =============================================================================
+# Step 5: Cloud Storage Client Application
+# =============================================================================
+# Runs a container that performs storage operations
+
+gcs-client:
+  defines: runnable
+
+  # Allow reading the service account credentials secret
+  permitted-secrets:
+    demo-gcs-credentials: true
+
+  # Connect to bucket and service account entities
+  connections:
+    bucket:
+      runnable: gcp-storage-demo/data-bucket
+      service: bucket
+    sa-key:
+      runnable: gcp-storage-demo/storage-sa-key
+      service: key
+
+  # Wait for all resources to be ready
+  depends:
+    wait-for:
+      runnables:
+        - gcp-storage-demo/data-bucket
+        - gcp-storage-demo/storage-sa-key
+      timeout: 300
+
+  # Environment variables from entity states and secrets
+  variables:
+    bucket_name:
+      env: GCS_BUCKET
+      value: <- connection-target("bucket") entity-state get-member("name")
+      type: string
+    bucket_uri:
+      env: GCS_BUCKET_URI
+      value: <- connection-target("bucket") entity-state get-member("gs_uri")
+      type: string
+    gcp_credentials:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("demo-gcs-credentials")
+      type: string
+
+  containers:
+    client:
+      # Using a simple alpine image with gcloud SDK for demo
+      # In production, use your own application image
+      image: google/cloud-sdk:alpine
+      bash: |
+        set -e
+        echo "=== GCP Cloud Storage Demo Client ==="
+        echo ""
+
+        # Write credentials to file
+        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/gcp-creds.json
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json
+
+        # Activate service account
+        echo "Activating service account..."
+        gcloud auth activate-service-account --key-file=/tmp/gcp-creds.json
+
+        echo ""
+        echo "Bucket: $GCS_BUCKET"
+        echo "URI: $GCS_BUCKET_URI"
+        echo ""
+
+        # Create a test file
+        echo "Creating test file..."
+        echo "Hello from Monk GCP Storage Demo! Timestamp: $(date)" > /tmp/test-file.txt
+
+        # Upload to bucket
+        echo "Uploading file to bucket..."
+        gsutil cp /tmp/test-file.txt gs://$GCS_BUCKET/demo/test-file.txt
+        echo "Upload successful!"
+
+        # List bucket contents
+        echo ""
+        echo "Bucket contents:"
+        gsutil ls -l gs://$GCS_BUCKET/
+
+        # Download and verify
+        echo ""
+        echo "Downloading and verifying..."
+        gsutil cp gs://$GCS_BUCKET/demo/test-file.txt /tmp/downloaded.txt
+        echo "Downloaded content:"
+        cat /tmp/downloaded.txt
+
+        # Upload more files in a loop
+        echo ""
+        echo "Starting continuous operation loop..."
+        counter=1
+        while true; do
+          timestamp=$(date +%Y%m%d-%H%M%S)
+          echo "Iteration $counter at $timestamp"
+
+          # Create and upload a file
+          echo "Data from iteration $counter at $timestamp" > /tmp/data-$counter.txt
+          gsutil cp /tmp/data-$counter.txt gs://$GCS_BUCKET/demo/data-$counter.txt
+
+          # List recent files
+          echo "Recent files in bucket:"
+          gsutil ls -l gs://$GCS_BUCKET/demo/ | tail -5
+
+          counter=$((counter + 1))
+          echo "Sleeping for 30 seconds..."
+          echo "---"
+          sleep 30
+        done

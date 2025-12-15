@@ -1,0 +1,218 @@
+namespace: gcp-cloudsql-demo
+
+# =============================================================================
+# GCP Cloud SQL Complete Example
+# =============================================================================
+#
+# This example demonstrates:
+# 1. Enabling required GCP APIs (sqladmin, iam)
+# 2. Creating a Cloud SQL PostgreSQL instance
+# 3. Creating a database within the instance
+# 4. Creating a database user with auto-generated password (stored in secret)
+# 5. Running a client application that connects to the database
+#
+# Prerequisites:
+# - GCP provider configured in Monk with appropriate permissions
+# - Project with billing enabled
+#
+# Run with:
+#   monk load gcp-cloudsql-demo/stack.yaml
+#   monk run gcp-cloudsql-demo/cloudsql-app
+#
+# =============================================================================
+
+# Process group to run everything together
+cloudsql-app:
+  defines: process-group
+  runnable-list:
+    - enable-apis
+    - postgres-instance
+    - app-database
+    - app-user
+    - db-client
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+# This must run first - Cloud SQL and IAM APIs need to be enabled
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - iam.googleapis.com
+  services:
+    api-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create Cloud SQL PostgreSQL Instance
+# =============================================================================
+# Creates a PostgreSQL 15 instance with public IP access
+
+postgres-instance:
+  defines: gcp/cloud-sql-instance
+  name: demo-postgres-instance
+  database_version: POSTGRES_15
+  tier: db-f1-micro
+  region: us-central1
+  storage_size_gb: 10
+  storage_auto_resize: true
+
+  # Network configuration - allow public access for demo
+  # In production, use private IP or Cloud SQL Proxy
+  allow_all: true
+
+  # Backup configuration
+  backup_enabled: true
+  backup_start_time: "03:00"
+
+  # High availability (disabled for demo to save cost)
+  availability_type: ZONAL
+
+  # Maintenance window
+  maintenance_window_day: 7
+  maintenance_window_hour: 3
+
+  # Protection settings
+  deletion_protection: false
+
+  # Service endpoint for connections
+  services:
+    instance:
+      protocol: tcp
+      address: <- entity-state get-member("address") default("")
+      port: <- entity-state get-member("port") default(5432) to-int
+
+  # Wait for APIs to be enabled
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudsql-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Database
+# =============================================================================
+# Creates a database named "appdb" in the PostgreSQL instance
+
+app-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: appdb
+  charset: UTF8
+
+  services:
+    database:
+      protocol: custom
+
+  connections:
+    instance:
+      runnable: gcp-cloudsql-demo/postgres-instance
+      service: instance
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudsql-demo/postgres-instance
+      timeout: 900
+
+# =============================================================================
+# Step 4: Create Database User
+# =============================================================================
+# Creates a user with auto-generated password stored in Monk secrets
+# IMPORTANT: permitted-secrets is required to allow writing the password
+
+app-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: appuser
+  password_secret: demo-db-password
+
+  # REQUIRED: Allow entity to write password to this secret
+  permitted-secrets:
+    demo-db-password: true
+
+  services:
+    user:
+      protocol: custom
+
+  connections:
+    instance:
+      runnable: gcp-cloudsql-demo/postgres-instance
+      service: instance
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudsql-demo/postgres-instance
+        - gcp-cloudsql-demo/app-database
+      timeout: 900
+
+# =============================================================================
+# Step 5: Database Client Application
+# =============================================================================
+# Runs a container that connects to the database and performs operations
+
+db-client:
+  defines: runnable
+
+  # Allow reading the database password secret
+  permitted-secrets:
+    demo-db-password: true
+
+  # Connect to database instance and user entities
+  connections:
+    db-instance:
+      runnable: gcp-cloudsql-demo/postgres-instance
+      service: instance
+    db-user:
+      runnable: gcp-cloudsql-demo/app-user
+      service: user
+    database:
+      runnable: gcp-cloudsql-demo/app-database
+      service: database
+
+  # Wait for all database resources to be ready
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudsql-demo/postgres-instance
+        - gcp-cloudsql-demo/app-database
+        - gcp-cloudsql-demo/app-user
+      timeout: 900
+
+  # Environment variables composed from entity states
+  variables:
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("db-instance") entity-state get-member("address")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("db-instance") entity-state get-member("port")
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("database") entity-state get-member("name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("db-user") entity-state get-member("name")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("demo-db-password")
+      type: string
+
+  containers:
+    client:
+      image: docker.io/imanachyn/rds-client:v1
+      environment:
+        - DB_ENGINE=postgresql
+        - DB_CONNECTION_LIMIT=5
+        - DB_TIMEOUT=30000
+        - DB_SSL=true
+        - OPERATION_INTERVAL_MS=15000
+        - SAMPLE_TABLE_NAME=gcp_demo_users
+        - SAMPLE_RECORDS_COUNT=5

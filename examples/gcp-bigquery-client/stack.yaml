@@ -1,0 +1,376 @@
+namespace: gcp-bigquery-demo
+
+# =============================================================================
+# GCP BigQuery with Service Account Example
+# =============================================================================
+#
+# This example demonstrates:
+# 1. Enabling required GCP APIs (bigquery, iam)
+# 2. Creating a BigQuery dataset with tables
+# 3. Creating a service account with BigQuery roles
+# 4. Creating a service account key (stored in secret)
+# 5. Running a client application that queries BigQuery
+#
+# Prerequisites:
+# - GCP provider configured in Monk with appropriate permissions
+# - Project with billing enabled
+#
+# Run with:
+#   monk load gcp-bigquery-demo/stack.yaml
+#   monk run gcp-bigquery-demo/bigquery-app
+#
+# =============================================================================
+
+# Process group to run everything together
+bigquery-app:
+  defines: process-group
+  runnable-list:
+    - enable-apis
+    - analytics-dataset
+    - analytics-sa
+    - analytics-sa-key
+    - bq-client
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - bigquery.googleapis.com
+    - iam.googleapis.com
+  services:
+    api-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create BigQuery Dataset with Tables
+# =============================================================================
+# Creates a dataset with pre-defined tables for analytics
+
+analytics-dataset:
+  defines: gcp/big-query
+  dataset: monk_demo_analytics
+  location: US
+  description: Demo analytics dataset created by Monk
+
+  # Default table expiration (optional)
+  # default_table_expiration_ms: 2592000000  # 30 days
+
+  # Time travel window (7 days)
+  max_time_travel_hours: 168
+
+  # Labels for organization
+  labels:
+    environment: demo
+    managed-by: monk
+
+  # Pre-create tables with schemas
+  tables: |
+    [
+      {
+        "name": "events",
+        "description": "Application events table",
+        "schema": [
+          {"name": "event_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique event identifier"},
+          {"name": "event_type", "type": "STRING", "mode": "REQUIRED", "description": "Type of event"},
+          {"name": "user_id", "type": "STRING", "description": "User who triggered the event"},
+          {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When the event occurred"},
+          {"name": "properties", "type": "JSON", "description": "Event properties as JSON"},
+          {"name": "session_id", "type": "STRING", "description": "Session identifier"}
+        ]
+      },
+      {
+        "name": "users",
+        "description": "User profiles table",
+        "schema": [
+          {"name": "user_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique user identifier"},
+          {"name": "email", "type": "STRING", "description": "User email address"},
+          {"name": "created_at", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "Account creation time"},
+          {"name": "last_seen", "type": "TIMESTAMP", "description": "Last activity timestamp"},
+          {"name": "metadata", "type": "JSON", "description": "Additional user metadata"}
+        ]
+      },
+      {
+        "name": "metrics",
+        "description": "Aggregated metrics table",
+        "schema": [
+          {"name": "date", "type": "DATE", "mode": "REQUIRED", "description": "Metric date"},
+          {"name": "metric_name", "type": "STRING", "mode": "REQUIRED", "description": "Name of the metric"},
+          {"name": "value", "type": "FLOAT64", "mode": "REQUIRED", "description": "Metric value"},
+          {"name": "dimensions", "type": "JSON", "description": "Metric dimensions"}
+        ]
+      }
+    ]
+
+  services:
+    dataset:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-bigquery-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Service Account
+# =============================================================================
+# Service account with BigQuery data editor and job user roles
+
+analytics-sa:
+  defines: gcp/service-account
+  name: demo-bigquery-app
+  display_name: Demo BigQuery Application
+  description: Service account for BigQuery demo application
+
+  # Grant BigQuery roles at project level
+  roles:
+    - roles/bigquery.dataEditor
+    - roles/bigquery.jobUser
+
+  services:
+    service-account:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-bigquery-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 4: Create Service Account Key
+# =============================================================================
+# Generates credentials and stores them in a Monk secret
+
+analytics-sa-key:
+  defines: gcp/service-account-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  secret: demo-bq-credentials
+
+  # REQUIRED: Allow entity to write credentials to this secret
+  permitted-secrets:
+    demo-bq-credentials: true
+
+  services:
+    key:
+      protocol: custom
+
+  connections:
+    sa:
+      runnable: gcp-bigquery-demo/analytics-sa
+      service: service-account
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-bigquery-demo/analytics-sa
+      timeout: 120
+
+# =============================================================================
+# Step 5: BigQuery Client Application
+# =============================================================================
+# Runs a container that queries and inserts data into BigQuery
+
+bq-client:
+  defines: runnable
+
+  # Allow reading the service account credentials secret
+  permitted-secrets:
+    demo-bq-credentials: true
+
+  # Connect to dataset and service account entities
+  connections:
+    dataset:
+      runnable: gcp-bigquery-demo/analytics-dataset
+      service: dataset
+    sa-key:
+      runnable: gcp-bigquery-demo/analytics-sa-key
+      service: key
+
+  # Wait for all resources to be ready
+  depends:
+    wait-for:
+      runnables:
+        - gcp-bigquery-demo/analytics-dataset
+        - gcp-bigquery-demo/analytics-sa-key
+      timeout: 300
+
+  # Environment variables from entity states and secrets
+  variables:
+    dataset_id:
+      env: BQ_DATASET
+      value: <- connection-target("dataset") entity-state get-member("dataset_id")
+      type: string
+    dataset_ref:
+      env: BQ_DATASET_REF
+      value: <- connection-target("dataset") entity-state get-member("dataset_reference")
+      type: string
+    project_id:
+      env: GCP_PROJECT
+      value: <- connection-target("dataset") entity-state get-member("project")
+      type: string
+    gcp_credentials:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("demo-bq-credentials")
+      type: string
+
+  containers:
+    client:
+      image: google/cloud-sdk:alpine
+      bash: |
+        set -e
+        echo "=== GCP BigQuery Demo Client ==="
+        echo ""
+
+        # Write credentials to file
+        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/gcp-creds.json
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json
+
+        # Activate service account
+        echo "Activating service account..."
+        gcloud auth activate-service-account --key-file=/tmp/gcp-creds.json
+
+        echo ""
+        echo "Project: $GCP_PROJECT"
+        echo "Dataset: $BQ_DATASET"
+        echo "Dataset Reference: $BQ_DATASET_REF"
+        echo ""
+
+        # List tables in dataset
+        echo "Tables in dataset:"
+        bq ls --format=pretty "$GCP_PROJECT:$BQ_DATASET"
+        echo ""
+
+        # Show table schemas
+        echo "=== Table Schemas ==="
+        for table in events users metrics; do
+          echo ""
+          echo "--- $table ---"
+          bq show --format=prettyjson "$GCP_PROJECT:$BQ_DATASET.$table" | jq '.schema.fields[] | {name, type, mode}'
+        done
+
+        # Insert sample data
+        echo ""
+        echo "=== Inserting Sample Data ==="
+
+        # Generate a unique run ID
+        RUN_ID=$(date +%s)
+
+        # Insert sample users
+        echo "Inserting users..."
+        bq query --use_legacy_sql=false --format=none "
+        INSERT INTO \`$GCP_PROJECT.$BQ_DATASET.users\` (user_id, email, created_at, last_seen, metadata)
+        VALUES
+          ('user-$RUN_ID-1', 'alice-$RUN_ID@example.com', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), JSON '{\"plan\": \"pro\"}'),
+          ('user-$RUN_ID-2', 'bob-$RUN_ID@example.com', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), JSON '{\"plan\": \"free\"}'),
+          ('user-$RUN_ID-3', 'carol-$RUN_ID@example.com', CURRENT_TIMESTAMP(), NULL, JSON '{\"plan\": \"enterprise\"}')
+        "
+        echo "Users inserted!"
+
+        # Insert sample events
+        echo "Inserting events..."
+        bq query --use_legacy_sql=false --format=none "
+        INSERT INTO \`$GCP_PROJECT.$BQ_DATASET.events\` (event_id, event_type, user_id, timestamp, properties, session_id)
+        VALUES
+          ('evt-$RUN_ID-1', 'page_view', 'user-$RUN_ID-1', CURRENT_TIMESTAMP(), JSON '{\"page\": \"/home\"}', 'sess-$RUN_ID-a'),
+          ('evt-$RUN_ID-2', 'click', 'user-$RUN_ID-1', CURRENT_TIMESTAMP(), JSON '{\"button\": \"signup\"}', 'sess-$RUN_ID-a'),
+          ('evt-$RUN_ID-3', 'page_view', 'user-$RUN_ID-2', CURRENT_TIMESTAMP(), JSON '{\"page\": \"/pricing\"}', 'sess-$RUN_ID-b'),
+          ('evt-$RUN_ID-4', 'purchase', 'user-$RUN_ID-3', CURRENT_TIMESTAMP(), JSON '{\"amount\": 99.99}', 'sess-$RUN_ID-c')
+        "
+        echo "Events inserted!"
+
+        # Insert sample metrics
+        echo "Inserting metrics..."
+        bq query --use_legacy_sql=false --format=none "
+        INSERT INTO \`$GCP_PROJECT.$BQ_DATASET.metrics\` (date, metric_name, value, dimensions)
+        VALUES
+          (CURRENT_DATE(), 'daily_active_users', 3.0, JSON '{\"source\": \"demo\"}'),
+          (CURRENT_DATE(), 'page_views', 2.0, JSON '{\"source\": \"demo\"}'),
+          (CURRENT_DATE(), 'revenue', 99.99, JSON '{\"source\": \"demo\", \"currency\": \"USD\"}')
+        "
+        echo "Metrics inserted!"
+
+        echo ""
+        echo "=== Running Queries ==="
+
+        # Query users
+        echo ""
+        echo "--- Recent Users ---"
+        bq query --use_legacy_sql=false --format=pretty "
+        SELECT user_id, email, created_at, JSON_VALUE(metadata, '$.plan') as plan
+        FROM \`$GCP_PROJECT.$BQ_DATASET.users\`
+        ORDER BY created_at DESC
+        LIMIT 10
+        "
+
+        # Query events
+        echo ""
+        echo "--- Recent Events ---"
+        bq query --use_legacy_sql=false --format=pretty "
+        SELECT event_id, event_type, user_id, timestamp
+        FROM \`$GCP_PROJECT.$BQ_DATASET.events\`
+        ORDER BY timestamp DESC
+        LIMIT 10
+        "
+
+        # Query metrics
+        echo ""
+        echo "--- Today's Metrics ---"
+        bq query --use_legacy_sql=false --format=pretty "
+        SELECT metric_name, SUM(value) as total_value
+        FROM \`$GCP_PROJECT.$BQ_DATASET.metrics\`
+        WHERE date = CURRENT_DATE()
+        GROUP BY metric_name
+        ORDER BY metric_name
+        "
+
+        # Aggregation query
+        echo ""
+        echo "--- Events by Type ---"
+        bq query --use_legacy_sql=false --format=pretty "
+        SELECT event_type, COUNT(*) as count
+        FROM \`$GCP_PROJECT.$BQ_DATASET.events\`
+        GROUP BY event_type
+        ORDER BY count DESC
+        "
+
+        # Continuous operation loop
+        echo ""
+        echo "=== Starting Continuous Query Loop ==="
+        counter=1
+        while true; do
+          timestamp=$(date +%Y%m%d-%H%M%S)
+          echo ""
+          echo "Iteration $counter at $timestamp"
+
+          # Insert new event
+          bq query --use_legacy_sql=false --format=none "
+          INSERT INTO \`$GCP_PROJECT.$BQ_DATASET.events\` (event_id, event_type, user_id, timestamp, properties, session_id)
+          VALUES ('evt-loop-$counter-$timestamp', 'heartbeat', 'system', CURRENT_TIMESTAMP(), JSON '{\"iteration\": $counter}', 'loop-$RUN_ID')
+          "
+
+          # Show recent events
+          echo "Recent events:"
+          bq query --use_legacy_sql=false --format=pretty "
+          SELECT event_id, event_type, timestamp
+          FROM \`$GCP_PROJECT.$BQ_DATASET.events\`
+          ORDER BY timestamp DESC
+          LIMIT 5
+          "
+
+          # Show table row counts
+          echo ""
+          echo "Table row counts:"
+          for table in events users metrics; do
+            count=$(bq query --use_legacy_sql=false --format=csv "SELECT COUNT(*) FROM \`$GCP_PROJECT.$BQ_DATASET.$table\`" | tail -1)
+            echo "  $table: $count rows"
+          done
+
+          counter=$((counter + 1))
+          echo "Sleeping for 30 seconds..."
+          echo "---"
+          sleep 30
+        done
