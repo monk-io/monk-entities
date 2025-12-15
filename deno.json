@@ -4,7 +4,22 @@
     },
     "imports": {
         "monkec/base": "./src/lib/modules/base.d.ts",
-        "monkec/http-client": "./src/lib/modules/http-client.d.ts"
+        "monkec/http-client": "./src/lib/modules/http-client.d.ts",
+        "cli": "./src/lib/builtins/cli.d.ts",
+        "core": "./src/lib/builtins/core.d.ts",
+        "http": "./src/lib/builtins/http.d.ts",
+        "secret": "./src/lib/builtins/secret.d.ts",
+        "vars": "./src/lib/builtins/vars.d.ts",
+        "fs": "./src/lib/builtins/fs.d.ts",
+        "aws": "./src/lib/builtins/aws.d.ts",
+        "azure": "./src/lib/builtins/azure.d.ts",
+        "gcp": "./src/lib/builtins/gcp.d.ts",
+        "blobs": "./src/lib/builtins/blobs.d.ts",
+        "parser": "./src/lib/builtins/parser.d.ts",
+        "helpers": "./src/lib/builtins/helpers.d.ts",
+        "crypto": "./src/lib/builtins/crypto.d.ts",
+        "digitalocean": "./src/lib/builtins/digitalocean.d.ts",
+        "monkrpc": "./src/lib/builtins/monkrpc.d.ts"
     },
     "tasks": {
         "sync:yaml": "deno run -A scripts/syncYamlFormsToChroma.ts"
