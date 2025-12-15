@@ -55,11 +55,12 @@ const AWSIAMEntity = base.AWSIAMEntity;
 const common = require("aws-iam/common");
 const IAM_ACTIONS = common.IAM_ACTIONS;
 const formatIAMResourceName = common.formatIAMResourceName;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const secret = require("secret");
 var _regenerateAccessKeys_dec, _createAccessKeysAction_dec, _getCredentials_dec, _listAccessKeys_dec, _getUserInfo_dec, _a, _init;
-var _IAMUser = class _IAMUser extends (_a = AWSIAMEntity, _getUserInfo_dec = [MonkecBase.action("get-user-info")], _listAccessKeys_dec = [MonkecBase.action("list-access-keys")], _getCredentials_dec = [MonkecBase.action("get-credentials")], _createAccessKeysAction_dec = [MonkecBase.action("create-access-keys")], _regenerateAccessKeys_dec = [MonkecBase.action("regenerate-access-keys")], _a) {
+var _IAMUser = class _IAMUser extends (_a = AWSIAMEntity, _getUserInfo_dec = [action("get-user-info")], _listAccessKeys_dec = [action("list-access-keys")], _getCredentials_dec = [action("get-credentials")], _createAccessKeysAction_dec = [action("create-access-keys")], _regenerateAccessKeys_dec = [action("regenerate-access-keys")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

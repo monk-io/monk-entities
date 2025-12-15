@@ -1,7 +1,6 @@
 import { AWSAPIGatewayEntity, AWSAPIGatewayDefinition, AWSAPIGatewayState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
+import { action } from "monkec/base";
 import cli from "cli";
-const action = MonkecBase.action;
 
 export interface APIGatewayDefinition extends AWSAPIGatewayDefinition {
     name: string;

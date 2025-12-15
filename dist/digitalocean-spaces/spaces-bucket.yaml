@@ -3,7 +3,7 @@ spaces-bucket:
   defines: entity
   metadata:
     name: SpacesBucket
-    version-hash: 3eabcd98bb0f
+    version-hash: a13b3ad512db
   schema:
     region:
       type: string

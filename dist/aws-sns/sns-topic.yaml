@@ -3,7 +3,7 @@ sns-topic:
   defines: entity
   metadata:
     name: SNSTopic
-    version-hash: e5180a8db1ca
+    version-hash: 1e1e6bcfd13f
   schema:
     region:
       type: string

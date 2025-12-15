@@ -32,7 +32,9 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
     const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}`;
     const response = gcp.get(url);
     if (response.error) {
-      throw new Error(`Failed to check API ${apiName}: ${parseGcpError(response)}`);
+      throw new Error(
+        `Failed to check API ${apiName}: ${parseGcpError(response)}`
+      );
     }
     const data = JSON.parse(response.body);
     return data.state === "ENABLED";
@@ -45,7 +47,9 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
     const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}:enable`;
     const response = gcp.post(url);
     if (response.error) {
-      throw new Error(`Failed to enable API ${apiName}: ${parseGcpError(response)}`);
+      throw new Error(
+        `Failed to enable API ${apiName}: ${parseGcpError(response)}`
+      );
     }
     return JSON.parse(response.body);
   }
@@ -53,9 +57,7 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
    * Check which APIs from a list are not yet enabled
    */
   checkApis(apiNames) {
-    const names = apiNames.map(
-      (api) => `names=projects/${this.projectId}/services/${api}`
-    ).join("&");
+    const names = apiNames.map((api) => `names=projects/${this.projectId}/services/${api}`).join("&");
     const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchGet?${names}`;
     const response = gcp.get(url);
     if (response.error) {
@@ -82,7 +84,9 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
     const body = { serviceIds: apiNames };
     const response = gcp.post(url, { body: JSON.stringify(body) });
     if (response.error) {
-      throw new Error(`Failed to batch enable APIs: ${parseGcpError(response)}`);
+      throw new Error(
+        `Failed to batch enable APIs: ${parseGcpError(response)}`
+      );
     }
     return JSON.parse(response.body);
   }

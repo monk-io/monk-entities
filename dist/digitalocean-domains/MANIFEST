@@ -1,8 +1,8 @@
 REPO digitalocean-domains
-VERSION_HASH 802a512adfd7
+VERSION_HASH 1001dff8124a
 DESCRIPTION Managed DNS via DigitalOcean.
 HOSTING managed
 TAGS digitalocean,dns,domains
  
-LOAD common.yaml domain.yaml
+LOAD domain.yaml common.yaml
 RESOURCES domain-sync.js common.js

@@ -1,6 +1,5 @@
 import { AWSSESEntity, AWSSESDefinition, AWSSESState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateEmailAddress, type VerificationStatus, type SESEmailIdentityResponse } from "./common.ts";
 
@@ -182,7 +181,7 @@ export class SESEmailIdentity extends AWSSESEntity<SESEmailIdentityDefinition, S
     // Custom Actions
 
     @action("get-verification-status")
-    getVerificationStatus(_args?: MonkecBase.Args): void {
+    getVerificationStatus(_args?: Args): void {
         if (!this.state.email_address) {
             throw new Error("Email identity not created yet");
         }
@@ -201,7 +200,7 @@ export class SESEmailIdentity extends AWSSESEntity<SESEmailIdentityDefinition, S
     }
 
     @action("send-test-email")
-    sendTestEmail(args?: MonkecBase.Args): void {
+    sendTestEmail(args?: Args): void {
         if (!this.state.email_address) {
             throw new Error("Email identity not created yet");
         }
@@ -247,7 +246,7 @@ export class SESEmailIdentity extends AWSSESEntity<SESEmailIdentityDefinition, S
     }
 
     @action("get-dkim-tokens")
-    getDkimTokens(_args?: MonkecBase.Args): void {
+    getDkimTokens(_args?: Args): void {
         if (!this.state.email_address) {
             throw new Error("Email identity not created yet");
         }

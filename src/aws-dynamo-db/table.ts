@@ -1,6 +1,5 @@
 import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action } from "monkec/base";
 
 import {
     AttributeDefinition,

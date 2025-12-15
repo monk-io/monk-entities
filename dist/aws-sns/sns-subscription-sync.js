@@ -52,11 +52,11 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-sns/subscription.ts
 const base = require("aws-sns/base");
 const AWSSNSEntity = base.AWSSNSEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
-var action2 = MonkecBase.action;
 var _confirmSubscription_dec, _setRedrivePolicy_dec, _setFilterPolicy_dec, _getAttributes_dec, _a, _init;
-var _SNSSubscription = class _SNSSubscription extends (_a = AWSSNSEntity, _getAttributes_dec = [action2("get-attributes")], _setFilterPolicy_dec = [action2("set-filter-policy")], _setRedrivePolicy_dec = [action2("set-redrive-policy")], _confirmSubscription_dec = [action2("confirm-subscription")], _a) {
+var _SNSSubscription = class _SNSSubscription extends (_a = AWSSNSEntity, _getAttributes_dec = [action("get-attributes")], _setFilterPolicy_dec = [action("set-filter-policy")], _setRedrivePolicy_dec = [action("set-redrive-policy")], _confirmSubscription_dec = [action("confirm-subscription")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

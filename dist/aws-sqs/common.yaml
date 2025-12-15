@@ -3,5 +3,5 @@ namespace: aws-sqs
 common:
   defines: module
   metadata:
-    version-hash: 44ae1812b96c
+    version-hash: 733da7ddfd93
   source: <<< common.js

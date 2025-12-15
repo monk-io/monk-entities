@@ -52,11 +52,11 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-lambda/function.ts
 const base = require("aws-lambda/base");
 const AWSLambdaEntity = base.AWSLambdaEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
-var action2 = MonkecBase.action;
 var _updateCode_dec, _getLogs_dec, _invoke_dec, _a, _init;
-var _LambdaFunction = class _LambdaFunction extends (_a = AWSLambdaEntity, _invoke_dec = [action2("invoke")], _getLogs_dec = [action2("get-logs")], _updateCode_dec = [action2("update-code")], _a) {
+var _LambdaFunction = class _LambdaFunction extends (_a = AWSLambdaEntity, _invoke_dec = [action("invoke")], _getLogs_dec = [action("get-logs")], _updateCode_dec = [action("update-code")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

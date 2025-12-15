@@ -52,7 +52,8 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-cloudfront/distribution.ts
 const base = require("aws-cloudfront/base");
 const AWSCloudFrontEntity = base.AWSCloudFrontEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const aws = require("cloud/aws");
 const common = require("aws-cloudfront/common");
@@ -60,9 +61,8 @@ const validateDistributionConfig = common.validateDistributionConfig;
 const buildDistributionConfig = common.buildDistributionConfig;
 const formatDistributionState = common.formatDistributionState;
 const generateCallerReference = common.generateCallerReference;
-var action2 = MonkecBase.action;
 var _listInvalidations_dec, _createInvalidation_dec, _getDistributionConfig_dec, _getDistributionInfo_dec, _a, _init;
-var _CloudFrontDistribution = class _CloudFrontDistribution extends (_a = AWSCloudFrontEntity, _getDistributionInfo_dec = [action2("get-distribution-info")], _getDistributionConfig_dec = [action2("get-distribution-config")], _createInvalidation_dec = [action2("create-invalidation")], _listInvalidations_dec = [action2("list-invalidations")], _a) {
+var _CloudFrontDistribution = class _CloudFrontDistribution extends (_a = AWSCloudFrontEntity, _getDistributionInfo_dec = [action("get-distribution-info")], _getDistributionConfig_dec = [action("get-distribution-config")], _createInvalidation_dec = [action("create-invalidation")], _listInvalidations_dec = [action("list-invalidations")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

@@ -1,10 +1,7 @@
 import cli from "cli";
 import secret from "secret";
 import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-
-const action = MonkecBase.action;
-type Args = MonkecBase.Args;
+import { action, Args } from "monkec/base";
 
 /**
  * Pro database definition - full-featured schema for Pro subscriptions

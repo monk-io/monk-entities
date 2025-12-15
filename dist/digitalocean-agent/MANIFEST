@@ -1,8 +1,8 @@
 REPO digitalocean-agent
-VERSION_HASH 5fc69e6c5200
+VERSION_HASH 20750f03ae4a
 DESCRIPTION Manage DigitalOcean GenAI Agents, deployments, and keys.
 HOSTING managed
 TAGS digitalocean,ai,agent,genai
  
 LOAD agent.yaml gradient-base.yaml
-RESOURCES gradient-base.js agent-sync.js
+RESOURCES agent-sync.js gradient-base.js

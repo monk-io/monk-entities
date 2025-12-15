@@ -51,7 +51,8 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-sqs/queue.ts
 const base = require("aws-sqs/base");
 const AWSSQSEntity = base.AWSSQSEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const common = require("aws-sqs/common");
 const validateQueueName = common.validateQueueName;
@@ -59,9 +60,8 @@ const convertAttributesToApiFormat = common.convertAttributesToApiFormat;
 const validateMessageBodySize = common.validateMessageBodySize;
 const DEFAULT_STANDARD_QUEUE_ATTRIBUTES = common.DEFAULT_STANDARD_QUEUE_ATTRIBUTES;
 const DEFAULT_FIFO_QUEUE_ATTRIBUTES = common.DEFAULT_FIFO_QUEUE_ATTRIBUTES;
-var action2 = MonkecBase.action;
 var _getQueueStatistics_dec, _purgeQueue_dec, _receiveMessagesAction_dec, _sendMessageAction_dec, _a, _init;
-var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _sendMessageAction_dec = [action2("send-message")], _receiveMessagesAction_dec = [action2("receive-messages")], _purgeQueue_dec = [action2("purge-messages")], _getQueueStatistics_dec = [action2("get-statistics")], _a) {
+var _SQSQueue = class _SQSQueue extends (_a = AWSSQSEntity, _sendMessageAction_dec = [action("send-message")], _receiveMessagesAction_dec = [action("receive-messages")], _purgeQueue_dec = [action("purge-messages")], _getQueueStatistics_dec = [action("get-statistics")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

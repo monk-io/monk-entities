@@ -9,12 +9,6 @@ var __typeError = (msg) => {
 };
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
-}) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
-});
 var __decoratorStart = (base) => [, , , __create(base?.[__knownSymbol("metadata")] ?? null)];
 var __decoratorStrings = ["class", "method", "getter", "setter", "accessor", "field", "value", "get", "set"];
 var __expectFn = (fn) => fn !== void 0 && typeof fn !== "function" ? __typeError("Function expected") : fn;
@@ -56,11 +50,12 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 
 // input/digitalocean-agent/agent.ts
 const cli = require("cli");
-const MonkecBase = require("monkec/base");
-var action2 = MonkecBase.action;
-var digitalocean = __require("cloud/digitalocean");
+const base = require("monkec/base");
+const action = base.action;
+const MonkEntity = base.MonkEntity;
+const digitalocean = require("cloud/digitalocean");
 var _models_dec, _makePublic_dec, _deploy_dec, _listApiKeys_dec, _deleteApiKey_dec, _revokeApiKey_dec, _createApiKey_dec, _setKnowledgeBases_dec, _setGuardrails_dec, _get_dec, _a, _init;
-var _Agent = class _Agent extends (_a = MonkecBase.MonkEntity, _get_dec = [action2()], _setGuardrails_dec = [action2()], _setKnowledgeBases_dec = [action2()], _createApiKey_dec = [action2()], _revokeApiKey_dec = [action2()], _deleteApiKey_dec = [action2()], _listApiKeys_dec = [action2()], _deploy_dec = [action2()], _makePublic_dec = [action2()], _models_dec = [action2()], _a) {
+var _Agent = class _Agent extends (_a = MonkEntity, _get_dec = [action()], _setGuardrails_dec = [action()], _setKnowledgeBases_dec = [action()], _createApiKey_dec = [action()], _revokeApiKey_dec = [action()], _deleteApiKey_dec = [action()], _listApiKeys_dec = [action()], _deploy_dec = [action()], _makePublic_dec = [action()], _models_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

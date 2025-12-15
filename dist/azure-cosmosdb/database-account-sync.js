@@ -53,10 +53,10 @@ const azureCosmosdbBase = require("azure-cosmosdb/azure-cosmosdb-base");
 const AzureCosmosDBEntity = azureCosmosdbBase.AzureCosmosDBEntity;
 const cli = require("cli");
 const secret = require("secret");
-const MonkecBase = require("monkec/base");
-var action2 = MonkecBase.action;
+const base = require("monkec/base");
+const action = base.action;
 var _restoreAccount_dec, _listRestorableContainers_dec, _listRestorableDatabases_dec, _listRestorableAccounts_dec, _getBackupInfo_dec, _a, _init;
-var _DatabaseAccount = class _DatabaseAccount extends (_a = AzureCosmosDBEntity, _getBackupInfo_dec = [action2("get-backup-info")], _listRestorableAccounts_dec = [action2("list-restorable-accounts")], _listRestorableDatabases_dec = [action2("list-restorable-databases")], _listRestorableContainers_dec = [action2("list-restorable-containers")], _restoreAccount_dec = [action2("restore")], _a) {
+var _DatabaseAccount = class _DatabaseAccount extends (_a = AzureCosmosDBEntity, _getBackupInfo_dec = [action("get-backup-info")], _listRestorableAccounts_dec = [action("list-restorable-accounts")], _listRestorableDatabases_dec = [action("list-restorable-databases")], _listRestorableContainers_dec = [action("list-restorable-containers")], _restoreAccount_dec = [action("restore")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

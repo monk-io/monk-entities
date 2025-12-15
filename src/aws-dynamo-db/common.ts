@@ -72,10 +72,6 @@ export interface TableSchema {
     DeletionProtectionEnabled?: boolean;
 }
 
-export interface Item {
-    [key: string]: AttributeValue;
-}
-
 export interface AttributeValue {
     S?: string;
     N?: string;
@@ -83,11 +79,13 @@ export interface AttributeValue {
     SS?: string[];
     NS?: string[];
     BS?: string[];
-    M?: { [key: string]: AttributeValue };
-    L?: AttributeValue[];
+    M?: Record<string, any>;
+    L?: any[];
     NULL?: boolean;
     BOOL?: boolean;
 }
+
+export type Item = Record<string, AttributeValue>;
 
 export interface TableInfo {
     TableName: string;

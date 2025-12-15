@@ -52,10 +52,10 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 const doS3Base = require("digitalocean-spaces/do-s3-base");
 const DOSpacesS3Entity = doS3Base.DOSpacesS3Entity;
 const cli = require("cli");
-const MonkecBase = require("monkec/base");
-var action2 = MonkecBase.action;
+const base = require("monkec/base");
+const action = base.action;
 var _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBucketInfo_dec = [action2()], _listObjects_dec = [action2()], _generatePresignedUrl_dec = [action2()], _emptyBucket_dec = [action2()], _getBucketStatistics_dec = [action2()], _a) {
+var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

@@ -1,6 +1,5 @@
 import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 
 /**
@@ -290,7 +289,7 @@ export class SNSSubscription extends AWSSNSEntity<SNSSubscriptionDefinition, SNS
      * Custom action: Get subscription attributes
      */
     @action("get-attributes")
-    getAttributes(_args?: MonkecBase.Args): Record<string, any> {
+    getAttributes(_args?: Args): Record<string, any> {
         if (!this.state?.subscription_arn || this.state.pending_confirmation) {
             throw new Error("Cannot get attributes: subscription not confirmed");
         }
@@ -303,7 +302,7 @@ export class SNSSubscription extends AWSSNSEntity<SNSSubscriptionDefinition, SNS
      * Custom action: Set filter policy
      */
     @action("set-filter-policy")
-    setFilterPolicy(args?: MonkecBase.Args): void {
+    setFilterPolicy(args?: Args): void {
         if (!this.state?.subscription_arn || this.state.pending_confirmation) {
             throw new Error("Cannot set filter policy: subscription not confirmed");
         }
@@ -321,7 +320,7 @@ export class SNSSubscription extends AWSSNSEntity<SNSSubscriptionDefinition, SNS
      * Custom action: Set redrive policy (DLQ)
      */
     @action("set-redrive-policy")
-    setRedrivePolicy(args?: MonkecBase.Args): void {
+    setRedrivePolicy(args?: Args): void {
         if (!this.state?.subscription_arn || this.state.pending_confirmation) {
             throw new Error("Cannot set redrive policy: subscription not confirmed");
         }
@@ -339,7 +338,7 @@ export class SNSSubscription extends AWSSNSEntity<SNSSubscriptionDefinition, SNS
      * Custom action: Confirm subscription (for HTTP/HTTPS endpoints)
      */
     @action("confirm-subscription")
-    confirmSubscription(args?: MonkecBase.Args): void {
+    confirmSubscription(args?: Args): void {
         if (!this.definition.topic_arn) {
             throw new Error("Topic ARN not available");
         }

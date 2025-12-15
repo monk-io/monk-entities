@@ -3,5 +3,5 @@ namespace: aws-lambda
 base:
   defines: module
   metadata:
-    version-hash: 100898ca157c
+    version-hash: e6751ebe8029
   source: <<< base.js

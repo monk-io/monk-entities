@@ -1,8 +1,6 @@
 import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntityState } from "./base.ts";
 import cli from "cli";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
-type Args = MonkecBase.Args;
+import { action, Args } from "monkec/base";
 
 /**
  * Represents a MongoDB Atlas cluster entity.

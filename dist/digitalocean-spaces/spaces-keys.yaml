@@ -3,7 +3,7 @@ spaces-keys:
   defines: entity
   metadata:
     name: SpacesKeys
-    version-hash: 3eabcd98bb0f
+    version-hash: a13b3ad512db
   schema:
     name:
       type: string
@@ -23,5 +23,6 @@ spaces-keys:
       attempts: 10
   requires:
     - monkec/base
+    - cloud/digitalocean
     - secret
     - cli

@@ -52,16 +52,16 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-dynamo-db/table.ts
 const base = require("aws-dynamo-db/base");
 const AWSDynamoDBEntity = base.AWSDynamoDBEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const common = require("aws-dynamo-db/common");
 const validateTableName = common.validateTableName;
 const validateBillingMode = common.validateBillingMode;
 const validateKeySchemaAttributes = common.validateKeySchemaAttributes;
 const convertTagsToArray = common.convertTagsToArray;
 const convertTagsToObject = common.convertTagsToObject;
-var action2 = MonkecBase.action;
 var _listTags_dec, _scanTable_dec, _deleteItem_dec, _getItem_dec, _putItem_dec, _getTableDetails_dec, _a, _init;
-var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getTableDetails_dec = [action2()], _putItem_dec = [action2()], _getItem_dec = [action2()], _deleteItem_dec = [action2()], _scanTable_dec = [action2()], _listTags_dec = [action2()], _a) {
+var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getTableDetails_dec = [action()], _putItem_dec = [action()], _getItem_dec = [action()], _deleteItem_dec = [action()], _scanTable_dec = [action()], _listTags_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

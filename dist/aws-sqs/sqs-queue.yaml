@@ -3,7 +3,7 @@ sqs-queue:
   defines: entity
   metadata:
     name: SQSQueue
-    version-hash: 44ae1812b96c
+    version-hash: 733da7ddfd93
   schema:
     region:
       type: string

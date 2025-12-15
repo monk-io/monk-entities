@@ -1,9 +1,7 @@
 import { AzureCosmosDBEntity, AzureCosmosDBDefinition, AzureCosmosDBState } from "./azure-cosmosdb-base.ts";
 import cli from "cli";
 import secret from "secret";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
-type Args = MonkecBase.Args;
+import { action, Args } from "monkec/base";
 
 /**
  * Location configuration for Cosmos DB account

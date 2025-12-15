@@ -1,6 +1,5 @@
 import { AWSSESEntity, AWSSESDefinition, AWSSESState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateDomainName, type VerificationStatus, type SESEmailIdentityResponse } from "./common.ts";
 
@@ -235,7 +234,7 @@ export class SESDomainIdentity extends AWSSESEntity<SESDomainIdentityDefinition,
     // Custom Actions
 
     @action("get-verification-status")
-    getVerificationStatus(_args?: MonkecBase.Args): void {
+    getVerificationStatus(_args?: Args): void {
         if (!this.state.domain_name) {
             throw new Error("Domain identity not created yet");
         }
@@ -261,7 +260,7 @@ export class SESDomainIdentity extends AWSSESEntity<SESDomainIdentityDefinition,
     }
 
     @action("get-dns-records")
-    getDnsRecords(_args?: MonkecBase.Args): void {
+    getDnsRecords(_args?: Args): void {
         if (!this.state.domain_name) {
             throw new Error("Domain identity not created yet");
         }
@@ -320,7 +319,7 @@ export class SESDomainIdentity extends AWSSESEntity<SESDomainIdentityDefinition,
     }
 
     @action("send-test-email")
-    sendTestEmail(args?: MonkecBase.Args): void {
+    sendTestEmail(args?: Args): void {
         if (!this.state.domain_name) {
             throw new Error("Domain identity not created yet");
         }

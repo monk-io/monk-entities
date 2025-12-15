@@ -1,6 +1,5 @@
 import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./base.ts";
-import * as MonkecBase from "monkec/base";
-const action = MonkecBase.action;
+import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateTopicName, parseTopicArn, TopicAttributes, type SNSProtocol } from "./common.ts";
 
@@ -285,7 +284,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     // Custom Actions
 
     @action("get-attributes")
-    getAttributes(_args?: MonkecBase.Args): void {
+    getAttributes(_args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }
@@ -310,7 +309,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("list-subscriptions")
-    listSubscriptions(_args?: MonkecBase.Args): void {
+    listSubscriptions(_args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }
@@ -336,7 +335,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("subscribe")
-    subscribe(args?: MonkecBase.Args): void {
+    subscribe(args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }
@@ -366,7 +365,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("unsubscribe")
-    unsubscribe(args?: MonkecBase.Args): void {
+    unsubscribe(args?: Args): void {
         const subscriptionArn = args?.subscription_arn;
 
         if (!subscriptionArn) {
@@ -383,7 +382,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("publish")
-    publish(args?: MonkecBase.Args): void {
+    publish(args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }
@@ -423,7 +422,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("add-permission")
-    addPermission(args?: MonkecBase.Args): void {
+    addPermission(args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }
@@ -449,7 +448,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     }
 
     @action("remove-permission")
-    removePermission(args?: MonkecBase.Args): void {
+    removePermission(args?: Args): void {
         if (!this.state.topic_arn) {
             throw new Error("Topic not created yet");
         }

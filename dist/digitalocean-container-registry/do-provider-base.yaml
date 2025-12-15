@@ -3,5 +3,5 @@ namespace: digitalocean-container-registry
 do-provider-base:
   defines: module
   metadata:
-    version-hash: c6399121e7cb
+    version-hash: 2e9a3b5c1c19
   source: <<< do-provider-base.js

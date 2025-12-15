@@ -52,15 +52,15 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-sns/topic.ts
 const base = require("aws-sns/base");
 const AWSSNSEntity = base.AWSSNSEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const common = require("aws-sns/common");
 const validateTopicName = common.validateTopicName;
 const parseTopicArn = common.parseTopicArn;
 const TopicAttributes = common.TopicAttributes;
-var action2 = MonkecBase.action;
 var _removePermission_dec, _addPermission_dec, _publish_dec, _unsubscribe_dec, _subscribe_dec, _listSubscriptions_dec, _getAttributes_dec, _a, _init;
-var _SNSTopic = class _SNSTopic extends (_a = AWSSNSEntity, _getAttributes_dec = [action2("get-attributes")], _listSubscriptions_dec = [action2("list-subscriptions")], _subscribe_dec = [action2("subscribe")], _unsubscribe_dec = [action2("unsubscribe")], _publish_dec = [action2("publish")], _addPermission_dec = [action2("add-permission")], _removePermission_dec = [action2("remove-permission")], _a) {
+var _SNSTopic = class _SNSTopic extends (_a = AWSSNSEntity, _getAttributes_dec = [action("get-attributes")], _listSubscriptions_dec = [action("list-subscriptions")], _subscribe_dec = [action("subscribe")], _unsubscribe_dec = [action("unsubscribe")], _publish_dec = [action("publish")], _addPermission_dec = [action("add-permission")], _removePermission_dec = [action("remove-permission")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

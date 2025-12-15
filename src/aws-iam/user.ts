@@ -1,6 +1,6 @@
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
 import { IAM_ACTIONS, formatIAMResourceName } from "./common.ts";
-import * as MonkecBase from "monkec/base";
+import { action } from "monkec/base";
 import cli from "cli";
 import secret from "secret";
 
@@ -686,7 +686,7 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
     
     // Custom Actions
     
-    @MonkecBase.action("get-user-info")
+    @action("get-user-info")
     getUserInfo(): void {
         const userName = formatIAMResourceName(this.definition.user_name);
         
@@ -739,7 +739,7 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
         }
     }
     
-    @MonkecBase.action("list-access-keys")
+    @action("list-access-keys")
     listAccessKeys(): void {
         const userName = formatIAMResourceName(this.definition.user_name);
         
@@ -767,7 +767,7 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
         }
     }
     
-    @MonkecBase.action("get-credentials")
+    @action("get-credentials")
     getCredentials(): void {
         const userName = formatIAMResourceName(this.definition.user_name);
         
@@ -792,7 +792,7 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
         }
     }
     
-    @MonkecBase.action("create-access-keys")
+    @action("create-access-keys")
     createAccessKeysAction(): void {
         try {
             if (this.state.access_key_id && this.state.access_keys_created) {
@@ -816,7 +816,7 @@ export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
         }
     }
     
-    @MonkecBase.action("regenerate-access-keys") 
+    @action("regenerate-access-keys") 
     regenerateAccessKeys(): void {
         const userName = formatIAMResourceName(this.definition.user_name);
         

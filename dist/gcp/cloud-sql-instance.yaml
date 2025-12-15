@@ -3,7 +3,7 @@ cloud-sql-instance:
   defines: entity
   metadata:
     name: CloudSqlInstance
-    version-hash: 1a2c7246f95f
+    version-hash: 6239ea0127d2
   schema:
     project:
       type: string

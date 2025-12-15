@@ -3,7 +3,7 @@ iam-role:
   defines: entity
   metadata:
     name: IAMRole
-    version-hash: 426c4b1855d4
+    version-hash: 4a3599593512
   schema:
     region:
       type: string

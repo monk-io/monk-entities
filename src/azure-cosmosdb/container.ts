@@ -3,11 +3,6 @@ import cli from "cli";
 import http from "http";
 import crypto from "crypto";
 
-// Use runtime require to avoid TS type resolution for cloud/azure
-declare const require: (module: string) => unknown;
-// @ts-ignore: Runtime provided module, no type definitions available
-const _azure = require("cloud/azure"); // Renamed to _azure as it's only used indirectly
-
 /**
  * Partition key configuration
  */
