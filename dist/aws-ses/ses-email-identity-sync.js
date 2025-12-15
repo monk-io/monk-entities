@@ -52,13 +52,13 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-ses/emailIdentity.ts
 const base = require("aws-ses/base");
 const AWSSESEntity = base.AWSSESEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const common = require("aws-ses/common");
 const validateEmailAddress = common.validateEmailAddress;
-var action2 = MonkecBase.action;
 var _getDkimTokens_dec, _sendTestEmail_dec, _getVerificationStatus_dec, _a, _init;
-var _SESEmailIdentity = class _SESEmailIdentity extends (_a = AWSSESEntity, _getVerificationStatus_dec = [action2("get-verification-status")], _sendTestEmail_dec = [action2("send-test-email")], _getDkimTokens_dec = [action2("get-dkim-tokens")], _a) {
+var _SESEmailIdentity = class _SESEmailIdentity extends (_a = AWSSESEntity, _getVerificationStatus_dec = [action("get-verification-status")], _sendTestEmail_dec = [action("send-test-email")], _getDkimTokens_dec = [action("get-dkim-tokens")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

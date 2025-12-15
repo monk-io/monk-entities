@@ -11,8 +11,8 @@ export function getApiToken(secretRef: string): string {
     return token;
 }
 
-export interface NetlifyApiResponse<T = any> {
-    data: T;
+export interface NetlifyApiResponse {
+    data: any;
     status: string;
     message?: string;
 }

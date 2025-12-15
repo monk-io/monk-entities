@@ -52,11 +52,11 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-ses/configurationSet.ts
 const base = require("aws-ses/base");
 const AWSSESEntity = base.AWSSESEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
-var action2 = MonkecBase.action;
 var _disableSending_dec, _enableSending_dec, _getInfo_dec, _a, _init;
-var _SESConfigurationSet = class _SESConfigurationSet extends (_a = AWSSESEntity, _getInfo_dec = [action2("get-info")], _enableSending_dec = [action2("enable-sending")], _disableSending_dec = [action2("disable-sending")], _a) {
+var _SESConfigurationSet = class _SESConfigurationSet extends (_a = AWSSESEntity, _getInfo_dec = [action("get-info")], _enableSending_dec = [action("enable-sending")], _disableSending_dec = [action("disable-sending")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

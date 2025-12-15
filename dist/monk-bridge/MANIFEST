@@ -1,4 +1,4 @@
 REPO monk-bridge
 VERSION_HASH 280717edf59d
-LOAD cluster.yaml runnable.yaml monk-bridge-base.yaml
-RESOURCES cluster-sync.js monk-bridge-base.js runnable-sync.js
+LOAD runnable.yaml monk-bridge-base.yaml cluster.yaml
+RESOURCES runnable-sync.js cluster-sync.js monk-bridge-base.js

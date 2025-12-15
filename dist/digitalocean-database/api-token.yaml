@@ -3,7 +3,7 @@ api-token:
   defines: entity
   metadata:
     name: ApiToken
-    version-hash: 75465066b6b5
+    version-hash: 0dd529074c57
   schema:
     name:
       type: string
@@ -23,5 +23,6 @@ api-token:
       attempts: 10
   requires:
     - monkec/base
+    - cloud/digitalocean
     - secret
     - cli

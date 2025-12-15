@@ -52,13 +52,13 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-ses/domainIdentity.ts
 const base = require("aws-ses/base");
 const AWSSESEntity = base.AWSSESEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const common = require("aws-ses/common");
 const validateDomainName = common.validateDomainName;
-var action2 = MonkecBase.action;
 var _sendTestEmail_dec, _getDnsRecords_dec, _getVerificationStatus_dec, _a, _init;
-var _SESDomainIdentity = class _SESDomainIdentity extends (_a = AWSSESEntity, _getVerificationStatus_dec = [action2("get-verification-status")], _getDnsRecords_dec = [action2("get-dns-records")], _sendTestEmail_dec = [action2("send-test-email")], _a) {
+var _SESDomainIdentity = class _SESDomainIdentity extends (_a = AWSSESEntity, _getVerificationStatus_dec = [action("get-verification-status")], _getDnsRecords_dec = [action("get-dns-records")], _sendTestEmail_dec = [action("send-test-email")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

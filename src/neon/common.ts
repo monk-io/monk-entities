@@ -16,8 +16,8 @@ export function getApiKey(secretRef: string): string {
 /**
  * Neon API response interfaces
  */
-export interface NeonApiResponse<T = any> {
-    data: T;
+export interface NeonApiResponse {
+    data: any;
     statusCode: number;
     status: string;
     ok: boolean;

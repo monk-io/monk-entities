@@ -51,7 +51,8 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-s3/bucket.ts
 const base = require("aws-s3/base");
 const AWSS3Entity = base.AWSS3Entity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
 const aws = require("cloud/aws");
 const common = require("aws-s3/common");
@@ -60,9 +61,8 @@ const DEFAULT_BUCKET_CONFIG = common.DEFAULT_BUCKET_CONFIG;
 const buildLifecycleConfigXml = common.buildLifecycleConfigXml;
 const buildEncryptionConfigXml = common.buildEncryptionConfigXml;
 const parseS3Error = common.parseS3Error;
-var action2 = MonkecBase.action;
 var _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action2()], _listObjects_dec = [action2()], _generatePresignedUrl_dec = [action2()], _emptyBucket_dec = [action2()], _getBucketStatistics_dec = [action2()], _getWebsiteInfo_dec = [action2()], _a) {
+var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _getWebsiteInfo_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);

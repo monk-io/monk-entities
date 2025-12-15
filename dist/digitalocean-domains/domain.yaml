@@ -3,7 +3,7 @@ domain:
   defines: entity
   metadata:
     name: Domain
-    version-hash: 802a512adfd7
+    version-hash: 1001dff8124a
   schema:
     name:
       type: string

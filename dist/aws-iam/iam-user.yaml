@@ -3,7 +3,7 @@ iam-user:
   defines: entity
   metadata:
     name: IAMUser
-    version-hash: 426c4b1855d4
+    version-hash: 4a3599593512
   schema:
     region:
       type: string
@@ -66,6 +66,11 @@ iam-user:
       description: List of attached policy ARNs
   lifecycle:
     sync: <<< iam-user-sync.js
+    get-user-info: ''
+    list-access-keys: ''
+    get-credentials: ''
+    create-access-keys: ''
+    regenerate-access-keys: ''
   checks:
     readiness:
       period: 5

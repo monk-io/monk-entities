@@ -22,8 +22,8 @@ export type RepositoryVisibility = "private" | "public";
 /**
  * Common response interface for DigitalOcean Container Registry API
  */
-export interface ContainerRegistryApiResponse<T = any> {
-    data?: T;
+export interface ContainerRegistryApiResponse {
+    data?: any;
     links?: {
         first?: string;
         last?: string;

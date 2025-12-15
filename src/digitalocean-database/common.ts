@@ -38,8 +38,8 @@ export type DatabaseSize =
 /**
  * Common response interface for DigitalOcean API
  */
-export interface DigitalOceanApiResponse<T = any> {
-    data?: T;
+export interface DigitalOceanApiResponse {
+    data?: any;
     links?: {
         first?: string;
         last?: string;

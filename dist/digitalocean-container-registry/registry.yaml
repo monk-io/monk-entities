@@ -3,7 +3,7 @@ registry:
   defines: entity
   metadata:
     name: Registry
-    version-hash: c6399121e7cb
+    version-hash: 2e9a3b5c1c19
   schema:
     name:
       type: string

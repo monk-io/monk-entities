@@ -36,8 +36,8 @@ __export(do_provider_base_exports, {
 });
 module.exports = __toCommonJS(do_provider_base_exports);
 var import_base = require("monkec/base");
+var import_digitalocean = __toESM(require("cloud/digitalocean"));
 var import_cli = __toESM(require("cli"));
-var digitalocean = require("cloud/digitalocean");
 var DOMonitoringEntity = class extends import_base.MonkEntity {
   before() {
   }
@@ -71,16 +71,16 @@ var DOMonitoringEntity = class extends import_base.MonkEntity {
       let response;
       switch (method.toUpperCase()) {
         case "GET":
-          response = digitalocean.get(apiPath, requestOptions);
+          response = import_digitalocean.default.get(apiPath, requestOptions);
           break;
         case "POST":
-          response = digitalocean.post(apiPath, requestOptions);
+          response = import_digitalocean.default.post(apiPath, requestOptions);
           break;
         case "PUT":
-          response = digitalocean.put(apiPath, requestOptions);
+          response = import_digitalocean.default.put(apiPath, requestOptions);
           break;
         case "DELETE":
-          response = digitalocean.delete(apiPath, requestOptions);
+          response = import_digitalocean.default.delete(apiPath, requestOptions);
           break;
         default:
           throw new Error(`Unsupported HTTP method: ${method}`);

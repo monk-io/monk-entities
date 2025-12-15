@@ -3,7 +3,7 @@ ses-configuration-set:
   defines: entity
   metadata:
     name: SESConfigurationSet
-    version-hash: 162f303faa27
+    version-hash: 977f2b1b6d6f
   schema:
     region:
       type: string

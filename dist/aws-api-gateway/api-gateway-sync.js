@@ -51,11 +51,11 @@ var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "acce
 // input/aws-api-gateway/apiGateway.ts
 const base = require("aws-api-gateway/base");
 const AWSAPIGatewayEntity = base.AWSAPIGatewayEntity;
-const MonkecBase = require("monkec/base");
+const base = require("monkec/base");
+const action = base.action;
 const cli = require("cli");
-var action2 = MonkecBase.action;
 var _listRoutes_dec, _getEndpoint_dec, _syncRoutes_dec, _a, _init;
-var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRoutes_dec = [action2("sync-routes")], _getEndpoint_dec = [action2("get-endpoint")], _listRoutes_dec = [action2("list-routes")], _a) {
+var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRoutes_dec = [action("sync-routes")], _getEndpoint_dec = [action("get-endpoint")], _listRoutes_dec = [action("list-routes")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
