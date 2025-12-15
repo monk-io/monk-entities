@@ -126,7 +126,8 @@ var _ServiceUsage = class _ServiceUsage extends MonkEntity {
       return true;
     }
     if (this.state.operation) {
-      const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/${this.state.operation}`;
+      const opName = `${this.state.operation}`.replace(/^\/+/, "");
+      const url = `${SERVICE_USAGE_API_URL}/${opName}`;
       const response = gcp.get(url);
       if (response.error) {
         cli.output(`Error checking operation: ${parseGcpError(response)}`);

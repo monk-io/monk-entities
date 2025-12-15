@@ -14,7 +14,11 @@
 import { MonkEntity } from "monkec/base";
 import gcp from "cloud/gcp";
 import cli from "cli";
-import { SERVICE_USAGE_API_URL, parseGcpError, isOperationDone } from "./common.ts";
+import {
+  SERVICE_USAGE_API_URL,
+  parseGcpError,
+  isOperationDone,
+} from "./common.ts";
 
 /**
  * Common GCP API names for reference (not exhaustive)
@@ -73,26 +77,26 @@ import { SERVICE_USAGE_API_URL, parseGcpError, isOperationDone } from "./common.
  * @interface ServiceUsageDefinition
  */
 export interface ServiceUsageDefinition {
-    /**
-     * @description Single API name to enable.
-     * Use this for enabling just one API.
-     * Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com")
-     */
-    name?: string;
+  /**
+   * @description Single API name to enable.
+   * Use this for enabling just one API.
+   * Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com")
+   */
+  name?: string;
 
-    /**
-     * @description Array of API names to batch enable.
-     * Use this for enabling multiple APIs efficiently.
-     * APIs are enabled concurrently in a single operation.
-     * @example ["sqladmin.googleapis.com", "bigquery.googleapis.com"]
-     */
-    apis?: string[];
+  /**
+   * @description Array of API names to batch enable.
+   * Use this for enabling multiple APIs efficiently.
+   * APIs are enabled concurrently in a single operation.
+   * @example ["sqladmin.googleapis.com", "bigquery.googleapis.com"]
+   */
+  apis?: string[];
 
-    /**
-     * @description Override the GCP project ID.
-     * If not specified, uses the project from environment/credentials.
-     */
-    project?: string;
+  /**
+   * @description Override the GCP project ID.
+   * If not specified, uses the project from environment/credentials.
+   */
+  project?: string;
 }
 
 /**
@@ -100,25 +104,25 @@ export interface ServiceUsageDefinition {
  * @interface ServiceUsageState
  */
 export interface ServiceUsageState {
-    /**
-     * @description Indicates if all requested APIs are enabled and ready
-     */
-    ready?: boolean;
+  /**
+   * @description Indicates if all requested APIs are enabled and ready
+   */
+  ready?: boolean;
 
-    /**
-     * @description Operation name for tracking async enable operation
-     */
-    operation?: string;
+  /**
+   * @description Operation name for tracking async enable operation
+   */
+  operation?: string;
 
-    /**
-     * @description List of APIs that were enabled by this entity
-     */
-    enabled_apis?: string[];
+  /**
+   * @description List of APIs that were enabled by this entity
+   */
+  enabled_apis?: string[];
 
-    /**
-     * @description Indicates if APIs were already enabled (adopted)
-     */
-    existing?: boolean;
+  /**
+   * @description Indicates if APIs were already enabled (adopted)
+   */
+  existing?: boolean;
 }
 
 /**
@@ -201,197 +205,212 @@ export interface ServiceUsageState {
  *       timeout: 300
  * ```
  */
-export class ServiceUsage extends MonkEntity<ServiceUsageDefinition, ServiceUsageState> {
+export class ServiceUsage extends MonkEntity<
+  ServiceUsageDefinition,
+  ServiceUsageState
+> {
+  protected projectId!: string;
 
-    protected projectId!: string;
+  static readonly readiness = { period: 10, initialDelay: 2, attempts: 30 };
 
-    static readonly readiness = { period: 10, initialDelay: 2, attempts: 30 };
+  protected override before(): void {
+    this.projectId = this.definition.project || gcp.getProject();
+    if (!this.projectId) {
+      throw new Error("GCP project ID not available");
+    }
+  }
 
-    protected override before(): void {
-        this.projectId = this.definition.project || gcp.getProject();
-        if (!this.projectId) {
-            throw new Error("GCP project ID not available");
-        }
+  /**
+   * Check if a single API is enabled
+   */
+  private checkApi(apiName: string): boolean {
+    const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}`;
+    const response = gcp.get(url);
+
+    if (response.error) {
+      throw new Error(
+        `Failed to check API ${apiName}: ${parseGcpError(response)}`
+      );
     }
 
-    /**
-     * Check if a single API is enabled
-     */
-    private checkApi(apiName: string): boolean {
-        const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}`;
-        const response = gcp.get(url);
+    const data = JSON.parse(response.body);
+    return data.state === "ENABLED";
+  }
 
-        if (response.error) {
-            throw new Error(`Failed to check API ${apiName}: ${parseGcpError(response)}`);
-        }
+  /**
+   * Enable a single API
+   */
+  private enableApi(apiName: string): any {
+    cli.output(`Enabling API: ${apiName}`);
+    const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}:enable`;
+    const response = gcp.post(url);
 
-        const data = JSON.parse(response.body);
-        return data.state === "ENABLED";
+    if (response.error) {
+      throw new Error(
+        `Failed to enable API ${apiName}: ${parseGcpError(response)}`
+      );
     }
 
-    /**
-     * Enable a single API
-     */
-    private enableApi(apiName: string): any {
-        cli.output(`Enabling API: ${apiName}`);
-        const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}:enable`;
-        const response = gcp.post(url);
+    return JSON.parse(response.body);
+  }
 
-        if (response.error) {
-            throw new Error(`Failed to enable API ${apiName}: ${parseGcpError(response)}`);
-        }
+  /**
+   * Check which APIs from a list are not yet enabled
+   */
+  private checkApis(apiNames: string[]): string[] {
+    const names = apiNames
+      .map((api) => `names=projects/${this.projectId}/services/${api}`)
+      .join("&");
 
-        return JSON.parse(response.body);
+    const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchGet?${names}`;
+    const response = gcp.get(url);
+
+    if (response.error) {
+      throw new Error(`Failed to batch check APIs: ${parseGcpError(response)}`);
     }
 
-    /**
-     * Check which APIs from a list are not yet enabled
-     */
-    private checkApis(apiNames: string[]): string[] {
-        const names = apiNames.map(api =>
-            `names=projects/${this.projectId}/services/${api}`
-        ).join("&");
+    const data = JSON.parse(response.body);
+    const enabledApis = new Set<string>();
 
-        const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchGet?${names}`;
-        const response = gcp.get(url);
-
-        if (response.error) {
-            throw new Error(`Failed to batch check APIs: ${parseGcpError(response)}`);
+    if (data.services) {
+      for (const service of data.services) {
+        if (service.state === "ENABLED") {
+          // Extract API name from full resource name
+          const parts = service.name.split("/");
+          enabledApis.add(parts[parts.length - 1]);
         }
-
-        const data = JSON.parse(response.body);
-        const enabledApis = new Set<string>();
-
-        if (data.services) {
-            for (const service of data.services) {
-                if (service.state === "ENABLED") {
-                    // Extract API name from full resource name
-                    const parts = service.name.split("/");
-                    enabledApis.add(parts[parts.length - 1]);
-                }
-            }
-        }
-
-        // Return APIs that are not enabled
-        return apiNames.filter(api => !enabledApis.has(api));
+      }
     }
 
-    /**
-     * Batch enable multiple APIs
-     */
-    private enableApis(apiNames: string[]): any {
-        cli.output(`Enabling ${apiNames.length} APIs: ${apiNames.join(", ")}`);
+    // Return APIs that are not enabled
+    return apiNames.filter((api) => !enabledApis.has(api));
+  }
 
-        const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchEnable`;
-        const body = { serviceIds: apiNames };
-        const response = gcp.post(url, { body: JSON.stringify(body) });
+  /**
+   * Batch enable multiple APIs
+   */
+  private enableApis(apiNames: string[]): any {
+    cli.output(`Enabling ${apiNames.length} APIs: ${apiNames.join(", ")}`);
 
-        if (response.error) {
-            throw new Error(`Failed to batch enable APIs: ${parseGcpError(response)}`);
-        }
+    const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchEnable`;
+    const body = { serviceIds: apiNames };
+    const response = gcp.post(url, { body: JSON.stringify(body) });
 
-        return JSON.parse(response.body);
+    if (response.error) {
+      throw new Error(
+        `Failed to batch enable APIs: ${parseGcpError(response)}`
+      );
     }
 
-    override create(): void {
-        if (this.definition.apis && this.definition.apis.length > 0) {
-            // Batch enable mode
-            // Copy to mutable array
-            const apis = [...this.definition.apis];
-            const toEnable = this.checkApis(apis);
+    return JSON.parse(response.body);
+  }
 
-            if (toEnable.length === 0) {
-                cli.output("All APIs are already enabled");
-                this.state.ready = true;
-                this.state.enabled_apis = apis;
-                return;
-            }
+  override create(): void {
+    if (this.definition.apis && this.definition.apis.length > 0) {
+      // Batch enable mode
+      // Copy to mutable array
+      const apis = [...this.definition.apis];
+      const toEnable = this.checkApis(apis);
 
-            const result = this.enableApis(toEnable);
-            this.state.ready = false;
-            this.state.operation = result.name;
-            this.state.enabled_apis = apis;
-        } else if (this.definition.name) {
-            // Single API mode
-            if (this.checkApi(this.definition.name)) {
-                cli.output(`API ${this.definition.name} is already enabled`);
-                this.state.ready = true;
-                this.state.enabled_apis = [this.definition.name];
-                return;
-            }
+      if (toEnable.length === 0) {
+        cli.output("All APIs are already enabled");
+        this.state.ready = true;
+        this.state.enabled_apis = apis;
+        return;
+      }
 
-            const result = this.enableApi(this.definition.name);
-            this.state.ready = false;
-            this.state.operation = result.name;
-            this.state.enabled_apis = [this.definition.name];
-        } else {
-            throw new Error("Either 'name' or 'apis' must be specified");
-        }
+      const result = this.enableApis(toEnable);
+      this.state.ready = false;
+      this.state.operation = result.name;
+      this.state.enabled_apis = apis;
+    } else if (this.definition.name) {
+      // Single API mode
+      if (this.checkApi(this.definition.name)) {
+        cli.output(`API ${this.definition.name} is already enabled`);
+        this.state.ready = true;
+        this.state.enabled_apis = [this.definition.name];
+        return;
+      }
+
+      const result = this.enableApi(this.definition.name);
+      this.state.ready = false;
+      this.state.operation = result.name;
+      this.state.enabled_apis = [this.definition.name];
+    } else {
+      throw new Error("Either 'name' or 'apis' must be specified");
+    }
+  }
+
+  override update(): void {
+    // Re-run create to ensure APIs are enabled
+    this.create();
+  }
+
+  override delete(): void {
+    // APIs are typically not disabled on delete
+    // as they may be used by other resources
+    cli.output("Service Usage entity does not disable APIs on delete");
+  }
+
+  override checkReadiness(): boolean {
+    // If already marked ready, verify APIs are still enabled
+    if (this.state.ready) {
+      return true;
     }
 
-    override update(): void {
-        // Re-run create to ensure APIs are enabled
-        this.create();
-    }
+    // Check operation status if we have one
+    if (this.state.operation) {
+      // Service Usage Operations.get endpoint is:
+      //   GET https://serviceusage.googleapis.com/v1/{name}
+      // where {name} is the operation resource name (e.g. "operations/abc123").
+      // Do NOT prefix with "projects/{projectId}/" or the request will 404.
+      const opName = `${this.state.operation}`.replace(/^\/+/, "");
+      const url = `${SERVICE_USAGE_API_URL}/${opName}`;
+      const response = gcp.get(url);
 
-    override delete(): void {
-        // APIs are typically not disabled on delete
-        // as they may be used by other resources
-        cli.output("Service Usage entity does not disable APIs on delete");
-    }
-
-    override checkReadiness(): boolean {
-        // If already marked ready, verify APIs are still enabled
-        if (this.state.ready) {
-            return true;
-        }
-
-        // Check operation status if we have one
-        if (this.state.operation) {
-            const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/${this.state.operation}`;
-            const response = gcp.get(url);
-
-            if (response.error) {
-                cli.output(`Error checking operation: ${parseGcpError(response)}`);
-                return false;
-            }
-
-            const operation = JSON.parse(response.body);
-
-            if (isOperationDone(operation)) {
-                cli.output("API enablement operation completed");
-                this.state.ready = true;
-                this.state.operation = undefined;
-                return true;
-            }
-
-            const statusInfo = operation.status || (operation.done === false ? "in progress" : "unknown");
-            cli.output(`Operation status: ${statusInfo}`);
-            return false;
-        }
-
-        // Verify APIs are enabled
-        if (this.definition.apis && this.definition.apis.length > 0) {
-            const notEnabled = this.checkApis([...this.definition.apis]);
-            if (notEnabled.length === 0) {
-                this.state.ready = true;
-                return true;
-            }
-            cli.output(`APIs not yet enabled: ${notEnabled.join(", ")}`);
-            return false;
-        } else if (this.definition.name) {
-            if (this.checkApi(this.definition.name)) {
-                this.state.ready = true;
-                return true;
-            }
-            cli.output(`API ${this.definition.name} not yet enabled`);
-            return false;
-        }
-
+      if (response.error) {
+        cli.output(`Error checking operation: ${parseGcpError(response)}`);
         return false;
+      }
+
+      const operation = JSON.parse(response.body);
+
+      if (isOperationDone(operation)) {
+        cli.output("API enablement operation completed");
+        this.state.ready = true;
+        this.state.operation = undefined;
+        return true;
+      }
+
+      const statusInfo =
+        operation.status ||
+        (operation.done === false ? "in progress" : "unknown");
+      cli.output(`Operation status: ${statusInfo}`);
+      return false;
     }
 
-    checkLiveness(): boolean {
-        return this.checkReadiness();
+    // Verify APIs are enabled
+    if (this.definition.apis && this.definition.apis.length > 0) {
+      const notEnabled = this.checkApis([...this.definition.apis]);
+      if (notEnabled.length === 0) {
+        this.state.ready = true;
+        return true;
+      }
+      cli.output(`APIs not yet enabled: ${notEnabled.join(", ")}`);
+      return false;
+    } else if (this.definition.name) {
+      if (this.checkApi(this.definition.name)) {
+        this.state.ready = true;
+        return true;
+      }
+      cli.output(`API ${this.definition.name} not yet enabled`);
+      return false;
     }
+
+    return false;
+  }
+
+  checkLiveness(): boolean {
+    return this.checkReadiness();
+  }
 }

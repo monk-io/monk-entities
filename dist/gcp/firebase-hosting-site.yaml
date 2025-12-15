@@ -3,7 +3,7 @@ firebase-hosting-site:
   defines: entity
   metadata:
     name: FirebaseHostingSite
-    version-hash: 60073a5fb197
+    version-hash: 1a2c7246f95f
   schema:
     project:
       type: string
