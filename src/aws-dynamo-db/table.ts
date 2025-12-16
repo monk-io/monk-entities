@@ -1,5 +1,5 @@
-import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState } from "./base.ts";
-import { action } from "monkec/base";
+import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState, action } from "./base.ts";
+import cli from "cli";
 
 import {
     AttributeDefinition,
@@ -582,6 +582,477 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         const tags = convertTagsToObject(response.Tags);
         return tags || {};
     }
+
+    // ==================== BACKUP ACTIONS ====================
+
+    /**
+     * Get backup configuration and status including PITR and recent backups
+     */
+    @action("get-backup-info")
+    getBackupInfo(): void {
+        if (!this.state.table_name) {
+            throw new Error("Table not created yet");
+        }
+
+        cli.output("==================================================");
+        cli.output(`Backup Info for table: ${this.state.table_name}`);
+        cli.output("==================================================");
+
+        // Get continuous backups (PITR) status
+        try {
+            const continuousBackups = this.makeDynamoDBRequest("DescribeContinuousBackups", {
+                TableName: this.state.table_name
+            });
+
+            const pitrDesc = continuousBackups.ContinuousBackupsDescription;
+            if (pitrDesc) {
+                cli.output("");
+                cli.output("📋 Continuous Backups Status:");
+                cli.output(`   Status: ${pitrDesc.ContinuousBackupsStatus}`);
+                
+                const pitr = pitrDesc.PointInTimeRecoveryDescription;
+                if (pitr) {
+                    cli.output(`   PITR Enabled: ${pitr.PointInTimeRecoveryStatus === 'ENABLED' ? '✅ Yes' : '❌ No'}`);
+                    if (pitr.EarliestRestorableDateTime) {
+                        cli.output(`   Earliest Restore: ${pitr.EarliestRestorableDateTime}`);
+                    }
+                    if (pitr.LatestRestorableDateTime) {
+                        cli.output(`   Latest Restore: ${pitr.LatestRestorableDateTime}`);
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`⚠️ Could not fetch PITR status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+
+        // List recent on-demand backups
+        try {
+            const backups = this.makeDynamoDBRequest("ListBackups", {
+                TableName: this.state.table_name,
+                Limit: 5
+            });
+
+            cli.output("");
+            cli.output("📦 Recent On-Demand Backups:");
+            
+            if (backups.BackupSummaries && backups.BackupSummaries.length > 0) {
+                cli.output(`   Total: ${backups.BackupSummaries.length} backup(s)`);
+                for (const backup of backups.BackupSummaries) {
+                    cli.output("");
+                    cli.output(`   • ${backup.BackupName}`);
+                    cli.output(`     ARN: ${backup.BackupArn}`);
+                    cli.output(`     Status: ${backup.BackupStatus}`);
+                    cli.output(`     Created: ${backup.BackupCreationDateTime}`);
+                    if (backup.BackupSizeBytes) {
+                        const sizeMB = (backup.BackupSizeBytes / (1024 * 1024)).toFixed(2);
+                        cli.output(`     Size: ${sizeMB} MB`);
+                    }
+                }
+            } else {
+                cli.output("   No on-demand backups found");
+            }
+        } catch (error) {
+            cli.output(`⚠️ Could not list backups: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+
+        cli.output("");
+        cli.output("==================================================");
+    }
+
+    /**
+     * Create an on-demand backup snapshot
+     * @param args.backup_name - Name for the backup (optional, auto-generated if not provided)
+     */
+    @action("create-snapshot")
+    createSnapshot(args?: any): void {
+        if (!this.state.table_name) {
+            throw new Error("Table not created yet");
+        }
+
+        const backupName = args?.backup_name || args?.snapshot_id || 
+            `${this.state.table_name}-backup-${Date.now()}`;
+
+        cli.output(`Creating backup '${backupName}' for table '${this.state.table_name}'...`);
+
+        const response = this.makeDynamoDBRequest("CreateBackup", {
+            TableName: this.state.table_name,
+            BackupName: backupName
+        });
+
+        if (response.BackupDetails) {
+            const details = response.BackupDetails;
+            cli.output("");
+            cli.output("✅ Backup created successfully!");
+            cli.output(`   Name: ${details.BackupName}`);
+            cli.output(`   ARN: ${details.BackupArn}`);
+            cli.output(`   Status: ${details.BackupStatus}`);
+            cli.output(`   Created: ${details.BackupCreationDateTime}`);
+            
+            // Extract backup ID from ARN for easier reference
+            const backupId = details.BackupArn.split('/').pop();
+            cli.output(`   Backup ID: ${backupId}`);
+            cli.output("");
+            cli.output("💡 Use this ARN or ID with 'restore' action to restore from this backup");
+        }
+    }
+
+    /**
+     * List available on-demand backups
+     * @param args.limit - Maximum number of backups to list (default: 20)
+     * @param args.status - Filter by status: CREATING, AVAILABLE, DELETED (optional)
+     */
+    @action("list-snapshots")
+    listSnapshots(args?: any): void {
+        if (!this.state.table_name) {
+            throw new Error("Table not created yet");
+        }
+
+        const limit = parseInt(args?.limit || "20", 10);
+        const status = args?.status;
+
+        const params: any = {
+            TableName: this.state.table_name,
+            Limit: limit
+        };
+
+        if (status) {
+            params.BackupType = status === 'SYSTEM' ? 'SYSTEM' : 
+                               status === 'AWS_BACKUP' ? 'AWS_BACKUP' : 'USER';
+        }
+
+        cli.output("==================================================");
+        cli.output(`Backups for table: ${this.state.table_name}`);
+        cli.output("==================================================");
+
+        const response = this.makeDynamoDBRequest("ListBackups", params);
+
+        if (response.BackupSummaries && response.BackupSummaries.length > 0) {
+            cli.output(`Total backups found: ${response.BackupSummaries.length}`);
+            cli.output("");
+
+            for (let i = 0; i < response.BackupSummaries.length; i++) {
+                const backup = response.BackupSummaries[i];
+                const backupId = backup.BackupArn.split('/').pop();
+                
+                cli.output(`📦 Backup #${i + 1}`);
+                cli.output(`   Name: ${backup.BackupName}`);
+                cli.output(`   ID: ${backupId}`);
+                cli.output(`   ARN: ${backup.BackupArn}`);
+                cli.output(`   Status: ${backup.BackupStatus}`);
+                cli.output(`   Type: ${backup.BackupType || 'USER'}`);
+                cli.output(`   Created: ${backup.BackupCreationDateTime}`);
+                if (backup.BackupExpiryDateTime) {
+                    cli.output(`   Expires: ${backup.BackupExpiryDateTime}`);
+                }
+                if (backup.BackupSizeBytes) {
+                    const sizeMB = (backup.BackupSizeBytes / (1024 * 1024)).toFixed(2);
+                    cli.output(`   Size: ${sizeMB} MB`);
+                }
+                cli.output("");
+            }
+
+            if (response.LastEvaluatedBackupArn) {
+                cli.output("📝 More backups available. Increase limit to see more.");
+            }
+        } else {
+            cli.output("No backups found for this table.");
+            cli.output("");
+            cli.output("💡 Create a backup with: monk do <namespace>/<table>/create-snapshot");
+        }
+
+        cli.output("==================================================");
+    }
+
+    /**
+     * Get detailed information about a specific backup
+     * @param args.backup_arn - Full ARN of the backup
+     * @param args.snapshot_id - Backup ID (alternative to full ARN)
+     */
+    @action("describe-snapshot")
+    describeSnapshot(args?: any): void {
+        const backupArn = args?.backup_arn || args?.snapshot_id;
+        if (!backupArn) {
+            throw new Error("backup_arn or snapshot_id is required");
+        }
+
+        // If just an ID is provided, construct the ARN
+        let fullArn = backupArn;
+        if (!backupArn.startsWith('arn:')) {
+            if (!this.state.table_arn) {
+                throw new Error("Cannot construct backup ARN without table ARN. Please provide full backup_arn.");
+            }
+            // Extract account and region from table ARN
+            const arnParts = this.state.table_arn.split(':');
+            const region = arnParts[3];
+            const account = arnParts[4];
+            fullArn = `arn:aws:dynamodb:${region}:${account}:table/${this.state.table_name}/backup/${backupArn}`;
+        }
+
+        const response = this.makeDynamoDBRequest("DescribeBackup", {
+            BackupArn: fullArn
+        });
+
+        if (response.BackupDescription) {
+            const desc = response.BackupDescription;
+            const details = desc.BackupDetails;
+            const sourceTable = desc.SourceTableDetails;
+            const sourceFeatures = desc.SourceTableFeatureDetails;
+
+            cli.output("==================================================");
+            cli.output("Backup Details");
+            cli.output("==================================================");
+            
+            if (details) {
+                cli.output(`Name: ${details.BackupName}`);
+                cli.output(`ARN: ${details.BackupArn}`);
+                cli.output(`Status: ${details.BackupStatus}`);
+                cli.output(`Type: ${details.BackupType || 'USER'}`);
+                cli.output(`Created: ${details.BackupCreationDateTime}`);
+                if (details.BackupExpiryDateTime) {
+                    cli.output(`Expires: ${details.BackupExpiryDateTime}`);
+                }
+                if (details.BackupSizeBytes) {
+                    const sizeMB = (details.BackupSizeBytes / (1024 * 1024)).toFixed(2);
+                    cli.output(`Size: ${sizeMB} MB`);
+                }
+            }
+
+            if (sourceTable) {
+                cli.output("");
+                cli.output("📋 Source Table Info:");
+                cli.output(`   Table Name: ${sourceTable.TableName}`);
+                cli.output(`   Table ARN: ${sourceTable.TableArn}`);
+                cli.output(`   Item Count: ${sourceTable.ItemCount || 'N/A'}`);
+                cli.output(`   Billing Mode: ${sourceTable.BillingMode || 'PROVISIONED'}`);
+                if (sourceTable.ProvisionedThroughput) {
+                    cli.output(`   Read Capacity: ${sourceTable.ProvisionedThroughput.ReadCapacityUnits}`);
+                    cli.output(`   Write Capacity: ${sourceTable.ProvisionedThroughput.WriteCapacityUnits}`);
+                }
+            }
+
+            if (sourceFeatures) {
+                cli.output("");
+                cli.output("📋 Source Table Features:");
+                if (sourceFeatures.GlobalSecondaryIndexes) {
+                    cli.output(`   GSI Count: ${sourceFeatures.GlobalSecondaryIndexes.length}`);
+                }
+                if (sourceFeatures.LocalSecondaryIndexes) {
+                    cli.output(`   LSI Count: ${sourceFeatures.LocalSecondaryIndexes.length}`);
+                }
+                if (sourceFeatures.StreamDescription) {
+                    cli.output(`   Streams: Enabled`);
+                }
+                if (sourceFeatures.SSEDescription) {
+                    cli.output(`   Encryption: ${sourceFeatures.SSEDescription.SSEType || 'Enabled'}`);
+                }
+            }
+
+            cli.output("==================================================");
+        }
+    }
+
+    /**
+     * Delete an on-demand backup
+     * @param args.backup_arn - Full ARN of the backup to delete
+     * @param args.snapshot_id - Backup ID (alternative to full ARN)
+     */
+    @action("delete-snapshot")
+    deleteSnapshot(args?: any): void {
+        const backupArn = args?.backup_arn || args?.snapshot_id;
+        if (!backupArn) {
+            throw new Error("backup_arn or snapshot_id is required");
+        }
+
+        // If just an ID is provided, construct the ARN
+        let fullArn = backupArn;
+        if (!backupArn.startsWith('arn:')) {
+            if (!this.state.table_arn) {
+                throw new Error("Cannot construct backup ARN without table ARN. Please provide full backup_arn.");
+            }
+            const arnParts = this.state.table_arn.split(':');
+            const region = arnParts[3];
+            const account = arnParts[4];
+            fullArn = `arn:aws:dynamodb:${region}:${account}:table/${this.state.table_name}/backup/${backupArn}`;
+        }
+
+        cli.output(`Deleting backup: ${fullArn}...`);
+
+        const response = this.makeDynamoDBRequest("DeleteBackup", {
+            BackupArn: fullArn
+        });
+
+        if (response.BackupDescription) {
+            const details = response.BackupDescription.BackupDetails;
+            cli.output("");
+            cli.output("✅ Backup deletion initiated!");
+            cli.output(`   Name: ${details.BackupName}`);
+            cli.output(`   Status: ${details.BackupStatus}`);
+        }
+    }
+
+    /**
+     * Restore table from backup or point-in-time
+     * @param args.backup_arn - Full ARN of backup to restore from (for on-demand backup restore)
+     * @param args.snapshot_id - Backup ID (alternative to backup_arn)
+     * @param args.target_table - Name for the restored table (required)
+     * @param args.restore_timestamp - ISO timestamp for PITR restore (alternative to backup restore)
+     * @param args.use_latest - Set to "true" to restore to latest restorable time (for PITR)
+     */
+    @action("restore")
+    restore(args?: any): void {
+        if (!this.state.table_name) {
+            throw new Error("Table not created yet");
+        }
+
+        const targetTable = args?.target_table || args?.target_id;
+        if (!targetTable) {
+            throw new Error("target_table is required - restored data goes to a NEW table");
+        }
+
+        const backupArn = args?.backup_arn || args?.snapshot_id;
+        const restoreTimestamp = args?.restore_timestamp;
+        const useLatest = args?.use_latest === 'true' || args?.use_latest === true;
+
+        if (!backupArn && !restoreTimestamp && !useLatest) {
+            throw new Error("Either backup_arn/snapshot_id, restore_timestamp, or use_latest=true is required");
+        }
+
+        // Point-in-time restore
+        if (restoreTimestamp || useLatest) {
+            cli.output(`Initiating point-in-time restore to new table '${targetTable}'...`);
+            
+            const params: any = {
+                SourceTableName: this.state.table_name,
+                TargetTableName: targetTable
+            };
+
+            if (useLatest) {
+                params.UseLatestRestorableTime = true;
+                cli.output("Using latest restorable time...");
+            } else {
+                // Parse timestamp - support both ISO string and Unix timestamp
+                let restoreTime: string;
+                if (/^\d+$/.test(restoreTimestamp)) {
+                    // Unix timestamp in seconds
+                    restoreTime = new Date(parseInt(restoreTimestamp, 10) * 1000).toISOString();
+                } else {
+                    restoreTime = restoreTimestamp;
+                }
+                params.RestoreDateTime = restoreTime;
+                cli.output(`Restoring to: ${restoreTime}`);
+            }
+
+            const response = this.makeDynamoDBRequest("RestoreTableToPointInTime", params);
+
+            if (response.TableDescription) {
+                cli.output("");
+                cli.output("✅ Point-in-time restore initiated!");
+                cli.output(`   Target Table: ${response.TableDescription.TableName}`);
+                cli.output(`   Status: ${response.TableDescription.TableStatus}`);
+                cli.output(`   ARN: ${response.TableDescription.TableArn}`);
+                cli.output("");
+                cli.output("💡 Use 'get-restore-status' action to monitor progress:");
+                cli.output(`   monk do <namespace>/<entity>/get-restore-status target_table="${targetTable}"`);
+            }
+        } 
+        // On-demand backup restore
+        else {
+            // Construct full ARN if needed
+            let fullArn = backupArn;
+            if (!backupArn.startsWith('arn:')) {
+                if (!this.state.table_arn) {
+                    throw new Error("Cannot construct backup ARN without table ARN. Please provide full backup_arn.");
+                }
+                const arnParts = this.state.table_arn.split(':');
+                const region = arnParts[3];
+                const account = arnParts[4];
+                fullArn = `arn:aws:dynamodb:${region}:${account}:table/${this.state.table_name}/backup/${backupArn}`;
+            }
+
+            cli.output(`Restoring from backup to new table '${targetTable}'...`);
+            cli.output(`Backup ARN: ${fullArn}`);
+
+            const response = this.makeDynamoDBRequest("RestoreTableFromBackup", {
+                BackupArn: fullArn,
+                TargetTableName: targetTable
+            });
+
+            if (response.TableDescription) {
+                cli.output("");
+                cli.output("✅ Restore from backup initiated!");
+                cli.output(`   Target Table: ${response.TableDescription.TableName}`);
+                cli.output(`   Status: ${response.TableDescription.TableStatus}`);
+                cli.output(`   ARN: ${response.TableDescription.TableArn}`);
+                cli.output("");
+                cli.output("💡 Use 'get-restore-status' action to monitor progress:");
+                cli.output(`   monk do <namespace>/<entity>/get-restore-status target_table="${targetTable}"`);
+            }
+        }
+    }
+
+    /**
+     * Check the status of a restored table
+     * @param args.target_table - Name of the restored table to check
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args?: any): void {
+        const targetTable = args?.target_table || args?.target_id;
+        if (!targetTable) {
+            throw new Error("target_table is required");
+        }
+
+        cli.output(`Checking restore status for table: ${targetTable}`);
+        cli.output("");
+
+        try {
+            const response = this.makeDynamoDBRequest("DescribeTable", {
+                TableName: targetTable
+            });
+
+            if (response.Table) {
+                const table = response.Table;
+                cli.output("==================================================");
+                cli.output("Restore Status");
+                cli.output("==================================================");
+                cli.output(`Table Name: ${table.TableName}`);
+                cli.output(`Status: ${table.TableStatus}`);
+                cli.output(`ARN: ${table.TableArn}`);
+                
+                if (table.RestoreSummary) {
+                    const restore = table.RestoreSummary;
+                    cli.output("");
+                    cli.output("📋 Restore Details:");
+                    if (restore.SourceBackupArn) {
+                        cli.output(`   Source Backup: ${restore.SourceBackupArn}`);
+                    }
+                    if (restore.SourceTableArn) {
+                        cli.output(`   Source Table: ${restore.SourceTableArn}`);
+                    }
+                    cli.output(`   Restore Time: ${restore.RestoreDateTime}`);
+                    cli.output(`   In Progress: ${restore.RestoreInProgress ? '🔄 Yes' : '✅ Completed'}`);
+                }
+
+                if (table.TableStatus === 'ACTIVE') {
+                    cli.output("");
+                    cli.output("✅ Table is ACTIVE and ready for use!");
+                } else if (table.TableStatus === 'CREATING') {
+                    cli.output("");
+                    cli.output("🔄 Restore is still in progress. Check again in a few minutes.");
+                }
+
+                cli.output("==================================================");
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {
+                cli.output(`❌ Table '${targetTable}' not found.`);
+                cli.output("   The restore may not have started yet or the table name is incorrect.");
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    // ==================== END BACKUP ACTIONS ====================
 
     private updatePointInTimeRecovery(): void {
         if (!this.state.table_name) {

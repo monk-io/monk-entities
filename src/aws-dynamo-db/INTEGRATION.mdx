@@ -63,3 +63,51 @@ monk update aws-dynamo-db-example/simple-table
 monk describe aws-dynamo-db-example/simple-table
 ```
 
+## Backup & Restore Actions
+
+DynamoDB supports **Point-in-Time Recovery (PITR)** with 35-day continuous backups and **On-Demand Backups** that are retained indefinitely.
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View PITR status and recent backups |
+| `create-snapshot` | Create an on-demand backup |
+| `list-snapshots` | List available backups |
+| `describe-snapshot` | Get detailed backup info |
+| `delete-snapshot` | Delete an on-demand backup |
+| `restore` | Restore to a new table |
+| `get-restore-status` | Check restore progress |
+
+```bash
+# View backup configuration
+monk do my-app/my-table/get-backup-info
+
+# Create an on-demand backup
+monk do my-app/my-table/create-snapshot backup_name="pre-migration"
+
+# List available backups
+monk do my-app/my-table/list-snapshots
+
+# Restore from backup to new table
+monk do my-app/my-table/restore backup_arn="arn:aws:dynamodb:..." target_table="restored-table"
+
+# Point-in-time restore (latest)
+monk do my-app/my-table/restore use_latest="true" target_table="restored-table"
+
+# Check restore status
+monk do my-app/my-table/get-restore-status target_table="restored-table"
+```
+
+**Note:** DynamoDB restore always creates a **new table** - it does not overwrite the source.
+
+### Enable PITR in Definition
+
+```yaml
+my-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: production-table
+  point_in_time_recovery_enabled: true  # Enable 35-day continuous backup
+  deletion_protection_enabled: true
+  # ... key schema ...
+```
+

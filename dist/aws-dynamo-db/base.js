@@ -32,7 +32,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 // input/aws-dynamo-db/base.ts
 var base_exports = {};
 __export(base_exports, {
-  AWSDynamoDBEntity: () => AWSDynamoDBEntity
+  AWSDynamoDBEntity: () => AWSDynamoDBEntity,
+  action: () => import_base.action
 });
 module.exports = __toCommonJS(base_exports);
 var import_base = require("monkec/base");
@@ -45,13 +46,13 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
   before() {
     this.region = this.definition.region;
   }
-  makeDynamoDBRequest(action, body) {
+  makeDynamoDBRequest(action2, body) {
     const url = `https://dynamodb.${this.region}.amazonaws.com/`;
     const options = {
       service: "dynamodb",
       region: this.region,
       headers: {
-        "X-Amz-Target": `DynamoDB_20120810.${action}`,
+        "X-Amz-Target": `DynamoDB_20120810.${action2}`,
         "Content-Type": "application/x-amz-json-1.0"
       },
       body: typeof body === "string" ? body : JSON.stringify(body),
@@ -145,5 +146,6 @@ var AWSDynamoDBEntity = class extends import_base.MonkEntity {
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  AWSDynamoDBEntity
+  AWSDynamoDBEntity,
+  action
 });
