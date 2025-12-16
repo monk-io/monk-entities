@@ -3,7 +3,7 @@ service-usage:
   defines: entity
   metadata:
     name: ServiceUsage
-    version-hash: 6239ea0127d2
+    version-hash: c729f43fd5ca
   schema:
     name:
       type: string

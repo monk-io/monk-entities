@@ -3,7 +3,7 @@ cloud-sql-instance:
   defines: entity
   metadata:
     name: CloudSqlInstance
-    version-hash: 6239ea0127d2
+    version-hash: c729f43fd5ca
   schema:
     project:
       type: string
@@ -142,6 +142,13 @@ cloud-sql-instance:
     restart: ''
     stop: ''
     start: ''
+    get-backup-info: ''
+    create-backup: ''
+    list-backups: ''
+    describe-backup: ''
+    delete-backup: ''
+    restore: ''
+    get-restore-status: ''
   checks:
     readiness:
       period: 15

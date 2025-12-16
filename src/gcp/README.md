@@ -12,6 +12,7 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-sql-user` | Database users with password management |
 | `gcp/big-query` | BigQuery datasets and tables |
 | `gcp/cloud-storage` | Cloud Storage buckets |
+| `gcp/firestore` | Firestore databases with PITR and backup support |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -149,6 +150,15 @@ my-postgres:
 - `stop`: Stop the instance
 - `start`: Start the instance
 
+**Backup & Restore Actions:**
+- `get-backup-info`: Show backup configuration and PITR status
+- `create-backup`: Create an on-demand backup
+- `list-backups`: List all backups (automated and on-demand)
+- `describe-backup`: Get detailed backup information
+- `delete-backup`: Delete a specific backup
+- `restore`: Restore from a backup
+- `get-restore-status`: Check restore operation progress
+
 ### cloud-sql-database
 
 Create databases within a Cloud SQL instance.
@@ -220,6 +230,15 @@ my-dataset:
 - `create-table`: Create a new table (args: name, schema)
 - `delete-table`: Delete a table (args: name)
 
+**Backup & Restore Actions (Table Snapshots):**
+- `get-backup-info`: Show time travel settings and storage billing model
+- `create-snapshot`: Create a table snapshot (args: table, snapshot, expiration_days, snapshot_time)
+- `list-snapshots`: List all table snapshots in the dataset
+- `describe-snapshot`: Get detailed snapshot information
+- `delete-snapshot`: Delete a table snapshot
+- `restore`: Restore a table from a snapshot (args: snapshot, target)
+- `time-travel-info`: Show time travel query examples for a table
+
 ### cloud-storage
 
 Create and manage Cloud Storage buckets.
@@ -255,6 +274,34 @@ my-bucket:
 **Actions:**
 - `get`: Get bucket details
 - `list-objects`: List objects (args: prefix, max_results)
+
+### firestore
+
+Create and manage Firestore databases with point-in-time recovery support.
+
+```yaml
+my-firestore:
+  defines: gcp/firestore
+  database_id: my-database           # Required: database ID (use "(default)" for default)
+  location: nam5                     # Required: multi-region or regional location
+  type: FIRESTORE_NATIVE             # Default: FIRESTORE_NATIVE (or DATASTORE_MODE)
+  point_in_time_recovery: true       # Optional: enable PITR for 7-day recovery window
+  delete_protection: false           # Optional: prevent accidental deletion
+  concurrency_mode: OPTIMISTIC       # Optional: OPTIMISTIC or PESSIMISTIC
+```
+
+**Actions:**
+- `get`: Get database details
+- `export-documents`: Export documents to GCS (args: output_uri_prefix, collection_ids)
+- `import-documents`: Import documents from GCS (args: input_uri_prefix, collection_ids)
+
+**Backup & Restore Actions:**
+- `get-backup-info`: Show PITR status and earliest restore time
+- `list-backups`: List backups in a location (args: location, limit)
+- `describe-backup`: Get detailed backup information (args: backup_name)
+- `delete-backup`: Delete a backup (args: backup_name)
+- `restore`: Restore to a new database from backup (args: backup_name, target_database)
+- `get-restore-status`: Check restore operation progress (args: operation_name)
 
 ### service-account
 
@@ -344,6 +391,81 @@ cp src/gcp/test/env.example src/gcp/test/.env
 
 # Run tests
 sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose
+```
+
+## Backup & Restore Interface
+
+GCP database entities implement a unified backup and restore interface, providing consistent operations across different database types.
+
+### Supported Entities
+
+| Entity | Backup Type | Point-in-Time Recovery |
+|--------|-------------|------------------------|
+| `gcp/cloud-sql-instance` | Automated + On-demand backups | ✅ Supported (enable via `point_in_time_recovery_enabled`) |
+| `gcp/firestore` | Scheduled backups + Export | ✅ Supported (enable via `point_in_time_recovery`) |
+| `gcp/big-query` | Table snapshots + Time travel | ✅ Built-in (7+ days via `max_time_travel_hours`) |
+
+### Common Operations
+
+```bash
+# Check backup configuration
+monk do namespace/entity get-backup-info
+
+# Create a backup/snapshot
+monk do namespace/cloud-sql create-backup description="Pre-migration"
+monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/backup"
+monk do namespace/bigquery create-snapshot table="events" snapshot="events_backup"
+
+# List available backups
+monk do namespace/cloud-sql list-backups
+monk do namespace/firestore list-backups location="nam5"
+monk do namespace/bigquery list-snapshots
+
+# Restore from backup
+monk do namespace/cloud-sql restore backup_id="123456789"
+monk do namespace/firestore restore backup_name="projects/.../backups/..." target_database="restored-db"
+monk do namespace/bigquery restore snapshot="events_backup" target="events_restored"
+
+# Check restore progress
+monk do namespace/entity get-restore-status operation_name="..."
+```
+
+### Cloud SQL Backup Example
+
+```yaml
+# Enable automated backups with PITR
+my-postgres:
+  defines: gcp/cloud-sql-instance
+  name: production-db
+  database_version: POSTGRES_16
+  tier: db-custom-2-7680
+  region: us-central1
+  backup_start_time: "03:00"              # Enable automated backups at 3 AM
+  point_in_time_recovery_enabled: true    # Enable PITR for granular recovery
+```
+
+### BigQuery Time Travel
+
+BigQuery provides built-in time travel for querying historical data:
+
+```sql
+-- Query data from 1 day ago
+SELECT * FROM `project.dataset.table`
+FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
+
+-- Query data at a specific point in time
+SELECT * FROM `project.dataset.table`
+FOR SYSTEM_TIME AS OF TIMESTAMP("2024-01-15 10:00:00 UTC")
+```
+
+Configure extended time travel (up to 7 weeks) using PHYSICAL storage billing:
+
+```yaml
+my-dataset:
+  defines: gcp/big-query
+  dataset: analytics
+  storage_billing_model: PHYSICAL
+  max_time_travel_hours: 1176    # 49 days (7 weeks)
 ```
 
 ## Best Practices

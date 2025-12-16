@@ -3,7 +3,7 @@ cloud-sql-user:
   defines: entity
   metadata:
     name: CloudSqlUser
-    version-hash: 6239ea0127d2
+    version-hash: c729f43fd5ca
   schema:
     project:
       type: string

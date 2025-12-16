@@ -57,8 +57,8 @@ const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
 const common = require("gcp/common");
 const FIRESTORE_API_URL = common.FIRESTORE_API_URL;
-var _importDocuments_dec, _exportDocuments_dec, _listFields_dec, _listIndexes_dec, _getInfo_dec, _a, _init;
-var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [action("get")], _listIndexes_dec = [action("list-indexes")], _listFields_dec = [action("list-fields")], _exportDocuments_dec = [action("export-documents")], _importDocuments_dec = [action("import-documents")], _a) {
+var _getRestoreStatus_dec, _restoreDatabase_dec, _deleteBackup_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _importDocuments_dec, _exportDocuments_dec, _listFields_dec, _listIndexes_dec, _getInfo_dec, _a, _init;
+var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [action("get")], _listIndexes_dec = [action("list-indexes")], _listFields_dec = [action("list-fields")], _exportDocuments_dec = [action("export-documents")], _importDocuments_dec = [action("import-documents")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _deleteBackup_dec = [action("delete-backup")], _restoreDatabase_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -278,6 +278,307 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
     const operation = this.post(url, body);
     cli.output(`Import started: ${operation.name}`);
   }
+  getBackupInfo(_args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4E6} Backup Information for Firestore database`);
+    cli.output(`Database: ${this.getDatabaseId()}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+    const db = this.getDatabase();
+    if (!db) {
+      throw new Error(`Database ${this.getDatabaseId()} not found`);
+    }
+    cli.output(`
+\u{1F527} Database Configuration:`);
+    cli.output(`   Location: ${db.locationId || this.definition.location}`);
+    cli.output(`   Type: ${db.type || "FIRESTORE_NATIVE"}`);
+    const pitrEnabled = db.pointInTimeRecoveryEnablement === "ENABLED";
+    cli.output(`   Point-in-Time Recovery: ${pitrEnabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
+    if (db.earliestVersionTime) {
+      cli.output(`   Earliest Restore Time: ${db.earliestVersionTime}`);
+    }
+    cli.output(`   Delete Protection: ${db.deleteProtectionState === "DELETE_PROTECTION_ENABLED" ? "\u2705 Enabled" : "\u274C Disabled"}`);
+    if (!pitrEnabled) {
+      cli.output(`
+\u26A0\uFE0F  Note: Enable point_in_time_recovery in definition to use PITR restores`);
+      cli.output(`   PITR allows restoring to any point in the last 7 days`);
+    }
+    cli.output(`
+\u{1F4CB} Available backup operations:`);
+    cli.output(`   monk do namespace/firestore list-backups location="${db.locationId || this.definition.location}"`);
+    cli.output(`   monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/path"`);
+    if (pitrEnabled) {
+      cli.output(`   monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="restored-db"`);
+    }
+    cli.output(`
+==================================================`);
+  }
+  listBackups(args) {
+    const location = args?.location || this.definition.location;
+    if (!location) {
+      throw new Error(
+        `'location' is required.
+Usage: monk do namespace/firestore list-backups location="us-central1"
+`
+      );
+    }
+    cli.output(`==================================================`);
+    cli.output(`Listing Firestore backups`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`Location: ${location}`);
+    cli.output(`==================================================`);
+    const limit = Number(args?.limit) || 10;
+    try {
+      const url = `${FIRESTORE_API_URL}/projects/${this.projectId}/locations/${location}/backups`;
+      const response = this.get(url);
+      const backups = response.backups || [];
+      cli.output(`
+Total backups found: ${backups.length}`);
+      cli.output(`Showing: ${Math.min(backups.length, limit)} backup(s)
+`);
+      if (backups.length === 0) {
+        cli.output(`No backups found in location ${location}.`);
+        cli.output(`
+\u{1F4CB} To create a backup, use export-documents:`);
+        cli.output(`   monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/path"`);
+      } else {
+        const displayBackups = backups.slice(0, limit);
+        for (let i = 0; i < displayBackups.length; i++) {
+          const backup = displayBackups[i];
+          const statusIcon = this.getBackupStatusIcon(backup.state);
+          const backupId = backup.name?.split("/").pop() || "unknown";
+          cli.output(`${statusIcon} Backup #${i + 1}`);
+          cli.output(`   ID: ${backupId}`);
+          cli.output(`   Name: ${backup.name}`);
+          cli.output(`   State: ${backup.state || "UNKNOWN"}`);
+          cli.output(`   Database: ${backup.database || "N/A"}`);
+          cli.output(`   Snapshot Time: ${backup.snapshotTime || "N/A"}`);
+          cli.output(`   Expire Time: ${backup.expireTime || "N/A"}`);
+          cli.output(``);
+        }
+        if (backups.length > limit) {
+          cli.output(`... and ${backups.length - limit} more backup(s)`);
+          cli.output(`Increase limit with: monk do namespace/firestore list-backups location="${location}" limit=${backups.length}`);
+        }
+      }
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to list backups`);
+      throw new Error(`List backups failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  describeBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4F8} Backup Details`);
+    cli.output(`==================================================`);
+    const backupName = args?.backup_name;
+    if (!backupName) {
+      throw new Error(
+        `'backup_name' is required.
+Usage: monk do namespace/firestore describe-backup backup_name="projects/.../backups/backup-id"
+
+To find backup names, run: monk do namespace/firestore list-backups location="us-central1"`
+      );
+    }
+    try {
+      const url = `${FIRESTORE_API_URL}/${backupName}`;
+      const backup = this.get(url);
+      const statusIcon = this.getBackupStatusIcon(backup.state);
+      cli.output(`
+${statusIcon} Backup Information`);
+      cli.output(`--------------------------------------------------`);
+      cli.output(`Name: ${backup.name}`);
+      cli.output(`State: ${backup.state || "UNKNOWN"}`);
+      cli.output(`Database: ${backup.database}`);
+      cli.output(`Database UID: ${backup.databaseUid || "N/A"}`);
+      cli.output(`Snapshot Time: ${backup.snapshotTime || "N/A"}`);
+      cli.output(`Expire Time: ${backup.expireTime || "N/A"}`);
+      if (backup.state === "READY") {
+        cli.output(`
+\u{1F4CB} To restore from this backup:`);
+        cli.output(`   monk do namespace/firestore restore backup_name="${backupName}" target_database="restored-db"`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get backup details`);
+      throw new Error(`Describe backup failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  deleteBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F5D1}\uFE0F DELETE BACKUP - READ CAREFULLY!`);
+    cli.output(`==================================================`);
+    const backupName = args?.backup_name;
+    if (!backupName) {
+      throw new Error(
+        `'backup_name' is required.
+Usage: monk do namespace/firestore delete-backup backup_name="projects/.../backups/backup-id"
+
+To find backup names, run: monk do namespace/firestore list-backups location="us-central1"`
+      );
+    }
+    try {
+      const url = `${FIRESTORE_API_URL}/${backupName}`;
+      const backup = this.get(url);
+      cli.output(`
+\u26A0\uFE0F  WARNING: This will permanently delete the backup!`);
+      cli.output(`   Backup: ${backupName}`);
+      cli.output(`   Database: ${backup.database}`);
+      cli.output(`   Snapshot Time: ${backup.snapshotTime || "N/A"}`);
+      cli.output(`--------------------------------------------------`);
+      this.httpDelete(url);
+      cli.output(`
+\u2705 Backup deleted successfully!`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to delete backup`);
+      throw new Error(`Delete backup failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  restoreDatabase(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F504} RESTORE FIRESTORE DATABASE`);
+    cli.output(`==================================================`);
+    cli.output(`Project: ${this.projectId}`);
+    const backupName = args?.backup_name;
+    const restoreTime = args?.restore_time;
+    const targetDatabase = args?.target_database;
+    if (!backupName && !restoreTime) {
+      throw new Error(
+        `Either 'backup_name' or 'restore_time' is required.
+Usage:
+  monk do namespace/firestore restore backup_name="..." target_database="new-db"
+  monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="new-db"
+
+To find backup names, run: monk do namespace/firestore list-backups location="us-central1"`
+      );
+    }
+    if (!targetDatabase) {
+      throw new Error(
+        "'target_database' is required.\nSpecify an ID for the new restored database (4-63 characters, starting with a letter)."
+      );
+    }
+    if (targetDatabase.length < 4 || targetDatabase.length > 63) {
+      throw new Error("target_database must be 4-63 characters long");
+    }
+    cli.output(`
+\u{1F4CB} Restore Configuration:`);
+    if (backupName) {
+      cli.output(`   Source: Backup`);
+      cli.output(`   Backup Name: ${backupName}`);
+    } else {
+      cli.output(`   Source: Point-in-Time Recovery`);
+      cli.output(`   Restore Time: ${restoreTime}`);
+    }
+    cli.output(`   Target Database: ${targetDatabase}`);
+    cli.output(`--------------------------------------------------`);
+    cli.output(`
+\u26A0\uFE0F  NOTE: This will create a NEW database.`);
+    cli.output(`   The original database will NOT be affected.`);
+    const body = {
+      databaseId: targetDatabase
+    };
+    if (backupName) {
+      body.backup = backupName;
+    }
+    try {
+      const url = `${FIRESTORE_API_URL}/projects/${this.projectId}/databases:restore`;
+      const operation = this.post(url, body);
+      cli.output(`
+\u2705 Restore operation initiated successfully!`);
+      cli.output(`Operation: ${operation.name}`);
+      cli.output(`
+\u23F3 The new database is being restored. This may take several minutes.`);
+      cli.output(`   The database will be unavailable until the operation completes.`);
+      cli.output(`
+\u{1F4CB} To check restore progress:`);
+      cli.output(`   monk do namespace/firestore get-restore-status operation_name="${operation.name}"`);
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to restore database`);
+      throw new Error(`Restore failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getRestoreStatus(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F504} RESTORE STATUS CHECK`);
+    cli.output(`==================================================`);
+    const operationName = args?.operation_name;
+    if (!operationName) {
+      throw new Error(
+        `'operation_name' is required.
+Usage: monk do namespace/firestore get-restore-status operation_name="projects/.../operations/..."
+`
+      );
+    }
+    cli.output(`Operation: ${operationName}`);
+    cli.output(`--------------------------------------------------`);
+    try {
+      const url = `${FIRESTORE_API_URL}/${operationName}`;
+      const operation = this.get(url);
+      cli.output(`
+\u{1F4CB} Operation Details`);
+      cli.output(`   Name: ${operation.name}`);
+      cli.output(`   Done: ${operation.done ? "\u2705 Yes" : "\u23F3 No"}`);
+      if (operation.metadata) {
+        const metadata = operation.metadata;
+        if (metadata.database) {
+          cli.output(`   Database: ${metadata.database}`);
+        }
+        if (metadata.operationType) {
+          cli.output(`   Operation Type: ${metadata.operationType}`);
+        }
+        if (metadata.progressPercentage !== void 0) {
+          cli.output(`   Progress: ${metadata.progressPercentage}%`);
+        }
+      }
+      if (operation.done) {
+        if (operation.error) {
+          cli.output(`
+\u274C Operation failed!`);
+          cli.output(`   Error: ${operation.error.message || JSON.stringify(operation.error)}`);
+        } else {
+          cli.output(`
+\u2705 Operation completed successfully!`);
+          if (operation.response) {
+            cli.output(`   Restored Database: ${operation.response.name || "Created"}`);
+          }
+        }
+      } else {
+        cli.output(`
+\u23F3 Operation is still in progress...`);
+        cli.output(`   Check again later with the same command.`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get operation status`);
+      throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Get status icon for backup state
+   */
+  getBackupStatusIcon(state) {
+    const stateUpper = (state || "").toUpperCase();
+    switch (stateUpper) {
+      case "READY":
+        return "\u{1F4F8}";
+      case "CREATING":
+        return "\u23F3";
+      case "NOT_AVAILABLE":
+        return "\u274C";
+      default:
+        return "\u{1F4F7}";
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _Firestore);
@@ -285,6 +586,12 @@ __decorateElement(_init, 1, "listIndexes", _listIndexes_dec, _Firestore);
 __decorateElement(_init, 1, "listFields", _listFields_dec, _Firestore);
 __decorateElement(_init, 1, "exportDocuments", _exportDocuments_dec, _Firestore);
 __decorateElement(_init, 1, "importDocuments", _importDocuments_dec, _Firestore);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _Firestore);
+__decorateElement(_init, 1, "listBackups", _listBackups_dec, _Firestore);
+__decorateElement(_init, 1, "describeBackup", _describeBackup_dec, _Firestore);
+__decorateElement(_init, 1, "deleteBackup", _deleteBackup_dec, _Firestore);
+__decorateElement(_init, 1, "restoreDatabase", _restoreDatabase_dec, _Firestore);
+__decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _Firestore);
 __decoratorMetadata(_init, _Firestore);
 __name(_Firestore, "Firestore");
 __publicField(_Firestore, "readiness", { period: 10, initialDelay: 5, attempts: 60 });
