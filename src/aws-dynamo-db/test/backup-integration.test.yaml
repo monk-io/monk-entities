@@ -1,0 +1,107 @@
+name: "AWS DynamoDB Backup Actions Integration Test"
+description: "Integration test for DynamoDB backup and restore operations including PITR and on-demand backups"
+timeout: 600000
+
+setup:
+  - name: "Load AWS DynamoDB entity manifest"
+    action: "load"
+    target: "dist/input/aws-dynamo-db/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load backup test template"
+    action: "load"
+    target: "backup-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # ==================== TABLE SETUP ====================
+  - name: "Deploy backup test table"
+    action: "run"
+    target: "aws-dynamo-db-backup-test/backup-test-table"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for table readiness"
+    action: "wait"
+    target: "aws-dynamo-db-backup-test/backup-test-table"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
+
+  - name: "Verify table is active"
+    action: "describe"
+    target: "aws-dynamo-db-backup-test/backup-test-table"
+    expect:
+      exitCode: 0
+
+  # ==================== ADD TEST DATA ====================
+  - name: "Insert test item 1"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/put-item"
+    args:
+      item: '{"id":{"S":"backup-test-1"},"name":{"S":"Backup Test Item 1"},"value":{"N":"100"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Insert test item 2"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/put-item"
+    args:
+      item: '{"id":{"S":"backup-test-2"},"name":{"S":"Backup Test Item 2"},"value":{"N":"200"}}'
+    expect:
+      exitCode: 0
+
+  - name: "Verify test data inserted"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/scan-table"
+    expect:
+      exitCode: 0
+
+  # ==================== BACKUP INFO ====================
+  - name: "Test get-backup-info action"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/get-backup-info"
+    expect:
+      exitCode: 0
+
+  # ==================== ON-DEMAND BACKUP ====================
+  - name: "Create on-demand backup"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/create-snapshot"
+    args:
+      backup_name: "monkec-test-backup"
+    expect:
+      exitCode: 0
+
+  - name: "List available backups"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/list-snapshots"
+    expect:
+      exitCode: 0
+
+  - name: "List backups with limit"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/list-snapshots"
+    args:
+      limit: "5"
+    expect:
+      exitCode: 0
+
+  # Note: describe-snapshot and restore require the backup ARN which is dynamic
+  # These actions are tested manually or via CI with ARN capture
+
+  # ==================== CLEANUP ====================
+  # Note: We don't test restore in automated tests because:
+  # 1. It creates a new table that needs separate cleanup
+  # 2. Restore operations can take several minutes
+  # 3. On-demand backups may need time to become AVAILABLE
+
+cleanup:
+  - name: "Delete backup test table"
+    action: "delete"
+    target: "aws-dynamo-db-backup-test/backup-test-table"
+    expect:
+      exitCode: 0
+

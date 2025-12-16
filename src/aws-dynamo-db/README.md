@@ -182,6 +182,118 @@ Lists all tags associated with the table.
 monk do my-app/test-table/list-tags
 ```
 
+## Backup & Restore Actions
+
+DynamoDB supports two backup mechanisms:
+- **Point-in-Time Recovery (PITR)**: Continuous backups with 35-day retention
+- **On-Demand Backups**: User-initiated snapshots retained indefinitely
+
+### Backup Actions Quick Reference
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| **Get Backup Info** | `monk do ns/table/get-backup-info` | View PITR status and recent backups |
+| **Create Backup** | `monk do ns/table/create-snapshot` | Create on-demand backup |
+| **List Backups** | `monk do ns/table/list-snapshots` | List available backups |
+| **Describe Backup** | `monk do ns/table/describe-snapshot` | Get detailed backup info |
+| **Delete Backup** | `monk do ns/table/delete-snapshot` | Delete an on-demand backup |
+| **Restore** | `monk do ns/table/restore` | Restore to a new table |
+| **Check Status** | `monk do ns/table/get-restore-status` | Monitor restore progress |
+
+### `get-backup-info`
+View backup configuration including PITR status and recent backups.
+
+```bash
+monk do my-app/test-table/get-backup-info
+```
+
+### `create-snapshot`
+Create an on-demand backup snapshot.
+
+```bash
+# Create backup with auto-generated name
+monk do my-app/test-table/create-snapshot
+
+# Create backup with custom name
+monk do my-app/test-table/create-snapshot backup_name="pre-migration-backup"
+```
+
+### `list-snapshots`
+List available on-demand backups.
+
+```bash
+# List backups (default: 20)
+monk do my-app/test-table/list-snapshots
+
+# List more backups
+monk do my-app/test-table/list-snapshots limit="50"
+```
+
+### `describe-snapshot`
+Get detailed information about a specific backup.
+
+```bash
+# Using backup ARN
+monk do my-app/test-table/describe-snapshot backup_arn="arn:aws:dynamodb:..."
+
+# Using backup ID (extracted from ARN)
+monk do my-app/test-table/describe-snapshot snapshot_id="01234567890123-abcdef"
+```
+
+### `delete-snapshot`
+Delete an on-demand backup.
+
+```bash
+monk do my-app/test-table/delete-snapshot backup_arn="arn:aws:dynamodb:..."
+```
+
+### `restore`
+Restore to a **new table** from backup or point-in-time.
+
+```bash
+# Restore from on-demand backup
+monk do my-app/test-table/restore backup_arn="arn:aws:dynamodb:..." target_table="restored-table"
+
+# Point-in-time restore to latest
+monk do my-app/test-table/restore use_latest="true" target_table="restored-table"
+
+# Point-in-time restore to specific timestamp (ISO format)
+monk do my-app/test-table/restore restore_timestamp="2024-12-15T10:30:00Z" target_table="restored-table"
+
+# Point-in-time restore to specific timestamp (Unix seconds)
+monk do my-app/test-table/restore restore_timestamp="1702636200" target_table="restored-table"
+```
+
+**Important**: DynamoDB restore always creates a **new table**. It does not overwrite the source table.
+
+### `get-restore-status`
+Check the status of a restored table.
+
+```bash
+monk do my-app/test-table/get-restore-status target_table="restored-table"
+```
+
+### Backup Configuration
+
+Enable Point-in-Time Recovery in your table definition:
+
+```yaml
+my-table:
+  defines: aws-dynamo-db/dynamo-db-table
+  region: us-east-1
+  table_name: my-production-table
+  # ... key schema ...
+  point_in_time_recovery_enabled: true  # Enable PITR (35-day continuous backup)
+  deletion_protection_enabled: true      # Prevent accidental deletion
+```
+
+### Backup Best Practices
+
+1. **Enable PITR for production tables** - Continuous backups with 35-day retention
+2. **Create on-demand backups before major changes** - Migrations, schema updates
+3. **Test restore procedures regularly** - Verify you can restore when needed
+4. **Use meaningful backup names** - Include date, purpose, or version
+
 ## Examples
 
 ### Simple Table with Tags

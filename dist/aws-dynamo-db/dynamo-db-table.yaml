@@ -3,7 +3,7 @@ dynamo-db-table:
   defines: entity
   metadata:
     name: DynamoDBTable
-    version-hash: a365bd2a74f6
+    version-hash: f6ae3ba264ef
   schema:
     region:
       type: string
@@ -246,6 +246,13 @@ dynamo-db-table:
     delete-item: ''
     scan-table: ''
     list-tags: ''
+    get-backup-info: ''
+    create-snapshot: ''
+    list-snapshots: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
+    restore: ''
+    get-restore-status: ''
   checks:
     readiness:
       period: 10
@@ -255,5 +262,5 @@ dynamo-db-table:
       period: 300
   requires:
     - aws-dynamo-db/base
-    - monkec/base
+    - cli
     - aws-dynamo-db/common

@@ -1,5 +1,8 @@
-import { MonkEntity } from "monkec/base";
+import { MonkEntity, action } from "monkec/base";
 import aws from "cloud/aws";
+
+// Re-export action decorator to avoid duplicate 'base' variable in compiled output
+export { action };
 
 export interface AWSDynamoDBDefinition {
     /** @description AWS region for the DynamoDB table */
