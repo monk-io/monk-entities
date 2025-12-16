@@ -58,8 +58,8 @@ const cli = require("cli");
 const common = require("gcp/common");
 const CLOUD_SQL_API_URL = common.CLOUD_SQL_API_URL;
 const getDefaultPort = common.getDefaultPort;
-var _startInstance_dec, _stopInstance_dec, _restart_dec, _getInfo_dec, _a, _init;
-var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _restart_dec = [action("restart")], _stopInstance_dec = [action("stop")], _startInstance_dec = [action("start")], _a) {
+var _getRestoreStatus_dec, _restoreBackup_dec, _deleteBackup_dec, _describeBackup_dec, _listBackups_dec, _createBackup_dec, _getBackupInfo_dec, _startInstance_dec, _stopInstance_dec, _restart_dec, _getInfo_dec, _a, _init;
+var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _restart_dec = [action("restart")], _stopInstance_dec = [action("stop")], _startInstance_dec = [action("start")], _getBackupInfo_dec = [action("get-backup-info")], _createBackup_dec = [action("create-backup")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _deleteBackup_dec = [action("delete-backup")], _restoreBackup_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -285,12 +285,387 @@ var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInf
     this.patch(`${this.apiUrl}/instances/${this.definition.name}`, body);
     cli.output("Start initiated");
   }
+  getBackupInfo(_args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4E6} Backup Information for Cloud SQL instance`);
+    cli.output(`Instance: ${this.definition.name}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+    const instance = this.getInstance();
+    if (!instance) {
+      throw new Error(`Instance ${this.definition.name} not found`);
+    }
+    const settings = instance.settings || {};
+    const backupConfig = settings.backupConfiguration || {};
+    cli.output(`
+\u{1F527} Backup Configuration:`);
+    cli.output(`   Automated Backups: ${backupConfig.enabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
+    cli.output(`   Backup Start Time: ${backupConfig.startTime || "Not set"}`);
+    cli.output(`   Point-in-Time Recovery: ${backupConfig.pointInTimeRecoveryEnabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
+    if (backupConfig.binaryLogEnabled !== void 0) {
+      cli.output(`   Binary Logging: ${backupConfig.binaryLogEnabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
+    }
+    cli.output(`   Backup Location: ${backupConfig.location || "Default"}`);
+    cli.output(`   Transaction Log Retention: ${backupConfig.transactionLogRetentionDays || 7} days`);
+    cli.output(`   Backup Retention: ${backupConfig.backupRetentionSettings?.retainedBackups || 7} backups`);
+    if (!backupConfig.enabled) {
+      cli.output(`
+\u26A0\uFE0F  Note: Set backup_start_time in definition to enable automated backups`);
+    }
+    cli.output(`
+\u{1F4CB} To create an on-demand backup:`);
+    cli.output(`   monk do namespace/instance create-backup`);
+    cli.output(`
+\u{1F4CB} To list all backups:`);
+    cli.output(`   monk do namespace/instance list-backups`);
+    cli.output(`
+==================================================`);
+  }
+  createBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`Creating on-demand backup for Cloud SQL instance`);
+    cli.output(`Instance: ${this.definition.name}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+    const instance = this.getInstance();
+    if (!instance) {
+      throw new Error(`Instance ${this.definition.name} not found`);
+    }
+    const description = args?.description || `On-demand backup at ${(/* @__PURE__ */ new Date()).toISOString()}`;
+    cli.output(`Description: ${description}`);
+    const body = {
+      instance: this.definition.name
+    };
+    if (description) {
+      body.description = description;
+    }
+    try {
+      const result = this.post(`${this.apiUrl}/instances/${this.definition.name}/backupRuns`, body);
+      cli.output(`
+\u2705 Backup creation initiated successfully!`);
+      cli.output(`Operation: ${result.name}`);
+      cli.output(`Status: ${result.status || "PENDING"}`);
+      cli.output(`
+\u{1F4CB} Note: Backup creation may take several minutes.`);
+      cli.output(`Use 'monk do namespace/instance list-backups' to check status.`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to create backup`);
+      throw new Error(`Backup creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  listBackups(args) {
+    cli.output(`==================================================`);
+    cli.output(`Listing backups for Cloud SQL instance`);
+    cli.output(`Instance: ${this.definition.name}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+    const limit = Number(args?.limit) || 10;
+    try {
+      const response = this.get(`${this.apiUrl}/instances/${this.definition.name}/backupRuns`);
+      const backups = response.items || [];
+      cli.output(`
+Total backups found: ${backups.length}`);
+      cli.output(`Showing: ${Math.min(backups.length, limit)} backup(s)
+`);
+      if (backups.length === 0) {
+        cli.output(`No backups found for this instance.`);
+        cli.output(`Create a backup using: monk do namespace/instance create-backup`);
+      } else {
+        const displayBackups = backups.slice(0, limit);
+        for (let i = 0; i < displayBackups.length; i++) {
+          const backup = displayBackups[i];
+          const statusIcon = this.getBackupStatusIcon(backup.status);
+          cli.output(`${statusIcon} Backup #${i + 1}`);
+          cli.output(`   ID: ${backup.id}`);
+          cli.output(`   Status: ${backup.status || "unknown"}`);
+          cli.output(`   Type: ${backup.type || "AUTOMATED"}`);
+          cli.output(`   Start Time: ${backup.startTime || "N/A"}`);
+          cli.output(`   End Time: ${backup.endTime || "In progress"}`);
+          cli.output(`   Location: ${backup.location || "N/A"}`);
+          if (backup.description) {
+            cli.output(`   Description: ${backup.description}`);
+          }
+          if (backup.error) {
+            cli.output(`   Error: ${backup.error.message || "Unknown error"}`);
+          }
+          cli.output(``);
+        }
+        if (backups.length > limit) {
+          cli.output(`... and ${backups.length - limit} more backup(s)`);
+          cli.output(`Increase limit with: monk do namespace/instance list-backups limit=${backups.length}`);
+        }
+      }
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to list backups`);
+      throw new Error(`List backups failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  describeBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4F8} Backup Details`);
+    cli.output(`==================================================`);
+    const backupId = args?.backup_id;
+    if (!backupId) {
+      throw new Error(
+        `'backup_id' is required.
+Usage: monk do namespace/instance describe-backup backup_id="123456789"
+
+To find backup IDs, run: monk do namespace/instance list-backups`
+      );
+    }
+    try {
+      const backup = this.get(`${this.apiUrl}/instances/${this.definition.name}/backupRuns/${backupId}`);
+      const statusIcon = this.getBackupStatusIcon(backup.status);
+      cli.output(`
+${statusIcon} Backup Information`);
+      cli.output(`--------------------------------------------------`);
+      cli.output(`ID: ${backup.id}`);
+      cli.output(`Instance: ${backup.instance}`);
+      cli.output(`Status: ${backup.status}`);
+      cli.output(`Type: ${backup.type || "AUTOMATED"}`);
+      cli.output(`Backup Kind: ${backup.backupKind || "SNAPSHOT"}`);
+      cli.output(`Start Time: ${backup.startTime || "N/A"}`);
+      cli.output(`End Time: ${backup.endTime || "In progress"}`);
+      cli.output(`Enqueued Time: ${backup.enqueuedTime || "N/A"}`);
+      cli.output(`Location: ${backup.location || "N/A"}`);
+      cli.output(`Database Version: ${backup.databaseVersion || "N/A"}`);
+      if (backup.description) {
+        cli.output(`Description: ${backup.description}`);
+      }
+      if (backup.windowStartTime) {
+        cli.output(`Window Start: ${backup.windowStartTime}`);
+      }
+      if (backup.error) {
+        cli.output(`
+\u274C Error: ${backup.error.message || JSON.stringify(backup.error)}`);
+      }
+      if (backup.status === "SUCCESSFUL") {
+        cli.output(`
+\u{1F4CB} To restore from this backup:`);
+        cli.output(`   monk do namespace/instance restore backup_id="${backupId}"`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get backup details`);
+      throw new Error(`Describe backup failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  deleteBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F5D1}\uFE0F DELETE BACKUP - READ CAREFULLY!`);
+    cli.output(`==================================================`);
+    const backupId = args?.backup_id;
+    if (!backupId) {
+      throw new Error(
+        `'backup_id' is required.
+Usage: monk do namespace/instance delete-backup backup_id="123456789"
+
+To find backup IDs, run: monk do namespace/instance list-backups`
+      );
+    }
+    try {
+      const backup = this.get(`${this.apiUrl}/instances/${this.definition.name}/backupRuns/${backupId}`);
+      cli.output(`
+\u26A0\uFE0F  WARNING: This will permanently delete the backup!`);
+      cli.output(`   Backup ID: ${backupId}`);
+      cli.output(`   Type: ${backup.type || "AUTOMATED"}`);
+      cli.output(`   Start Time: ${backup.startTime || "N/A"}`);
+      cli.output(`--------------------------------------------------`);
+      this.httpDelete(`${this.apiUrl}/instances/${this.definition.name}/backupRuns/${backupId}`);
+      cli.output(`
+\u2705 Backup deletion initiated successfully!`);
+      cli.output(`   Backup ID: ${backupId}`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to delete backup`);
+      throw new Error(`Delete backup failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  restoreBackup(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u26A0\uFE0F  RESTORE OPERATION - READ CAREFULLY!`);
+    cli.output(`==================================================`);
+    cli.output(`Instance: ${this.definition.name}`);
+    cli.output(`Project: ${this.projectId}`);
+    const backupId = args?.backup_id;
+    if (!backupId) {
+      throw new Error(
+        `'backup_id' is required.
+Usage: monk do namespace/instance restore backup_id="123456789"
+
+To find backup IDs, run: monk do namespace/instance list-backups`
+      );
+    }
+    const targetInstance = args?.target_instance || this.definition.name;
+    const targetProject = args?.target_project || this.projectId;
+    cli.output(`
+\u26A0\uFE0F  WARNING: This operation will:`);
+    cli.output(`   - OVERWRITE ALL DATA in instance '${targetInstance}'`);
+    cli.output(`   - RESTART the target instance`);
+    cli.output(`   - May take several minutes to complete`);
+    cli.output(`
+Restoring from Backup ID: ${backupId}`);
+    cli.output(`Target Instance: ${targetInstance}`);
+    cli.output(`Target Project: ${targetProject}`);
+    cli.output(`--------------------------------------------------`);
+    const body = {
+      restoreBackupContext: {
+        kind: "sql#restoreBackupContext",
+        backupRunId: parseInt(backupId, 10),
+        instanceId: this.definition.name,
+        project: this.projectId
+      }
+    };
+    try {
+      const result = this.post(
+        `https://sqladmin.googleapis.com/v1/projects/${targetProject}/instances/${targetInstance}/restoreBackup`,
+        body
+      );
+      cli.output(`
+\u2705 Restore operation initiated successfully!`);
+      cli.output(`Operation: ${result.name}`);
+      cli.output(`Status: ${result.status || "PENDING"}`);
+      cli.output(`
+\u23F3 The instance is being restored. This may take several minutes.`);
+      cli.output(`   The instance will restart during this process.`);
+      cli.output(`
+\u{1F4CB} To check restore progress:`);
+      cli.output(`   monk do namespace/instance get-restore-status operation_name="${result.name}"`);
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to restore from backup`);
+      throw new Error(`Restore failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getRestoreStatus(args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F504} RESTORE STATUS CHECK`);
+    cli.output(`==================================================`);
+    const operationName = args?.operation_name;
+    if (!operationName) {
+      cli.output(`Checking instance status: ${this.definition.name}`);
+      const instance = this.getInstance();
+      if (!instance) {
+        throw new Error(`Instance ${this.definition.name} not found`);
+      }
+      cli.output(`
+\u{1F4CB} Instance Status`);
+      cli.output(`   State: ${this.getRestoreStatusIcon(instance.state)} ${instance.state}`);
+      cli.output(`   Database Version: ${instance.databaseVersion}`);
+      if (instance.state === "RUNNABLE") {
+        cli.output(`
+\u2705 Instance is ready and available!`);
+      } else {
+        cli.output(`
+\u23F3 Instance is still processing...`);
+      }
+      cli.output(`
+==================================================`);
+      return;
+    }
+    cli.output(`Operation: ${operationName}`);
+    cli.output(`--------------------------------------------------`);
+    try {
+      const operation = this.get(`${this.apiUrl}/operations/${operationName}`);
+      cli.output(`
+\u{1F4CB} Operation Details`);
+      cli.output(`   Name: ${operation.name}`);
+      cli.output(`   Type: ${operation.operationType}`);
+      cli.output(`   Status: ${this.getRestoreStatusIcon(operation.status)} ${operation.status}`);
+      cli.output(`   Target: ${operation.targetId}`);
+      cli.output(`   Start Time: ${operation.startTime || "N/A"}`);
+      if (operation.endTime) {
+        cli.output(`   End Time: ${operation.endTime}`);
+      }
+      if (operation.status === "DONE") {
+        if (operation.error) {
+          cli.output(`
+\u274C Operation failed!`);
+          cli.output(`   Error: ${operation.error.message || JSON.stringify(operation.error)}`);
+        } else {
+          cli.output(`
+\u2705 Operation completed successfully!`);
+          cli.output(`   The instance should now be available.`);
+        }
+      } else {
+        cli.output(`
+\u23F3 Operation is still in progress...`);
+        cli.output(`   Check again later with the same command.`);
+      }
+      cli.output(`
+==================================================`);
+    } catch (error) {
+      cli.output(`
+\u274C Failed to get operation status`);
+      throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  /**
+   * Get status icon for backup status
+   */
+  getBackupStatusIcon(status) {
+    const statusUpper = (status || "").toUpperCase();
+    switch (statusUpper) {
+      case "SUCCESSFUL":
+        return "\u{1F4F8}";
+      case "RUNNING":
+      case "ENQUEUED":
+      case "PENDING":
+        return "\u23F3";
+      case "FAILED":
+      case "SKIPPED":
+        return "\u274C";
+      case "DELETED":
+      case "DELETION_PENDING":
+        return "\u{1F5D1}\uFE0F";
+      default:
+        return "\u{1F4F7}";
+    }
+  }
+  /**
+   * Get status icon for restore/operation status
+   */
+  getRestoreStatusIcon(status) {
+    const statusUpper = (status || "").toUpperCase();
+    switch (statusUpper) {
+      case "DONE":
+      case "RUNNABLE":
+        return "\u2705";
+      case "RUNNING":
+      case "PENDING":
+      case "MAINTENANCE":
+      case "PENDING_CREATE":
+        return "\u23F3";
+      case "FAILED":
+      case "SUSPENDED":
+      case "UNKNOWN_STATE":
+        return "\u274C";
+      default:
+        return "\u{1F504}";
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudSqlInstance);
 __decorateElement(_init, 1, "restart", _restart_dec, _CloudSqlInstance);
 __decorateElement(_init, 1, "stopInstance", _stopInstance_dec, _CloudSqlInstance);
 __decorateElement(_init, 1, "startInstance", _startInstance_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "createBackup", _createBackup_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "listBackups", _listBackups_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "describeBackup", _describeBackup_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "deleteBackup", _deleteBackup_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "restoreBackup", _restoreBackup_dec, _CloudSqlInstance);
+__decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _CloudSqlInstance);
 __decoratorMetadata(_init, _CloudSqlInstance);
 __name(_CloudSqlInstance, "CloudSqlInstance");
 __publicField(_CloudSqlInstance, "readiness", { period: 15, initialDelay: 10, attempts: 80 });

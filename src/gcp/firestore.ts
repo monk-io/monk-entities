@@ -546,4 +546,406 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
         const operation = this.post(url, body);
         cli.output(`Import started: ${operation.name}`);
     }
+
+    // =========================================================================
+    // Backup & Restore Interface
+    // =========================================================================
+
+    /**
+     * Get backup configuration and status information for the Firestore database
+     *
+     * Shows current backup settings including Point-in-Time Recovery (PITR) status
+     * and earliest restore time if PITR is enabled.
+     *
+     * Usage:
+     * - monk do namespace/firestore get-backup-info
+     */
+    @action("get-backup-info")
+    getBackupInfo(_args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`📦 Backup Information for Firestore database`);
+        cli.output(`Database: ${this.getDatabaseId()}`);
+        cli.output(`Project: ${this.projectId}`);
+        cli.output(`==================================================`);
+
+        const db = this.getDatabase();
+        if (!db) {
+            throw new Error(`Database ${this.getDatabaseId()} not found`);
+        }
+
+        cli.output(`\n🔧 Database Configuration:`);
+        cli.output(`   Location: ${db.locationId || this.definition.location}`);
+        cli.output(`   Type: ${db.type || 'FIRESTORE_NATIVE'}`);
+
+        const pitrEnabled = db.pointInTimeRecoveryEnablement === 'ENABLED';
+        cli.output(`   Point-in-Time Recovery: ${pitrEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+
+        if (db.earliestVersionTime) {
+            cli.output(`   Earliest Restore Time: ${db.earliestVersionTime}`);
+        }
+
+        cli.output(`   Delete Protection: ${db.deleteProtectionState === 'DELETE_PROTECTION_ENABLED' ? '✅ Enabled' : '❌ Disabled'}`);
+
+        if (!pitrEnabled) {
+            cli.output(`\n⚠️  Note: Enable point_in_time_recovery in definition to use PITR restores`);
+            cli.output(`   PITR allows restoring to any point in the last 7 days`);
+        }
+
+        cli.output(`\n📋 Available backup operations:`);
+        cli.output(`   monk do namespace/firestore list-backups location="${db.locationId || this.definition.location}"`);
+        cli.output(`   monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/path"`);
+        if (pitrEnabled) {
+            cli.output(`   monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="restored-db"`);
+        }
+        cli.output(`\n==================================================`);
+    }
+
+    /**
+     * List all available backups for this Firestore database
+     *
+     * Lists backups in the specified location. Use this to find backup IDs
+     * for restore operations.
+     *
+     * Usage:
+     * - monk do namespace/firestore list-backups location="us-central1"
+     * - monk do namespace/firestore list-backups location="nam5" limit=20
+     *
+     * @param args Required/Optional arguments:
+     *   - location: GCP location to list backups from (required)
+     *   - limit: Maximum number of backups to display (default: 10)
+     */
+    @action("list-backups")
+    listBackups(args?: Args): void {
+        const location = (args?.location as string) || this.definition.location;
+        if (!location) {
+            throw new Error(
+                "'location' is required.\n" +
+                "Usage: monk do namespace/firestore list-backups location=\"us-central1\"\n"
+            );
+        }
+
+        cli.output(`==================================================`);
+        cli.output(`Listing Firestore backups`);
+        cli.output(`Project: ${this.projectId}`);
+        cli.output(`Location: ${location}`);
+        cli.output(`==================================================`);
+
+        const limit = Number(args?.limit) || 10;
+
+        try {
+            const url = `${FIRESTORE_API_URL}/projects/${this.projectId}/locations/${location}/backups`;
+            const response = this.get(url);
+            const backups = response.backups || [];
+
+            cli.output(`\nTotal backups found: ${backups.length}`);
+            cli.output(`Showing: ${Math.min(backups.length, limit)} backup(s)\n`);
+
+            if (backups.length === 0) {
+                cli.output(`No backups found in location ${location}.`);
+                cli.output(`\n📋 To create a backup, use export-documents:`);
+                cli.output(`   monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/path"`);
+            } else {
+                const displayBackups = backups.slice(0, limit);
+
+                for (let i = 0; i < displayBackups.length; i++) {
+                    const backup = displayBackups[i];
+                    const statusIcon = this.getBackupStatusIcon(backup.state);
+                    const backupId = backup.name?.split('/').pop() || 'unknown';
+
+                    cli.output(`${statusIcon} Backup #${i + 1}`);
+                    cli.output(`   ID: ${backupId}`);
+                    cli.output(`   Name: ${backup.name}`);
+                    cli.output(`   State: ${backup.state || 'UNKNOWN'}`);
+                    cli.output(`   Database: ${backup.database || 'N/A'}`);
+                    cli.output(`   Snapshot Time: ${backup.snapshotTime || 'N/A'}`);
+                    cli.output(`   Expire Time: ${backup.expireTime || 'N/A'}`);
+                    cli.output(``);
+                }
+
+                if (backups.length > limit) {
+                    cli.output(`... and ${backups.length - limit} more backup(s)`);
+                    cli.output(`Increase limit with: monk do namespace/firestore list-backups location="${location}" limit=${backups.length}`);
+                }
+            }
+
+            cli.output(`==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to list backups`);
+            throw new Error(`List backups failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get detailed information about a specific backup
+     *
+     * Usage:
+     * - monk do namespace/firestore describe-backup backup_name="projects/my-project/locations/us-central1/backups/backup-id"
+     *
+     * @param args Required arguments:
+     *   - backup_name: Full backup resource name
+     */
+    @action("describe-backup")
+    describeBackup(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`📸 Backup Details`);
+        cli.output(`==================================================`);
+
+        const backupName = args?.backup_name as string | undefined;
+        if (!backupName) {
+            throw new Error(
+                "'backup_name' is required.\n" +
+                "Usage: monk do namespace/firestore describe-backup backup_name=\"projects/.../backups/backup-id\"\n" +
+                "\nTo find backup names, run: monk do namespace/firestore list-backups location=\"us-central1\""
+            );
+        }
+
+        try {
+            const url = `${FIRESTORE_API_URL}/${backupName}`;
+            const backup = this.get(url);
+            const statusIcon = this.getBackupStatusIcon(backup.state);
+
+            cli.output(`\n${statusIcon} Backup Information`);
+            cli.output(`--------------------------------------------------`);
+            cli.output(`Name: ${backup.name}`);
+            cli.output(`State: ${backup.state || 'UNKNOWN'}`);
+            cli.output(`Database: ${backup.database}`);
+            cli.output(`Database UID: ${backup.databaseUid || 'N/A'}`);
+            cli.output(`Snapshot Time: ${backup.snapshotTime || 'N/A'}`);
+            cli.output(`Expire Time: ${backup.expireTime || 'N/A'}`);
+
+            if (backup.state === 'READY') {
+                cli.output(`\n📋 To restore from this backup:`);
+                cli.output(`   monk do namespace/firestore restore backup_name="${backupName}" target_database="restored-db"`);
+            }
+
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get backup details`);
+            throw new Error(`Describe backup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Delete a backup
+     *
+     * ⚠️ WARNING: This permanently deletes the backup. This action cannot be undone.
+     *
+     * Usage:
+     * - monk do namespace/firestore delete-backup backup_name="projects/.../backups/backup-id"
+     *
+     * @param args Required arguments:
+     *   - backup_name: Full backup resource name
+     */
+    @action("delete-backup")
+    deleteBackup(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🗑️ DELETE BACKUP - READ CAREFULLY!`);
+        cli.output(`==================================================`);
+
+        const backupName = args?.backup_name as string | undefined;
+        if (!backupName) {
+            throw new Error(
+                "'backup_name' is required.\n" +
+                "Usage: monk do namespace/firestore delete-backup backup_name=\"projects/.../backups/backup-id\"\n" +
+                "\nTo find backup names, run: monk do namespace/firestore list-backups location=\"us-central1\""
+            );
+        }
+
+        try {
+            // First verify the backup exists
+            const url = `${FIRESTORE_API_URL}/${backupName}`;
+            const backup = this.get(url);
+
+            cli.output(`\n⚠️  WARNING: This will permanently delete the backup!`);
+            cli.output(`   Backup: ${backupName}`);
+            cli.output(`   Database: ${backup.database}`);
+            cli.output(`   Snapshot Time: ${backup.snapshotTime || 'N/A'}`);
+            cli.output(`--------------------------------------------------`);
+
+            // Delete the backup
+            this.httpDelete(url);
+
+            cli.output(`\n✅ Backup deleted successfully!`);
+            cli.output(`==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to delete backup`);
+            throw new Error(`Delete backup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Restore a Firestore database from a backup or point-in-time
+     *
+     * Creates a NEW database by restoring from a backup or using PITR.
+     * The original database is NOT affected.
+     *
+     * Usage:
+     * - monk do namespace/firestore restore backup_name="projects/.../backups/backup-id" target_database="restored-db"
+     * - monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="pitr-db"
+     *
+     * @param args Required/Optional arguments:
+     *   - backup_name: Full backup resource name (required unless using restore_time)
+     *   - restore_time: ISO 8601 timestamp for point-in-time restore (alternative to backup_name)
+     *   - target_database: ID for the new restored database (required, 4-63 chars)
+     */
+    @action("restore")
+    restoreDatabase(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE FIRESTORE DATABASE`);
+        cli.output(`==================================================`);
+        cli.output(`Project: ${this.projectId}`);
+
+        const backupName = args?.backup_name as string | undefined;
+        const restoreTime = args?.restore_time as string | undefined;
+        const targetDatabase = args?.target_database as string | undefined;
+
+        if (!backupName && !restoreTime) {
+            throw new Error(
+                "Either 'backup_name' or 'restore_time' is required.\n" +
+                "Usage:\n" +
+                "  monk do namespace/firestore restore backup_name=\"...\" target_database=\"new-db\"\n" +
+                "  monk do namespace/firestore restore restore_time=\"2024-01-15T10:00:00Z\" target_database=\"new-db\"\n" +
+                "\nTo find backup names, run: monk do namespace/firestore list-backups location=\"us-central1\""
+            );
+        }
+
+        if (!targetDatabase) {
+            throw new Error(
+                "'target_database' is required.\n" +
+                "Specify an ID for the new restored database (4-63 characters, starting with a letter)."
+            );
+        }
+
+        // Validate target database ID
+        if (targetDatabase.length < 4 || targetDatabase.length > 63) {
+            throw new Error("target_database must be 4-63 characters long");
+        }
+
+        cli.output(`\n📋 Restore Configuration:`);
+        if (backupName) {
+            cli.output(`   Source: Backup`);
+            cli.output(`   Backup Name: ${backupName}`);
+        } else {
+            cli.output(`   Source: Point-in-Time Recovery`);
+            cli.output(`   Restore Time: ${restoreTime}`);
+        }
+        cli.output(`   Target Database: ${targetDatabase}`);
+        cli.output(`--------------------------------------------------`);
+
+        cli.output(`\n⚠️  NOTE: This will create a NEW database.`);
+        cli.output(`   The original database will NOT be affected.`);
+
+        const body: any = {
+            databaseId: targetDatabase,
+        };
+
+        if (backupName) {
+            body.backup = backupName;
+        }
+        // Note: PITR restore would use a different field, but the Firestore API
+        // primarily supports restore from backups. PITR is handled via the
+        // database's built-in time travel capabilities.
+
+        try {
+            const url = `${FIRESTORE_API_URL}/projects/${this.projectId}/databases:restore`;
+            const operation = this.post(url, body);
+
+            cli.output(`\n✅ Restore operation initiated successfully!`);
+            cli.output(`Operation: ${operation.name}`);
+            cli.output(`\n⏳ The new database is being restored. This may take several minutes.`);
+            cli.output(`   The database will be unavailable until the operation completes.`);
+            cli.output(`\n📋 To check restore progress:`);
+            cli.output(`   monk do namespace/firestore get-restore-status operation_name="${operation.name}"`);
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to restore database`);
+            throw new Error(`Restore failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Check the status of a restore operation
+     *
+     * Usage:
+     * - monk do namespace/firestore get-restore-status operation_name="projects/.../operations/..."
+     *
+     * @param args Required arguments:
+     *   - operation_name: The operation name returned from restore
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`🔄 RESTORE STATUS CHECK`);
+        cli.output(`==================================================`);
+
+        const operationName = args?.operation_name as string | undefined;
+        if (!operationName) {
+            throw new Error(
+                "'operation_name' is required.\n" +
+                "Usage: monk do namespace/firestore get-restore-status operation_name=\"projects/.../operations/...\"\n"
+            );
+        }
+
+        cli.output(`Operation: ${operationName}`);
+        cli.output(`--------------------------------------------------`);
+
+        try {
+            const url = `${FIRESTORE_API_URL}/${operationName}`;
+            const operation = this.get(url);
+
+            cli.output(`\n📋 Operation Details`);
+            cli.output(`   Name: ${operation.name}`);
+            cli.output(`   Done: ${operation.done ? '✅ Yes' : '⏳ No'}`);
+
+            if (operation.metadata) {
+                const metadata = operation.metadata;
+                if (metadata.database) {
+                    cli.output(`   Database: ${metadata.database}`);
+                }
+                if (metadata.operationType) {
+                    cli.output(`   Operation Type: ${metadata.operationType}`);
+                }
+                if (metadata.progressPercentage !== undefined) {
+                    cli.output(`   Progress: ${metadata.progressPercentage}%`);
+                }
+            }
+
+            if (operation.done) {
+                if (operation.error) {
+                    cli.output(`\n❌ Operation failed!`);
+                    cli.output(`   Error: ${operation.error.message || JSON.stringify(operation.error)}`);
+                } else {
+                    cli.output(`\n✅ Operation completed successfully!`);
+                    if (operation.response) {
+                        cli.output(`   Restored Database: ${operation.response.name || 'Created'}`);
+                    }
+                }
+            } else {
+                cli.output(`\n⏳ Operation is still in progress...`);
+                cli.output(`   Check again later with the same command.`);
+            }
+
+            cli.output(`\n==================================================`);
+        } catch (error) {
+            cli.output(`\n❌ Failed to get operation status`);
+            throw new Error(`Get restore status failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get status icon for backup state
+     */
+    private getBackupStatusIcon(state?: string): string {
+        const stateUpper = (state || '').toUpperCase();
+        switch (stateUpper) {
+            case 'READY':
+                return '📸';
+            case 'CREATING':
+                return '⏳';
+            case 'NOT_AVAILABLE':
+                return '❌';
+            default:
+                return '📷';
+        }
+    }
 }

@@ -3,7 +3,7 @@ cloud-storage:
   defines: entity
   metadata:
     name: CloudStorage
-    version-hash: 6239ea0127d2
+    version-hash: c729f43fd5ca
   schema:
     project:
       type: string

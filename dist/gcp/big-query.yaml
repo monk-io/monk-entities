@@ -3,7 +3,7 @@ big-query:
   defines: entity
   metadata:
     name: BigQuery
-    version-hash: 6239ea0127d2
+    version-hash: c729f43fd5ca
   schema:
     project:
       type: string
@@ -154,6 +154,13 @@ big-query:
     list-tables: ''
     create-table: ''
     delete-table: ''
+    get-backup-info: ''
+    create-snapshot: ''
+    list-snapshots: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
+    restore: ''
+    time-travel-info: ''
   checks:
     readiness:
       period: 5

@@ -636,4 +636,511 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
     );
     cli.output(`Table ${args.name} deleted`);
   }
+
+  // =========================================================================
+  // Backup & Restore Interface (Table Snapshots & Time Travel)
+  // =========================================================================
+
+  /**
+   * Get backup configuration and status information for the BigQuery dataset
+   *
+   * Shows current time travel settings and storage billing model which affect
+   * how long historical data is retained for recovery.
+   *
+   * Usage:
+   * - monk do namespace/dataset get-backup-info
+   */
+  @action("get-backup-info")
+  getBackupInfo(_args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`📦 Backup Information for BigQuery dataset`);
+    cli.output(`Dataset: ${this.definition.dataset}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+
+    const dataset = this.getDataset();
+    if (!dataset) {
+      throw new Error(`Dataset ${this.definition.dataset} not found`);
+    }
+
+    cli.output(`\n🔧 Dataset Configuration:`);
+    cli.output(`   Location: ${dataset.location || 'US'}`);
+    cli.output(`   Storage Billing Model: ${dataset.storageBillingModel || 'LOGICAL'}`);
+
+    const maxTimeTravelHours = dataset.maxTimeTravelHours || 168;
+    const maxTimeTravelDays = Math.floor(maxTimeTravelHours / 24);
+    cli.output(`   Time Travel Window: ${maxTimeTravelHours} hours (${maxTimeTravelDays} days)`);
+
+    if (dataset.defaultTableExpirationMs) {
+      const expDays = Math.floor(Number(dataset.defaultTableExpirationMs) / (1000 * 60 * 60 * 24));
+      cli.output(`   Default Table Expiration: ${expDays} days`);
+    }
+
+    cli.output(`\n📋 BigQuery Backup Capabilities:`);
+    cli.output(`   ✅ Time Travel: Query data from up to ${maxTimeTravelDays} days ago`);
+    cli.output(`   ✅ Table Snapshots: Create point-in-time copies of tables`);
+    cli.output(`   ✅ Table Clones: Create lightweight copies for testing`);
+
+    cli.output(`\n📋 Available operations:`);
+    cli.output(`   monk do namespace/dataset create-snapshot table="my_table" snapshot="my_table_backup"`);
+    cli.output(`   monk do namespace/dataset list-snapshots`);
+    cli.output(`   monk do namespace/dataset restore snapshot="my_table_backup" target="restored_table"`);
+    cli.output(`\n==================================================`);
+  }
+
+  /**
+   * Create a table snapshot (point-in-time backup)
+   *
+   * Creates a snapshot of a table that preserves its state at a specific point in time.
+   * Snapshots are read-only and only store data that differs from the base table.
+   *
+   * Usage:
+   * - monk do namespace/dataset create-snapshot table="source_table" snapshot="snapshot_name"
+   * - monk do namespace/dataset create-snapshot table="source_table" snapshot="snapshot_name" expiration_days=30
+   * - monk do namespace/dataset create-snapshot table="source_table" snapshot="snapshot_name" snapshot_time="2024-01-15T10:00:00Z"
+   *
+   * @param args Required/Optional arguments:
+   *   - table: Source table name to snapshot (required)
+   *   - snapshot: Name for the snapshot table (required)
+   *   - expiration_days: Days until snapshot expires (optional)
+   *   - snapshot_time: Point-in-time to snapshot from, for time travel (optional, ISO 8601)
+   *   - target_dataset: Dataset for the snapshot (optional, defaults to current dataset)
+   */
+  @action("create-snapshot")
+  createSnapshot(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`Creating table snapshot in BigQuery`);
+    cli.output(`Dataset: ${this.definition.dataset}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+
+    const sourceTable = args?.table as string | undefined;
+    const snapshotName = args?.snapshot as string | undefined;
+
+    if (!sourceTable) {
+      throw new Error(
+        "'table' is required.\n" +
+        "Usage: monk do namespace/dataset create-snapshot table=\"source_table\" snapshot=\"snapshot_name\""
+      );
+    }
+
+    if (!snapshotName) {
+      throw new Error(
+        "'snapshot' is required.\n" +
+        "Usage: monk do namespace/dataset create-snapshot table=\"source_table\" snapshot=\"snapshot_name\""
+      );
+    }
+
+    const targetDataset = (args?.target_dataset as string) || this.definition.dataset;
+    const expirationDays = args?.expiration_days ? Number(args.expiration_days) : undefined;
+    const snapshotTime = args?.snapshot_time as string | undefined;
+
+    cli.output(`Source Table: ${sourceTable}`);
+    cli.output(`Snapshot Name: ${snapshotName}`);
+    cli.output(`Target Dataset: ${targetDataset}`);
+    if (expirationDays) {
+      cli.output(`Expiration: ${expirationDays} days`);
+    }
+    if (snapshotTime) {
+      cli.output(`Snapshot Time: ${snapshotTime}`);
+    }
+
+    // Build the snapshot table resource
+    const body: any = {
+      tableReference: {
+        projectId: this.projectId,
+        datasetId: targetDataset,
+        tableId: snapshotName,
+      },
+      snapshotDefinition: {
+        baseTableReference: {
+          projectId: this.projectId,
+          datasetId: this.definition.dataset,
+          tableId: sourceTable,
+        },
+      },
+    };
+
+    // Add snapshot time for time travel snapshot
+    if (snapshotTime) {
+      body.snapshotDefinition.snapshotTime = snapshotTime;
+    }
+
+    // Add expiration time if specified
+    if (expirationDays) {
+      const expirationMs = Date.now() + (expirationDays * 24 * 60 * 60 * 1000);
+      body.expirationTime = expirationMs.toString();
+    }
+
+    try {
+      const result = this.post(
+        `${this.apiUrl}/datasets/${targetDataset}/tables`,
+        body
+      );
+
+      cli.output(`\n✅ Snapshot created successfully!`);
+      cli.output(`Snapshot: ${result.tableReference?.tableId || snapshotName}`);
+      cli.output(`Type: ${result.type || 'SNAPSHOT'}`);
+      cli.output(`Created: ${result.creationTime ? new Date(Number(result.creationTime)).toISOString() : 'Now'}`);
+
+      if (result.expirationTime) {
+        cli.output(`Expires: ${new Date(Number(result.expirationTime)).toISOString()}`);
+      }
+
+      cli.output(`\n📋 To restore from this snapshot:`);
+      cli.output(`   monk do namespace/dataset restore snapshot="${snapshotName}" target="restored_table"`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`\n❌ Failed to create snapshot`);
+      throw new Error(`Snapshot creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * List all table snapshots in the dataset
+   *
+   * Shows all SNAPSHOT type tables in the dataset.
+   *
+   * Usage:
+   * - monk do namespace/dataset list-snapshots
+   * - monk do namespace/dataset list-snapshots limit=20
+   *
+   * @param args Optional arguments:
+   *   - limit: Maximum number of snapshots to display (default: 10)
+   */
+  @action("list-snapshots")
+  listSnapshots(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`Listing table snapshots in BigQuery dataset`);
+    cli.output(`Dataset: ${this.definition.dataset}`);
+    cli.output(`Project: ${this.projectId}`);
+    cli.output(`==================================================`);
+
+    const limit = Number(args?.limit) || 10;
+
+    try {
+      const response = this.listTables();
+      const allTables = response.tables || [];
+
+      // Filter for snapshots only
+      const snapshots = allTables.filter((t: any) => t.type === 'SNAPSHOT');
+
+      cli.output(`\nTotal snapshots found: ${snapshots.length}`);
+      cli.output(`Showing: ${Math.min(snapshots.length, limit)} snapshot(s)\n`);
+
+      if (snapshots.length === 0) {
+        cli.output(`No snapshots found in this dataset.`);
+        cli.output(`\n📋 To create a snapshot:`);
+        cli.output(`   monk do namespace/dataset create-snapshot table="source_table" snapshot="snapshot_name"`);
+      } else {
+        const displaySnapshots = snapshots.slice(0, limit);
+
+        for (let i = 0; i < displaySnapshots.length; i++) {
+          const snapshot = displaySnapshots[i];
+          const tableRef = snapshot.tableReference || {};
+
+          cli.output(`📸 Snapshot #${i + 1}`);
+          cli.output(`   Name: ${tableRef.tableId || 'unknown'}`);
+          cli.output(`   Type: ${snapshot.type}`);
+          cli.output(`   Created: ${snapshot.creationTime ? new Date(Number(snapshot.creationTime)).toISOString() : 'N/A'}`);
+
+          if (snapshot.expirationTime) {
+            cli.output(`   Expires: ${new Date(Number(snapshot.expirationTime)).toISOString()}`);
+          }
+
+          if (snapshot.snapshotDefinition?.baseTableReference) {
+            const baseRef = snapshot.snapshotDefinition.baseTableReference;
+            cli.output(`   Base Table: ${baseRef.datasetId}.${baseRef.tableId}`);
+          }
+
+          if (snapshot.snapshotDefinition?.snapshotTime) {
+            cli.output(`   Snapshot Time: ${snapshot.snapshotDefinition.snapshotTime}`);
+          }
+
+          cli.output(``);
+        }
+
+        if (snapshots.length > limit) {
+          cli.output(`... and ${snapshots.length - limit} more snapshot(s)`);
+          cli.output(`Increase limit with: monk do namespace/dataset list-snapshots limit=${snapshots.length}`);
+        }
+      }
+
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`\n❌ Failed to list snapshots`);
+      throw new Error(`List snapshots failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get detailed information about a specific snapshot
+   *
+   * Usage:
+   * - monk do namespace/dataset describe-snapshot snapshot="snapshot_name"
+   *
+   * @param args Required arguments:
+   *   - snapshot: Snapshot table name
+   */
+  @action("describe-snapshot")
+  describeSnapshot(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`📸 Snapshot Details`);
+    cli.output(`==================================================`);
+
+    const snapshotName = args?.snapshot as string | undefined;
+    if (!snapshotName) {
+      throw new Error(
+        "'snapshot' is required.\n" +
+        "Usage: monk do namespace/dataset describe-snapshot snapshot=\"snapshot_name\"\n" +
+        "\nTo find snapshots, run: monk do namespace/dataset list-snapshots"
+      );
+    }
+
+    try {
+      const url = `${this.apiUrl}/datasets/${this.definition.dataset}/tables/${snapshotName}`;
+      const snapshot = this.get(url);
+
+      if (snapshot.type !== 'SNAPSHOT') {
+        cli.output(`\n⚠️  Warning: Table '${snapshotName}' is not a snapshot (type: ${snapshot.type})`);
+      }
+
+      cli.output(`\n📸 Snapshot Information`);
+      cli.output(`--------------------------------------------------`);
+      cli.output(`Name: ${snapshot.tableReference?.tableId || snapshotName}`);
+      cli.output(`Type: ${snapshot.type || 'TABLE'}`);
+      cli.output(`Dataset: ${snapshot.tableReference?.datasetId}`);
+      cli.output(`Project: ${snapshot.tableReference?.projectId}`);
+      cli.output(`Created: ${snapshot.creationTime ? new Date(Number(snapshot.creationTime)).toISOString() : 'N/A'}`);
+      cli.output(`Last Modified: ${snapshot.lastModifiedTime ? new Date(Number(snapshot.lastModifiedTime)).toISOString() : 'N/A'}`);
+
+      if (snapshot.expirationTime) {
+        cli.output(`Expires: ${new Date(Number(snapshot.expirationTime)).toISOString()}`);
+      }
+
+      if (snapshot.numBytes) {
+        const sizeGB = (Number(snapshot.numBytes) / (1024 * 1024 * 1024)).toFixed(4);
+        cli.output(`Size: ${sizeGB} GB`);
+      }
+
+      if (snapshot.numRows) {
+        cli.output(`Rows: ${snapshot.numRows}`);
+      }
+
+      if (snapshot.snapshotDefinition) {
+        const snapDef = snapshot.snapshotDefinition;
+        cli.output(`\n📋 Snapshot Source:`);
+        if (snapDef.baseTableReference) {
+          const baseRef = snapDef.baseTableReference;
+          cli.output(`   Base Table: ${baseRef.projectId}.${baseRef.datasetId}.${baseRef.tableId}`);
+        }
+        if (snapDef.snapshotTime) {
+          cli.output(`   Snapshot Time: ${snapDef.snapshotTime}`);
+        }
+      }
+
+      cli.output(`\n📋 To restore from this snapshot:`);
+      cli.output(`   monk do namespace/dataset restore snapshot="${snapshotName}" target="restored_table"`);
+      cli.output(`\n==================================================`);
+    } catch (error) {
+      cli.output(`\n❌ Failed to get snapshot details`);
+      throw new Error(`Describe snapshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Delete a table snapshot
+   *
+   * ⚠️ WARNING: This permanently deletes the snapshot. This action cannot be undone.
+   *
+   * Usage:
+   * - monk do namespace/dataset delete-snapshot snapshot="snapshot_name"
+   *
+   * @param args Required arguments:
+   *   - snapshot: Snapshot table name to delete
+   */
+  @action("delete-snapshot")
+  deleteSnapshot(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`🗑️ DELETE SNAPSHOT - READ CAREFULLY!`);
+    cli.output(`==================================================`);
+
+    const snapshotName = args?.snapshot as string | undefined;
+    if (!snapshotName) {
+      throw new Error(
+        "'snapshot' is required.\n" +
+        "Usage: monk do namespace/dataset delete-snapshot snapshot=\"snapshot_name\"\n" +
+        "\nTo find snapshots, run: monk do namespace/dataset list-snapshots"
+      );
+    }
+
+    try {
+      // First verify the snapshot exists
+      const url = `${this.apiUrl}/datasets/${this.definition.dataset}/tables/${snapshotName}`;
+      const snapshot = this.get(url);
+
+      cli.output(`\n⚠️  WARNING: This will permanently delete the snapshot!`);
+      cli.output(`   Snapshot: ${snapshotName}`);
+      cli.output(`   Type: ${snapshot.type || 'TABLE'}`);
+      cli.output(`   Created: ${snapshot.creationTime ? new Date(Number(snapshot.creationTime)).toISOString() : 'N/A'}`);
+      cli.output(`--------------------------------------------------`);
+
+      // Delete the snapshot
+      this.httpDelete(url);
+
+      cli.output(`\n✅ Snapshot deleted successfully!`);
+      cli.output(`==================================================`);
+    } catch (error) {
+      cli.output(`\n❌ Failed to delete snapshot`);
+      throw new Error(`Delete snapshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Restore a table from a snapshot (creates a clone)
+   *
+   * Creates a new writable table from a snapshot. The original snapshot
+   * is NOT affected.
+   *
+   * Usage:
+   * - monk do namespace/dataset restore snapshot="snapshot_name" target="restored_table"
+   * - monk do namespace/dataset restore snapshot="snapshot_name" target="restored_table" target_dataset="other_dataset"
+   *
+   * @param args Required/Optional arguments:
+   *   - snapshot: Source snapshot table name (required)
+   *   - target: Name for the restored table (required)
+   *   - target_dataset: Dataset for the restored table (optional, defaults to current dataset)
+   */
+  @action("restore")
+  restoreSnapshot(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`🔄 RESTORE TABLE FROM SNAPSHOT`);
+    cli.output(`==================================================`);
+    cli.output(`Dataset: ${this.definition.dataset}`);
+    cli.output(`Project: ${this.projectId}`);
+
+    const snapshotName = args?.snapshot as string | undefined;
+    const targetTable = args?.target as string | undefined;
+
+    if (!snapshotName) {
+      throw new Error(
+        "'snapshot' is required.\n" +
+        "Usage: monk do namespace/dataset restore snapshot=\"snapshot_name\" target=\"restored_table\"\n" +
+        "\nTo find snapshots, run: monk do namespace/dataset list-snapshots"
+      );
+    }
+
+    if (!targetTable) {
+      throw new Error(
+        "'target' is required.\n" +
+        "Specify a name for the restored table."
+      );
+    }
+
+    const targetDataset = (args?.target_dataset as string) || this.definition.dataset;
+
+    cli.output(`\n📋 Restore Configuration:`);
+    cli.output(`   Source Snapshot: ${snapshotName}`);
+    cli.output(`   Target Table: ${targetTable}`);
+    cli.output(`   Target Dataset: ${targetDataset}`);
+    cli.output(`--------------------------------------------------`);
+
+    cli.output(`\n⚠️  NOTE: This will create a NEW writable table.`);
+    cli.output(`   The original snapshot will NOT be affected.`);
+
+    // Build the clone table resource
+    const body: any = {
+      tableReference: {
+        projectId: this.projectId,
+        datasetId: targetDataset,
+        tableId: targetTable,
+      },
+      cloneDefinition: {
+        baseTableReference: {
+          projectId: this.projectId,
+          datasetId: this.definition.dataset,
+          tableId: snapshotName,
+        },
+      },
+    };
+
+    try {
+      const result = this.post(
+        `${this.apiUrl}/datasets/${targetDataset}/tables`,
+        body
+      );
+
+      cli.output(`\n✅ Table restored successfully!`);
+      cli.output(`Restored Table: ${result.tableReference?.tableId || targetTable}`);
+      cli.output(`Type: ${result.type || 'TABLE'}`);
+      cli.output(`Dataset: ${targetDataset}`);
+      cli.output(`Created: ${result.creationTime ? new Date(Number(result.creationTime)).toISOString() : 'Now'}`);
+
+      cli.output(`\n📋 The restored table is now available for queries:`);
+      cli.output(`   SELECT * FROM \`${this.projectId}.${targetDataset}.${targetTable}\``);
+      cli.output(`\n==================================================`);
+    } catch (error) {
+      cli.output(`\n❌ Failed to restore from snapshot`);
+      throw new Error(`Restore failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Query a table at a specific point in time (time travel)
+   *
+   * Shows how to query historical data using BigQuery's time travel feature.
+   * Time travel allows accessing data from up to 7 days ago (or longer with PHYSICAL billing).
+   *
+   * Usage:
+   * - monk do namespace/dataset time-travel-info table="my_table"
+   *
+   * @param args Required arguments:
+   *   - table: Table name to show time travel info for
+   */
+  @action("time-travel-info")
+  timeTravelInfo(args?: Args): void {
+    cli.output(`==================================================`);
+    cli.output(`⏰ Time Travel Information`);
+    cli.output(`==================================================`);
+
+    const tableName = args?.table as string | undefined;
+    if (!tableName) {
+      throw new Error(
+        "'table' is required.\n" +
+        "Usage: monk do namespace/dataset time-travel-info table=\"my_table\""
+      );
+    }
+
+    const dataset = this.getDataset();
+    if (!dataset) {
+      throw new Error(`Dataset ${this.definition.dataset} not found`);
+    }
+
+    const maxTimeTravelHours = dataset.maxTimeTravelHours || 168;
+    const maxTimeTravelDays = Math.floor(maxTimeTravelHours / 24);
+
+    cli.output(`\n📋 Time Travel Configuration:`);
+    cli.output(`   Dataset: ${this.definition.dataset}`);
+    cli.output(`   Table: ${tableName}`);
+    cli.output(`   Storage Billing: ${dataset.storageBillingModel || 'LOGICAL'}`);
+    cli.output(`   Max Time Travel: ${maxTimeTravelHours} hours (${maxTimeTravelDays} days)`);
+
+    cli.output(`\n📋 Time Travel Query Examples:`);
+    cli.output(`\n   Query data from 1 hour ago:`);
+    cli.output(`   SELECT * FROM \`${this.projectId}.${this.definition.dataset}.${tableName}\``);
+    cli.output(`   FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)`);
+
+    cli.output(`\n   Query data from 1 day ago:`);
+    cli.output(`   SELECT * FROM \`${this.projectId}.${this.definition.dataset}.${tableName}\``);
+    cli.output(`   FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)`);
+
+    cli.output(`\n   Query data at a specific time:`);
+    cli.output(`   SELECT * FROM \`${this.projectId}.${this.definition.dataset}.${tableName}\``);
+    cli.output(`   FOR SYSTEM_TIME AS OF TIMESTAMP("2024-01-15 10:00:00 UTC")`);
+
+    cli.output(`\n📋 Create a snapshot from a point in time:`);
+    cli.output(`   monk do namespace/dataset create-snapshot table="${tableName}" snapshot="${tableName}_backup" snapshot_time="2024-01-15T10:00:00Z"`);
+
+    cli.output(`\n==================================================`);
+  }
 }
