@@ -3,7 +3,7 @@ cloud-function:
   defines: entity
   metadata:
     name: CloudFunction
-    version-hash: c729f43fd5ca
+    version-hash: d87fc5c5f384
   schema:
     project:
       type: string
@@ -256,7 +256,7 @@ cloud-function:
       description: |-
         Event trigger configuration (for non-HTTP functions)
         If not specified, function is HTTP-triggered.
-    description:
+    function_description:
       type: string
       description: Description of the function
     labels:

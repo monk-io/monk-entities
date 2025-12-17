@@ -223,7 +223,7 @@ export interface CloudFunctionDefinition extends GcpEntityDefinition {
     /**
      * @description Description of the function
      */
-    description?: string;
+    function_description?: string;
 
     /**
      * @description Key-value labels for organizing functions
@@ -586,8 +586,8 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
         }
 
         // Optional metadata
-        if (this.definition.description) {
-            body.description = this.definition.description;
+        if (this.definition.function_description) {
+            body.description = this.definition.function_description;
         }
         if (this.definition.labels) {
             body.labels = this.definition.labels;

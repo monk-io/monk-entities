@@ -1,0 +1,32 @@
+# GCP BigQuery Backup Test Template
+#
+# Tests BigQuery table snapshot and time travel capabilities.
+
+namespace: gcp-bigquery-test
+
+# =============================================================================
+# Service Usage - Enable APIs
+# =============================================================================
+
+enable-bigquery-api:
+  defines: gcp/service-usage
+  apis:
+    - bigquery.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# =============================================================================
+# BigQuery Dataset with Table
+# =============================================================================
+
+backup-dataset:
+  defines: gcp/big-query
+  dataset: backup_test_dataset
+  location: US
+  depends:
+    wait-for:
+      runnables:
+        - gcp-bigquery-test/enable-bigquery-api
+      timeout: 300
+

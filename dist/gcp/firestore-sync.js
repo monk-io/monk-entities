@@ -124,7 +124,7 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
     }
     const body = {
       locationId: this.definition.location,
-      type: this.definition.type || "FIRESTORE_NATIVE"
+      type: this.definition.database_type || "FIRESTORE_NATIVE"
     };
     if (this.definition.concurrency_mode) {
       body.concurrencyMode = this.definition.concurrency_mode;
@@ -292,7 +292,7 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
 \u{1F527} Database Configuration:`);
     cli.output(`   Location: ${db.locationId || this.definition.location}`);
     cli.output(`   Type: ${db.type || "FIRESTORE_NATIVE"}`);
-    const pitrEnabled = db.pointInTimeRecoveryEnablement === "ENABLED";
+    const pitrEnabled = db.pointInTimeRecoveryEnablement === "POINT_IN_TIME_RECOVERY_ENABLED";
     cli.output(`   Point-in-Time Recovery: ${pitrEnabled ? "\u2705 Enabled" : "\u274C Disabled"}`);
     if (db.earliestVersionTime) {
       cli.output(`   Earliest Restore Time: ${db.earliestVersionTime}`);
@@ -300,16 +300,18 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
     cli.output(`   Delete Protection: ${db.deleteProtectionState === "DELETE_PROTECTION_ENABLED" ? "\u2705 Enabled" : "\u274C Disabled"}`);
     if (!pitrEnabled) {
       cli.output(`
-\u26A0\uFE0F  Note: Enable point_in_time_recovery in definition to use PITR restores`);
-      cli.output(`   PITR allows restoring to any point in the last 7 days`);
+\u26A0\uFE0F  Note: Enable point_in_time_recovery in definition for document-level time travel`);
+      cli.output(`   PITR allows reading document versions from the last 7 days`);
+    } else {
+      cli.output(`
+\u{1F4A1} With PITR enabled, you can read historical document versions`);
+      cli.output(`   from the last 7 days using the Firestore client SDK or REST API.`);
     }
     cli.output(`
 \u{1F4CB} Available backup operations:`);
     cli.output(`   monk do namespace/firestore list-backups location="${db.locationId || this.definition.location}"`);
     cli.output(`   monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/path"`);
-    if (pitrEnabled) {
-      cli.output(`   monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="restored-db"`);
-    }
+    cli.output(`   monk do namespace/firestore restore backup_name="..." target_database="new-db"`);
     cli.output(`
 ==================================================`);
   }
@@ -445,16 +447,18 @@ To find backup names, run: monk do namespace/firestore list-backups location="us
     cli.output(`==================================================`);
     cli.output(`Project: ${this.projectId}`);
     const backupName = args?.backup_name;
-    const restoreTime = args?.restore_time;
     const targetDatabase = args?.target_database;
-    if (!backupName && !restoreTime) {
+    if (!backupName) {
       throw new Error(
-        `Either 'backup_name' or 'restore_time' is required.
+        `'backup_name' is required.
 Usage:
-  monk do namespace/firestore restore backup_name="..." target_database="new-db"
-  monk do namespace/firestore restore restore_time="2024-01-15T10:00:00Z" target_database="new-db"
+  monk do namespace/firestore restore backup_name="projects/.../backups/..." target_database="new-db"
 
-To find backup names, run: monk do namespace/firestore list-backups location="us-central1"`
+To find backup names, run: monk do namespace/firestore list-backups location="us-central1"
+
+\u26A0\uFE0F  Note: Firestore does not support database-level PITR restore.
+   For point-in-time data recovery, use export-documents with a specific timestamp,
+   or read historical document versions directly (if PITR is enabled).`
       );
     }
     if (!targetDatabase) {
@@ -467,24 +471,17 @@ To find backup names, run: monk do namespace/firestore list-backups location="us
     }
     cli.output(`
 \u{1F4CB} Restore Configuration:`);
-    if (backupName) {
-      cli.output(`   Source: Backup`);
-      cli.output(`   Backup Name: ${backupName}`);
-    } else {
-      cli.output(`   Source: Point-in-Time Recovery`);
-      cli.output(`   Restore Time: ${restoreTime}`);
-    }
+    cli.output(`   Source: Backup`);
+    cli.output(`   Backup Name: ${backupName}`);
     cli.output(`   Target Database: ${targetDatabase}`);
     cli.output(`--------------------------------------------------`);
     cli.output(`
 \u26A0\uFE0F  NOTE: This will create a NEW database.`);
     cli.output(`   The original database will NOT be affected.`);
     const body = {
-      databaseId: targetDatabase
+      databaseId: targetDatabase,
+      backup: backupName
     };
-    if (backupName) {
-      body.backup = backupName;
-    }
     try {
       const url = `${FIRESTORE_API_URL}/projects/${this.projectId}/databases:restore`;
       const operation = this.post(url, body);
