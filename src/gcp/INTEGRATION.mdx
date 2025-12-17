@@ -1,0 +1,186 @@
+---
+title: Google Cloud Platform
+description: Managed cloud databases and storage (Cloud SQL, Firestore, BigQuery, Cloud Storage).
+website_url: https://cloud.google.com/
+docs_url: https://cloud.google.com/docs
+primary_category: database
+tags: [gcp, database, cloud-sql, firestore, bigquery, storage, postgresql, mysql]
+hosting_models: [managed]
+---
+
+## What is this integration?
+Google Cloud Platform (GCP) provides fully managed cloud services including relational databases (Cloud SQL), NoSQL document databases (Firestore), and serverless data warehouses (BigQuery).
+
+## What Monk manages
+- Cloud SQL instances, databases, and users
+- Firestore databases with PITR and backup support
+- BigQuery datasets and table snapshots
+- Cloud Storage buckets
+- Service accounts and IAM bindings
+- API enablement via Service Usage
+
+## What the Agent can do and how to use it
+- **Database Creation**: Provision PostgreSQL, MySQL, SQL Server (Cloud SQL), Firestore, or BigQuery datasets
+- **Backup & Recovery**: Automated backups, on-demand snapshots, point-in-time recovery, and restore operations
+- **Scaling**: Modify instance tiers, storage, and enable high availability
+- **Security**: Configure authorized networks, SSL, and IAM permissions
+- **Monitoring**: Access instance status and connection information
+
+Steps:
+1) Ensure GCP provider is added: `monk cluster provider add -p gcp`
+2) monk update \<namespace>/\<name>
+
+## Auth
+- Uses GCP provider credentials configured via `monk cluster provider add -p gcp`
+- GCP credentials are automatically injected into the GCP client
+
+## Getting Started
+
+1) Ensure GCP provider is added:
+```bash
+monk cluster provider add -p gcp
+```
+
+2) Define a Cloud SQL instance (save as gcp-stack.yaml):
+```yaml
+namespace: my-app
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+
+my-postgres:
+  defines: gcp/cloud-sql-instance
+  name: my-app-db
+  database_version: POSTGRES_14
+  tier: db-f1-micro
+  region: us-central1
+  backup_start_time: "03:00"              # Enable automated backups
+  point_in_time_recovery_enabled: true    # Enable PITR
+  depends:
+    wait-for:
+      runnables:
+        - my-app/enable-apis
+      timeout: 300
+```
+
+3) Create/update:
+```bash
+monk load gcp-stack.yaml
+monk update my-app/my-postgres
+monk describe my-app/my-postgres
+```
+
+---
+
+## Cloud SQL Backup & Restore Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View backup configuration and PITR status |
+| `create-backup` | Create an on-demand backup |
+| `list-backups` | List available backups (automated and on-demand) |
+| `describe-backup` | Get detailed information about a specific backup |
+| `delete-backup` | Delete a backup |
+| `restore` | Restore from backup (overwrites instance) |
+| `get-restore-status` | Check status of restore operation |
+
+```bash
+# View backup configuration
+monk do my-app/my-postgres/get-backup-info
+
+# Create a backup before maintenance
+monk do my-app/my-postgres/create-backup description="Pre-upgrade backup"
+
+# List available backups
+monk do my-app/my-postgres/list-backups
+
+# Restore from backup (WARNING: overwrites instance!)
+monk do my-app/my-postgres/restore backup_id="1765968494026"
+
+# Check restore progress
+monk do my-app/my-postgres/get-restore-status operation_name="operations/abc123"
+```
+
+---
+
+## Firestore Backup & Restore Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View PITR status and configuration |
+| `export-documents` | Export database to Cloud Storage |
+| `import-documents` | Import from Cloud Storage export |
+| `list-backups` | List scheduled backups in a location |
+| `describe-backup` | Get backup details |
+| `delete-backup` | Delete a scheduled backup |
+| `restore` | Restore to a new database from backup |
+| `get-restore-status` | Check restore operation progress |
+
+```bash
+# View backup configuration
+monk do my-app/my-firestore/get-backup-info
+
+# Export database to Cloud Storage
+monk do my-app/my-firestore/export-documents output_uri_prefix="gs://my-bucket/backup"
+
+# Import from Cloud Storage
+monk do my-app/my-firestore/import-documents input_uri_prefix="gs://my-bucket/backup"
+
+# List scheduled backups
+monk do my-app/my-firestore/list-backups location="us-central1"
+
+# Restore to a new database
+monk do my-app/my-firestore/restore backup_name="projects/.../backups/..." target_database="restored-db"
+```
+
+**Note:** Firestore PITR enables reading historical document versions (7 days), not database-level restore. Use `export-documents` for full database backups.
+
+---
+
+## BigQuery Backup & Restore Actions
+
+| Action | Description |
+|--------|-------------|
+| `get-backup-info` | View time travel settings and storage model |
+| `create-snapshot` | Create a table snapshot |
+| `list-snapshots` | List tables/snapshots in dataset |
+| `describe-snapshot` | Get table/snapshot details |
+| `delete-snapshot` | Delete a snapshot table |
+| `restore` | Create new table from snapshot |
+
+```bash
+# View backup configuration
+monk do my-app/my-dataset/get-backup-info
+
+# Create a snapshot of a table
+monk do my-app/my-dataset/create-snapshot source_table="events"
+
+# Create snapshot at a specific point in time (time travel)
+monk do my-app/my-dataset/create-snapshot source_table="events" snapshot_time="2024-12-16T10:00:00Z"
+
+# List all tables/snapshots
+monk do my-app/my-dataset/list-snapshots
+
+# Restore by creating a new table from snapshot
+monk do my-app/my-dataset/restore snapshot_table="events_backup" target_table="events_restored"
+```
+
+**Time Travel:** BigQuery provides built-in time travel (2-7 days) for querying historical data without creating snapshots:
+```sql
+SELECT * FROM `project.dataset.table`
+FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
+```
+
+---
+
+## Restore Behavior Summary
+
+| Database | Restore Target | Warning |
+|----------|----------------|---------|
+| Cloud SQL | Same instance | ⚠️ **OVERWRITES** existing instance |
+| Firestore | New database | ✅ Safe - creates new database |
+| BigQuery | New table | ✅ Safe - creates new table (clone) |
+
+
