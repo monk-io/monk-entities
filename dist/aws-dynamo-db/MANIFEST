@@ -3,5 +3,5 @@ VERSION_HASH f6ae3ba264ef
 DESCRIPTION Fully managed NoSQL database.
 HOSTING managed
 TAGS aws,dynamodb,nosql,database,key-value
-LOAD dynamo-db-table.yaml base.yaml common.yaml
-RESOURCES common.js dynamo-db-table-sync.js base.js
+LOAD common.yaml base.yaml dynamo-db-table.yaml
+RESOURCES base.js common.js dynamo-db-table-sync.js
