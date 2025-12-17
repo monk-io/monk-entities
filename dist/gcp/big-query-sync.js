@@ -126,8 +126,8 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
         projectId: this.projectId
       }
     };
-    if (this.definition.description) {
-      body.description = this.definition.description;
+    if (this.definition.dataset_description) {
+      body.description = this.definition.dataset_description;
     }
     if (this.definition.location) {
       body.location = this.definition.location;
@@ -231,8 +231,8 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
       return;
     }
     const body = {};
-    if (this.definition.description) {
-      body.description = this.definition.description;
+    if (this.definition.dataset_description) {
+      body.description = this.definition.dataset_description;
     }
     if (this.definition.labels) {
       body.labels = this.definition.labels;
@@ -394,43 +394,68 @@ Usage: monk do namespace/dataset create-snapshot table="source_table" snapshot="
     if (snapshotTime) {
       cli.output(`Snapshot Time: ${snapshotTime}`);
     }
-    const body = {
-      tableReference: {
-        projectId: this.projectId,
-        datasetId: targetDataset,
-        tableId: snapshotName
-      },
-      snapshotDefinition: {
-        baseTableReference: {
-          projectId: this.projectId,
-          datasetId: this.definition.dataset,
-          tableId: sourceTable
+    const jobBody = {
+      configuration: {
+        copy: {
+          sourceTable: {
+            projectId: this.projectId,
+            datasetId: this.definition.dataset,
+            tableId: sourceTable
+          },
+          destinationTable: {
+            projectId: this.projectId,
+            datasetId: targetDataset,
+            tableId: snapshotName
+          },
+          operationType: "SNAPSHOT"
         }
       }
     };
     if (snapshotTime) {
-      body.snapshotDefinition.snapshotTime = snapshotTime;
+      jobBody.configuration.copy.sourceTable.snapshotTime = snapshotTime;
     }
     if (expirationDays) {
       const expirationMs = Date.now() + expirationDays * 24 * 60 * 60 * 1e3;
-      body.expirationTime = expirationMs.toString();
+      jobBody.configuration.copy.destinationExpirationTime = new Date(expirationMs).toISOString();
     }
     try {
-      const result = this.post(
-        `${this.apiUrl}/datasets/${targetDataset}/tables`,
-        body
-      );
+      const jobResult = this.post(`${this.apiUrl}/jobs`, jobBody);
       cli.output(`
+Job submitted: ${jobResult.jobReference?.jobId}`);
+      cli.output(`Status: ${jobResult.status?.state || "PENDING"}`);
+      const jobId = jobResult.jobReference?.jobId;
+      if (jobId) {
+        let attempts = 0;
+        const maxAttempts = 30;
+        let jobStatus = jobResult;
+        while (jobStatus.status?.state !== "DONE" && attempts < maxAttempts) {
+          const start = Date.now();
+          while (Date.now() - start < 2e3) {
+          }
+          jobStatus = this.get(`${this.apiUrl}/jobs/${jobId}`);
+          attempts++;
+          if (jobStatus.status?.state === "DONE") {
+            break;
+          }
+          cli.output(`   Waiting for job... (attempt ${attempts}/${maxAttempts})`);
+        }
+        if (jobStatus.status?.errorResult) {
+          throw new Error(jobStatus.status.errorResult.message || "Job failed");
+        }
+        if (jobStatus.status?.state === "DONE") {
+          cli.output(`
 \u2705 Snapshot created successfully!`);
-      cli.output(`Snapshot: ${result.tableReference?.tableId || snapshotName}`);
-      cli.output(`Type: ${result.type || "SNAPSHOT"}`);
-      cli.output(`Created: ${result.creationTime ? new Date(Number(result.creationTime)).toISOString() : "Now"}`);
-      if (result.expirationTime) {
-        cli.output(`Expires: ${new Date(Number(result.expirationTime)).toISOString()}`);
-      }
-      cli.output(`
+          cli.output(`Snapshot: ${snapshotName}`);
+          cli.output(`Dataset: ${targetDataset}`);
+          cli.output(`
 \u{1F4CB} To restore from this snapshot:`);
-      cli.output(`   monk do namespace/dataset restore snapshot="${snapshotName}" target="restored_table"`);
+          cli.output(`   monk do namespace/dataset restore snapshot="${snapshotName}" target="restored_table"`);
+        } else {
+          cli.output(`
+\u23F3 Job still running. Check status with:`);
+          cli.output(`   Use BigQuery console to monitor job ${jobId}`);
+        }
+      }
       cli.output(`==================================================`);
     } catch (error) {
       cli.output(`
@@ -616,34 +641,60 @@ To find snapshots, run: monk do namespace/dataset list-snapshots`
     cli.output(`
 \u26A0\uFE0F  NOTE: This will create a NEW writable table.`);
     cli.output(`   The original snapshot will NOT be affected.`);
-    const body = {
-      tableReference: {
-        projectId: this.projectId,
-        datasetId: targetDataset,
-        tableId: targetTable
-      },
-      cloneDefinition: {
-        baseTableReference: {
-          projectId: this.projectId,
-          datasetId: this.definition.dataset,
-          tableId: snapshotName
+    const jobBody = {
+      configuration: {
+        copy: {
+          sourceTable: {
+            projectId: this.projectId,
+            datasetId: this.definition.dataset,
+            tableId: snapshotName
+          },
+          destinationTable: {
+            projectId: this.projectId,
+            datasetId: targetDataset,
+            tableId: targetTable
+          },
+          operationType: "RESTORE"
         }
       }
     };
     try {
-      const result = this.post(
-        `${this.apiUrl}/datasets/${targetDataset}/tables`,
-        body
-      );
+      const jobResult = this.post(`${this.apiUrl}/jobs`, jobBody);
       cli.output(`
+Job submitted: ${jobResult.jobReference?.jobId}`);
+      cli.output(`Status: ${jobResult.status?.state || "PENDING"}`);
+      const jobId = jobResult.jobReference?.jobId;
+      if (jobId) {
+        let attempts = 0;
+        const maxAttempts = 30;
+        let jobStatus = jobResult;
+        while (jobStatus.status?.state !== "DONE" && attempts < maxAttempts) {
+          const start = Date.now();
+          while (Date.now() - start < 2e3) {
+          }
+          jobStatus = this.get(`${this.apiUrl}/jobs/${jobId}`);
+          attempts++;
+          if (jobStatus.status?.state === "DONE") {
+            break;
+          }
+          cli.output(`   Waiting for job... (attempt ${attempts}/${maxAttempts})`);
+        }
+        if (jobStatus.status?.errorResult) {
+          throw new Error(jobStatus.status.errorResult.message || "Job failed");
+        }
+        if (jobStatus.status?.state === "DONE") {
+          cli.output(`
 \u2705 Table restored successfully!`);
-      cli.output(`Restored Table: ${result.tableReference?.tableId || targetTable}`);
-      cli.output(`Type: ${result.type || "TABLE"}`);
-      cli.output(`Dataset: ${targetDataset}`);
-      cli.output(`Created: ${result.creationTime ? new Date(Number(result.creationTime)).toISOString() : "Now"}`);
-      cli.output(`
+          cli.output(`Restored Table: ${targetTable}`);
+          cli.output(`Dataset: ${targetDataset}`);
+          cli.output(`
 \u{1F4CB} The restored table is now available for queries:`);
-      cli.output(`   SELECT * FROM \`${this.projectId}.${targetDataset}.${targetTable}\``);
+          cli.output(`   SELECT * FROM \`${this.projectId}.${targetDataset}.${targetTable}\``);
+        } else {
+          cli.output(`
+\u23F3 Job still running. Check status with BigQuery console.`);
+        }
+      }
       cli.output(`
 ==================================================`);
     } catch (error) {

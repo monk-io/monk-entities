@@ -73,7 +73,7 @@ export interface ServiceAccountDefinition extends GcpEntityDefinition {
      * @description Description of the service account's purpose.
      * Max 256 characters.
      */
-    description?: string;
+    account_description?: string;
 
     /**
      * @description List of IAM roles to grant to this service account at the project level.
@@ -349,7 +349,7 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
             accountId: this.definition.name,
             serviceAccount: {
                 displayName: this.definition.display_name || this.definition.name,
-                description: this.definition.description,
+                description: this.definition.account_description,
             },
         };
 
@@ -380,7 +380,7 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
         // Update service account metadata
         const body = {
             displayName: this.definition.display_name || this.definition.name,
-            description: this.definition.description,
+            description: this.definition.account_description,
         };
 
         const url = `${this.iamApiUrl}/${existing.email}`;

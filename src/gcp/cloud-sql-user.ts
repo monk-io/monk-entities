@@ -40,7 +40,7 @@ export interface CloudSqlUserDefinition extends GcpEntityDefinition {
      * @description User type (BUILT_IN, CLOUD_IAM_USER, CLOUD_IAM_SERVICE_ACCOUNT)
      * @default BUILT_IN
      */
-    type?: string;
+    user_type?: string;
 }
 
 /**
@@ -230,8 +230,8 @@ export class CloudSqlUser extends GcpEntity<CloudSqlUserDefinition, CloudSqlUser
             body.host = this.definition.host;
         }
 
-        if (this.definition.type) {
-            body.type = this.definition.type;
+        if (this.definition.user_type) {
+            body.type = this.definition.user_type;
         }
 
         cli.output(`Creating user ${this.definition.name} on instance ${this.definition.instance}`);

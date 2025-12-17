@@ -1,0 +1,32 @@
+# GCP Firestore Backup Test Template
+#
+# This template defines a Firestore database with PITR enabled
+# for testing backup and restore operations.
+
+namespace: gcp-firestore-test
+
+# =============================================================================
+# Service Usage - Enable APIs
+# =============================================================================
+
+enable-firestore-api:
+  defines: gcp/service-usage
+  apis:
+    - firestore.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# =============================================================================
+# Firestore Database with PITR Enabled
+# =============================================================================
+
+# Use the default database which should already exist
+backup-firestore:
+  defines: gcp/firestore
+  location: us-central1
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-test/enable-firestore-api
+      timeout: 300

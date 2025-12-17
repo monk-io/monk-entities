@@ -75,8 +75,8 @@ var _CloudSqlUser = class _CloudSqlUser extends GcpEntity {
     if (this.definition.host) {
       body.host = this.definition.host;
     }
-    if (this.definition.type) {
-      body.type = this.definition.type;
+    if (this.definition.user_type) {
+      body.type = this.definition.user_type;
     }
     cli.output(`Creating user ${this.definition.name} on instance ${this.definition.instance}`);
     const result = this.post(this.apiUrl, body);

@@ -224,8 +224,8 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
         body.eventTrigger.channel = this.definition.event_trigger.channel;
       }
     }
-    if (this.definition.description) {
-      body.description = this.definition.description;
+    if (this.definition.function_description) {
+      body.description = this.definition.function_description;
     }
     if (this.definition.labels) {
       body.labels = this.definition.labels;

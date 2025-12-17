@@ -166,7 +166,7 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
       accountId: this.definition.name,
       serviceAccount: {
         displayName: this.definition.display_name || this.definition.name,
-        description: this.definition.description
+        description: this.definition.account_description
       }
     };
     cli.output(`Creating service account: ${this.definition.name}`);
@@ -187,7 +187,7 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     }
     const body = {
       displayName: this.definition.display_name || this.definition.name,
-      description: this.definition.description
+      description: this.definition.account_description
     };
     const url = `${this.iamApiUrl}/${existing.email}`;
     const result = this.patch(url, body);

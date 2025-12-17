@@ -1,0 +1,121 @@
+# GCP Cloud SQL Backup Integration Test
+#
+# Tests backup and restore operations for Cloud SQL.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --test-file test/backup-integration.test.yaml --verbose
+
+name: Cloud SQL Backup Integration Test
+description: Test backup and restore operations for Cloud SQL instance
+timeout: 1200000  # 20 minutes - Cloud SQL instance creation and backups take time
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load backup test template
+    action: load
+    target: test/backup-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Setup - Create Cloud SQL Instance
+  # =========================================================================
+  - name: Enable Cloud SQL API
+    action: run
+    target: gcp-backup-test/enable-sql-api
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-backup-test/enable-sql-api"
+
+  - name: Wait for API to be enabled
+    action: wait
+    target: gcp-backup-test/enable-sql-api
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Create Cloud SQL instance with backup enabled
+    action: run
+    target: gcp-backup-test/backup-sql-instance
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-backup-test/backup-sql-instance"
+
+  - name: Wait for Cloud SQL instance to be ready
+    action: wait
+    target: gcp-backup-test/backup-sql-instance
+    waitFor:
+      condition: ready
+      timeout: 900000  # 15 minutes for instance creation
+
+  # =========================================================================
+  # Test get-backup-info Action
+  # =========================================================================
+  - name: Test get-backup-info action
+    action: action
+    target: gcp-backup-test/backup-sql-instance
+    actionName: get-backup-info
+    expect:
+      exitCode: 0
+      output:
+        - "Backup Information"
+        - "Automated Backups"
+
+  # =========================================================================
+  # Test create-backup Action
+  # =========================================================================
+  - name: Test create-backup action
+    action: action
+    target: gcp-backup-test/backup-sql-instance
+    actionName: create-backup
+    args:
+      description: "MonkEC integration test backup"
+    expect:
+      exitCode: 0
+      output:
+        - "Backup creation initiated"
+
+  # =========================================================================
+  # Test list-backups Action
+  # =========================================================================
+  - name: Test list-backups action
+    action: action
+    target: gcp-backup-test/backup-sql-instance
+    actionName: list-backups
+    expect:
+      exitCode: 0
+      output:
+        - "Listing backups"
+
+  # =========================================================================
+  # Test describe-backup Action (skip if no backups yet)
+  # =========================================================================
+  # Note: We can't easily test describe-backup without knowing the backup ID
+  # The list-backups action shows how to find backup IDs
+
+  # =========================================================================
+  # Test get-info Action (verify instance is still healthy)
+  # =========================================================================
+  - name: Verify instance is healthy after backup operations
+    action: action
+    target: gcp-backup-test/backup-sql-instance
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Cloud SQL instance
+    action: delete
+    target: gcp-backup-test/backup-sql-instance
+    expect:
+      exitCode: 0
+

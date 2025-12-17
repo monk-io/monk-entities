@@ -1,0 +1,19 @@
+# Simple Firestore test - uses default database
+namespace: gcp-firestore-test
+
+enable-firestore-api:
+  defines: gcp/service-usage
+  apis:
+    - firestore.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+backup-firestore:
+  defines: gcp/firestore
+  location: us-central1
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firestore-test/enable-firestore-api
+      timeout: 300

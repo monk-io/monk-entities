@@ -3,7 +3,7 @@ cloud-sql-user:
   defines: entity
   metadata:
     name: CloudSqlUser
-    version-hash: c729f43fd5ca
+    version-hash: d87fc5c5f384
   schema:
     project:
       type: string
@@ -20,7 +20,7 @@ cloud-sql-user:
     host:
       type: string
       description: 'Host restriction for the user (MySQL only, % for any host)'
-    type:
+    user_type:
       type: string
       description: 'User type (BUILT_IN, CLOUD_IAM_USER, CLOUD_IAM_SERVICE_ACCOUNT)'
       default: BUILT_IN
