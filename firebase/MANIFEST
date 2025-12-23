@@ -1,2 +1,2 @@
 REPO firebase-hosting
-LOAD hosting.yaml
+LOAD deploy.yaml
