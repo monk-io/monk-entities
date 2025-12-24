@@ -38,6 +38,24 @@ export interface IAMUserState extends AWSIAMState {
     attached_policies?: string[];
 }
 
+/**
+ * @description AWS IAM User entity.
+ * Creates and manages IAM users for programmatic and console access.
+ * Supports access key generation and policy attachments.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: `access_key_id_secret_ref`, `secret_access_key_secret_ref` (if `create_access_key` is true)
+ * 
+ * ## State Fields for Composition
+ * - `state.user_arn` - User ARN for policies and cross-account access
+ * - `state.user_id` - User ID
+ * - `state.access_key_id` - Access key ID (if created)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-iam/policy` - Attach policies for permissions
+ */
 export class IAMUser extends AWSIAMEntity<IAMUserDefinition, IAMUserState> {
     
     // Customize readiness check parameters

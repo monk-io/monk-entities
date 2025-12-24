@@ -4,9 +4,22 @@ access-list:
   metadata:
     name: AccessList
     description: |-
-      Base class for all Azure Cosmos DB entities.
-      Provides common functionality like Azure API interaction and error handling.
-    version-hash: 5987cccb4e12
+      Azure Cosmos DB Access List entity.
+      Manages IP firewall rules for Azure Cosmos DB accounts.
+      Controls which IP addresses can access the database.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.ip_rules_count` - Number of configured IP rules
+      - `state.configured_ip_ranges` - List of allowed IP addresses/ranges
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-cosmosdb/database-account` - The account to configure access for
+    version-hash: d78e8acb86cc
   schema:
     subscription_id:
       type: string

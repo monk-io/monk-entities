@@ -3,7 +3,27 @@ vpc:
   defines: entity
   metadata:
     name: VPC
-    version-hash: ed6c62fb4c12
+    description: |-
+      AWS EC2 VPC entity.
+      Creates and manages Amazon VPC (Virtual Private Cloud) for isolated network environments.
+      Supports custom CIDR blocks, DNS configuration, and can adopt existing VPCs.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.vpc_id` - VPC ID for subnet and security group configuration
+      - `state.state` - VPC state (available, pending)
+      - `state.cidr_block` - VPC CIDR block
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ec2/subnet` - Create subnets within the VPC
+      - `aws-ec2/security-group` - Define network access rules
+      - `aws-rds/instance` - Place databases in VPC subnets
+      - `aws-lambda/function` - Connect Lambda to VPC resources
+    version-hash: d4ccad916e47
   schema:
     region:
       type: string
@@ -26,10 +46,13 @@ vpc:
       type: boolean
     vpc_id:
       type: string
+      description: VPC ID
     state:
       type: string
+      description: 'VPC state (available, pending)'
     cidr_block:
       type: string
+      description: VPC CIDR block
   lifecycle:
     sync: <<< vpc-sync.js
   checks:

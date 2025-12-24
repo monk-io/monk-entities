@@ -3,7 +3,24 @@ cloudflare-dns-zone:
   defines: entity
   metadata:
     name: CloudflareDNSZone
-    version-hash: a6db03035e06
+    description: |-
+      Cloudflare DNS Zone entity.
+      Detects and manages Cloudflare DNS zones for domain configuration.
+      Adopts existing zones by name for DNS record management.
+
+      ## Secrets
+      - Reads: `secret_ref` - Cloudflare API token (defaults to `cloudflare-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Zone ID for DNS record operations
+      - `state.name` - Domain name (e.g., example.com)
+      - `state.status` - Zone status (active, pending)
+
+      ## Composing with Other Entities
+      Works with:
+      - `cloudflare/dns-record` - Create DNS records in this zone
+    version-hash: 27c75d760a1f
   schema:
     secret_ref:
       type: string

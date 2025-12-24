@@ -106,6 +106,25 @@ export interface IdentityPoolState extends AWSCognitoState {
     unauthenticated_role_arn?: string;
 }
 
+/**
+ * @description AWS Cognito Identity Pool entity.
+ * Creates and manages Cognito Identity Pools for federated identity access.
+ * Identity Pools provide temporary AWS credentials for authenticated/unauthenticated users.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.identity_pool_id` - Identity Pool ID for SDK configuration
+ * - `state.authenticated_role_arn` - IAM role for authenticated users
+ * - `state.unauthenticated_role_arn` - IAM role for guest users
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-cognito/user-pool` - User Pool as identity provider
+ * - `aws-iam/role` - IAM roles for authenticated/unauthenticated access
+ */
 export class IdentityPool extends AWSCognitoEntity<IdentityPoolDefinition, IdentityPoolState> {
 
     protected getIdentityPoolName(): string {

@@ -4,9 +4,23 @@ role:
   metadata:
     name: Role
     description: |-
-      Base class for all Neon entities.
-      Provides common functionality like authentication, HTTP client setup, and error handling.
-    version-hash: 110be63aa18b
+      Neon Role entity.
+      Creates and manages PostgreSQL roles (users) within a Neon branch.
+      Roles control database access and permissions.
+
+      ## Secrets
+      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+      - Writes: `password_secret_ref` - Role password (defaults to `{name}-password`)
+
+      ## State Fields for Composition
+      - `state.name` - Role name
+      - `state.protected` - Whether the role is protected (cannot be deleted)
+
+      ## Composing with Other Entities
+      Works with:
+      - `neon/project` - The project containing this role
+      - `neon/branch` - The branch this role exists on
+    version-hash: 2e545ec0b98f
   schema:
     secret_ref:
       type: string

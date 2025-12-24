@@ -36,6 +36,25 @@ export interface CloudflareDNSRecordState extends CloudflareEntityState {
   applied_zone_name?: string;
 }
 
+/**
+ * @description Cloudflare DNS Record entity.
+ * Creates and manages DNS records within a Cloudflare DNS zone.
+ * Supports A, AAAA, CNAME, TXT, MX, and other record types.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Cloudflare API token (defaults to `cloudflare-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - DNS record ID
+ * - `state.name` - Full record name (e.g., subdomain.example.com)
+ * - `state.type` - Record type (A, CNAME, etc.)
+ * - `state.content` - Record value
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `cloudflare/dns-zone` - The parent zone containing this record
+ */
 export class CloudflareDNSRecord extends CloudflareEntity<CloudflareDNSRecordDefinition, CloudflareDNSRecordState> {
   static readonly readiness = { period: 5, initialDelay: 1, attempts: 20 };
 

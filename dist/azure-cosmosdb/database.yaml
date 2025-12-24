@@ -4,9 +4,23 @@ database:
   metadata:
     name: Database
     description: |-
-      Base class for all Azure Cosmos DB entities.
-      Provides common functionality like Azure API interaction and error handling.
-    version-hash: 5987cccb4e12
+      Azure Cosmos DB Database entity.
+      Creates and manages databases within an Azure Cosmos DB account.
+      Databases are logical containers for collections/containers.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Database resource ID
+      - `state.name` - Database name
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-cosmosdb/database-account` - The parent Cosmos DB account
+      - `azure-cosmosdb/container` - Create containers within this database
+    version-hash: d78e8acb86cc
   schema:
     subscription_id:
       type: string

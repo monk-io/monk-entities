@@ -74,6 +74,24 @@ export interface FormState extends NetlifyEntityState {
     created_at?: string;
 }
 
+/**
+ * @description Netlify Form entity.
+ * Manages form submissions for Netlify sites.
+ * Forms collect user submissions from static HTML forms.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Form ID
+ * - `state.name` - Form name
+ * - `state.submission_count` - Number of submissions
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `netlify/site` - The site containing this form
+ */
 export class Form extends NetlifyEntity<FormDefinition, FormState> {
     
     protected getEntityName(): string {

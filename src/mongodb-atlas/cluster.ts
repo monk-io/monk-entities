@@ -70,6 +70,25 @@ export interface ClusterState extends MongoDBAtlasEntityState {
     connection_srv?: string;
 }
 
+/**
+ * @description MongoDB Atlas Cluster entity.
+ * Creates and manages MongoDB Atlas database clusters for document storage.
+ * Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.name` - Cluster name
+ * - `state.connection_srv` - SRV connection string (mongodb+srv://...)
+ * - `state.connection_standard` - Standard connection string
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `mongodb-atlas/user` - Create database users with role-based access
+ * - `mongodb-atlas/project` - The parent project containing the cluster
+ */
 export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState> {
     
     /**

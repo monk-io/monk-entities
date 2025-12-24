@@ -19,6 +19,26 @@ export interface StripeCredentialsState extends StripeEntityState {
     secret_ref?: string;
 }
 
+/**
+ * @description Stripe Credentials entity.
+ * Validates and manages Stripe API credentials.
+ * Verifies the API key and provides account information.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.account_id` - Stripe account ID
+ * - `state.mode` - API mode (test or live)
+ * - `state.publishable_key` - Publishable key for client-side use
+ * 
+ * ## Composing with Other Entities
+ * Validates credentials for use with:
+ * - `stripe/product` - Product management
+ * - `stripe/price` - Price management
+ * - `stripe/webhook-endpoint` - Webhook configuration
+ */
 export class Credentials extends StripeEntity<StripeCredentialsDefinition, StripeCredentialsState> {
     protected getEntityName(): string {
         return "stripe-credentials";

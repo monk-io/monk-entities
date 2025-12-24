@@ -15,6 +15,23 @@ export interface AWSRDSAccessListState {
     existing: boolean;
 }
 
+/**
+ * @description AWS RDS Access List entity.
+ * Manages security group ingress rules for RDS database access.
+ * Controls which CIDR blocks and security groups can connect to the database.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.existing` - Whether the rules pre-existed
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/security-group` - The security group to modify
+ * - `aws-rds/instance` - The RDS instance protected by the security group
+ */
 export class RDSAccessList extends MonkEntity<AWSRDSAccessListDefinition, AWSRDSAccessListState> {
     
     static readonly readiness = { period: 5, initialDelay: 2, attempts: 20 };

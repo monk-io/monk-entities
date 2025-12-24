@@ -250,8 +250,22 @@ export interface EssentialsDatabaseState extends RedisCloudEntityState {
 }
 
 /**
- * Essentials Database Entity
- * Manages Redis Cloud databases for Essentials subscriptions with API-compliant configuration options.
+ * @description Redis Cloud Essentials Database entity.
+ * Creates and manages Redis Cloud databases in Essentials (pay-as-you-go) subscriptions.
+ * Provides a cost-effective option for development and smaller workloads.
+ * 
+ * ## Secrets
+ * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
+ * - Writes: `password_secret_ref` - Database password (if specified)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Database ID
+ * - `state.public_endpoint` - Public endpoint for connections
+ * - `state.status` - Database status (active, pending, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `redis-cloud/essentials-subscription` - The parent subscription for this database
  */
 export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefinition, EssentialsDatabaseState> {
 

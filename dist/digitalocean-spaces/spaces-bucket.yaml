@@ -3,7 +3,22 @@ spaces-bucket:
   defines: entity
   metadata:
     name: SpacesBucket
-    version-hash: 4b86057735b0
+    description: |-
+      DigitalOcean Spaces Bucket entity.
+      Creates and manages DigitalOcean Spaces buckets for S3-compatible object storage.
+
+      ## Secrets
+      - Reads: `do-spaces-access-key`, `do-spaces-secret-key` - Spaces credentials
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.bucket_name` - Bucket name for SDK/API operations
+      - `state.region` - DigitalOcean region where the bucket resides
+      - `state.endpoint` - S3-compatible endpoint URL
+
+      ## Composing with Other Entities
+      Works with `digitalocean-spaces/spaces-keys` to create access credentials for bucket operations.
+    version-hash: 48ffffa87b50
   schema:
     region:
       type: string
@@ -131,8 +146,10 @@ spaces-bucket:
       description: Endpoint information for the resource
     bucket_name:
       type: string
+      description: Bucket name
     region:
       type: string
+      description: DigitalOcean region where the bucket resides
   lifecycle:
     sync: <<< spaces-bucket-sync.js
     get-bucket-info: ''

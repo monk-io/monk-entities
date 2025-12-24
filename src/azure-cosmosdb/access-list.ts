@@ -87,6 +87,23 @@ export interface AccessListState extends AzureCosmosDBState {
     configured_ip_ranges?: string[];
 }
 
+/**
+ * @description Azure Cosmos DB Access List entity.
+ * Manages IP firewall rules for Azure Cosmos DB accounts.
+ * Controls which IP addresses can access the database.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via Azure provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.ip_rules_count` - Number of configured IP rules
+ * - `state.configured_ip_ranges` - List of allowed IP addresses/ranges
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `azure-cosmosdb/database-account` - The account to configure access for
+ */
 export class AccessList extends AzureCosmosDBEntity<AccessListDefinition, AccessListState> {
 
     static readonly readiness = { period: 5, initialDelay: 2, attempts: 30 };

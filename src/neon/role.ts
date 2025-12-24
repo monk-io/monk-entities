@@ -85,6 +85,24 @@ export interface NeonRoleState extends NeonEntityState {
     operationId?: string;
 }
 
+/**
+ * @description Neon Role entity.
+ * Creates and manages PostgreSQL roles (users) within a Neon branch.
+ * Roles control database access and permissions.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Writes: `password_secret_ref` - Role password (defaults to `{name}-password`)
+ * 
+ * ## State Fields for Composition
+ * - `state.name` - Role name
+ * - `state.protected` - Whether the role is protected (cannot be deleted)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `neon/project` - The project containing this role
+ * - `neon/branch` - The branch this role exists on
+ */
 export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
     
     protected getEntityName(): string {

@@ -84,10 +84,21 @@ export interface RegistryState extends DOProviderStateBase {
 }
 
 /**
- * DigitalOcean Container Registry entity for managing private Docker registries.
+ * @description DigitalOcean Container Registry entity.
+ * Creates and manages DigitalOcean Container Registry for private Docker images.
+ * Provides a secure registry for storing and managing container images.
  * 
- * This entity provides complete lifecycle management for DigitalOcean container registries
- * including creation, updates, deletion, and monitoring operations.
+ * ## Secrets
+ * - Reads: none (authenticated via DigitalOcean provider)
+ * - Writes: none (Docker credentials available via `get-docker-config` action)
+ * 
+ * ## State Fields for Composition
+ * - `state.name` - Registry name
+ * - `state.server_url` - Registry server URL (registry.digitalocean.com)
+ * - `state.storage_usage_bytes` - Current storage usage
+ * 
+ * ## Composing with Other Entities
+ * DigitalOcean Container Registry is standalone for image storage.
  */
 export class Registry extends DOProviderEntity<
     RegistryDefinition,

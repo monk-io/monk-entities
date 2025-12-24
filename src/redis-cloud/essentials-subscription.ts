@@ -163,10 +163,22 @@ interface PlanCriteria {
 }
 
 /**
- * Redis Cloud Subscription Entity
+ * @description Redis Cloud Essentials Subscription entity.
+ * Creates and manages Redis Cloud Essentials (pay-as-you-go) subscriptions.
+ * Essentials subscriptions provide cost-effective Redis hosting for development and small workloads.
  * 
- * Manages Redis Cloud subscriptions which are containers for Redis databases.
- * Supports both Essentials and Pro subscription types with automatic plan selection.
+ * ## Secrets
+ * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Subscription ID
+ * - `state.name` - Subscription name
+ * - `state.status` - Subscription status
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `redis-cloud/essentials-database` - Create databases in this subscription
  */
 export class EssentialsSubscription extends RedisCloudEntity<EssentialsSubscriptionDefinition, EssentialsSubscriptionState> {
 

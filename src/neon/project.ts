@@ -84,6 +84,26 @@ export interface NeonProjectState extends NeonEntityState {
     operationId?: string;
 }
 
+/**
+ * @description Neon Project entity.
+ * Creates and manages Neon serverless PostgreSQL projects.
+ * Each project provides isolated database infrastructure with automatic scaling.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Project ID for branch and database operations
+ * - `state.name` - Project name
+ * - `state.region` - AWS region where the project is hosted
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `neon/branch` - Create database branches for dev/test environments
+ * - `neon/database` - Create databases within the project
+ * - `neon/role` - Create database users/roles (writes password secret)
+ */
 export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState> {
     
     protected getEntityName(): string {

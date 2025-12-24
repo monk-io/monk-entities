@@ -15,10 +15,20 @@ export interface AccountState extends NetlifyEntityState {
 }
 
 /**
- * Account Entity
+ * @description Netlify Account entity.
+ * Retrieves and manages Netlify account information.
+ * Lists all team accounts accessible by the current API token.
  * 
- * Simple entity that lists all accounts for the current user.
- * Uses the Netlify API to fetch account information and stores account slugs in state.
+ * ## Secrets
+ * - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.slugs` - Array of team slugs accessible
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `netlify/site` - Create sites under team accounts
  */
 export class Account extends NetlifyEntity<AccountDefinition, AccountState> {
     

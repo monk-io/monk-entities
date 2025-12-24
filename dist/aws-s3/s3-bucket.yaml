@@ -3,7 +3,25 @@ s3-bucket:
   defines: entity
   metadata:
     name: S3Bucket
-    version-hash: b26c91e12424
+    description: |-
+      AWS S3 Bucket entity.
+      Creates and manages Amazon S3 buckets for scalable object storage.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.bucket_name` - Bucket name for SDK/API operations
+      - `state.region` - AWS region where the bucket resides
+      - `state.location` - Bucket location constraint
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-iam/role` - Create IAM roles with S3 access permissions
+      - `aws-lambda/function` - Store Lambda deployment packages
+      - `aws-cloudfront/distribution` - Serve static content via CDN
+    version-hash: 2752e45db44d
   schema:
     region:
       type: string

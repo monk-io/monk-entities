@@ -1,6 +1,10 @@
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
 
-// IAM Role specific interfaces
+/**
+ * Definition interface for AWS IAM Role entity.
+ * Configures role properties including trust policy and attached managed policies.
+ * @interface IAMRoleDefinition
+ */
 export interface IAMRoleDefinition extends AWSIAMDefinition {
     /** @description IAM role name */
     role_name: string;
@@ -18,6 +22,11 @@ export interface IAMRoleDefinition extends AWSIAMDefinition {
     attached_policies?: string[]; // Array of policy ARNs to attach to the role
 }
 
+/**
+ * State interface for AWS IAM Role entity.
+ * Contains runtime information about the created role.
+ * @interface IAMRoleState
+ */
 export interface IAMRoleState extends AWSIAMState {
     /** @description Role ARN */
     role_arn?: string;
@@ -29,6 +38,25 @@ export interface IAMRoleState extends AWSIAMState {
     existing?: boolean;
 }
 
+/**
+ * @description AWS IAM Role entity.
+ * Creates and manages AWS IAM roles for granting permissions to AWS services and users.
+ * Supports trust policies for cross-account access and service-linked roles.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.role_arn` - Role ARN for service configurations and cross-account access
+ * - `state.role_id` - Unique role identifier
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-lambda/function` - Execution role for Lambda functions
+ * - `aws-rds/instance` - Enhanced monitoring and S3 import roles
+ * - `aws-iam/policy` - Attach custom policies for fine-grained permissions
+ */
 export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
     
     // Customize readiness check parameters

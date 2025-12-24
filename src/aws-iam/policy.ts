@@ -31,6 +31,24 @@ export interface IAMPolicyState extends AWSIAMState {
     update_date?: string;
 }
 
+/**
+ * @description AWS IAM Policy entity.
+ * Creates and manages IAM policies for fine-grained permissions.
+ * Policies define what actions are allowed or denied on AWS resources.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.policy_arn` - Policy ARN for attaching to roles/users
+ * - `state.policy_id` - Policy ID
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-iam/role` - Attach policy to roles
+ * - `aws-iam/user` - Attach policy to users
+ */
 export class IAMPolicy extends AWSIAMEntity<IAMPolicyDefinition, IAMPolicyState> {
     
     // Customize readiness check parameters - IAM policies can take longer to propagate

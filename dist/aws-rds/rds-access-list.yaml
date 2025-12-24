@@ -3,7 +3,23 @@ rds-access-list:
   defines: entity
   metadata:
     name: RDSAccessList
-    version-hash: c798c0714936
+    description: |-
+      AWS RDS Access List entity.
+      Manages security group ingress rules for RDS database access.
+      Controls which CIDR blocks and security groups can connect to the database.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.existing` - Whether the rules pre-existed
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ec2/security-group` - The security group to modify
+      - `aws-rds/instance` - The RDS instance protected by the security group
+    version-hash: 0e422af484d6
   schema:
     region:
       type: string

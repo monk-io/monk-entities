@@ -3,7 +3,26 @@ sns-topic:
   defines: entity
   metadata:
     name: SNSTopic
-    version-hash: 1e1e6bcfd13f
+    description: |-
+      AWS SNS Topic entity.
+      Creates and manages Amazon SNS topics for publish/subscribe messaging patterns.
+      Supports standard topics (high throughput) and FIFO topics (ordered delivery).
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.topic_arn` - Topic ARN for subscriptions and publishing
+      - `state.topic_name` - Topic name
+      - `state.is_fifo` - Whether this is a FIFO topic
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-sqs/queue` - Subscribe queues for fanout message distribution
+      - `aws-lambda/function` - Invoke functions on message publish
+      - `aws-sns/subscription` - Add email, HTTP, or other endpoint subscriptions
+    version-hash: d7e5c8b7ad17
   schema:
     region:
       type: string

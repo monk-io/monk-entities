@@ -10,14 +10,44 @@ import {
     formatInstanceState
 } from "./common.ts";
 
+/**
+ * Definition interface for AWS RDS Instance entity.
+ * All properties inherited from AWSRDSDefinition.
+ * @interface RDSInstanceDefinition
+ */
 export interface RDSInstanceDefinition extends AWSRDSDefinition {
-    // All properties inherited from AWSRDSDefinition
 }
 
+/**
+ * State interface for AWS RDS Instance entity.
+ * Contains runtime information about the database instance.
+ * All properties inherited from AWSRDSState.
+ * @interface RDSInstanceState
+ */
 export interface RDSInstanceState extends AWSRDSState {
-    // All properties inherited from AWSRDSState
 }
 
+/**
+ * @description AWS RDS Instance entity.
+ * Creates and manages Amazon RDS database instances for relational databases.
+ * Supports MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server engines.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: `password_secret_ref` - Master password (defaults to `{db_instance_identifier}-master-password`)
+ * 
+ * ## State Fields for Composition
+ * - `state.db_instance_identifier` - Instance identifier
+ * - `state.endpoint_address` - Database connection hostname
+ * - `state.endpoint_port` - Database connection port
+ * - `state.db_instance_arn` - Instance ARN for IAM policies
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/security-group` - Control network access to the database
+ * - `aws-ec2/subnet` - Place database in specific VPC subnets
+ * - `aws-lambda/function` - Connect serverless functions to the database
+ */
 export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstanceState> {
     
     static readonly readiness = { period: 10, initialDelay: 10, attempts: 100 };

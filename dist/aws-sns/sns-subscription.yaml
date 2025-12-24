@@ -4,9 +4,26 @@ sns-subscription:
   metadata:
     name: SNSSubscription
     description: |-
-      SNS Subscription Entity
-      Manages subscriptions to SNS topics
-    version-hash: 1e1e6bcfd13f
+      AWS SNS Subscription entity.
+      Creates and manages subscriptions to Amazon SNS topics for message delivery.
+      Supports protocols: HTTP/HTTPS, email, SMS, SQS, Lambda, application, and Firehose.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.subscription_arn` - Subscription ARN for management operations
+      - `state.protocol` - Subscription protocol (email, sqs, lambda, etc.)
+      - `state.endpoint` - Target endpoint receiving messages
+      - `state.pending_confirmation` - Whether subscription awaits confirmation
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-sns/topic` - The topic to subscribe to
+      - `aws-sqs/queue` - Use queue ARN as endpoint for SQS subscriptions
+      - `aws-lambda/function` - Use function ARN for Lambda subscriptions
+    version-hash: d7e5c8b7ad17
   schema:
     region:
       type: string

@@ -2,6 +2,11 @@ import { AWSAPIGatewayEntity, AWSAPIGatewayDefinition, AWSAPIGatewayState } from
 import { action } from "monkec/base";
 import cli from "cli";
 
+/**
+ * Definition interface for AWS API Gateway entity.
+ * Configures API properties including protocol type (HTTP/WebSocket) and routes.
+ * @interface APIGatewayDefinition
+ */
 export interface APIGatewayDefinition extends AWSAPIGatewayDefinition {
     name: string;
     protocol_type: "HTTP" | "WEBSOCKET";
@@ -9,13 +14,40 @@ export interface APIGatewayDefinition extends AWSAPIGatewayDefinition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS API Gateway entity.
+ * Contains runtime information about the created API.
+ * @interface APIGatewayState
+ */
 export interface APIGatewayState extends AWSAPIGatewayState {
+    /** @description API name */
     name?: string;
+    /** @description Protocol type (HTTP or WEBSOCKET) */
     protocol_type?: string;
 }
 
 type RouteDef = Required<NonNullable<APIGatewayDefinition["routes"]>>[number];
 
+/**
+ * @description AWS API Gateway entity.
+ * Creates and manages Amazon API Gateway HTTP APIs and WebSocket APIs.
+ * Supports Lambda integrations with automatic route configuration and auto-deploy stages.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.api_id` - API ID for management operations
+ * - `state.api_endpoint` - Invoke URL for API requests
+ * - `state.name` - API name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-lambda/function` - Backend integrations for API routes
+ * - `aws-cognito/user-pool` - JWT authorizers for authentication
+ * - `aws-iam/role` - IAM authorization for API access
+ */
 export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGatewayState> {
 
     protected getApiName(): string {

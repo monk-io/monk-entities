@@ -3,7 +3,29 @@ ses-email-identity:
   defines: entity
   metadata:
     name: SESEmailIdentity
-    version-hash: 977f2b1b6d6f
+    description: |-
+      AWS SES Email Identity entity.
+      Creates and manages Amazon SES email identities for sending emails.
+      Sends verification email to the address and manages DKIM configuration.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## Verification
+      After creation, the email address owner must click the verification link.
+      Check `state.verification_status` for current status (PENDING, SUCCESS, FAILED).
+
+      ## State Fields for Composition
+      - `state.email_address` - Verified email address for sending
+      - `state.verified` - Whether the identity is verified and ready for sending
+      - `state.dkim_tokens` - DKIM tokens for DNS configuration
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ses/configuration-set` - Associate with configuration set for tracking
+      - `aws-lambda/function` - Send emails from serverless functions
+    version-hash: 110a78540381
   schema:
     region:
       type: string

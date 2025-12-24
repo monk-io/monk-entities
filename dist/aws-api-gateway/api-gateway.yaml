@@ -3,7 +3,26 @@ api-gateway:
   defines: entity
   metadata:
     name: APIGateway
-    version-hash: 0e00b2eb7d14
+    description: |-
+      AWS API Gateway entity.
+      Creates and manages Amazon API Gateway HTTP APIs and WebSocket APIs.
+      Supports Lambda integrations with automatic route configuration and auto-deploy stages.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.api_id` - API ID for management operations
+      - `state.api_endpoint` - Invoke URL for API requests
+      - `state.name` - API name
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-lambda/function` - Backend integrations for API routes
+      - `aws-cognito/user-pool` - JWT authorizers for authentication
+      - `aws-iam/role` - IAM authorization for API access
+    version-hash: 7bfcef74d642
   schema:
     region:
       type: string
@@ -32,8 +51,10 @@ api-gateway:
       type: string
     name:
       type: string
+      description: API name
     protocol_type:
       type: string
+      description: Protocol type (HTTP or WEBSOCKET)
   lifecycle:
     sync: <<< api-gateway-sync.js
     sync-routes: ''

@@ -4,9 +4,24 @@ project:
   metadata:
     name: Project
     description: |-
-      Base class for all Vercel entities.
-      Provides common functionality like authentication, HTTP client setup, and error handling.
-    version-hash: 1db0d5c06a73
+      Vercel Project entity.
+      Creates and manages Vercel projects for serverless application deployments.
+      Supports framework presets, Git repository connections, and environment variables.
+
+      ## Secrets
+      - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Project ID
+      - `state.name` - Project name
+      - `state.url` - Production deployment URL
+      - `state.domains` - Associated domains
+
+      ## Composing with Other Entities
+      Works with:
+      - `vercel/deployment` - Deploy code to the project
+    version-hash: ec92791e03f8
   schema:
     secret_ref:
       type: string

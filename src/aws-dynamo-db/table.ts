@@ -19,6 +19,11 @@ import {
     convertTagsToObject
 } from "./common.ts";
 
+/**
+ * Definition interface for AWS DynamoDB Table entity.
+ * Configures table properties including key schema, indexes, billing mode, and encryption.
+ * @interface DynamoDBTableDefinition
+ */
 export interface DynamoDBTableDefinition extends AWSDynamoDBDefinition {
     /**
      * @description The name of the DynamoDB table
@@ -93,6 +98,11 @@ export interface DynamoDBTableDefinition extends AWSDynamoDBDefinition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS DynamoDB Table entity.
+ * Contains runtime information about the created table.
+ * @interface DynamoDBTableState
+ */
 export interface DynamoDBTableState extends AWSDynamoDBState {
     /** @description Table name */
     table_name?: string;
@@ -104,6 +114,25 @@ export interface DynamoDBTableState extends AWSDynamoDBState {
     existing?: boolean;
 }
 
+/**
+ * @description AWS DynamoDB Table entity.
+ * Creates and manages Amazon DynamoDB tables for serverless NoSQL database storage.
+ * Supports on-demand and provisioned billing, global/local secondary indexes, and streams.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.table_name` - Table name for SDK operations
+ * - `state.table_arn` - Table ARN for IAM policies and cross-service access
+ * - `state.table_status` - Current table status (ACTIVE, CREATING, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-iam/role` - Grant table access to Lambda functions or other services
+ * - `aws-lambda/function` - Read/write data from serverless functions
+ */
 export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, DynamoDBTableState> {
     
     static readonly readiness = { period: 10, initialDelay: 5, attempts: 30 };

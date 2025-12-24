@@ -66,10 +66,22 @@ export function formatUserPoolClientState(clientData: Record<string, unknown>, w
 }
 
 /**
- * AWS Cognito User Pool Client Entity
+ * @description AWS Cognito User Pool Client entity.
+ * Creates and manages app clients for Cognito User Pools.
+ * App clients enable web and mobile applications to authenticate users.
  * 
- * Manages User Pool Clients which define how applications interact with User Pools.
- * Handles OAuth flows, token validity, authentication flows, and callback URLs.
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none (client secret available in state if enabled)
+ * 
+ * ## State Fields for Composition
+ * - `state.client_id` - App client ID for SDK configuration
+ * - `state.client_secret` - Client secret (if enabled)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-cognito/user-pool` - The parent user pool
+ * - `aws-cognito/user-pool-domain` - Hosted UI domain for OAuth flows
  */
 export class UserPoolClient extends AWSCognitoEntity<UserPoolClientDefinition, UserPoolClientState> {
     /**

@@ -9,14 +9,43 @@ import {
     generateCallerReference
 } from "./common.ts";
 
+/**
+ * Definition interface for AWS CloudFront Distribution entity.
+ * Inherits all CloudFront definition properties.
+ * @interface CloudFrontDistributionDefinition
+ */
 export interface CloudFrontDistributionDefinition extends AWSCloudFrontDefinition {
-    // Inherits all CloudFront definition properties
 }
 
+/**
+ * State interface for AWS CloudFront Distribution entity.
+ * Contains runtime information about the created distribution.
+ * Inherits all CloudFront state properties.
+ * @interface CloudFrontDistributionState
+ */
 export interface CloudFrontDistributionState extends AWSCloudFrontState {
-    // Inherits all CloudFront state properties
 }
 
+/**
+ * @description AWS CloudFront Distribution entity.
+ * Creates and manages Amazon CloudFront CDN distributions for global content delivery.
+ * Supports S3 origins, custom origins, SSL/TLS certificates, and cache behaviors.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.distribution_id` - Distribution ID for management operations
+ * - `state.domain_name` - CloudFront domain (e.g., d1234.cloudfront.net)
+ * - `state.distribution_arn` - Distribution ARN for IAM policies
+ * - `state.distribution_status` - Deployment status (Deployed, InProgress)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-s3/bucket` - S3 bucket as origin for static content
+ * - `aws-lambda/function` - Lambda@Edge for request/response customization
+ */
 export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistributionDefinition, CloudFrontDistributionState> {
     
     // CloudFront distributions take 15-20 minutes to deploy, so we need longer polling

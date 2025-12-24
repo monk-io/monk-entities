@@ -88,6 +88,24 @@ export interface DatabaseState extends AzureCosmosDBState {
     };
 }
 
+/**
+ * @description Azure Cosmos DB Database entity.
+ * Creates and manages databases within an Azure Cosmos DB account.
+ * Databases are logical containers for collections/containers.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via Azure provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Database resource ID
+ * - `state.name` - Database name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `azure-cosmosdb/database-account` - The parent Cosmos DB account
+ * - `azure-cosmosdb/container` - Create containers within this database
+ */
 export class Database extends AzureCosmosDBEntity<DatabaseDefinition, DatabaseState> {
 
     private _masterKey?: string;

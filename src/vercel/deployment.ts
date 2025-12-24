@@ -87,6 +87,24 @@ export interface DeploymentState extends VercelEntityState {
     error?: string;
 }
 
+/**
+ * @description Vercel Deployment entity.
+ * Creates and manages deployments to Vercel projects.
+ * Supports deploying from Git or uploaded files.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Deployment ID
+ * - `state.url` - Deployment URL
+ * - `state.state` - Deployment state (READY, ERROR, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `vercel/project` - The project to deploy to
+ */
 export class Deployment extends VercelEntity<DeploymentDefinition, DeploymentState> {
     
     protected getEntityName(): string {

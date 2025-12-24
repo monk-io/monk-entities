@@ -179,6 +179,25 @@ export interface ProjectState extends VercelEntityState {
     root_directory?: string;
 }
 
+/**
+ * @description Vercel Project entity.
+ * Creates and manages Vercel projects for serverless application deployments.
+ * Supports framework presets, Git repository connections, and environment variables.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Project ID
+ * - `state.name` - Project name
+ * - `state.url` - Production deployment URL
+ * - `state.domains` - Associated domains
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `vercel/deployment` - Deploy code to the project
+ */
 export class Project extends VercelEntity<ProjectDefinition, ProjectState> {
 
     protected getEntityName(): string {

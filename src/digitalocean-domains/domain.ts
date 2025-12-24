@@ -21,6 +21,24 @@ export interface DomainState extends DODomainsStateBase {
     zone_file?: string;
 }
 
+/**
+ * @description DigitalOcean Domain entity.
+ * Creates and manages domains in DigitalOcean DNS.
+ * Domains are top-level DNS zones for managing DNS records.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via DigitalOcean provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.name` - Domain name (e.g., example.com)
+ * - `state.ttl` - Default TTL for DNS records
+ * - `state.zone_file` - Zone file content
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `digitalocean/dns-record` - Create DNS records in this domain
+ */
 export class Domain extends DODomainsEntity<DomainDefinition, DomainState> {
     static readonly readiness = { period: 5, initialDelay: 1, attempts: 10 };
 

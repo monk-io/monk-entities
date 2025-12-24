@@ -3,7 +3,25 @@ dynamo-db-table:
   defines: entity
   metadata:
     name: DynamoDBTable
-    version-hash: f6ae3ba264ef
+    description: |-
+      AWS DynamoDB Table entity.
+      Creates and manages Amazon DynamoDB tables for serverless NoSQL database storage.
+      Supports on-demand and provisioned billing, global/local secondary indexes, and streams.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.table_name` - Table name for SDK operations
+      - `state.table_arn` - Table ARN for IAM policies and cross-service access
+      - `state.table_status` - Current table status (ACTIVE, CREATING, etc.)
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-iam/role` - Grant table access to Lambda functions or other services
+      - `aws-lambda/function` - Read/write data from serverless functions
+    version-hash: 611fbaf4bb52
   schema:
     region:
       type: string

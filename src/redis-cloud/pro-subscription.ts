@@ -353,9 +353,22 @@ export interface ProSubscriptionState extends RedisCloudEntityState {
 }
 
 /**
- * Redis Cloud Subscription Entity
+ * @description Redis Cloud Pro Subscription entity.
+ * Creates and manages Redis Cloud Pro subscriptions for enterprise Redis deployments.
+ * Subscriptions are containers that define cloud provider, region, and pricing.
  * 
- * Manages Redis Cloud subscriptions which are containers for Redis databases.
+ * ## Secrets
+ * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Subscription ID
+ * - `state.name` - Subscription name
+ * - `state.status` - Subscription status (active, pending, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `redis-cloud/pro-database` - Create databases in this subscription
  */
 export class ProSubscription extends RedisCloudEntity<ProSubscriptionDefinition, ProSubscriptionState> {
 

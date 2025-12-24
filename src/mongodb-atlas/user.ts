@@ -66,6 +66,24 @@ export interface UserState extends MongoDBAtlasEntityState {
     }>;
 }
 
+/**
+ * @description MongoDB Atlas Database User entity.
+ * Creates and manages MongoDB Atlas database users for cluster authentication.
+ * Supports role-based access control with database and collection-level permissions.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+ * - Writes: `password_secret_ref` - Database user password (if specified)
+ * 
+ * ## State Fields for Composition
+ * - `state.username` - Database username
+ * - `state.database` - Authentication database
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `mongodb-atlas/project` - The parent project for this user
+ * - `mongodb-atlas/cluster` - Use this user to connect to clusters
+ */
 export class User extends MongoDBAtlasEntity<UserDefinition, UserState> {
     
     protected getEntityName(): string {

@@ -115,6 +115,26 @@ export interface SiteState extends NetlifyEntityState {
     updated_at?: string;
 }
 
+/**
+ * @description Netlify Site entity.
+ * Creates and manages Netlify sites for static web hosting and serverless functions.
+ * Supports custom domains, SSL, and password protection.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Site ID
+ * - `state.name` - Site name
+ * - `state.url` - Site URL
+ * - `state.default_domain` - Default Netlify domain (site-name.netlify.app)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `netlify/deploy` - Deploy content to the site
+ * - `netlify/form` - Manage form submissions
+ */
 export class Site extends NetlifyEntity<SiteDefinition, SiteState> {
     
     protected getEntityName(): string {

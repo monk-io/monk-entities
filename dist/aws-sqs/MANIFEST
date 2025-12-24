@@ -1,7 +1,7 @@
 REPO aws-sqs
-VERSION_HASH 733da7ddfd93
+VERSION_HASH 98a9b298cc75
 DESCRIPTION Fully managed message queuing.
 HOSTING managed
 TAGS aws,messaging,queue,sqs
-LOAD common.yaml sqs-queue.yaml base.yaml
-RESOURCES sqs-queue-sync.js base.js common.js
+LOAD base.yaml common.yaml sqs-queue.yaml
+RESOURCES base.js common.js sqs-queue-sync.js

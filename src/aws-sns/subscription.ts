@@ -1,3 +1,7 @@
+/**
+ * @fileoverview AWS SNS Subscription entity for managing topic subscriptions.
+ */
+
 import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
@@ -17,7 +21,9 @@ export type SNSSubscriptionProtocol =
     | "firehose";
 
 /**
- * Definition for SNS Subscription
+ * Definition interface for AWS SNS Subscription entity.
+ * Configures subscription properties including protocol, endpoint, and filtering policies.
+ * @interface SNSSubscriptionDefinition
  */
 export interface SNSSubscriptionDefinition extends AWSSNSDefinition {
     /** @description ARN of the SNS topic to subscribe to */
@@ -46,7 +52,9 @@ export interface SNSSubscriptionDefinition extends AWSSNSDefinition {
 }
 
 /**
- * State for SNS Subscription
+ * State interface for AWS SNS Subscription entity.
+ * Contains runtime information about the created subscription.
+ * @interface SNSSubscriptionState
  */
 export interface SNSSubscriptionState extends AWSSNSState {
     /** @description ARN of the subscription */
@@ -63,8 +71,25 @@ export interface SNSSubscriptionState extends AWSSNSState {
 }
 
 /**
- * SNS Subscription Entity
- * Manages subscriptions to SNS topics
+ * @description AWS SNS Subscription entity.
+ * Creates and manages subscriptions to Amazon SNS topics for message delivery.
+ * Supports protocols: HTTP/HTTPS, email, SMS, SQS, Lambda, application, and Firehose.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.subscription_arn` - Subscription ARN for management operations
+ * - `state.protocol` - Subscription protocol (email, sqs, lambda, etc.)
+ * - `state.endpoint` - Target endpoint receiving messages
+ * - `state.pending_confirmation` - Whether subscription awaits confirmation
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-sns/topic` - The topic to subscribe to
+ * - `aws-sqs/queue` - Use queue ARN as endpoint for SQS subscriptions
+ * - `aws-lambda/function` - Use function ARN for Lambda subscriptions
  */
 export class SNSSubscription extends AWSSNSEntity<SNSSubscriptionDefinition, SNSSubscriptionState> {
     entityKind = "sns-subscription" as const;

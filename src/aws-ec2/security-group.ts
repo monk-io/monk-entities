@@ -23,6 +23,25 @@ export interface SecurityGroupState extends AWSEC2State {
 	group_name?: string;
 }
 
+/**
+ * @description AWS EC2 Security Group entity.
+ * Creates and manages VPC security groups for network access control.
+ * Security groups act as virtual firewalls for inbound and outbound traffic.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.group_id` - Security group ID for resource associations
+ * - `state.group_name` - Security group name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/vpc` - The VPC containing this security group
+ * - `aws-rds/instance` - Assign to database instances
+ * - `aws-lambda/function` - Assign to Lambda functions in VPC
+ */
 export class SecurityGroup extends AWSEC2Entity<SecurityGroupDefinition, SecurityGroupState> {
 
 	override create(): void {

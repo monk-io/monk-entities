@@ -112,6 +112,26 @@ export interface NeonBranchState extends NeonEntityState {
     endpoints?: { id: string; type: string; state: string; host: string }[];
 }
 
+/**
+ * @description Neon Branch entity.
+ * Creates and manages Neon database branches for development and testing.
+ * Branches provide instant, copy-on-write database clones from a parent branch.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Branch ID
+ * - `state.name` - Branch name
+ * - `state.endpoints` - Connection endpoints for the branch
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `neon/project` - The parent project containing this branch
+ * - `neon/database` - Create databases on this branch
+ * - `neon/compute` - Configure compute endpoints for the branch
+ */
 export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
     
     protected getEntityName(): string {

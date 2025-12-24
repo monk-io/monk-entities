@@ -40,10 +40,22 @@ export function formatIdentityProviderState(providerData: Record<string, unknown
 }
 
 /**
- * AWS Cognito Identity Provider Entity
+ * @description AWS Cognito Identity Provider entity.
+ * Creates and manages external identity providers for User Pool federation.
+ * Supports SAML, OIDC, Google, Facebook, Amazon, and Apple sign-in.
  * 
- * Manages external identity providers for User Pools, supporting SAML, OIDC, and social providers.
- * Handles attribute mapping, provider configuration, and federation settings.
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.provider_name` - Provider name for configuration
+ * - `state.provider_type` - Provider type (SAML, OIDC, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-cognito/user-pool` - The parent user pool
+ * - `aws-cognito/user-pool-client` - App clients using this provider
  */
 export class IdentityProvider extends AWSCognitoEntity<IdentityProviderDefinition, IdentityProviderState> {
     /**

@@ -61,16 +61,23 @@ export interface UserPoolDomainState extends AWSCognitoState {
 }
 
 /**
- * AWS Cognito User Pool Domain Entity
+ * @description AWS Cognito User Pool Domain entity.
+ * Creates and manages hosted UI domains for Cognito User Pools.
+ * Supports Cognito prefix domains and custom branded domains.
  * 
- * Manages hosted UI domains for Cognito User Pools. Supports both:
- * 1. Cognito prefix domains (simple setup, no SSL needed)
- * 2. Custom domains (branded experience, requires ACM certificate)
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
  * 
- * Custom Actions:
- * - get-domain-info: Show domain details and CloudFront info
- * - get-hosted-ui-url: Generate hosted UI URLs for login/signup
- * - test-domain-access: Verify domain accessibility and SSL
+ * ## State Fields for Composition
+ * - `state.domain` - Domain name (prefix or custom)
+ * - `state.hosted_ui_base_url` - Base URL for hosted UI
+ * - `state.cloudfront_distribution` - CloudFront distribution (for custom domains)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-cognito/user-pool` - The parent user pool
+ * - `aws-cognito/user-pool-client` - App clients using this domain for OAuth
  */
 export class UserPoolDomain extends AWSCognitoEntity<UserPoolDomainDefinition, UserPoolDomainState> {
     

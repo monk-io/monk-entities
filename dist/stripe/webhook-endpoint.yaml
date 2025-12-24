@@ -3,7 +3,23 @@ webhook-endpoint:
   defines: entity
   metadata:
     name: WebhookEndpoint
-    version-hash: '586179988275'
+    description: |-
+      Stripe Webhook Endpoint entity.
+      Creates and manages Stripe webhook endpoints for receiving events.
+      Webhooks notify your application of events like successful payments.
+
+      ## Secrets
+      - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+      - Writes: `signing_secret_ref` - Webhook signing secret (if specified)
+
+      ## State Fields for Composition
+      - `state.id` - Webhook endpoint ID
+      - `state.url` - Webhook URL
+      - `state.secret` - Webhook signing secret
+
+      ## Composing with Other Entities
+      Stripe webhooks are typically standalone, pointing to your application's endpoint.
+    version-hash: 2f4ef1f2f27e
   schema:
     secret_ref:
       type: string

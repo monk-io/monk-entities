@@ -3,7 +3,24 @@ ses-configuration-set:
   defines: entity
   metadata:
     name: SESConfigurationSet
-    version-hash: 977f2b1b6d6f
+    description: |-
+      AWS SES Configuration Set entity.
+      Creates and manages SES configuration sets for email tracking and reputation.
+      Configuration sets group email sending settings and metrics.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.configuration_set_name` - Configuration set name
+      - `state.sending_enabled` - Whether sending is enabled
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ses/email-identity` - Associate identities with this configuration set
+      - `aws-ses/domain-identity` - Associate domain identities with this configuration set
+    version-hash: 110a78540381
   schema:
     region:
       type: string

@@ -177,8 +177,21 @@ export interface ContainerState extends AzureCosmosDBState {
 }
 
 /**
- * Azure Cosmos DB Container entity
- * Manages individual containers within Cosmos DB databases using the Data Plane API
+ * @description Azure Cosmos DB Container entity.
+ * Creates and manages containers within an Azure Cosmos DB database.
+ * Containers store items (documents) and support partition keys, indexing, and TTL.
+ * 
+ * ## Secrets
+ * - Reads: `master_key_secret_ref` - Cosmos DB account master key
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Container resource ID
+ * - `state.container_id` - Container name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `azure-cosmosdb/database` - The parent database for this container
  */
 export class Container extends AzureCosmosDBEntity<ContainerDefinition, ContainerState> {
 
