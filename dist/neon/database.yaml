@@ -9,7 +9,7 @@ database:
       Each database is a logical container for schemas, tables, and data.
 
       ## Secrets
-      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
       - Writes: none
 
       ## State Fields for Composition
@@ -22,7 +22,7 @@ database:
       - `neon/project` - The project containing this database
       - `neon/branch` - The branch this database resides on
       - `neon/role` - Database roles for access control
-    version-hash: 2e545ec0b98f
+    version-hash: b9e9da8541b6
   schema:
     secret_ref:
       type: string

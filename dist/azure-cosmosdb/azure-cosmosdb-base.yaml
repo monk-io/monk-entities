@@ -3,5 +3,5 @@ namespace: azure-cosmosdb
 azure-cosmosdb-base:
   defines: module
   metadata:
-    version-hash: d78e8acb86cc
+    version-hash: da28c99abf2b
   source: <<< azure-cosmosdb-base.js

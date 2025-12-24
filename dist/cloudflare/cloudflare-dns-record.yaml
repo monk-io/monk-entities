@@ -9,7 +9,7 @@ cloudflare-dns-record:
       Supports A, AAAA, CNAME, TXT, MX, and other record types.
 
       ## Secrets
-      - Reads: `secret_ref` - Cloudflare API token (defaults to `cloudflare-api-token`)
+      - Reads: secret name from `secret_ref` property - Cloudflare API token (defaults to `cloudflare-api-token`)
       - Writes: none
 
       ## State Fields for Composition
@@ -21,7 +21,7 @@ cloudflare-dns-record:
       ## Composing with Other Entities
       Works with:
       - `cloudflare/dns-zone` - The parent zone containing this record
-    version-hash: 27c75d760a1f
+    version-hash: 6c314defce77
   schema:
     secret_ref:
       type: string

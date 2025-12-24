@@ -34,7 +34,7 @@ export interface RDSInstanceState extends AWSRDSState {
  * 
  * ## Secrets
  * - Reads: none (authenticated via AWS provider)
- * - Writes: `password_secret_ref` - Master password (defaults to `{db_instance_identifier}-master-password`)
+ * - Writes: secret name from `password_secret_ref` property - Master password (defaults to `{db_instance_identifier}-master-password`)
  * 
  * ## State Fields for Composition
  * - `state.db_instance_identifier` - Instance identifier

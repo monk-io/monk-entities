@@ -20,7 +20,7 @@ database:
       Works with:
       - `azure-cosmosdb/database-account` - The parent Cosmos DB account
       - `azure-cosmosdb/container` - Create containers within this database
-    version-hash: d78e8acb86cc
+    version-hash: da28c99abf2b
   schema:
     subscription_id:
       type: string

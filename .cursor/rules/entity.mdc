@@ -87,9 +87,14 @@ export class MyEntity extends ProviderEntity<Definition, State> {
 
 **Secrets section rules:**
 - For provider-authenticated entities (AWS, GCP, Azure, DigitalOcean): `- Reads: none (authenticated via AWS provider)`
-- For entities reading from Monk secrets: `- Reads: \`secret_ref\` - API token (defaults to \`provider-api-token\`)`
+- For entities reading from Monk secrets with configurable name:
+  `- Reads: secret name from \`secret_ref\` property - API token (defaults to \`provider-api-token\`)`
+  This means the definition has a `secret_ref` property where user specifies the secret name.
+- For entities reading a fixed secret name: `- Reads: \`do-spaces-access-key\` - Spaces access key`
 - Only document writes if the entity actually calls `secret.set()` - verify in code before claiming
-- If entity writes secrets conditionally: `- Writes: \`password_secret_ref\` - Password (if specified)`
+- If entity writes to a configurable secret name:
+  `- Writes: secret name from \`password_secret_ref\` property - Password (if specified)`
+- If entity writes to a fixed secret name: `- Writes: \`do-api-token\` - Generated API token`
 
 **Definition interface:**
 

@@ -10,7 +10,7 @@ database-account:
 
       ## Secrets
       - Reads: none (authenticated via Azure provider)
-      - Writes: `primary_key_secret_ref`, `secondary_key_secret_ref` - Account keys (if specified)
+      - Writes: secret names from `primary_key_secret_ref`, `secondary_key_secret_ref` properties - Account keys (if specified)
 
       ## State Fields for Composition
       - `state.id` - Account resource ID
@@ -22,7 +22,7 @@ database-account:
       Works with:
       - `azure-cosmosdb/database` - Create databases within the account
       - `azure-cosmosdb/container` - Create containers within databases
-    version-hash: d78e8acb86cc
+    version-hash: da28c99abf2b
   schema:
     subscription_id:
       type: string

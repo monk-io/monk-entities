@@ -9,7 +9,7 @@ branch:
       Branches provide instant, copy-on-write database clones from a parent branch.
 
       ## Secrets
-      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
       - Writes: none
 
       ## State Fields for Composition
@@ -22,7 +22,7 @@ branch:
       - `neon/project` - The parent project containing this branch
       - `neon/database` - Create databases on this branch
       - `neon/compute` - Configure compute endpoints for the branch
-    version-hash: 2e545ec0b98f
+    version-hash: b9e9da8541b6
   schema:
     secret_ref:
       type: string

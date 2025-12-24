@@ -3,5 +3,5 @@ namespace: vercel
 vercel-base:
   defines: module
   metadata:
-    version-hash: ec92791e03f8
+    version-hash: 7fa921fb1912
   source: <<< vercel-base.js

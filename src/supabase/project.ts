@@ -96,9 +96,9 @@ export interface ProjectState extends SupabaseEntityState {
  * Provides a complete backend-as-a-service platform.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Supabase management API token (defaults to `supabase-api-token`)
- * - Writes: `db_pass_secret_ref` (defaults to `{name}-db-password`), 
- *   `anon_api_key_secret_ref`, `service_role_api_key_secret_ref` (if specified)
+ * - Reads: secret name from `secret_ref` property - Supabase management API token (defaults to `supabase-api-token`)
+ * - Writes: secret name from `db_pass_secret_ref` property (defaults to `{name}-db-password`), 
+ *   secret names from `anon_api_key_secret_ref`, `service_role_api_key_secret_ref` properties (if specified)
  * 
  * ## State Fields for Composition
  * - `state.id` - Project ID (reference ID for Supabase)

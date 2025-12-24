@@ -35,7 +35,7 @@ const ALLOWED: ReadonlyArray<string> = [
  * Enables cross-cluster resource visibility and management.
  * 
  * ## Secrets
- * - Reads: `monkcode_secret_ref` - Monk cluster connection code
+ * - Reads: secret name from `monkcode_secret_ref` property - Monk cluster connection code
  * - Writes: none
  * 
  * ## State Fields for Composition

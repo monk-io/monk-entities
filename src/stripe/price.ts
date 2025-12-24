@@ -25,7 +25,7 @@ export interface StripePriceState extends StripeEntityState {
  * Prices define how much and how often to charge for products.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+ * - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
  * - Writes: none
  * 
  * ## State Fields for Composition

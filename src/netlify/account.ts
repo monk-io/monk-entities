@@ -20,7 +20,7 @@ export interface AccountState extends NetlifyEntityState {
  * Lists all team accounts accessible by the current API token.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+ * - Reads: secret name from `secret_ref` property - Netlify API token (defaults to `netlify-api-token`)
  * - Writes: none
  * 
  * ## State Fields for Composition

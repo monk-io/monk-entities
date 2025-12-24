@@ -118,7 +118,7 @@ export interface NeonBranchState extends NeonEntityState {
  * Branches provide instant, copy-on-write database clones from a parent branch.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
  * - Writes: none
  * 
  * ## State Fields for Composition

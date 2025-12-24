@@ -182,7 +182,7 @@ export interface ContainerState extends AzureCosmosDBState {
  * Containers store items (documents) and support partition keys, indexing, and TTL.
  * 
  * ## Secrets
- * - Reads: `master_key_secret_ref` - Cosmos DB account master key
+ * - Reads: secret name from `master_key_secret_ref` property - Cosmos DB account master key
  * - Writes: none
  * 
  * ## State Fields for Composition

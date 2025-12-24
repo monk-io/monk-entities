@@ -80,7 +80,7 @@ export interface FormState extends NetlifyEntityState {
  * Forms collect user submissions from static HTML forms.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+ * - Reads: secret name from `secret_ref` property - Netlify API token (defaults to `netlify-api-token`)
  * - Writes: none
  * 
  * ## State Fields for Composition

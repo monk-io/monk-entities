@@ -416,8 +416,8 @@ export interface ProDatabaseState extends RedisCloudEntityState {
  * Supports clustering, replication, persistence, and advanced security options.
  * 
  * ## Secrets
- * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
- * - Writes: `password_secret_ref` - Database password (if specified)
+ * - Reads: secret names from `account_key_secret_ref`, `secret_key_secret_ref` properties - Redis Cloud API credentials
+ * - Writes: secret name from `password_secret_ref` property - Database password (if specified)
  * 
  * ## State Fields for Composition
  * - `state.id` - Database ID

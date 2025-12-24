@@ -1,5 +1,5 @@
 REPO aws-rds
-VERSION_HASH 0e422af484d6
+VERSION_HASH e96aa6ffe796
 DESCRIPTION Managed relational databases (MySQL, Postgres, etc.).
 HOSTING managed
 TAGS aws,database,rds,mysql,postgres

@@ -72,8 +72,8 @@ export interface UserState extends MongoDBAtlasEntityState {
  * Supports role-based access control with database and collection-level permissions.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
- * - Writes: `password_secret_ref` - Database user password (if specified)
+ * - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
+ * - Writes: secret name from `password_secret_ref` property - Database user password (if specified)
  * 
  * ## State Fields for Composition
  * - `state.username` - Database username

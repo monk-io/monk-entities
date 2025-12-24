@@ -51,7 +51,7 @@ export interface ProjectState extends MongoDBAtlasEntityState {
  * Projects serve as containers for clusters, users, and network configuration.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+ * - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
  * - Writes: none
  * 
  * ## State Fields for Composition

@@ -9,7 +9,7 @@ deployment:
       Supports deploying from Git or uploaded files.
 
       ## Secrets
-      - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+      - Reads: secret name from `secret_ref` property - Vercel API token (defaults to `vercel-api-token`)
       - Writes: none
 
       ## State Fields for Composition
@@ -20,7 +20,7 @@ deployment:
       ## Composing with Other Entities
       Works with:
       - `vercel/project` - The project to deploy to
-    version-hash: ec92791e03f8
+    version-hash: 7fa921fb1912
   schema:
     secret_ref:
       type: string

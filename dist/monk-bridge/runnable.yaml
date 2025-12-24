@@ -9,7 +9,7 @@ runnable:
       Enables cross-cluster resource visibility and management.
 
       ## Secrets
-      - Reads: `monkcode_secret_ref` - Monk cluster connection code
+      - Reads: secret name from `monkcode_secret_ref` property - Monk cluster connection code
       - Writes: none
 
       ## State Fields for Composition
@@ -19,7 +19,7 @@ runnable:
       ## Composing with Other Entities
       Works with:
       - `monk-bridge/cluster` - Remote cluster connection
-    version-hash: 50314a573457
+    version-hash: e229c3dfe3bb
   schema:
     monkcode_secret_ref:
       type: string

@@ -10,7 +10,7 @@ iam-user:
 
       ## Secrets
       - Reads: none (authenticated via AWS provider)
-      - Writes: `access_key_id_secret_ref`, `secret_access_key_secret_ref` (if `create_access_key` is true)
+      - Writes: secret names from `access_key_id_secret_ref`, `secret_access_key_secret_ref` properties (if `create_access_key` is true)
 
       ## State Fields for Composition
       - `state.user_arn` - User ARN for policies and cross-account access
@@ -20,7 +20,7 @@ iam-user:
       ## Composing with Other Entities
       Works with:
       - `aws-iam/policy` - Attach policies for permissions
-    version-hash: 8a2ed863f2cf
+    version-hash: 5844b24a6101
   schema:
     region:
       type: string

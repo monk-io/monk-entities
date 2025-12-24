@@ -91,8 +91,8 @@ export interface NeonRoleState extends NeonEntityState {
  * Roles control database access and permissions.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
- * - Writes: `password_secret_ref` - Role password (defaults to `{name}-password`)
+ * - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
+ * - Writes: secret name from `password_secret_ref` property - Role password (defaults to `{name}-password`)
  * 
  * ## State Fields for Composition
  * - `state.name` - Role name

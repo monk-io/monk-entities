@@ -45,7 +45,7 @@ export interface IAMUserState extends AWSIAMState {
  * 
  * ## Secrets
  * - Reads: none (authenticated via AWS provider)
- * - Writes: `access_key_id_secret_ref`, `secret_access_key_secret_ref` (if `create_access_key` is true)
+ * - Writes: secret names from `access_key_id_secret_ref`, `secret_access_key_secret_ref` properties (if `create_access_key` is true)
  * 
  * ## State Fields for Composition
  * - `state.user_arn` - User ARN for policies and cross-account access
