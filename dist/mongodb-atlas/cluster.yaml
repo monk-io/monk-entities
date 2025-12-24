@@ -9,7 +9,7 @@ cluster:
       Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
 
       ## Secrets
-      - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+      - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
       - Writes: none
 
       ## State Fields for Composition
@@ -21,7 +21,7 @@ cluster:
       Works with:
       - `mongodb-atlas/user` - Create database users with role-based access
       - `mongodb-atlas/project` - The parent project containing the cluster
-    version-hash: 90648fb5e491
+    version-hash: fcfa2c40f96e
   schema:
     secret_ref:
       type: string

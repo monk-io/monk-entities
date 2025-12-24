@@ -168,7 +168,7 @@ interface PlanCriteria {
  * Essentials subscriptions provide cost-effective Redis hosting for development and small workloads.
  * 
  * ## Secrets
- * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
+ * - Reads: secret names from `account_key_secret_ref`, `secret_key_secret_ref` properties - Redis Cloud API credentials
  * - Writes: none
  * 
  * ## State Fields for Composition

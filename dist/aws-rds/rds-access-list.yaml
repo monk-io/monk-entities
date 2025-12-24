@@ -19,7 +19,7 @@ rds-access-list:
       Works with:
       - `aws-ec2/security-group` - The security group to modify
       - `aws-rds/instance` - The RDS instance protected by the security group
-    version-hash: 0e422af484d6
+    version-hash: e96aa6ffe796
   schema:
     region:
       type: string

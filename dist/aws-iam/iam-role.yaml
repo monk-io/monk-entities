@@ -21,7 +21,7 @@ iam-role:
       - `aws-lambda/function` - Execution role for Lambda functions
       - `aws-rds/instance` - Enhanced monitoring and S3 import roles
       - `aws-iam/policy` - Attach custom policies for fine-grained permissions
-    version-hash: 8a2ed863f2cf
+    version-hash: 5844b24a6101
   schema:
     region:
       type: string

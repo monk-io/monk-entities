@@ -30,8 +30,8 @@ export interface StripeWebhookState extends StripeEntityState {
  * Webhooks notify your application of events like successful payments.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
- * - Writes: `signing_secret_ref` - Webhook signing secret (if specified)
+ * - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
+ * - Writes: secret name from `signing_secret_ref` property - Webhook signing secret (if specified)
  * 
  * ## State Fields for Composition
  * - `state.id` - Webhook endpoint ID

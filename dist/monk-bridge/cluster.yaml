@@ -9,7 +9,7 @@ cluster:
       Provides visibility into cluster peers, balancers, and version information.
 
       ## Secrets
-      - Reads: `monkcode_secret_ref` - Monk cluster connection code
+      - Reads: secret name from `monkcode_secret_ref` property - Monk cluster connection code
       - Writes: none
 
       ## State Fields for Composition
@@ -21,7 +21,7 @@ cluster:
       ## Composing with Other Entities
       Works with:
       - `monk-bridge/runnable` - Retrieve runnable information from this cluster
-    version-hash: 50314a573457
+    version-hash: e229c3dfe3bb
   schema:
     monkcode_secret_ref:
       type: string

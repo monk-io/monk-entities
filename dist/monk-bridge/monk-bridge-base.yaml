@@ -3,5 +3,5 @@ namespace: monk-bridge
 monk-bridge-base:
   defines: module
   metadata:
-    version-hash: 50314a573457
+    version-hash: e229c3dfe3bb
   source: <<< monk-bridge-base.js

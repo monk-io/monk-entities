@@ -1,5 +1,5 @@
 REPO stripe
-VERSION_HASH 2f4ef1f2f27e
+VERSION_HASH 96e499f07bb8
 DESCRIPTION Payments, products, prices, and webhooks.
 HOSTING managed
 TAGS stripe,payments,billing

@@ -9,8 +9,8 @@ role:
       Roles control database access and permissions.
 
       ## Secrets
-      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
-      - Writes: `password_secret_ref` - Role password (defaults to `{name}-password`)
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
+      - Writes: secret name from `password_secret_ref` property - Role password (defaults to `{name}-password`)
 
       ## State Fields for Composition
       - `state.name` - Role name
@@ -20,7 +20,7 @@ role:
       Works with:
       - `neon/project` - The project containing this role
       - `neon/branch` - The branch this role exists on
-    version-hash: 2e545ec0b98f
+    version-hash: b9e9da8541b6
   schema:
     secret_ref:
       type: string

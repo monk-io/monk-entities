@@ -9,7 +9,7 @@ form:
       Forms collect user submissions from static HTML forms.
 
       ## Secrets
-      - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+      - Reads: secret name from `secret_ref` property - Netlify API token (defaults to `netlify-api-token`)
       - Writes: none
 
       ## State Fields for Composition
@@ -20,7 +20,7 @@ form:
       ## Composing with Other Entities
       Works with:
       - `netlify/site` - The site containing this form
-    version-hash: a7d4108593b8
+    version-hash: bda3452f3b74
   schema:
     secret_ref:
       type: string

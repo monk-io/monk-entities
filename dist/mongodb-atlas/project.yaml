@@ -9,7 +9,7 @@ project:
       Projects serve as containers for clusters, users, and network configuration.
 
       ## Secrets
-      - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+      - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
       - Writes: none
 
       ## State Fields for Composition
@@ -20,7 +20,7 @@ project:
       Works with:
       - `mongodb-atlas/cluster` - Create database clusters in this project
       - `mongodb-atlas/user` - Create database users for access control
-    version-hash: 90648fb5e491
+    version-hash: fcfa2c40f96e
   schema:
     secret_ref:
       type: string

@@ -93,7 +93,7 @@ export interface DeploymentState extends VercelEntityState {
  * Supports deploying from Git or uploaded files.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+ * - Reads: secret name from `secret_ref` property - Vercel API token (defaults to `vercel-api-token`)
  * - Writes: none
  * 
  * ## State Fields for Composition

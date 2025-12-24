@@ -9,7 +9,7 @@ product:
       Products represent goods or services available for purchase.
 
       ## Secrets
-      - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+      - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
       - Writes: none
 
       ## State Fields for Composition
@@ -19,7 +19,7 @@ product:
       ## Composing with Other Entities
       Works with:
       - `stripe/price` - Create prices for this product
-    version-hash: 2f4ef1f2f27e
+    version-hash: 96e499f07bb8
   schema:
     secret_ref:
       type: string

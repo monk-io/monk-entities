@@ -10,7 +10,7 @@ rds-instance:
 
       ## Secrets
       - Reads: none (authenticated via AWS provider)
-      - Writes: `password_secret_ref` - Master password (defaults to `{db_instance_identifier}-master-password`)
+      - Writes: secret name from `password_secret_ref` property - Master password (defaults to `{db_instance_identifier}-master-password`)
 
       ## State Fields for Composition
       - `state.db_instance_identifier` - Instance identifier
@@ -23,7 +23,7 @@ rds-instance:
       - `aws-ec2/security-group` - Control network access to the database
       - `aws-ec2/subnet` - Place database in specific VPC subnets
       - `aws-lambda/function` - Connect serverless functions to the database
-    version-hash: 0e422af484d6
+    version-hash: e96aa6ffe796
   schema:
     region:
       type: string

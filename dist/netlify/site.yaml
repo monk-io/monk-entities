@@ -9,7 +9,7 @@ site:
       Supports custom domains, SSL, and password protection.
 
       ## Secrets
-      - Reads: `secret_ref` - Netlify API token (defaults to `netlify-api-token`)
+      - Reads: secret name from `secret_ref` property - Netlify API token (defaults to `netlify-api-token`)
       - Writes: none
 
       ## State Fields for Composition
@@ -22,7 +22,7 @@ site:
       Works with:
       - `netlify/deploy` - Deploy content to the site
       - `netlify/form` - Manage form submissions
-    version-hash: a7d4108593b8
+    version-hash: bda3452f3b74
   schema:
     secret_ref:
       type: string

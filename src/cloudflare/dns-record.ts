@@ -42,7 +42,7 @@ export interface CloudflareDNSRecordState extends CloudflareEntityState {
  * Supports A, AAAA, CNAME, TXT, MX, and other record types.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Cloudflare API token (defaults to `cloudflare-api-token`)
+ * - Reads: secret name from `secret_ref` property - Cloudflare API token (defaults to `cloudflare-api-token`)
  * - Writes: none
  * 
  * ## State Fields for Composition

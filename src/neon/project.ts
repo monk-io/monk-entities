@@ -90,7 +90,7 @@ export interface NeonProjectState extends NeonEntityState {
  * Each project provides isolated database infrastructure with automatic scaling.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
  * - Writes: none
  * 
  * ## State Fields for Composition

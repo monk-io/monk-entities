@@ -76,7 +76,7 @@ export interface ClusterState extends MongoDBAtlasEntityState {
  * Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+ * - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
  * - Writes: none
  * 
  * ## State Fields for Composition

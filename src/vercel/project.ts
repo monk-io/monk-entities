@@ -185,7 +185,7 @@ export interface ProjectState extends VercelEntityState {
  * Supports framework presets, Git repository connections, and environment variables.
  * 
  * ## Secrets
- * - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+ * - Reads: secret name from `secret_ref` property - Vercel API token (defaults to `vercel-api-token`)
  * - Writes: none
  * 
  * ## State Fields for Composition

@@ -1,5 +1,5 @@
 REPO neon
-VERSION_HASH 2e545ec0b98f
+VERSION_HASH b9e9da8541b6
 DESCRIPTION Serverless Postgres with branching.
 HOSTING managed
 TAGS neon,postgres,database

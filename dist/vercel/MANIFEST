@@ -1,5 +1,5 @@
 REPO vercel
-VERSION_HASH ec92791e03f8
+VERSION_HASH 7fa921fb1912
 DESCRIPTION Frontend hosting and deploys.
 HOSTING managed
 TAGS vercel,hosting,deploy

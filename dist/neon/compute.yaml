@@ -9,7 +9,7 @@ compute:
       Compute endpoints provide connection URLs and control compute resources.
 
       ## Secrets
-      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
       - Writes: none
 
       ## State Fields for Composition
@@ -21,7 +21,7 @@ compute:
       Works with:
       - `neon/project` - The project containing this endpoint
       - `neon/branch` - The branch this endpoint connects to
-    version-hash: 2e545ec0b98f
+    version-hash: b9e9da8541b6
   schema:
     secret_ref:
       type: string

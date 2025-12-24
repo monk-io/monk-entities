@@ -264,7 +264,7 @@ export interface DatabaseAccountState extends AzureCosmosDBState {
  * 
  * ## Secrets
  * - Reads: none (authenticated via Azure provider)
- * - Writes: `primary_key_secret_ref`, `secondary_key_secret_ref` - Account keys (if specified)
+ * - Writes: secret names from `primary_key_secret_ref`, `secondary_key_secret_ref` properties - Account keys (if specified)
  * 
  * ## State Fields for Composition
  * - `state.id` - Account resource ID

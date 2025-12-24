@@ -3,5 +3,5 @@ namespace: mongodb-atlas
 common:
   defines: module
   metadata:
-    version-hash: 90648fb5e491
+    version-hash: fcfa2c40f96e
   source: <<< common.js

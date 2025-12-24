@@ -100,7 +100,7 @@ export interface DOAgentState {
  * Agents provide AI-powered assistants with custom knowledge bases.
  * 
  * ## Secrets
- * - Reads: `endpoint_secret_ref`, `access_key_secret_ref` - GenAI API credentials
+ * - Reads: secret names from `endpoint_secret_ref`, `access_key_secret_ref` properties - GenAI API credentials
  * - Writes: none (Agent API key available in `state.endpoint_api_key`)
  * 
  * ## State Fields for Composition
