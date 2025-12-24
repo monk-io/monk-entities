@@ -12,4 +12,4 @@ USER node
 ENV NETLIFY_SITE_ID=""
 ENV NETLIFY_AUTH_TOKEN=""
 
-CMD ["sh", "-c", "netlify deploy --prod --dir=/home/node/app/build"]
+CMD ["sh", "-c", "netlify deploy --no-build --prod --dir=/home/node/app/build"]

@@ -20,7 +20,7 @@ deploy:
       contents: |
         #!/bin/sh
         {{ v "pre-deploy" }}
-        netlify deploy --prod --dir=$DEPLOY_DIR
+        netlify deploy --no-build --prod --dir=$DEPLOY_DIR
   variables:
     node-version:
       env: NODE_VERSION
