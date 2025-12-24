@@ -325,6 +325,39 @@ production-redis:
 
 ---
 
+### DigitalOcean Database Backup Parameters
+
+DigitalOcean managed databases include automatic daily backups with 7-day retention. Backups cannot be disabled or configured - they are always enabled.
+
+```yaml
+my-postgres:
+  defines: digitalocean-database/database
+  name: my-postgres-cluster
+  engine: pg
+  version: "16"
+  num_nodes: 1
+  region: nyc1
+  size: db-s-1vcpu-1gb
+  # No backup-specific parameters - backups are automatic
+```
+
+| Feature | Value | Notes |
+|---------|-------|-------|
+| Automatic Backups | Always enabled | Cannot be disabled |
+| Backup Frequency | Daily | Managed by DigitalOcean |
+| Retention Period | 7 days | Fixed, cannot be changed |
+| PITR Support | PostgreSQL, MySQL only | Via fork operation |
+| Restore Method | Fork to new cluster | No in-place restore |
+
+**Key Notes:**
+- All DigitalOcean managed databases have automatic daily backups included
+- Backup retention is fixed at 7 days
+- Restore always creates a NEW cluster (fork) - no in-place restore option
+- Point-in-time recovery is available only for PostgreSQL and MySQL
+- Kafka does not support backups
+
+---
+
 ## AWS RDS (Relational Database Service)
 
 ### Overview
@@ -980,24 +1013,101 @@ my-dataset:
 
 ---
 
+## DigitalOcean Database
+
+### Overview
+DigitalOcean Managed Databases support PostgreSQL, MySQL, Valkey (Redis replacement), MongoDB, Kafka, and OpenSearch with automatic daily backups.
+
+### Backup Model
+- **Automatic Daily Backups**: All managed databases include automatic daily backups (cannot be disabled)
+- **Retention**: Fixed 7-day retention for all engines
+- **Point-in-Time Recovery**: Available for PostgreSQL and MySQL only
+- **Restore Method**: Fork to new cluster (no in-place restore)
+
+### Available Actions
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `get-backup-info` | View backup configuration and PITR status | None |
+| `list-backups` | List available backup points | None |
+| `describe-backup` | Get details of a specific backup | `backup_created_at` |
+| `restore` | Fork new cluster from backup | `new_cluster_name`, `backup_created_at` or `restore_time` |
+| `get-restore-status` | Check fork operation progress | `cluster_id` |
+
+### Usage Examples
+
+```bash
+# Check backup configuration and PITR status
+monk do my-app/my-postgres/get-backup-info
+
+# List available backups
+monk do my-app/my-postgres/list-backups
+
+# Get details of a specific backup
+monk do my-app/my-postgres/describe-backup backup_created_at="2024-12-15T00:00:00Z"
+
+# Restore from a specific backup to new cluster
+monk do my-app/my-postgres/restore \
+  new_cluster_name="restored-db" \
+  backup_created_at="2024-12-15T00:00:00Z"
+
+# Point-in-time recovery (PostgreSQL/MySQL only)
+monk do my-app/my-postgres/restore \
+  new_cluster_name="restored-db" \
+  restore_time="2024-12-15T14:30:00Z"
+
+# Restore with custom size and region
+monk do my-app/my-postgres/restore \
+  new_cluster_name="restored-db" \
+  backup_created_at="2024-12-15T00:00:00Z" \
+  size="db-s-2vcpu-4gb" \
+  num_nodes="2" \
+  region="nyc3"
+
+# Check restore (fork) progress
+monk do my-app/my-postgres/get-restore-status cluster_id="<new-cluster-id>"
+```
+
+### Backup Support by Engine
+
+| Engine | Daily Backups | PITR | Fork/Restore |
+|--------|:-------------:|:----:|:------------:|
+| PostgreSQL (`pg`) | ✅ | ✅ | ✅ |
+| MySQL (`mysql`) | ✅ | ✅ | ✅ |
+| Valkey (`valkey`) | ✅ | ❌ | ❌ |
+| MongoDB (`mongodb`) | ✅ | ❌ | ❌ |
+| Kafka (`kafka`) | ❌ | ❌ | ❌ |
+| OpenSearch (`opensearch`) | ✅ | ❌ | ❌ |
+
+### Important Notes
+- **Restore creates a NEW cluster** - DigitalOcean does not support in-place restore
+- Automatic backups are always enabled (cannot be disabled)
+- Backup retention is fixed at 7 days (cannot be changed)
+- PITR is only available for PostgreSQL and MySQL
+- The restored cluster is independent and not managed by the source entity
+- First backup may take up to 24 hours after cluster creation
+
+---
+
 ## Cross-Provider Comparison
 
 ### Action Standardization
 
-| Action | AWS RDS | AWS DynamoDB | Azure Cosmos | MongoDB Atlas | Redis Cloud | GCP Cloud SQL | GCP Firestore | GCP BigQuery |
-|--------|:-------:|:------------:|:------------:|:-------------:|:-----------:|:-------------:|:-------------:|:------------:|
-| `get-backup-info` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `create-snapshot` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌² | ✅ |
-| `list-snapshots` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `describe-snapshot` | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ |
-| `delete-snapshot` | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ |
-| `restore` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `get-restore-status` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `export-documents` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `import-documents` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `list-restorable-*` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Action | AWS RDS | AWS DynamoDB | Azure Cosmos | MongoDB Atlas | Redis Cloud | GCP Cloud SQL | GCP Firestore | GCP BigQuery | DO Database |
+|--------|:-------:|:------------:|:------------:|:-------------:|:-----------:|:-------------:|:-------------:|:------------:|:-----------:|
+| `get-backup-info` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `create-snapshot` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌² | ✅ | ❌³ |
+| `list-snapshots` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `describe-snapshot` | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `delete-snapshot` | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌³ |
+| `restore` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `get-restore-status` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `export-documents` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `import-documents` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `list-restorable-*` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ²Firestore uses `export-documents` for manual backups; scheduled backups are managed via backup schedules.
+³DigitalOcean backups are automatic and cannot be created/deleted manually.
 
 ### Restore Behavior Differences
 
@@ -1011,6 +1121,7 @@ my-dataset:
 | GCP Cloud SQL | Same instance | **OVERWRITES** existing instance |
 | GCP Firestore | New database | Creates new database |
 | GCP BigQuery | New table | Creates new table (clone) |
+| DigitalOcean Database | New cluster | Creates new cluster (fork) |
 
 ### Parameter Naming Convention
 
@@ -1043,7 +1154,7 @@ All parameters use `snake_case`:
 3. Document the snapshot ID for potential rollback
 
 ### Restore Operations
-1. **AWS RDS / AWS DynamoDB / Azure Cosmos DB / GCP Firestore / GCP BigQuery**: Safe - creates new resources
+1. **AWS RDS / AWS DynamoDB / Azure Cosmos DB / GCP Firestore / GCP BigQuery / DigitalOcean Database**: Safe - creates new resources
 2. **MongoDB Atlas / GCP Cloud SQL**: **DANGEROUS** - overwrites existing data; confirm with user
 3. **Redis Cloud**: Merges data; may affect existing keys
 
