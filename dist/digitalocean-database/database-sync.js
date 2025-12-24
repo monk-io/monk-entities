@@ -58,8 +58,8 @@ const validateDatabaseEngine = common.validateDatabaseEngine;
 const validateDatabaseRegion = common.validateDatabaseRegion;
 const validateDatabaseSize = common.validateDatabaseSize;
 const cli = require("cli");
-var _resizeCluster_dec, _getConnectionInfo_dec, _deleteDatabase_dec, _createDatabase_dec, _listDatabases_dec, _getDatabase_dec, _a, _init;
-var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _a) {
+var _getRestoreStatus_dec, _restore_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _resizeCluster_dec, _getConnectionInfo_dec, _deleteDatabase_dec, _createDatabase_dec, _listDatabases_dec, _getDatabase_dec, _a, _init;
+var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -341,6 +341,211 @@ Cluster ID: ${this.state.id}
       throw new Error(`Failed to resize database cluster: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  getBackupInfo(_args) {
+    if (!this.state.id) {
+      throw new Error("No database ID available");
+    }
+    cli.output(`\u{1F4BE} Backup Information for "${this.state.name}":`);
+    cli.output(`   Cluster ID: ${this.state.id}`);
+    cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+    cli.output(`
+\u{1F4C5} Backup Configuration:`);
+    cli.output(`   Automatic Backups: Enabled (always on)`);
+    cli.output(`   Backup Frequency: Daily`);
+    cli.output(`   Retention Period: 7 days`);
+    cli.output(`   Backup Window: Managed by DigitalOcean`);
+    const supportsPitr = this.state.engine === "pg" || this.state.engine === "mysql";
+    cli.output(`
+\u23F1\uFE0F  Point-in-Time Recovery (PITR):`);
+    if (supportsPitr) {
+      cli.output(`   Status: Supported`);
+      cli.output(`   Recovery Window: Up to 7 days`);
+      cli.output(`   Note: Use restore action with restore_time parameter`);
+    } else {
+      cli.output(`   Status: Not supported for ${this.state.engine}`);
+      cli.output(`   Note: Only PostgreSQL and MySQL support PITR`);
+    }
+    cli.output(`
+\u{1F504} Restore Options:`);
+    cli.output(`   Fork from backup: Creates a new cluster from backup`);
+    cli.output(`   In-place restore: Not supported (use fork instead)`);
+    cli.output(`
+\u{1F4A1} Use 'list-backups' to see available backup points`);
+  }
+  listBackups(_args) {
+    if (!this.state.id) {
+      throw new Error("No database ID available");
+    }
+    try {
+      const response = this.makeRequest("GET", `/databases/${this.state.id}/backups`);
+      const backups = response.backups || [];
+      cli.output(`\u{1F4BE} Available Backups for "${this.state.name}":`);
+      cli.output(`   Cluster ID: ${this.state.id}`);
+      cli.output(`   Engine: ${this.state.engine}`);
+      cli.output(`   Total Backups: ${backups.length}`);
+      cli.output(``);
+      if (backups.length === 0) {
+        cli.output(`   No backups found yet.`);
+        cli.output(`   Note: First backup may take up to 24 hours after cluster creation.`);
+      } else {
+        cli.output(`\u{1F4CB} Backup List:`);
+        backups.forEach((backup, index) => {
+          const createdAt = backup.created_at || "Unknown";
+          const sizeGb = backup.size_gigabytes ? `${backup.size_gigabytes} GB` : "N/A";
+          cli.output(`   ${index + 1}. Created: ${createdAt}`);
+          cli.output(`      Size: ${sizeGb}`);
+          if (index < backups.length - 1) {
+            cli.output(``);
+          }
+        });
+      }
+      cli.output(`
+\u{1F4A1} To restore from a backup, use:`);
+      cli.output(`   monk do <entity>/restore --new_cluster_name=<name> --backup_created_at=<timestamp>`);
+    } catch (error) {
+      throw new Error(`Failed to list backups: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  describeBackup(args) {
+    if (!this.state.id) {
+      throw new Error("No database ID available");
+    }
+    const backupCreatedAt = args.backup_created_at;
+    if (!backupCreatedAt) {
+      throw new Error("backup_created_at is required (use --backup_created_at=2024-01-15T00:00:00Z)");
+    }
+    try {
+      const response = this.makeRequest("GET", `/databases/${this.state.id}/backups`);
+      const backups = response.backups || [];
+      const backup = backups.find((b) => b.created_at === backupCreatedAt);
+      if (!backup) {
+        cli.output(`\u274C Backup not found with timestamp: ${backupCreatedAt}`);
+        cli.output(`
+\u{1F4A1} Use 'list-backups' to see available backup timestamps`);
+        return;
+      }
+      cli.output(`\u{1F4BE} Backup Details:`);
+      cli.output(`   Cluster: ${this.state.name}`);
+      cli.output(`   Cluster ID: ${this.state.id}`);
+      cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+      cli.output(``);
+      cli.output(`\u{1F4CB} Backup Information:`);
+      cli.output(`   Created At: ${backup.created_at}`);
+      cli.output(`   Size: ${backup.size_gigabytes ? `${backup.size_gigabytes} GB` : "N/A"}`);
+      cli.output(`
+\u{1F504} To restore this backup:`);
+      cli.output(`   monk do <entity>/restore --new_cluster_name=my-restored-db --backup_created_at=${backupCreatedAt}`);
+    } catch (error) {
+      throw new Error(`Failed to describe backup: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  restore(args) {
+    if (!this.state.id) {
+      throw new Error("No database ID available");
+    }
+    const newClusterName = args.new_cluster_name;
+    if (!newClusterName) {
+      throw new Error("new_cluster_name is required (use --new_cluster_name=my-restored-db)");
+    }
+    const backupCreatedAt = args.backup_created_at;
+    const restoreTime = args.restore_time;
+    const supportsPitr = this.state.engine === "pg" || this.state.engine === "mysql";
+    if (!supportsPitr && !backupCreatedAt) {
+      throw new Error(`backup_created_at is required for ${this.state.engine} (only PostgreSQL and MySQL support point-in-time recovery)`);
+    }
+    const forkRequest = {
+      name: newClusterName,
+      engine: this.state.engine,
+      version: this.state.version,
+      region: args.region || this.state.region,
+      size: args.size || this.state.size,
+      num_nodes: args.num_nodes ? parseInt(args.num_nodes) : 1,
+      backup_restore: {
+        database_name: this.state.name
+      }
+    };
+    if (backupCreatedAt) {
+      forkRequest.backup_restore.backup_created_at = backupCreatedAt;
+    }
+    if (restoreTime && supportsPitr) {
+      forkRequest.backup_restore.backup_created_at = restoreTime;
+    }
+    try {
+      cli.output(`\u{1F504} Initiating database restore (fork)...`);
+      cli.output(`   Source Cluster: ${this.state.name}`);
+      cli.output(`   New Cluster Name: ${newClusterName}`);
+      cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+      cli.output(`   Region: ${forkRequest.region}`);
+      cli.output(`   Size: ${forkRequest.size}`);
+      cli.output(`   Nodes: ${forkRequest.num_nodes}`);
+      if (backupCreatedAt) {
+        cli.output(`   Restore Point: ${backupCreatedAt}`);
+      } else if (restoreTime) {
+        cli.output(`   Restore Point (PITR): ${restoreTime}`);
+      }
+      const response = this.makeRequest("POST", "/databases", forkRequest);
+      if (response.database) {
+        cli.output(`
+\u2705 Database fork initiated successfully!`);
+        cli.output(`   New Cluster ID: ${response.database.id}`);
+        cli.output(`   Status: ${response.database.status}`);
+        cli.output(`
+\u23F3 The fork operation may take several minutes.`);
+        cli.output(`   Use 'get-restore-status --cluster_id=${response.database.id}' to check progress.`);
+        cli.output(`
+\u26A0\uFE0F  Important: The new cluster is independent and not managed by this entity.`);
+        cli.output(`   To manage it with Monk, create a new entity definition.`);
+      } else {
+        throw new Error("Invalid response from DigitalOcean API - no database object returned");
+      }
+    } catch (error) {
+      throw new Error(`Failed to restore database: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  getRestoreStatus(args) {
+    const clusterId = args.cluster_id;
+    if (!clusterId) {
+      throw new Error("cluster_id is required (use --cluster_id=<new-cluster-id>)");
+    }
+    try {
+      const response = this.makeRequest("GET", `/databases/${clusterId}`);
+      if (response.database) {
+        const db = response.database;
+        cli.output(`\u{1F504} Restore Status for cluster: ${db.name}`);
+        cli.output(`   Cluster ID: ${db.id}`);
+        cli.output(`   Status: ${db.status}`);
+        cli.output(`   Engine: ${db.engine} v${db.version}`);
+        cli.output(`   Region: ${db.region}`);
+        cli.output(`   Size: ${db.size}`);
+        cli.output(`   Nodes: ${db.num_nodes}`);
+        cli.output(`   Created: ${db.created_at}`);
+        if (db.status === "online") {
+          cli.output(`
+\u2705 Restore completed! Cluster is online and ready.`);
+          if (db.connection) {
+            cli.output(`
+\u{1F517} Connection Details:`);
+            cli.output(`   Host: ${db.connection.host}`);
+            cli.output(`   Port: ${db.connection.port}`);
+            cli.output(`   User: ${db.connection.user}`);
+          }
+        } else if (db.status === "forking") {
+          cli.output(`
+\u23F3 Restore in progress... This may take several minutes.`);
+        } else if (db.status === "creating") {
+          cli.output(`
+\u23F3 Cluster is being created...`);
+        } else {
+          cli.output(`
+\u23F3 Current status: ${db.status}`);
+        }
+      } else {
+        throw new Error("Database cluster not found");
+      }
+    } catch (error) {
+      throw new Error(`Failed to get restore status: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
   /**
    * Find existing database by name
    */
@@ -402,6 +607,11 @@ __decorateElement(_init, 1, "createDatabase", _createDatabase_dec, _Database);
 __decorateElement(_init, 1, "deleteDatabase", _deleteDatabase_dec, _Database);
 __decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _Database);
 __decorateElement(_init, 1, "resizeCluster", _resizeCluster_dec, _Database);
+__decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _Database);
+__decorateElement(_init, 1, "listBackups", _listBackups_dec, _Database);
+__decorateElement(_init, 1, "describeBackup", _describeBackup_dec, _Database);
+__decorateElement(_init, 1, "restore", _restore_dec, _Database);
+__decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _Database);
 __decoratorMetadata(_init, _Database);
 __name(_Database, "Database");
 var Database = _Database;

@@ -523,6 +523,265 @@ export class Database extends DOProviderEntity<
         }
     }
 
+    // ==================== BACKUP & RESTORE ACTIONS ====================
+
+    /**
+     * Get backup configuration and status for the database cluster.
+     * DigitalOcean managed databases have automatic daily backups with 7-day retention.
+     */
+    @action("get-backup-info")
+    getBackupInfo(_args: Args): void {
+        if (!this.state.id) {
+            throw new Error("No database ID available");
+        }
+
+        cli.output(`💾 Backup Information for "${this.state.name}":`);
+        cli.output(`   Cluster ID: ${this.state.id}`);
+        cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+        cli.output(`\n📅 Backup Configuration:`);
+        cli.output(`   Automatic Backups: Enabled (always on)`);
+        cli.output(`   Backup Frequency: Daily`);
+        cli.output(`   Retention Period: 7 days`);
+        cli.output(`   Backup Window: Managed by DigitalOcean`);
+        
+        // Check engine-specific PITR support
+        const supportsPitr = this.state.engine === "pg" || this.state.engine === "mysql";
+        cli.output(`\n⏱️  Point-in-Time Recovery (PITR):`);
+        if (supportsPitr) {
+            cli.output(`   Status: Supported`);
+            cli.output(`   Recovery Window: Up to 7 days`);
+            cli.output(`   Note: Use restore action with restore_time parameter`);
+        } else {
+            cli.output(`   Status: Not supported for ${this.state.engine}`);
+            cli.output(`   Note: Only PostgreSQL and MySQL support PITR`);
+        }
+        
+        cli.output(`\n🔄 Restore Options:`);
+        cli.output(`   Fork from backup: Creates a new cluster from backup`);
+        cli.output(`   In-place restore: Not supported (use fork instead)`);
+        
+        cli.output(`\n💡 Use 'list-backups' to see available backup points`);
+    }
+
+    /**
+     * List all available backups for the database cluster.
+     * Returns backup timestamps that can be used for restore operations.
+     */
+    @action("list-backups")
+    listBackups(_args: Args): void {
+        if (!this.state.id) {
+            throw new Error("No database ID available");
+        }
+
+        try {
+            const response = this.makeRequest("GET", `/databases/${this.state.id}/backups`);
+            const backups = response.backups || [];
+            
+            cli.output(`💾 Available Backups for "${this.state.name}":`);
+            cli.output(`   Cluster ID: ${this.state.id}`);
+            cli.output(`   Engine: ${this.state.engine}`);
+            cli.output(`   Total Backups: ${backups.length}`);
+            cli.output(``);
+            
+            if (backups.length === 0) {
+                cli.output(`   No backups found yet.`);
+                cli.output(`   Note: First backup may take up to 24 hours after cluster creation.`);
+            } else {
+                cli.output(`📋 Backup List:`);
+                backups.forEach((backup: any, index: number) => {
+                    const createdAt = backup.created_at || "Unknown";
+                    const sizeGb = backup.size_gigabytes ? `${backup.size_gigabytes} GB` : "N/A";
+                    cli.output(`   ${index + 1}. Created: ${createdAt}`);
+                    cli.output(`      Size: ${sizeGb}`);
+                    if (index < backups.length - 1) {
+                        cli.output(``);
+                    }
+                });
+            }
+            
+            cli.output(`\n💡 To restore from a backup, use:`);
+            cli.output(`   monk do <entity>/restore --new_cluster_name=<name> --backup_created_at=<timestamp>`);
+        } catch (error) {
+            throw new Error(`Failed to list backups: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get details of a specific backup by timestamp.
+     * @param backup_created_at - The timestamp of the backup (from list-backups)
+     */
+    @action("describe-backup")
+    describeBackup(args: Args): void {
+        if (!this.state.id) {
+            throw new Error("No database ID available");
+        }
+
+        const backupCreatedAt = args.backup_created_at;
+        if (!backupCreatedAt) {
+            throw new Error("backup_created_at is required (use --backup_created_at=2024-01-15T00:00:00Z)");
+        }
+
+        try {
+            const response = this.makeRequest("GET", `/databases/${this.state.id}/backups`);
+            const backups = response.backups || [];
+            
+            // Find the specific backup by timestamp
+            const backup = backups.find((b: any) => b.created_at === backupCreatedAt);
+            
+            if (!backup) {
+                cli.output(`❌ Backup not found with timestamp: ${backupCreatedAt}`);
+                cli.output(`\n💡 Use 'list-backups' to see available backup timestamps`);
+                return;
+            }
+            
+            cli.output(`💾 Backup Details:`);
+            cli.output(`   Cluster: ${this.state.name}`);
+            cli.output(`   Cluster ID: ${this.state.id}`);
+            cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+            cli.output(``);
+            cli.output(`📋 Backup Information:`);
+            cli.output(`   Created At: ${backup.created_at}`);
+            cli.output(`   Size: ${backup.size_gigabytes ? `${backup.size_gigabytes} GB` : 'N/A'}`);
+            
+            cli.output(`\n🔄 To restore this backup:`);
+            cli.output(`   monk do <entity>/restore --new_cluster_name=my-restored-db --backup_created_at=${backupCreatedAt}`);
+        } catch (error) {
+            throw new Error(`Failed to describe backup: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Restore (fork) a new database cluster from a backup.
+     * This creates a NEW cluster - it does not restore in-place.
+     * 
+     * @param new_cluster_name - Name for the new forked cluster (required)
+     * @param backup_created_at - Backup timestamp for exact backup restore (optional for PITR engines)
+     * @param restore_time - Point-in-time to restore to (ISO 8601, only for pg/mysql)
+     * @param size - Size for new cluster (optional, defaults to source size)
+     * @param num_nodes - Number of nodes for new cluster (optional, defaults to 1)
+     * @param region - Region for new cluster (optional, defaults to source region)
+     */
+    @action("restore")
+    restore(args: Args): void {
+        if (!this.state.id) {
+            throw new Error("No database ID available");
+        }
+
+        const newClusterName = args.new_cluster_name;
+        if (!newClusterName) {
+            throw new Error("new_cluster_name is required (use --new_cluster_name=my-restored-db)");
+        }
+
+        const backupCreatedAt = args.backup_created_at;
+        const restoreTime = args.restore_time;
+
+        // For non-PITR engines, backup_created_at is required
+        const supportsPitr = this.state.engine === "pg" || this.state.engine === "mysql";
+        if (!supportsPitr && !backupCreatedAt) {
+            throw new Error(`backup_created_at is required for ${this.state.engine} (only PostgreSQL and MySQL support point-in-time recovery)`);
+        }
+
+        // Build the fork request
+        const forkRequest: any = {
+            name: newClusterName,
+            engine: this.state.engine,
+            version: this.state.version,
+            region: args.region || this.state.region,
+            size: args.size || this.state.size,
+            num_nodes: args.num_nodes ? parseInt(args.num_nodes) : 1,
+            backup_restore: {
+                database_name: this.state.name
+            }
+        };
+
+        // Add backup timestamp or restore time
+        if (backupCreatedAt) {
+            forkRequest.backup_restore.backup_created_at = backupCreatedAt;
+        }
+        if (restoreTime && supportsPitr) {
+            forkRequest.backup_restore.backup_created_at = restoreTime;
+        }
+
+        try {
+            cli.output(`🔄 Initiating database restore (fork)...`);
+            cli.output(`   Source Cluster: ${this.state.name}`);
+            cli.output(`   New Cluster Name: ${newClusterName}`);
+            cli.output(`   Engine: ${this.state.engine} v${this.state.version}`);
+            cli.output(`   Region: ${forkRequest.region}`);
+            cli.output(`   Size: ${forkRequest.size}`);
+            cli.output(`   Nodes: ${forkRequest.num_nodes}`);
+            if (backupCreatedAt) {
+                cli.output(`   Restore Point: ${backupCreatedAt}`);
+            } else if (restoreTime) {
+                cli.output(`   Restore Point (PITR): ${restoreTime}`);
+            }
+            
+            const response = this.makeRequest("POST", "/databases", forkRequest);
+            
+            if (response.database) {
+                cli.output(`\n✅ Database fork initiated successfully!`);
+                cli.output(`   New Cluster ID: ${response.database.id}`);
+                cli.output(`   Status: ${response.database.status}`);
+                cli.output(`\n⏳ The fork operation may take several minutes.`);
+                cli.output(`   Use 'get-restore-status --cluster_id=${response.database.id}' to check progress.`);
+                cli.output(`\n⚠️  Important: The new cluster is independent and not managed by this entity.`);
+                cli.output(`   To manage it with Monk, create a new entity definition.`);
+            } else {
+                throw new Error("Invalid response from DigitalOcean API - no database object returned");
+            }
+        } catch (error) {
+            throw new Error(`Failed to restore database: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Check the status of a restore (fork) operation.
+     * @param cluster_id - The ID of the new forked cluster
+     */
+    @action("get-restore-status")
+    getRestoreStatus(args: Args): void {
+        const clusterId = args.cluster_id;
+        if (!clusterId) {
+            throw new Error("cluster_id is required (use --cluster_id=<new-cluster-id>)");
+        }
+
+        try {
+            const response = this.makeRequest("GET", `/databases/${clusterId}`);
+            
+            if (response.database) {
+                const db = response.database;
+                cli.output(`🔄 Restore Status for cluster: ${db.name}`);
+                cli.output(`   Cluster ID: ${db.id}`);
+                cli.output(`   Status: ${db.status}`);
+                cli.output(`   Engine: ${db.engine} v${db.version}`);
+                cli.output(`   Region: ${db.region}`);
+                cli.output(`   Size: ${db.size}`);
+                cli.output(`   Nodes: ${db.num_nodes}`);
+                cli.output(`   Created: ${db.created_at}`);
+                
+                if (db.status === "online") {
+                    cli.output(`\n✅ Restore completed! Cluster is online and ready.`);
+                    if (db.connection) {
+                        cli.output(`\n🔗 Connection Details:`);
+                        cli.output(`   Host: ${db.connection.host}`);
+                        cli.output(`   Port: ${db.connection.port}`);
+                        cli.output(`   User: ${db.connection.user}`);
+                    }
+                } else if (db.status === "forking") {
+                    cli.output(`\n⏳ Restore in progress... This may take several minutes.`);
+                } else if (db.status === "creating") {
+                    cli.output(`\n⏳ Cluster is being created...`);
+                } else {
+                    cli.output(`\n⏳ Current status: ${db.status}`);
+                }
+            } else {
+                throw new Error("Database cluster not found");
+            }
+        } catch (error) {
+            throw new Error(`Failed to get restore status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     /**
      * Find existing database by name
      */

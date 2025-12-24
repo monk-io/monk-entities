@@ -49,3 +49,29 @@ my-postgres-db:
 ```bash
 monk update digitalocean-database-example/my-postgres-db
 ```
+
+## Backup & Restore Actions
+
+DigitalOcean managed databases include automatic daily backups with 7-day retention.
+
+| Action | Description | Key Parameters |
+|--------|-------------|----------------|
+| `get-backup-info` | Show backup config and PITR status | - |
+| `list-backups` | List available backup points | - |
+| `describe-backup` | Get backup details | `backup_created_at` |
+| `restore` | Fork new cluster from backup | `new_cluster_name`, `backup_created_at` |
+| `get-restore-status` | Check fork progress | `cluster_id` |
+
+### Restore Example
+
+```bash
+# List available backups
+monk do digitalocean-database-example/my-postgres-db/list-backups
+
+# Restore to new cluster
+monk do digitalocean-database-example/my-postgres-db/restore \
+  --new_cluster_name=restored-db \
+  --backup_created_at=2024-01-15T00:00:00Z
+```
+
+**Note:** Restore creates a NEW independent cluster (no in-place restore). PITR is supported for PostgreSQL and MySQL only.

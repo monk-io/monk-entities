@@ -174,6 +174,93 @@ monk do my-app/my-postgres/deleteDatabase --db_name=myapp_test
 monk do my-app/my-postgres/getConnectionInfo
 ```
 
+## Backup & Restore Actions
+
+DigitalOcean managed databases include automatic daily backups with 7-day retention. The following actions allow you to manage and restore from backups.
+
+### Get Backup Information
+
+Shows backup configuration and PITR support status:
+
+```bash
+monk do my-app/my-postgres/get-backup-info
+```
+
+### List Available Backups
+
+Lists all available backup points:
+
+```bash
+monk do my-app/my-postgres/list-backups
+```
+
+### Describe a Specific Backup
+
+Get details of a backup by timestamp:
+
+```bash
+monk do my-app/my-postgres/describe-backup --backup_created_at=2024-01-15T00:00:00Z
+```
+
+### Restore (Fork) from Backup
+
+Create a new cluster from a backup. This **creates a new independent cluster** - it does not restore in-place.
+
+```bash
+# Restore from a specific backup
+monk do my-app/my-postgres/restore \
+  --new_cluster_name=my-restored-db \
+  --backup_created_at=2024-01-15T00:00:00Z
+
+# Point-in-time recovery (PostgreSQL and MySQL only)
+monk do my-app/my-postgres/restore \
+  --new_cluster_name=my-restored-db \
+  --restore_time=2024-01-15T14:30:00Z
+
+# With custom size and region
+monk do my-app/my-postgres/restore \
+  --new_cluster_name=my-restored-db \
+  --backup_created_at=2024-01-15T00:00:00Z \
+  --size=db-s-2vcpu-4gb \
+  --num_nodes=2 \
+  --region=nyc3
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `new_cluster_name` | Yes | Name for the new forked cluster |
+| `backup_created_at` | Conditional | Backup timestamp (required for non-PITR engines) |
+| `restore_time` | No | Point-in-time to restore (ISO 8601, PostgreSQL/MySQL only) |
+| `size` | No | Size for new cluster (defaults to source size) |
+| `num_nodes` | No | Number of nodes (defaults to 1) |
+| `region` | No | Region for new cluster (defaults to source region) |
+
+### Check Restore Status
+
+Monitor the progress of a fork operation:
+
+```bash
+monk do my-app/my-postgres/get-restore-status --cluster_id=<new-cluster-id>
+```
+
+### Backup Support by Engine
+
+| Engine | Daily Backups | PITR Support | Fork/Restore |
+|--------|---------------|--------------|--------------|
+| PostgreSQL (`pg`) | ✅ | ✅ | ✅ |
+| MySQL (`mysql`) | ✅ | ✅ | ✅ |
+| Valkey (`valkey`) | ✅ | ❌ | ❌ |
+| MongoDB (`mongodb`) | ✅ | ❌ | ❌ |
+| Kafka (`kafka`) | ❌ | ❌ | ❌ |
+| OpenSearch (`opensearch`) | ✅ | ❌ | ❌ |
+
+**Important Notes:**
+- All DigitalOcean managed databases have automatic daily backups (cannot be disabled)
+- Backup retention is fixed at 7 days
+- Restore always creates a NEW cluster (no in-place restore)
+- The restored cluster is independent and not managed by the source entity
+- Point-in-time recovery (PITR) is only available for PostgreSQL and MySQL
+
 ## DigitalOcean API Authentication
 
 ### Using DigitalOcean Provider (Recommended)
