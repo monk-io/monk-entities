@@ -3,6 +3,9 @@ sns-subscription:
   defines: entity
   metadata:
     name: SNSSubscription
+    description: |-
+      SNS Subscription Entity
+      Manages subscriptions to SNS topics
     version-hash: 1e1e6bcfd13f
   schema:
     region:

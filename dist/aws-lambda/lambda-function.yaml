@@ -10,14 +10,10 @@ lambda-function:
       description: AWS region where the Lambda function will be managed
     blob_name:
       type: string
-      description: >-
-        Name of the blob that contains the ZIP archive for code deployments
-        (used when `package_type` is Zip)
+      description: Name of the blob that contains the ZIP archive for code deployments (used when `package_type` is Zip)
     image_uri:
       type: string
-      description: >-
-        ECR image URI for container image deployments (used when `package_type`
-        is Image)
+      description: ECR image URI for container image deployments (used when `package_type` is Image)
     function_name:
       type: string
       description: Lambda function name

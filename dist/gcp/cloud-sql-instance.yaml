@@ -3,6 +3,28 @@ cloud-sql-instance:
   defines: entity
   metadata:
     name: CloudSqlInstance
+    description: |-
+      Cloud SQL Instance entity
+
+      Creates and manages Google Cloud SQL database instances (PostgreSQL, MySQL, SQL Server).
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      - Requires `sqladmin.googleapis.com` API to be enabled (use `gcp/service-usage` entity)
+
+      ## State Fields for Composition
+      The following state fields can be used by other entities:
+      - `state.address` - Public IP address for database connections
+      - `state.port` - Database port (5432 for PostgreSQL, 3306 for MySQL, 1433 for SQL Server)
+      - `state.connection_name` - Instance connection name for Cloud SQL Proxy (format: project:region:instance)
+      - `state.database_version` - The database engine version
+
+      ## Composing with Other Entities
+      This entity is typically composed with:
+      - `gcp/cloud-sql-database` - Pass `definition.name` to its `instance` field
+      - `gcp/cloud-sql-user` - Pass `definition.name` to its `instance` field
     version-hash: d87fc5c5f384
   schema:
     project:
@@ -75,9 +97,7 @@ cloud-sql-instance:
       default: false
     root_password:
       type: string
-      description: >-
-        Root password for the instance (optional, generates random if not
-        provided)
+      description: 'Root password for the instance (optional, generates random if not provided)'
     deletion_protection:
       type: boolean
       description: Enable deletion protection

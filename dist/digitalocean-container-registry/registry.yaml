@@ -3,13 +3,16 @@ registry:
   defines: entity
   metadata:
     name: Registry
+    description: |-
+      DigitalOcean Container Registry entity for managing private Docker registries.
+
+      This entity provides complete lifecycle management for DigitalOcean container registries
+      including creation, updates, deletion, and monitoring operations.
     version-hash: 2e9a3b5c1c19
   schema:
     name:
       type: string
-      description: >-
-        Name of the container registry (3-63 characters, alphanumeric and
-        hyphens only)
+      description: 'Name of the container registry (3-63 characters, alphanumeric and hyphens only)'
     region:
       type: string
       enum:
@@ -29,9 +32,7 @@ registry:
       enum:
         - basic
         - professional
-      description: >-
-        The subscription tier for the registry (basic or professional). Note:
-        starter tier only available via web interface.
+      description: 'The subscription tier for the registry (basic or professional). Note: starter tier only available via web interface.'
     storage_quota_bytes:
       type: number
       description: Storage quota for the registry in bytes

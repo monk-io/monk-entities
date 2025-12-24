@@ -3,6 +3,9 @@ project:
   defines: entity
   metadata:
     name: Project
+    description: |-
+      Base class for all Supabase entities.
+      Provides common functionality like authentication, HTTP client setup, and error handling.
     version-hash: e92916a78ca8
   schema:
     secret_ref:
@@ -18,9 +21,7 @@ project:
     db_pass:
       type: string
       minLength: 8
-      description: >-
-        Database password (optional - if not provided, will be
-        retrieved/generated from secret)
+      description: 'Database password (optional - if not provided, will be retrieved/generated from secret)'
     db_pass_secret_ref:
       type: string
       description: |-
@@ -33,11 +34,9 @@ project:
         If provided, the anon API key will be fetched and saved to this secret
     service_role_api_key_secret_ref:
       type: string
-      description: >-
+      description: |-
         Secret reference for service_role API key
-
-        If provided, the service_role API key will be fetched and saved to this
-        secret
+        If provided, the service_role API key will be fetched and saved to this secret
     organization_id:
       type: string
       description: |-
@@ -98,11 +97,9 @@ project:
                 - ca-central-1
                 - ap-south-1
                 - sa-east-1
-              description: >-
+              description: |-
                 Specific region code
-
-                Note: Codes should be retrieved from /available-regions endpoint
-                for latest options
+                Note: Codes should be retrieved from /available-regions endpoint for latest options
           required:
             - type
             - code
@@ -119,11 +116,9 @@ project:
                 - americas
                 - emea
                 - apac
-              description: >-
+              description: |-
                 Smart Region Group code
-
-                Note: Codes should be retrieved from /available-regions endpoint
-                for latest options
+                Note: Codes should be retrieved from /available-regions endpoint for latest options
           required:
             - type
             - code

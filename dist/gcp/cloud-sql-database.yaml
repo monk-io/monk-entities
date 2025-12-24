@@ -3,6 +3,25 @@ cloud-sql-database:
   defines: entity
   metadata:
     name: CloudSqlDatabase
+    description: |-
+      Cloud SQL Database entity
+
+      Creates a database within an existing Cloud SQL instance.
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      - **REQUIRED**: `gcp/cloud-sql-instance` - Must be created first
+      - Pass the instance name via `instance` field (from instance's `definition.name`)
+
+      ## State Fields for Composition
+      The following state fields can be used by other entities:
+      - `state.name` - Database name for connection strings
+      - `state.self_link` - Full resource URL
+
+      ## Definition Fields from Other Entities
+      - `instance` - Get from `gcp/cloud-sql-instance` entity's `definition.name`
     version-hash: d87fc5c5f384
   schema:
     project:

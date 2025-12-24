@@ -3,6 +3,9 @@ container:
   defines: entity
   metadata:
     name: Container
+    description: |-
+      Azure Cosmos DB Container entity
+      Manages individual containers within Cosmos DB databases using the Data Plane API
     version-hash: 5987cccb4e12
   schema:
     subscription_id:

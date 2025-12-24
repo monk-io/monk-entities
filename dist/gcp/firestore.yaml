@@ -3,6 +3,40 @@ firestore:
   defines: entity
   metadata:
     name: Firestore
+    description: |-
+      GCP Firestore Database Entity
+
+      Manages Cloud Firestore databases which provide a flexible NoSQL document
+      database with real-time synchronization, offline support, and scalability.
+
+      ## Database Types
+      - **FIRESTORE_NATIVE**: Full Firestore functionality including real-time
+        listeners, offline support, and rich querying. Recommended for new projects.
+      - **DATASTORE_MODE**: Datastore compatibility mode for existing Datastore
+        applications. Cannot use Firestore client libraries in this mode.
+
+      ## Locations
+      - **Multi-region**: "nam5" (US), "eur3" (Europe) - highest availability
+      - **Regional**: us-central1, europe-west1, etc. - lower latency, lower cost
+
+      ## Secrets
+      This entity does NOT write any secrets.
+      Use a service account with appropriate roles for access.
+
+      ## Dependencies
+      Required APIs:
+      - `firestore.googleapis.com`
+
+      ## State Fields for Composition
+      - `state.name` - Full resource name for IAM/access
+      - `state.database_id` - Database ID for SDK configuration
+      - `state.location` - Database location
+      - `state.type` - Database type (Native vs Datastore mode)
+
+      ## Composing with Other Entities
+      - `gcp/service-account` - Create SA with `roles/datastore.user` or `roles/datastore.owner`
+      - `gcp/service-usage` - Enable firestore.googleapis.com
+      - `gcp/cloud-function` - Functions triggered by Firestore document changes
     version-hash: d87fc5c5f384
   schema:
     project:

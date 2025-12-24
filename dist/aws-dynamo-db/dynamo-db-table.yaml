@@ -67,9 +67,7 @@ dynamo-db-table:
         - ReadCapacityUnits
         - WriteCapacityUnits
       additionalProperties: false
-      description: >-
-        Provisioned throughput settings (required if billing_mode is
-        PROVISIONED)
+      description: Provisioned throughput settings (required if billing_mode is PROVISIONED)
     global_secondary_indexes:
       type: array
       items:

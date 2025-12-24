@@ -22,9 +22,7 @@ webhook-endpoint:
       type: string
       minLength: 1
       maxLength: 64
-      description: >-
-        Secret name to store the signing secret; defaults to
-        stripe-webhook-secret
+      description: Secret name to store the signing secret; defaults to stripe-webhook-secret
     required:
       - secret_ref
       - destination_url

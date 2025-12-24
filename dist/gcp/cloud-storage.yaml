@@ -3,6 +3,35 @@ cloud-storage:
   defines: entity
   metadata:
     name: CloudStorage
+    description: |-
+      Cloud Storage Bucket entity
+
+      Creates and manages Cloud Storage buckets for storing objects (files, blobs).
+      Supports storage classes, lifecycle management, versioning, and encryption.
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      - `storage.googleapis.com` API is typically enabled by default in GCP projects
+      - For custom encryption, may require `cloudkms.googleapis.com` API
+
+      ## State Fields for Composition
+      The following state fields can be used by other entities or applications:
+      - `state.gs_uri` - GCS URI for the bucket (format: gs://bucket-name)
+      - `state.name` - Bucket name for SDK/API operations
+      - `state.location` - Bucket location (important for data locality)
+      - `state.self_link` - Full resource URL
+
+      ## Composing with Other Entities
+      Cloud Storage buckets work well with:
+      - `gcp/service-account` - Create a service account with storage roles for access
+      - `gcp/big-query` - Export/import data between GCS and BigQuery
+
+      ## Accessing Bucket Data
+      Applications can access bucket objects using:
+      - GCS URI: `state.gs_uri` + `/path/to/object`
+      - HTTPS URL: `https://storage.googleapis.com/{bucket}/{object}`
     version-hash: d87fc5c5f384
   schema:
     project:
@@ -162,11 +191,9 @@ cloud-storage:
       default: false
     kms_key_name:
       type: string
-      description: >-
+      description: |-
         Custom Cloud KMS key for bucket encryption
-
-        Format:
-        projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
+        Format: projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
     required:
       - name
   state-schema:

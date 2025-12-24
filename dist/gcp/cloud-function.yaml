@@ -3,6 +3,46 @@ cloud-function:
   defines: entity
   metadata:
     name: CloudFunction
+    description: |-
+      GCP Cloud Function Gen 2 Entity
+
+      Deploys and manages serverless functions using Cloud Functions 2nd generation,
+      which runs on Cloud Run infrastructure for improved performance.
+
+      ## Function Code Deployment
+      Source code is provided via a blob (directory of function code). The entity
+      will automatically:
+      1. Zip the blob contents
+      2. Upload to a GCS staging bucket via signed URL
+      3. Deploy the function from the staged source
+
+      ## Trigger Types
+      - **HTTP**: Default trigger, provides HTTPS endpoint
+      - **Pub/Sub**: Triggered by Pub/Sub messages
+      - **Cloud Storage**: Triggered by bucket events (create, delete, etc.)
+      - **Firestore**: Triggered by document changes
+      - **Firebase Auth**: Triggered by user lifecycle events
+
+      ## Secrets
+      This entity does NOT write any secrets directly.
+
+      ## Dependencies
+      Required APIs:
+      - `cloudfunctions.googleapis.com`
+      - `cloudbuild.googleapis.com`
+      - `artifactregistry.googleapis.com`
+      - `run.googleapis.com`
+
+      ## State Fields for Composition
+      - `state.url` - HTTPS endpoint URL for invoking HTTP-triggered functions
+      - `state.service_url` - Cloud Run service URL
+      - `state.service` - Cloud Run service name
+      - `state.resource_name` - Full resource name for IAM bindings
+
+      ## Composing with Other Entities
+      - `gcp/service-account` - Create dedicated SA with `roles/cloudfunctions.invoker`
+      - `gcp/cloud-storage` - Trigger functions on storage events
+      - `gcp/service-usage` - Enable required APIs before deployment
     version-hash: d87fc5c5f384
   schema:
     project:
@@ -101,11 +141,9 @@ cloud-function:
           description: Build environment variables
         docker_repository:
           type: string
-          description: >-
+          description: |-
             Docker repository for storing built images
-
-            Format:
-            projects/{project}/locations/{location}/repositories/{repository}
+            Format: projects/{project}/locations/{location}/repositories/{repository}
         worker_pool:
           type: string
           description: |-
@@ -151,23 +189,17 @@ cloud-function:
           type: object
           additionalProperties:
             type: string
-            description: >-
+            description: |-
               Secret environment variables
-
-              Maps env var names to secret references
-              (projects/{project}/secrets/{secret}/versions/{version})
-          description: >-
+              Maps env var names to secret references (projects/{project}/secrets/{secret}/versions/{version})
+          description: |-
             Secret environment variables
-
-            Maps env var names to secret references
-            (projects/{project}/secrets/{secret}/versions/{version})
+            Maps env var names to secret references (projects/{project}/secrets/{secret}/versions/{version})
         vpc_connector:
           type: string
-          description: >-
+          description: |-
             VPC connector for VPC access
-
-            Format:
-            projects/{project}/locations/{location}/connectors/{connector}
+            Format: projects/{project}/locations/{location}/connectors/{connector}
         vpc_connector_egress_settings:
           type: string
           enum:
@@ -267,11 +299,9 @@ cloud-function:
       description: Key-value labels for organizing functions
     kms_key_name:
       type: string
-      description: >-
+      description: |-
         KMS key for customer-managed encryption
-
-        Format:
-        projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
+        Format: projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}
     required:
       - name
       - location

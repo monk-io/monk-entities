@@ -52,9 +52,7 @@ agent:
             - Anthropic Claude 4.5 Sonnet
             - Anthropic Claude Opus 4.5
         - type: string
-      description: >-
-        Human-readable model identifier, e.g. "OpenAI GPT-4o" (resolved to
-        UUID). Custom values also accepted.
+      description: 'Human-readable model identifier, e.g. "OpenAI GPT-4o" (resolved to UUID). Custom values also accepted.'
     inference_name:
       anyOf:
         - type: string

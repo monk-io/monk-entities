@@ -3,6 +3,25 @@ service-usage:
   defines: entity
   metadata:
     name: ServiceUsage
+    description: |-
+      Service Usage entity for enabling GCP APIs
+
+      Enables one or more Google Cloud APIs for a project. This is typically
+      the first entity in a stack, as other GCP resources require their APIs
+      to be enabled before they can be created.
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      This is a standalone entity with no dependencies on other entities.
+      However, other GCP entities typically depend on this entity to ensure
+      required APIs are enabled before creating resources.
+
+      ## Composing with Other Entities
+      Use this entity as a dependency for other GCP entities that require
+      specific APIs to be enabled. No state fields need to be passed to
+      dependent entities - they just need to wait for this entity to be ready.
     version-hash: d87fc5c5f384
   schema:
     name:

@@ -3,6 +3,42 @@ cloud-sql-user:
   defines: entity
   metadata:
     name: CloudSqlUser
+    description: |-
+      Cloud SQL User entity
+
+      Creates a database user within an existing Cloud SQL instance.
+      Generates a secure random password and stores it in Monk secrets.
+
+      ## Secrets
+      **⚠️ WRITES SECRETS** - This entity writes the database password to a Monk secret.
+      You MUST add `permitted-secrets` to allow the entity to write the password:
+      ```yaml
+      permitted-secrets:
+        <password_secret>: true
+      ```
+      The secret name is specified in the `password_secret` definition field.
+      If the secret already contains a password, it will be used; otherwise a new
+      16-character random password is generated and stored.
+
+      ## Dependencies
+      - **REQUIRED**: `gcp/cloud-sql-instance` - Must be created first
+      - Pass the instance name via `instance` field (from instance's `definition.name`)
+
+      ## State Fields for Composition
+      The following state fields can be used by other entities:
+      - `state.name` - Username for database connections
+      - `state.host` - Host restriction (MySQL only, typically "%")
+
+      ## Definition Fields from Other Entities
+      - `instance` - Get from `gcp/cloud-sql-instance` entity's `definition.name`
+
+      ## Credentials for Applications
+      To connect to the database, your application needs:
+      - Host: from `gcp/cloud-sql-instance` `state.address`
+      - Port: from `gcp/cloud-sql-instance` `state.port`
+      - Database: from `gcp/cloud-sql-database` `state.name`
+      - Username: from this entity's `state.name`
+      - Password: from Monk secret specified in `password_secret`
     version-hash: d87fc5c5f384
   schema:
     project:

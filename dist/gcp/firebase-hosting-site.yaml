@@ -3,6 +3,48 @@ firebase-hosting-site:
   defines: entity
   metadata:
     name: FirebaseHostingSite
+    description: |-
+      GCP Firebase Hosting Site Entity
+
+      Manages Firebase Hosting sites which serve web applications. Each site
+      has a default domain ({site}.web.app) and can have custom domains configured.
+
+      ## Site Deployment
+      This entity creates and manages the site resource. To deploy content:
+      - Use Firebase CLI in a container: `firebase deploy --only hosting`
+      - Use the Firebase Hosting Channel entity for preview deployments
+      - Or use the deploy action with blob content
+
+      ## Builder Pattern
+      For deploying content, combine this entity with a runnable that uses
+      Firebase CLI:
+      ```yaml
+      hosting-deploy:
+        defines: runnable
+        containers:
+          deploy:
+            image: node:20
+            bash: firebase deploy --only hosting --project=$PROJECT
+            paths:
+              - <- `blobs://my-site-content:/app`
+      ```
+
+      ## Secrets
+      This entity does NOT write any secrets directly.
+
+      ## Dependencies
+      Required APIs:
+      - `firebasehosting.googleapis.com`
+
+      ## State Fields for Composition
+      - `state.default_url` - Default URL ({site}.web.app)
+      - `state.firebase_app_url` - Legacy URL ({site}.firebaseapp.com)
+      - `state.site_id` - Site ID for use in other API calls
+      - `state.name` - Full resource name
+
+      ## Composing with Other Entities
+      - `gcp/firebase-hosting-channel` - Create preview channels
+      - `gcp/service-usage` - Enable firebasehosting.googleapis.com
     version-hash: d87fc5c5f384
   schema:
     project:

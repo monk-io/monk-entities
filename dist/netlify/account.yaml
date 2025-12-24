@@ -3,6 +3,11 @@ account:
   defines: entity
   metadata:
     name: Account
+    description: |-
+      Account Entity
+
+      Simple entity that lists all accounts for the current user.
+      Uses the Netlify API to fetch account information and stores account slugs in state.
     version-hash: 62c7ce5ff12f
   schema:
     secret_ref:

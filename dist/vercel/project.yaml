@@ -3,6 +3,9 @@ project:
   defines: entity
   metadata:
     name: Project
+    description: |-
+      Base class for all Vercel entities.
+      Provides common functionality like authentication, HTTP client setup, and error handling.
     version-hash: 1db0d5c06a73
   schema:
     secret_ref:

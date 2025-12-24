@@ -3,6 +3,36 @@ firebase-hosting-channel:
   defines: entity
   metadata:
     name: FirebaseHostingChannel
+    description: |-
+      GCP Firebase Hosting Channel Entity
+
+      Manages Firebase Hosting channels which provide preview URLs for testing
+      before deploying to production. Each channel has its own URL and can
+      retain multiple releases for rollback.
+
+      ## Channel URLs
+      Channels have preview URLs in the format:
+      - `https://{channel}--{site}.web.app`
+      - The "live" channel is the production channel (default)
+
+      ## Automatic Expiration
+      Channels can have a TTL (time-to-live) after which they are automatically
+      deleted. This is useful for feature branch previews.
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      - Requires an existing Firebase Hosting site
+      - `firebasehosting.googleapis.com` API
+
+      ## State Fields for Composition
+      - `state.url` - Preview URL for this channel
+      - `state.channel_id` - Channel ID
+      - `state.name` - Full resource name
+
+      ## Composing with Other Entities
+      - `gcp/firebase-hosting-site` - The parent site for this channel
     version-hash: d87fc5c5f384
   schema:
     project:

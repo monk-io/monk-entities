@@ -3,6 +3,34 @@ big-query:
   defines: entity
   metadata:
     name: BigQuery
+    description: |-
+      BigQuery Dataset entity
+
+      Creates and manages BigQuery datasets for storing and analyzing data.
+      Supports automatic table creation, storage billing configuration, and time travel settings.
+
+      ## Secrets
+      This entity does NOT write any secrets.
+
+      ## Dependencies
+      - Requires `bigquery.googleapis.com` API to be enabled (use `gcp/service-usage` entity)
+
+      ## State Fields for Composition
+      The following state fields can be used by other entities or applications:
+      - `state.dataset_id` - Dataset ID for queries and references
+      - `state.dataset_reference` - Full dataset reference (format: project:dataset)
+      - `state.location` - Dataset location (needed for cross-region queries)
+      - `state.self_link` - Full resource URL
+
+      ## Composing with Other Entities
+      BigQuery datasets work well with:
+      - `gcp/service-account` - Create a service account with BigQuery roles for access
+      - `gcp/cloud-storage` - Export/import data between GCS and BigQuery
+
+      ## Accessing BigQuery Data
+      Applications can query BigQuery using:
+      - Dataset reference: `{project}.{dataset_id}.{table_name}`
+      - Full path: `state.dataset_reference` + `.{table_name}`
     version-hash: d87fc5c5f384
   schema:
     project:
@@ -73,11 +101,9 @@ big-query:
         - me-central2
         - me-west1
         - africa-south1
-      description: >-
+      description: |-
         Location for the dataset.
-
-        Use multi-regions (US, EU) for high availability or regional locations
-        for data residency.
+        Use multi-regions (US, EU) for high availability or regional locations for data residency.
       default: US
     labels:
       type: object
@@ -103,10 +129,8 @@ big-query:
       default: LOGICAL
     max_time_travel_hours:
       type: number
-      description: >-
-        Maximum time travel duration in hours (168 to 168*7 = 1176). Default is
-        168 hours (7 days).
-
+      description: |-
+        Maximum time travel duration in hours (168 to 168*7 = 1176). Default is 168 hours (7 days).
         Only applicable when storage_billing_model is PHYSICAL.
       default: 168
     is_case_insensitive:
@@ -115,9 +139,7 @@ big-query:
       default: false
     default_collation:
       type: string
-      description: >-
-        Default collation for STRING fields (e.g., "und:ci" for
-        case-insensitive)
+      description: 'Default collation for STRING fields (e.g., "und:ci" for case-insensitive)'
     required:
       - dataset
   state-schema:

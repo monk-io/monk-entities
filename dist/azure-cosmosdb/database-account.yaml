@@ -3,6 +3,9 @@ database-account:
   defines: entity
   metadata:
     name: DatabaseAccount
+    description: |-
+      Base class for all Azure Cosmos DB entities.
+      Provides common functionality like Azure API interaction and error handling.
     version-hash: 5987cccb4e12
   schema:
     subscription_id:
@@ -37,9 +40,7 @@ database-account:
           failover_priority:
             type: number
             minimum: 0
-            description: >-
-              The failover priority (0 for write region, higher for read
-              regions)
+            description: 'The failover priority (0 for write region, higher for read regions)'
           is_zone_redundant:
             type: boolean
             description: Whether this region is zone redundant
@@ -48,9 +49,7 @@ database-account:
           - location_name
           - failover_priority
         additionalProperties: false
-      description: >-
-        An array that contains the georeplication locations enabled for the
-        Cosmos DB account
+      description: An array that contains the georeplication locations enabled for the Cosmos DB account
     account_kind:
       type: string
       enum:
@@ -107,9 +106,7 @@ database-account:
       default: Enabled
     disable_local_auth:
       type: boolean
-      description: >-
-        Opt-out of local authentication and ensure only MSI and AAD can be used
-        exclusively for authentication
+      description: Opt-out of local authentication and ensure only MSI and AAD can be used exclusively for authentication
       default: false
     location:
       type: string
@@ -122,18 +119,14 @@ database-account:
       description: Tags for the resource
     primary_key_secret_ref:
       type: string
-      description: >-
+      description: |-
         Secret reference for Cosmos DB primary access key
-
-        If provided, the primary key will be saved to this secret on account
-        creation
+        If provided, the primary key will be saved to this secret on account creation
     secondary_key_secret_ref:
       type: string
-      description: >-
+      description: |-
         Secret reference for Cosmos DB secondary access key
-
-        If provided, the secondary key will be saved to this secret on account
-        creation
+        If provided, the secondary key will be saved to this secret on account creation
     backup_policy:
       type: object
       properties:
@@ -142,14 +135,10 @@ database-account:
           enum:
             - Continuous
             - Periodic
-          description: >-
+          description: |-
             Backup policy type
-
-            - Continuous: Enables point-in-time restore with 7 or 30 day
-            retention
-
-            - Periodic: Traditional backup with configurable interval (requires
-            support ticket to restore)
+            - Continuous: Enables point-in-time restore with 7 or 30 day retention
+            - Periodic: Traditional backup with configurable interval (requires support ticket to restore)
         continuous_tier:
           type: string
           enum:
@@ -164,17 +153,13 @@ database-account:
           type: number
           minimum: 60
           maximum: 1440
-          description: >-
-            Periodic backup interval in minutes (only applicable for Periodic
-            backup type)
+          description: Periodic backup interval in minutes (only applicable for Periodic backup type)
           default: 240
         periodic_retention_hours:
           type: number
           minimum: 8
           maximum: 720
-          description: >-
-            Periodic backup retention in hours (only applicable for Periodic
-            backup type)
+          description: Periodic backup retention in hours (only applicable for Periodic backup type)
           default: 8
         backup_storage_redundancy:
           type: string
@@ -191,14 +176,10 @@ database-account:
       required:
         - backup_type
       additionalProperties: false
-      description: >-
+      description: |-
         Backup policy configuration
-
-        Configure either Continuous (for point-in-time restore) or Periodic
-        backup
-
-        Note: Once Continuous backup is enabled, it cannot be changed back to
-        Periodic
+        Configure either Continuous (for point-in-time restore) or Periodic backup
+        Note: Once Continuous backup is enabled, it cannot be changed back to Periodic
     required:
       - subscription_id
       - resource_group_name
@@ -238,9 +219,7 @@ database-account:
       description: Continuous backup tier if applicable
     restorable_instance_id:
       type: string
-      description: >-
-        Instance ID for restorable database accounts (used for restore
-        operations)
+      description: Instance ID for restorable database accounts (used for restore operations)
     earliest_restore_time:
       type: string
       description: Earliest restore time for continuous backup (ISO 8601 format)

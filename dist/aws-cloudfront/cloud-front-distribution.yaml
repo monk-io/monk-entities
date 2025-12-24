@@ -7,9 +7,7 @@ cloud-front-distribution:
   schema:
     region:
       type: string
-      description: >-
-        AWS region for CloudFront operations (global service, but required for
-        API calls)
+      description: 'AWS region for CloudFront operations (global service, but required for API calls)'
     caller_reference:
       type: string
       description: Caller reference for the distribution (must be unique)

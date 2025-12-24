@@ -3,6 +3,9 @@ access-list:
   defines: entity
   metadata:
     name: AccessList
+    description: |-
+      Base class for all Azure Cosmos DB entities.
+      Provides common functionality like Azure API interaction and error handling.
     version-hash: 5987cccb4e12
   schema:
     subscription_id:
@@ -25,11 +28,9 @@ access-list:
         properties:
           subnet_id:
             type: string
-            description: >-
+            description: |-
               Full resource ID of the subnet
-
-              Format:
-              /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Network/virtualNetworks/{vnet-name}/subnets/{subnet-name}
+              Format: /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Network/virtualNetworks/{vnet-name}/subnets/{subnet-name}
           ignore_missing_vnet_service_endpoint:
             type: boolean
             description: Ignore missing VNet service endpoint

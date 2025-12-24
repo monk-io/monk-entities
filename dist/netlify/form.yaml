@@ -3,6 +3,9 @@ form:
   defines: entity
   metadata:
     name: Form
+    description: |-
+      Base class for all Netlify entities.
+      Provides common functionality like authentication, HTTP client setup, and error handling.
     version-hash: 62c7ce5ff12f
   schema:
     secret_ref:

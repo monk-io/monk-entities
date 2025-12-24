@@ -3,6 +3,9 @@ database:
   defines: entity
   metadata:
     name: Database
+    description: |-
+      Base class for all Azure Cosmos DB entities.
+      Provides common functionality like Azure API interaction and error handling.
     version-hash: 5987cccb4e12
   schema:
     subscription_id:

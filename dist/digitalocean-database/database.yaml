@@ -3,13 +3,16 @@ database:
   defines: entity
   metadata:
     name: Database
+    description: |-
+      DigitalOcean Database cluster entity for managing database instances.
+
+      This entity provides complete lifecycle management for DigitalOcean database clusters
+      including creation, updates, deletion, and monitoring operations.
     version-hash: 2991d896c739
   schema:
     name:
       type: string
-      description: >-
-        Name of the database cluster (3-63 characters, alphanumeric and hyphens
-        only)
+      description: 'Name of the database cluster (3-63 characters, alphanumeric and hyphens only)'
     engine:
       type: string
       enum:
@@ -19,9 +22,7 @@ database:
         - kafka
         - opensearch
         - valkey
-      description: >-
-        The database engine to use (mysql, pg, valkey, mongodb, kafka,
-        opensearch)
+      description: 'The database engine to use (mysql, pg, valkey, mongodb, kafka, opensearch)'
     version:
       type: string
       description: 'Version of the database engine (optional, uses latest if not specified)'
@@ -29,9 +30,7 @@ database:
       type: number
       minimum: 1
       maximum: 10
-      description: >-
-        Number of nodes for the database cluster (1 for single node, 2+ for
-        cluster)
+      description: 'Number of nodes for the database cluster (1 for single node, 2+ for cluster)'
     region:
       type: string
       enum:

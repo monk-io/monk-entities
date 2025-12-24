@@ -3,6 +3,9 @@ role:
   defines: entity
   metadata:
     name: Role
+    description: |-
+      Base class for all Neon entities.
+      Provides common functionality like authentication, HTTP client setup, and error handling.
     version-hash: 110be63aa18b
   schema:
     secret_ref:
