@@ -59,6 +59,80 @@ Reserved names
 
 - Avoid JSON Schema keywords in Definition/State (e.g., `type`, `enum`, `items`, `properties`, `$ref`). Prefer specific names like `zone_type`, `record_type`.
 
+JSDoc documentation
+
+Every entity must have JSDoc comments for the class, Definition interface, and State interface.
+
+**Entity class description format:**
+
+```typescript
+/**
+ * @description Provider Entity Name entity.
+ * One-line user-oriented summary of what this entity manages.
+ * Additional context about capabilities if needed.
+ * 
+ * ## Secrets
+ * - Reads: `secret_name` - Description (or "none (authenticated via Provider provider)")
+ * - Writes: `secret_name` - Description (or "none")
+ * 
+ * ## State Fields for Composition
+ * - `state.field_name` - Description of how other entities can use this
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `provider/other-entity` - How they work together
+ */
+export class MyEntity extends ProviderEntity<Definition, State> {
+```
+
+**Secrets section rules:**
+- For provider-authenticated entities (AWS, GCP, Azure, DigitalOcean): `- Reads: none (authenticated via AWS provider)`
+- For entities reading from Monk secrets: `- Reads: \`secret_ref\` - API token (defaults to \`provider-api-token\`)`
+- Only document writes if the entity actually calls `secret.set()` - verify in code before claiming
+- If entity writes secrets conditionally: `- Writes: \`password_secret_ref\` - Password (if specified)`
+
+**Definition interface:**
+
+```typescript
+/**
+ * Definition interface for Provider Entity.
+ * Configures entity properties including X, Y, and Z.
+ * @interface EntityDefinition
+ */
+export interface EntityDefinition extends ProviderDefinition {
+    /** @description Human-readable description of this property */
+    property_name: string;
+    
+    /**
+     * @description Longer description for complex properties
+     * @default default_value
+     */
+    optional_property?: string;
+}
+```
+
+**State interface:**
+
+```typescript
+/**
+ * State interface for Provider Entity.
+ * Contains runtime information about the created resource.
+ * @interface EntityState
+ */
+export interface EntityState extends ProviderState {
+    /** @description Resource identifier */
+    id?: string;
+    /** @description Current status of the resource */
+    status?: string;
+}
+```
+
+**Key principles:**
+- Descriptions should be user-oriented, not code-focused
+- Use `@description` tag for all properties
+- Document defaults with `@default` tag
+- State fields should explain what they're useful for in composition
+
 CRUD preflight (before writing tests)
 
 1) Compile and load MANIFEST

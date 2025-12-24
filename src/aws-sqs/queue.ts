@@ -11,7 +11,11 @@ import {
     DEFAULT_FIFO_QUEUE_ATTRIBUTES
 } from "./common.ts";
 
-
+/**
+ * Definition interface for AWS SQS Queue entity.
+ * Configures queue properties including message retention, visibility timeout, and encryption.
+ * @interface SQSQueueDefinition
+ */
 export interface SQSQueueDefinition extends AWSSQSDefinition {
     /** @description Queue name (append .fifo for FIFO queues) */
     queue_name: string;
@@ -71,13 +75,36 @@ export interface SQSQueueDefinition extends AWSSQSDefinition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS SQS Queue entity.
+ * Contains runtime information about the created queue.
+ * Inherits only essential fields: queue_url, queue_name, existing.
+ * All other data (attributes, timestamps, etc.) obtained via API calls.
+ * @interface SQSQueueState
+ */
 export interface SQSQueueState extends AWSSQSState {
-    /**
-     * Inherits only essential fields: queue_url, queue_name, existing
-     * All other data (attributes, timestamps, etc.) obtained via API calls
-     */
 }
 
+/**
+ * @description AWS SQS Queue entity.
+ * Creates and manages Amazon SQS queues for reliable message-based communication.
+ * Supports both standard queues (high throughput) and FIFO queues (ordered, exactly-once delivery).
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.queue_url` - Queue URL for sending/receiving messages
+ * - `state.queue_arn` - Queue ARN for IAM policies and cross-service integration
+ * - `state.queue_name` - Queue name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-lambda/function` - Trigger Lambda functions from queue messages
+ * - `aws-sns/topic` - Subscribe queue to SNS topic for fanout patterns
+ * - `aws-iam/role` - Grant queue access to other services
+ */
 export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
     
     protected getQueueName(): string {

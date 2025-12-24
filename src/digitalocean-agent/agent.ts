@@ -94,6 +94,23 @@ export interface DOAgentState {
     endpoint_api_key?: string;
 }
 
+/**
+ * @description DigitalOcean Agent entity.
+ * Creates and manages DigitalOcean AI agents (GenAI platform).
+ * Agents provide AI-powered assistants with custom knowledge bases.
+ * 
+ * ## Secrets
+ * - Reads: `endpoint_secret_ref`, `access_key_secret_ref` - GenAI API credentials
+ * - Writes: none (Agent API key available in `state.endpoint_api_key`)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Agent ID
+ * - `state.endpoint` - Agent API endpoint URL
+ * - `state.endpoint_api_key` - Agent API key for invocations
+ * 
+ * ## Composing with Other Entities
+ * DigitalOcean agents are standalone AI services.
+ */
 export class Agent extends MonkEntity<DOAgentDefinition, DOAgentState> {
     protected getEntityName(): string { return "digitalocean-agent/agent"; }
 

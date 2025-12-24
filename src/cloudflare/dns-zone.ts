@@ -3,7 +3,10 @@ import cli from "cli";
 import { CloudflareEntity, type CloudflareEntityDefinition, type CloudflareEntityState } from "./cloudflare-base.ts";
 
 /**
+ * Definition interface for Cloudflare DNS Zone entity.
+ * Configures zone properties for domain management.
  * @see https://developers.cloudflare.com/api/resources/zones/
+ * @interface CloudflareDNSZoneDefinition
  */
 export interface CloudflareDNSZoneDefinition extends CloudflareEntityDefinition {
   /** @description Zone name (e.g., example.com) */
@@ -14,6 +17,11 @@ export interface CloudflareDNSZoneDefinition extends CloudflareEntityDefinition 
   account_id?: string;
 }
 
+/**
+ * State interface for Cloudflare DNS Zone entity.
+ * Contains runtime information about the zone.
+ * @interface CloudflareDNSZoneState
+ */
 export interface CloudflareDNSZoneState extends CloudflareEntityState {
   /** @description Cloudflare Zone ID */
   id?: string;
@@ -23,6 +31,24 @@ export interface CloudflareDNSZoneState extends CloudflareEntityState {
   name?: string;
 }
 
+/**
+ * @description Cloudflare DNS Zone entity.
+ * Detects and manages Cloudflare DNS zones for domain configuration.
+ * Adopts existing zones by name for DNS record management.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Cloudflare API token (defaults to `cloudflare-api-token`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Zone ID for DNS record operations
+ * - `state.name` - Domain name (e.g., example.com)
+ * - `state.status` - Zone status (active, pending)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `cloudflare/dns-record` - Create DNS records in this zone
+ */
 export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinition, CloudflareDNSZoneState> {
   static readonly readiness = { period: 10, initialDelay: 2, attempts: 30 };
 

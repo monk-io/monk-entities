@@ -148,10 +148,24 @@ export interface DigitalOceanDatabaseState extends DOProviderStateBase {
 }
 
 /**
- * DigitalOcean Database cluster entity for managing database instances.
+ * @description DigitalOcean Database entity.
+ * Creates and manages DigitalOcean managed database clusters.
+ * Supports PostgreSQL, MySQL, Redis, MongoDB, and Kafka engines.
  * 
- * This entity provides complete lifecycle management for DigitalOcean database clusters
- * including creation, updates, deletion, and monitoring operations.
+ * ## Secrets
+ * - Reads: none (authenticated via DigitalOcean provider)
+ * - Writes: none (connection credentials available in state)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Database cluster UUID
+ * - `state.host` - Database hostname for connections
+ * - `state.port` - Database port
+ * - `state.status` - Cluster status (online, creating, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `digitalocean/database-user` - Create additional database users
+ * - `digitalocean/database-db` - Create databases within the cluster
  */
 export class Database extends DOProviderEntity<
     DatabaseDefinition,

@@ -1,8 +1,8 @@
 REPO digitalocean-monitoring
-VERSION_HASH afa77c350357
+VERSION_HASH 8864af15f946
 DESCRIPTION Monitoring and alert policies.
 HOSTING managed
 TAGS digitalocean,monitoring,alerts
  
 LOAD common.yaml digital-ocean-monitoring.yaml do-provider-base.yaml
-RESOURCES common.js do-provider-base.js digital-ocean-monitoring-sync.js
+RESOURCES common.js digital-ocean-monitoring-sync.js do-provider-base.js

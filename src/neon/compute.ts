@@ -124,6 +124,25 @@ export interface NeonComputeState extends NeonEntityState {
     operationId?: string;
 }
 
+/**
+ * @description Neon Compute entity.
+ * Creates and manages Neon compute endpoints for database connections.
+ * Compute endpoints provide connection URLs and control compute resources.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Compute endpoint ID
+ * - `state.host` - Connection hostname
+ * - `state.current_state` - Endpoint state (idle, active)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `neon/project` - The project containing this endpoint
+ * - `neon/branch` - The branch this endpoint connects to
+ */
 export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState> {
     
     protected getEntityName(): string {

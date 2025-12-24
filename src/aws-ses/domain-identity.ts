@@ -29,6 +29,30 @@ export interface SESDomainIdentityState extends AWSSESState {
     verification_token?: string;
 }
 
+/**
+ * @description AWS SES Domain Identity entity.
+ * Creates and manages SES domain identities for sending emails from a domain.
+ * Provides DKIM and verification tokens for DNS configuration.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## DNS Configuration
+ * After creation, configure DNS records:
+ * - TXT record for domain verification: `state.verification_token`
+ * - CNAME records for DKIM: `state.dkim_tokens`
+ * 
+ * ## State Fields for Composition
+ * - `state.domain_name` - Domain for sending emails
+ * - `state.verified` - Whether domain verification is complete
+ * - `state.dkim_tokens` - DKIM CNAME records for DNS
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ses/configuration-set` - Associate with a configuration set
+ * - `cloudflare/dns-record` - Create required DNS records
+ */
 export class SESDomainIdentity extends AWSSESEntity<SESDomainIdentityDefinition, SESDomainIdentityState> {
     
     static readonly readiness = { period: 15, initialDelay: 10, attempts: 40 };

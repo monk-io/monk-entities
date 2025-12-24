@@ -25,6 +25,24 @@ export interface SESConfigurationSetState extends AWSSESState {
     sending_enabled?: boolean;
 }
 
+/**
+ * @description AWS SES Configuration Set entity.
+ * Creates and manages SES configuration sets for email tracking and reputation.
+ * Configuration sets group email sending settings and metrics.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.configuration_set_name` - Configuration set name
+ * - `state.sending_enabled` - Whether sending is enabled
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ses/email-identity` - Associate identities with this configuration set
+ * - `aws-ses/domain-identity` - Associate domain identities with this configuration set
+ */
 export class SESConfigurationSet extends AWSSESEntity<SESConfigurationSetDefinition, SESConfigurationSetState> {
     
     static readonly readiness = { period: 5, initialDelay: 2, attempts: 10 };

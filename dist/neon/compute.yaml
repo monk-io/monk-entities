@@ -4,9 +4,24 @@ compute:
   metadata:
     name: Compute
     description: |-
-      Base class for all Neon entities.
-      Provides common functionality like authentication, HTTP client setup, and error handling.
-    version-hash: 110be63aa18b
+      Neon Compute entity.
+      Creates and manages Neon compute endpoints for database connections.
+      Compute endpoints provide connection URLs and control compute resources.
+
+      ## Secrets
+      - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Compute endpoint ID
+      - `state.host` - Connection hostname
+      - `state.current_state` - Endpoint state (idle, active)
+
+      ## Composing with Other Entities
+      Works with:
+      - `neon/project` - The project containing this endpoint
+      - `neon/branch` - The branch this endpoint connects to
+    version-hash: 2e545ec0b98f
   schema:
     secret_ref:
       type: string

@@ -115,6 +115,24 @@ export interface DigitalOceanMonitoringState extends DOMonitoringStateBase {
     created_at?: string;
 }
 
+/**
+ * @description DigitalOcean Monitoring Alert Policy entity.
+ * Creates and manages monitoring alert policies for DigitalOcean resources.
+ * Sends notifications when resource metrics exceed defined thresholds.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via DigitalOcean provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.uuid` - Alert policy UUID
+ * - `state.type` - Alert type (CPU, memory, etc.)
+ * - `state.enabled` - Whether the alert is active
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - DigitalOcean Droplets, Databases, and other resources as alert targets
+ */
 export class DigitalOceanMonitoring extends DOMonitoringEntity<DigitalOceanMonitoringDefinition, DigitalOceanMonitoringState> {
 
   static readonly readiness = { period: 15, initialDelay: 5, attempts: 40 };

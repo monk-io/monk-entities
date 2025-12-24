@@ -1,4 +1,4 @@
 REPO gcp
 VERSION_HASH d87fc5c5f384
-LOAD cloud-function.yaml big-query.yaml cloud-sql-instance.yaml cloud-storage.yaml gcp-base.yaml common.yaml firestore.yaml firebase-hosting-site.yaml service-account.yaml service-usage.yaml cloud-sql-database.yaml cloud-sql-user.yaml service-account-key.yaml firebase-hosting-channel.yaml
-RESOURCES cloud-sql-database-sync.js firebase-hosting-channel-sync.js cloud-function-sync.js service-account-key-sync.js firebase-hosting-site-sync.js gcp-base.js service-usage-sync.js cloud-sql-user-sync.js common.js cloud-storage-sync.js service-account-sync.js big-query-sync.js firestore-sync.js cloud-sql-instance-sync.js
+LOAD common.yaml gcp-base.yaml big-query.yaml cloud-function.yaml cloud-sql-database.yaml cloud-sql-instance.yaml cloud-sql-user.yaml cloud-storage.yaml firebase-hosting-channel.yaml firebase-hosting-site.yaml firestore.yaml service-account-key.yaml service-account.yaml service-usage.yaml
+RESOURCES big-query-sync.js cloud-function-sync.js cloud-sql-database-sync.js cloud-sql-instance-sync.js cloud-sql-user-sync.js cloud-storage-sync.js common.js firebase-hosting-channel-sync.js firebase-hosting-site-sync.js firestore-sync.js gcp-base.js service-account-key-sync.js service-account-sync.js service-usage-sync.js

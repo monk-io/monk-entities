@@ -19,6 +19,23 @@ export interface StripePriceState extends StripeEntityState {
     lookup_key?: string;
 }
 
+/**
+ * @description Stripe Price entity.
+ * Creates and manages Stripe prices for products.
+ * Prices define how much and how often to charge for products.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.price_id` - Stripe price ID
+ * - `state.unit_amount` - Price amount in cents
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `stripe/product` - The product this price is for
+ */
 export class Price extends StripeEntity<StripePriceDefinition, StripePriceState> {
     protected getEntityName(): string { return this.state?.price_id || (this.definition.lookup_key || "stripe-price"); }
 

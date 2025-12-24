@@ -3,6 +3,11 @@ import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateEmailAddress, type VerificationStatus, type SESEmailIdentityResponse } from "./common.ts";
 
+/**
+ * Definition interface for AWS SES Email Identity entity.
+ * Configures email identity properties including DKIM and configuration set.
+ * @interface SESEmailIdentityDefinition
+ */
 export interface SESEmailIdentityDefinition extends AWSSESDefinition {
     /** @description Email address to verify and use for sending */
     email_address: string;
@@ -12,6 +17,11 @@ export interface SESEmailIdentityDefinition extends AWSSESDefinition {
     configuration_set_name?: string;
 }
 
+/**
+ * State interface for AWS SES Email Identity entity.
+ * Contains runtime information about the email identity verification.
+ * @interface SESEmailIdentityState
+ */
 export interface SESEmailIdentityState extends AWSSESState {
     /** @description Email address identity */
     email_address?: string;
@@ -25,6 +35,29 @@ export interface SESEmailIdentityState extends AWSSESState {
     dkim_tokens?: string[];
 }
 
+/**
+ * @description AWS SES Email Identity entity.
+ * Creates and manages Amazon SES email identities for sending emails.
+ * Sends verification email to the address and manages DKIM configuration.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## Verification
+ * After creation, the email address owner must click the verification link.
+ * Check `state.verification_status` for current status (PENDING, SUCCESS, FAILED).
+ * 
+ * ## State Fields for Composition
+ * - `state.email_address` - Verified email address for sending
+ * - `state.verified` - Whether the identity is verified and ready for sending
+ * - `state.dkim_tokens` - DKIM tokens for DNS configuration
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ses/configuration-set` - Associate with configuration set for tracking
+ * - `aws-lambda/function` - Send emails from serverless functions
+ */
 export class SESEmailIdentity extends AWSSESEntity<SESEmailIdentityDefinition, SESEmailIdentityState> {
     
     static readonly readiness = { period: 10, initialDelay: 5, attempts: 30 };

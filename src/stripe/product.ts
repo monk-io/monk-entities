@@ -17,6 +17,23 @@ export interface StripeProductState extends StripeEntityState {
     name?: string;
 }
 
+/**
+ * @description Stripe Product entity.
+ * Creates and manages Stripe products for billing and subscriptions.
+ * Products represent goods or services available for purchase.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Stripe API key (defaults to `stripe-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.product_id` - Stripe product ID
+ * - `state.name` - Product name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `stripe/price` - Create prices for this product
+ */
 export class Product extends StripeEntity<StripeProductDefinition, StripeProductState> {
     protected getEntityName(): string { return this.definition.name; }
 

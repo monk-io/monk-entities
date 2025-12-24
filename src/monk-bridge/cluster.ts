@@ -34,6 +34,25 @@ const ALLOWED: ReadonlyArray<string> = [
   "templates.Balancers",
 ] as const;
 
+/**
+ * @description Monk Bridge Cluster entity.
+ * Connects to remote Monk clusters and retrieves cluster information.
+ * Provides visibility into cluster peers, balancers, and version information.
+ * 
+ * ## Secrets
+ * - Reads: `monkcode_secret_ref` - Monk cluster connection code
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.cluster_name` - Name of the remote cluster
+ * - `state.version` - Monk version running on the cluster
+ * - `state.peers` - List of cluster peers with IPs
+ * - `state.balancer_endpoints` - Load balancer endpoints
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `monk-bridge/runnable` - Retrieve runnable information from this cluster
+ */
 export class Cluster extends MonkBridgeBase<ClusterDefinition, ClusterState> {
   protected getBaseAllowedMethods(): ReadonlyArray<string> { return ALLOWED; }
 

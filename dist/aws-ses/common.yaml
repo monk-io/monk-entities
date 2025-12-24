@@ -3,5 +3,5 @@ namespace: aws-ses
 common:
   defines: module
   metadata:
-    version-hash: 977f2b1b6d6f
+    version-hash: 110a78540381
   source: <<< common.js

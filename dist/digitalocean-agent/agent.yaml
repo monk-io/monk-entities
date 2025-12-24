@@ -3,7 +3,23 @@ agent:
   defines: entity
   metadata:
     name: Agent
-    version-hash: 20750f03ae4a
+    description: |-
+      DigitalOcean Agent entity.
+      Creates and manages DigitalOcean AI agents (GenAI platform).
+      Agents provide AI-powered assistants with custom knowledge bases.
+
+      ## Secrets
+      - Reads: `endpoint_secret_ref`, `access_key_secret_ref` - GenAI API credentials
+      - Writes: none (Agent API key available in `state.endpoint_api_key`)
+
+      ## State Fields for Composition
+      - `state.id` - Agent ID
+      - `state.endpoint` - Agent API endpoint URL
+      - `state.endpoint_api_key` - Agent API key for invocations
+
+      ## Composing with Other Entities
+      DigitalOcean agents are standalone AI services.
+    version-hash: 4e493d7cafd1
   schema:
     name:
       type: string

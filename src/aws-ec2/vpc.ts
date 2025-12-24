@@ -1,5 +1,10 @@
 import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./base.ts";
 
+/**
+ * Definition interface for AWS EC2 VPC entity.
+ * Configures VPC properties including CIDR block and DNS settings.
+ * @interface VPCDefinition
+ */
 export interface VPCDefinition extends AWSEC2Definition {
 	/** Optional existing VPC ID to adopt */
 	vpc_id?: string;
@@ -13,12 +18,41 @@ export interface VPCDefinition extends AWSEC2Definition {
 	tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS EC2 VPC entity.
+ * Contains runtime information about the created VPC.
+ * @interface VPCState
+ */
 export interface VPCState extends AWSEC2State {
+	/** @description VPC ID */
 	vpc_id?: string;
+	/** @description VPC state (available, pending) */
 	state?: string;
+	/** @description VPC CIDR block */
 	cidr_block?: string;
 }
 
+/**
+ * @description AWS EC2 VPC entity.
+ * Creates and manages Amazon VPC (Virtual Private Cloud) for isolated network environments.
+ * Supports custom CIDR blocks, DNS configuration, and can adopt existing VPCs.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.vpc_id` - VPC ID for subnet and security group configuration
+ * - `state.state` - VPC state (available, pending)
+ * - `state.cidr_block` - VPC CIDR block
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/subnet` - Create subnets within the VPC
+ * - `aws-ec2/security-group` - Define network access rules
+ * - `aws-rds/instance` - Place databases in VPC subnets
+ * - `aws-lambda/function` - Connect Lambda to VPC resources
+ */
 export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 
 	protected getVpcId(): string | undefined {

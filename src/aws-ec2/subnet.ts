@@ -14,6 +14,25 @@ export interface SubnetState extends AWSEC2State {
 	cidr_block?: string;
 }
 
+/**
+ * @description AWS EC2 Subnet entity.
+ * Creates and manages VPC subnets for network segmentation.
+ * Subnets are IP address ranges within a VPC for resource isolation.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.subnet_id` - Subnet ID for resource placement
+ * - `state.cidr_block` - Subnet CIDR block
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/vpc` - The parent VPC
+ * - `aws-rds/instance` - Place database in private subnets
+ * - `aws-rds/db-subnet-group` - Group subnets for RDS
+ */
 export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 
 	protected getSubnetId(): string | undefined {

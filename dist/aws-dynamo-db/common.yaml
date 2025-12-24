@@ -3,5 +3,5 @@ namespace: aws-dynamo-db
 common:
   defines: module
   metadata:
-    version-hash: f6ae3ba264ef
+    version-hash: 611fbaf4bb52
   source: <<< common.js

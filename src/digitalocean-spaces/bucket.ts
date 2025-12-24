@@ -2,6 +2,11 @@ import { DOSpacesS3Entity, DOSpacesS3DefinitionBase, DOSpacesS3StateBase } from 
 import cli from "cli";
 import { action, Args } from "monkec/base";
 
+/**
+ * Definition interface for DigitalOcean Spaces Bucket entity.
+ * Configures bucket properties including versioning, access control, CORS, and lifecycle rules.
+ * @interface SpacesBucketDefinition
+ */
 export interface SpacesBucketDefinition extends DOSpacesS3DefinitionBase {
     /** @description Space (bucket) name */
     bucket_name: string;
@@ -34,11 +39,34 @@ export interface SpacesBucketDefinition extends DOSpacesS3DefinitionBase {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for DigitalOcean Spaces Bucket entity.
+ * Contains runtime information about the created bucket.
+ * @interface SpacesBucketState
+ */
 export interface SpacesBucketState extends DOSpacesS3StateBase {
+    /** @description Bucket name */
     bucket_name?: string;
+    /** @description DigitalOcean region where the bucket resides */
     region?: string;
 }
 
+/**
+ * @description DigitalOcean Spaces Bucket entity.
+ * Creates and manages DigitalOcean Spaces buckets for S3-compatible object storage.
+ * 
+ * ## Secrets
+ * - Reads: `do-spaces-access-key`, `do-spaces-secret-key` - Spaces credentials
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.bucket_name` - Bucket name for SDK/API operations
+ * - `state.region` - DigitalOcean region where the bucket resides
+ * - `state.endpoint` - S3-compatible endpoint URL
+ * 
+ * ## Composing with Other Entities
+ * Works with `digitalocean-spaces/spaces-keys` to create access credentials for bucket operations.
+ */
 export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, SpacesBucketState> {
 
     protected getBucketName(): string {

@@ -3,7 +3,24 @@ iam-policy:
   defines: entity
   metadata:
     name: IAMPolicy
-    version-hash: 4a3599593512
+    description: |-
+      AWS IAM Policy entity.
+      Creates and manages IAM policies for fine-grained permissions.
+      Policies define what actions are allowed or denied on AWS resources.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.policy_arn` - Policy ARN for attaching to roles/users
+      - `state.policy_id` - Policy ID
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-iam/role` - Attach policy to roles
+      - `aws-iam/user` - Attach policy to users
+    version-hash: 8a2ed863f2cf
   schema:
     region:
       type: string

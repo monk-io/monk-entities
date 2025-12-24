@@ -4,9 +4,23 @@ deployment:
   metadata:
     name: Deployment
     description: |-
-      Base class for all Vercel entities.
-      Provides common functionality like authentication, HTTP client setup, and error handling.
-    version-hash: 1db0d5c06a73
+      Vercel Deployment entity.
+      Creates and manages deployments to Vercel projects.
+      Supports deploying from Git or uploaded files.
+
+      ## Secrets
+      - Reads: `secret_ref` - Vercel API token (defaults to `vercel-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Deployment ID
+      - `state.url` - Deployment URL
+      - `state.state` - Deployment state (READY, ERROR, etc.)
+
+      ## Composing with Other Entities
+      Works with:
+      - `vercel/project` - The project to deploy to
+    version-hash: ec92791e03f8
   schema:
     secret_ref:
       type: string

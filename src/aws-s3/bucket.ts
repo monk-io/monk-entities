@@ -10,6 +10,11 @@ import {
     parseS3Error
 } from "./common.ts";
 
+/**
+ * Definition interface for AWS S3 Bucket entity.
+ * Configures bucket properties including versioning, encryption, CORS, lifecycle rules, and website hosting.
+ * @interface S3BucketDefinition
+ */
 export interface S3BucketDefinition extends AWSS3Definition {
     /** @description S3 bucket name */
     bucket_name: string;
@@ -114,11 +119,14 @@ export interface S3BucketDefinition extends AWSS3Definition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS S3 Bucket entity.
+ * Contains runtime information about the created bucket.
+ * Inherits: existing, bucket_name, region, location.
+ * All other data (configuration, attributes, etc.) obtained via API calls.
+ * @interface S3BucketState
+ */
 export interface S3BucketState extends AWSS3State {
-    /**
-     * Inherits: existing, bucket_name, region, location
-     * All other data (configuration, attributes, etc.) obtained via API calls
-     */
 }
 
 interface S3ObjectInfo {
@@ -127,6 +135,25 @@ interface S3ObjectInfo {
     lastModified: string;
 }
 
+/**
+ * @description AWS S3 Bucket entity.
+ * Creates and manages Amazon S3 buckets for scalable object storage.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.bucket_name` - Bucket name for SDK/API operations
+ * - `state.region` - AWS region where the bucket resides
+ * - `state.location` - Bucket location constraint
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-iam/role` - Create IAM roles with S3 access permissions
+ * - `aws-lambda/function` - Store Lambda deployment packages
+ * - `aws-cloudfront/distribution` - Serve static content via CDN
+ */
 export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     
     protected getBucketName(): string {

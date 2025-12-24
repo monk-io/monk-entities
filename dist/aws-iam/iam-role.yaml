@@ -3,7 +3,25 @@ iam-role:
   defines: entity
   metadata:
     name: IAMRole
-    version-hash: 4a3599593512
+    description: |-
+      AWS IAM Role entity.
+      Creates and manages AWS IAM roles for granting permissions to AWS services and users.
+      Supports trust policies for cross-account access and service-linked roles.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.role_arn` - Role ARN for service configurations and cross-account access
+      - `state.role_id` - Unique role identifier
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-lambda/function` - Execution role for Lambda functions
+      - `aws-rds/instance` - Enhanced monitoring and S3 import roles
+      - `aws-iam/policy` - Attach custom policies for fine-grained permissions
+    version-hash: 8a2ed863f2cf
   schema:
     region:
       type: string

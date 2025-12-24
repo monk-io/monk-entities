@@ -3,6 +3,11 @@ import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateTopicName, parseTopicArn, TopicAttributes, type SNSProtocol } from "./common.ts";
 
+/**
+ * Definition interface for AWS SNS Topic entity.
+ * Configures topic properties including FIFO settings, encryption, and delivery policies.
+ * @interface SNSTopicDefinition
+ */
 export interface SNSTopicDefinition extends AWSSNSDefinition {
     /** @description Name of the SNS topic */
     topic_name: string;
@@ -22,6 +27,11 @@ export interface SNSTopicDefinition extends AWSSNSDefinition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS SNS Topic entity.
+ * Contains runtime information about the created topic.
+ * @interface SNSTopicState
+ */
 export interface SNSTopicState extends AWSSNSState {
     /** @description SNS topic name */
     topic_name?: string;
@@ -31,6 +41,26 @@ export interface SNSTopicState extends AWSSNSState {
     is_fifo?: boolean;
 }
 
+/**
+ * @description AWS SNS Topic entity.
+ * Creates and manages Amazon SNS topics for publish/subscribe messaging patterns.
+ * Supports standard topics (high throughput) and FIFO topics (ordered delivery).
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.topic_arn` - Topic ARN for subscriptions and publishing
+ * - `state.topic_name` - Topic name
+ * - `state.is_fifo` - Whether this is a FIFO topic
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-sqs/queue` - Subscribe queues for fanout message distribution
+ * - `aws-lambda/function` - Invoke functions on message publish
+ * - `aws-sns/subscription` - Add email, HTTP, or other endpoint subscriptions
+ */
 export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     
     static readonly readiness = { period: 5, initialDelay: 2, attempts: 10 };

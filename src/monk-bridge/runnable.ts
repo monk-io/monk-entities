@@ -29,6 +29,23 @@ const ALLOWED: ReadonlyArray<string> = [
   "cluster.Peers",
 ] as const;
 
+/**
+ * @description Monk Bridge Runnable entity.
+ * Connects to remote Monk clusters and retrieves runnable information.
+ * Enables cross-cluster resource visibility and management.
+ * 
+ * ## Secrets
+ * - Reads: `monkcode_secret_ref` - Monk cluster connection code
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.endpoints` - Public endpoints of the runnable
+ * - `state.is_run` - Whether the runnable is currently running
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `monk-bridge/cluster` - Remote cluster connection
+ */
 export class Runnable extends MonkBridgeBase<RunnableDefinition, RunnableState> {
   static readonly readiness = { period: 10, initialDelay: 1, attempts: 12 } as const;
   protected getBaseAllowedMethods(): ReadonlyArray<string> { return ALLOWED; }

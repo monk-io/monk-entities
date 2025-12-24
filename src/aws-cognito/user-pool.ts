@@ -2,6 +2,11 @@ import { action, type Args } from "monkec/base";
 import cli from "cli";
 import { AWSCognitoEntity, type AWSCognitoDefinition, type AWSCognitoState } from "./cognito-base.ts";
 
+/**
+ * Definition interface for AWS Cognito User Pool entity.
+ * Configures user pool properties including MFA, password policy, and email settings.
+ * @interface UserPoolDefinition
+ */
 export interface UserPoolDefinition extends AWSCognitoDefinition {
     /**
      * @description Name of the User Pool
@@ -152,6 +157,11 @@ export interface UserPoolDefinition extends AWSCognitoDefinition {
     tags?: Record<string, string>;
 }
 
+/**
+ * State interface for AWS Cognito User Pool entity.
+ * Contains runtime information about the created user pool.
+ * @interface UserPoolState
+ */
 export interface UserPoolState extends AWSCognitoState {
     /** @description User Pool ID assigned by AWS */
     user_pool_id?: string;
@@ -171,6 +181,27 @@ export interface UserPoolState extends AWSCognitoState {
     estimated_number_of_users?: number;
 }
 
+/**
+ * @description AWS Cognito User Pool entity.
+ * Creates and manages Amazon Cognito User Pools for user authentication and management.
+ * Supports MFA, password policies, custom attributes, and federated identity providers.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.user_pool_id` - User Pool ID for SDK operations and client configuration
+ * - `state.user_pool_arn` - User Pool ARN for IAM policies
+ * - `state.user_pool_name` - User Pool display name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-cognito/user-pool-client` - Create app clients for web/mobile applications
+ * - `aws-cognito/user-pool-domain` - Configure hosted UI domain
+ * - `aws-cognito/identity-provider` - Add social or SAML identity providers
+ * - `aws-api-gateway/api-gateway` - Protect APIs with Cognito authorizers
+ */
 export class UserPool extends AWSCognitoEntity<UserPoolDefinition, UserPoolState> {
 
     protected getUserPoolName(): string {

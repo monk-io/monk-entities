@@ -1,3 +1,7 @@
+/**
+ * @fileoverview AWS Lambda Function entity for managing serverless functions.
+ */
+
 import { AWSLambdaEntity, AWSLambdaDefinition, AWSLambdaState } from "./base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
@@ -164,6 +168,11 @@ export interface LambdaFunctionDefinition extends AWSLambdaDefinition {
     publish?: boolean;
 }
 
+/**
+ * State interface for AWS Lambda Function entity.
+ * Contains runtime information about the deployed function.
+ * @interface LambdaFunctionState
+ */
 export interface LambdaFunctionState extends AWSLambdaState {
     /** @description Effective runtime */
     runtime?: string;
@@ -185,6 +194,27 @@ export interface LambdaFunctionState extends AWSLambdaState {
     revision_id?: string;
 }
 
+/**
+ * @description AWS Lambda Function entity.
+ * Creates and manages AWS Lambda serverless functions for event-driven compute.
+ * Supports ZIP package deployments from Monk blobs or container images from ECR.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.function_name` - Function name for invocations
+ * - `state.function_arn` - Function ARN for cross-service integrations
+ * - `state.state` - Current function state (Active, Pending, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-iam/role` - Execution role with required permissions
+ * - `aws-api-gateway/api-gateway` - HTTP endpoints for Lambda functions
+ * - `aws-sqs/queue` - Event source mappings for queue processing
+ * - `aws-sns/topic` - Subscribe to topic notifications
+ */
 export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, LambdaFunctionState> {
     
     // Customize readiness check parameters

@@ -90,6 +90,22 @@ export interface ProjectState extends SupabaseEntityState {
     id?: string;
 }
 
+/**
+ * @description Supabase Project entity.
+ * Creates and manages Supabase projects with PostgreSQL database, Auth, and Storage.
+ * Provides a complete backend-as-a-service platform.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Supabase management API token (defaults to `supabase-api-token`)
+ * - Writes: `db_pass_secret_ref` (defaults to `{name}-db-password`), 
+ *   `anon_api_key_secret_ref`, `service_role_api_key_secret_ref` (if specified)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Project ID (reference ID for Supabase)
+ * 
+ * ## Composing with Other Entities
+ * Supabase projects are standalone and include integrated services.
+ */
 export class Project extends SupabaseEntity<ProjectDefinition, ProjectState> {
 
     protected getEntityName(): string {

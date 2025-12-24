@@ -3,7 +3,23 @@ runnable:
   defines: entity
   metadata:
     name: Runnable
-    version-hash: 280717edf59d
+    description: |-
+      Monk Bridge Runnable entity.
+      Connects to remote Monk clusters and retrieves runnable information.
+      Enables cross-cluster resource visibility and management.
+
+      ## Secrets
+      - Reads: `monkcode_secret_ref` - Monk cluster connection code
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.endpoints` - Public endpoints of the runnable
+      - `state.is_run` - Whether the runnable is currently running
+
+      ## Composing with Other Entities
+      Works with:
+      - `monk-bridge/cluster` - Remote cluster connection
+    version-hash: 50314a573457
   schema:
     monkcode_secret_ref:
       type: string

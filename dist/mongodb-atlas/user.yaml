@@ -4,9 +4,23 @@ user:
   metadata:
     name: User
     description: |-
-      Base class for all MongoDB Atlas entities.
-      Provides common functionality like authentication, HTTP client setup, and error handling.
-    version-hash: 48b0410cd6b7
+      MongoDB Atlas Database User entity.
+      Creates and manages MongoDB Atlas database users for cluster authentication.
+      Supports role-based access control with database and collection-level permissions.
+
+      ## Secrets
+      - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+      - Writes: `password_secret_ref` - Database user password (if specified)
+
+      ## State Fields for Composition
+      - `state.username` - Database username
+      - `state.database` - Authentication database
+
+      ## Composing with Other Entities
+      Works with:
+      - `mongodb-atlas/project` - The parent project for this user
+      - `mongodb-atlas/cluster` - Use this user to connect to clusters
+    version-hash: 90648fb5e491
   schema:
     secret_ref:
       type: string

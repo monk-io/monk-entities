@@ -3,7 +3,26 @@ sqs-queue:
   defines: entity
   metadata:
     name: SQSQueue
-    version-hash: 733da7ddfd93
+    description: |-
+      AWS SQS Queue entity.
+      Creates and manages Amazon SQS queues for reliable message-based communication.
+      Supports both standard queues (high throughput) and FIFO queues (ordered, exactly-once delivery).
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.queue_url` - Queue URL for sending/receiving messages
+      - `state.queue_arn` - Queue ARN for IAM policies and cross-service integration
+      - `state.queue_name` - Queue name
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-lambda/function` - Trigger Lambda functions from queue messages
+      - `aws-sns/topic` - Subscribe queue to SNS topic for fanout patterns
+      - `aws-iam/role` - Grant queue access to other services
+    version-hash: 98a9b298cc75
   schema:
     region:
       type: string

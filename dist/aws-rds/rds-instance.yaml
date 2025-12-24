@@ -3,7 +3,27 @@ rds-instance:
   defines: entity
   metadata:
     name: RDSInstance
-    version-hash: c798c0714936
+    description: |-
+      AWS RDS Instance entity.
+      Creates and manages Amazon RDS database instances for relational databases.
+      Supports MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server engines.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: `password_secret_ref` - Master password (defaults to `{db_instance_identifier}-master-password`)
+
+      ## State Fields for Composition
+      - `state.db_instance_identifier` - Instance identifier
+      - `state.endpoint_address` - Database connection hostname
+      - `state.endpoint_port` - Database connection port
+      - `state.db_instance_arn` - Instance ARN for IAM policies
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ec2/security-group` - Control network access to the database
+      - `aws-ec2/subnet` - Place database in specific VPC subnets
+      - `aws-lambda/function` - Connect serverless functions to the database
+    version-hash: 0e422af484d6
   schema:
     region:
       type: string

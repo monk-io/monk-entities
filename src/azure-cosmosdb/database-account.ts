@@ -257,6 +257,26 @@ export interface DatabaseAccountState extends AzureCosmosDBState {
     earliest_restore_time?: string;
 }
 
+/**
+ * @description Azure Cosmos DB Account entity.
+ * Creates and manages Azure Cosmos DB database accounts for globally distributed NoSQL data.
+ * Supports SQL API, MongoDB API, and multi-region replication.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via Azure provider)
+ * - Writes: `primary_key_secret_ref`, `secondary_key_secret_ref` - Account keys (if specified)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Account resource ID
+ * - `state.name` - Account name
+ * - `state.endpoint` - Document endpoint URL
+ * - `state.connection_strings` - Available connection strings
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `azure-cosmosdb/database` - Create databases within the account
+ * - `azure-cosmosdb/container` - Create containers within databases
+ */
 export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefinition, DatabaseAccountState> {
 
     protected getEntityName(): string {

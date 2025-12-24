@@ -4,11 +4,25 @@ database:
   metadata:
     name: Database
     description: |-
-      DigitalOcean Database cluster entity for managing database instances.
+      DigitalOcean Database entity.
+      Creates and manages DigitalOcean managed database clusters.
+      Supports PostgreSQL, MySQL, Redis, MongoDB, and Kafka engines.
 
-      This entity provides complete lifecycle management for DigitalOcean database clusters
-      including creation, updates, deletion, and monitoring operations.
-    version-hash: 2991d896c739
+      ## Secrets
+      - Reads: none (authenticated via DigitalOcean provider)
+      - Writes: none (connection credentials available in state)
+
+      ## State Fields for Composition
+      - `state.id` - Database cluster UUID
+      - `state.host` - Database hostname for connections
+      - `state.port` - Database port
+      - `state.status` - Cluster status (online, creating, etc.)
+
+      ## Composing with Other Entities
+      Works with:
+      - `digitalocean/database-user` - Create additional database users
+      - `digitalocean/database-db` - Create databases within the cluster
+    version-hash: a580a683dd31
   schema:
     name:
       type: string

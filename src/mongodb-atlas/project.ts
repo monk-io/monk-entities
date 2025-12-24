@@ -45,6 +45,24 @@ export interface ProjectState extends MongoDBAtlasEntityState {
     name?: string;
 }
 
+/**
+ * @description MongoDB Atlas Project entity.
+ * Creates and manages MongoDB Atlas projects (groups) for organizing clusters.
+ * Projects serve as containers for clusters, users, and network configuration.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - MongoDB Atlas service account credentials JSON
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Project (group) ID
+ * - `state.name` - Project name
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `mongodb-atlas/cluster` - Create database clusters in this project
+ * - `mongodb-atlas/user` - Create database users for access control
+ */
 export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState> {
     
     /**

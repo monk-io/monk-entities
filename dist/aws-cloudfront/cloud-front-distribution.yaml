@@ -3,7 +3,26 @@ cloud-front-distribution:
   defines: entity
   metadata:
     name: CloudFrontDistribution
-    version-hash: 3debbf201ced
+    description: |-
+      AWS CloudFront Distribution entity.
+      Creates and manages Amazon CloudFront CDN distributions for global content delivery.
+      Supports S3 origins, custom origins, SSL/TLS certificates, and cache behaviors.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.distribution_id` - Distribution ID for management operations
+      - `state.domain_name` - CloudFront domain (e.g., d1234.cloudfront.net)
+      - `state.distribution_arn` - Distribution ARN for IAM policies
+      - `state.distribution_status` - Deployment status (Deployed, InProgress)
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-s3/bucket` - S3 bucket as origin for static content
+      - `aws-lambda/function` - Lambda@Edge for request/response customization
+    version-hash: f0c2778826f1
   schema:
     region:
       type: string

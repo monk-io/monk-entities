@@ -11,7 +11,7 @@ spaces-keys:
       - `do-spaces-secret-key`: The secret access key
 
       These secrets can be used by other Spaces entities (e.g., bucket) for S3-compatible API operations.
-    version-hash: 4b86057735b0
+    version-hash: 48ffffa87b50
   schema:
     name:
       type: string

@@ -3,5 +3,5 @@ namespace: digitalocean-database
 digitalocean-base:
   defines: module
   metadata:
-    version-hash: 2991d896c739
+    version-hash: a580a683dd31
   source: <<< digitalocean-base.js

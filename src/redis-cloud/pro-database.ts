@@ -411,8 +411,23 @@ export interface ProDatabaseState extends RedisCloudEntityState {
 }
 
 /**
- * Pro Database Entity
- * Manages Redis Cloud databases for Pro subscriptions with full-featured configuration options.
+ * @description Redis Cloud Pro Database entity.
+ * Creates and manages Redis Cloud databases in Pro subscriptions with enterprise features.
+ * Supports clustering, replication, persistence, and advanced security options.
+ * 
+ * ## Secrets
+ * - Reads: `account_key_secret_ref`, `secret_key_secret_ref` - Redis Cloud API credentials
+ * - Writes: `password_secret_ref` - Database password (if specified)
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Database ID
+ * - `state.public_endpoint` - Public endpoint for connections
+ * - `state.private_endpoint` - Private endpoint (if configured)
+ * - `state.status` - Database status (active, pending, etc.)
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `redis-cloud/pro-subscription` - The parent subscription for this database
  */
 export class ProDatabase extends RedisCloudEntity<ProDatabaseDefinition, ProDatabaseState> {
     

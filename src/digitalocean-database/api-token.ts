@@ -13,6 +13,21 @@ export interface DOApiTokenState {
     existing?: boolean;
 }
 
+/**
+ * @description DigitalOcean API Token entity.
+ * Creates and manages DigitalOcean API tokens for programmatic access.
+ * API tokens provide authentication for DigitalOcean API operations.
+ * 
+ * ## Secrets
+ * Stores the generated API token to `do-api-token` secret.
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Token ID
+ * - `state.token` - The API token value
+ * 
+ * ## Composing with Other Entities
+ * API tokens are used for authentication with other DigitalOcean entities.
+ */
 export class ApiToken extends MonkEntity<DOApiTokenDefinition, DOApiTokenState> {
     static readonly readiness = { period: 5, initialDelay: 1, attempts: 10 };
 

@@ -16,6 +16,24 @@ export interface DBSubnetGroupState extends RDSLiteState {
 	vpc_id?: string;
 }
 
+/**
+ * @description AWS RDS DB Subnet Group entity.
+ * Creates and manages RDS subnet groups for database placement.
+ * Subnet groups define which subnets RDS instances can be launched in.
+ * 
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.db_subnet_group_name` - Subnet group name for RDS instances
+ * - `state.vpc_id` - VPC containing the subnets
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-ec2/subnet` - Subnets to include in the group
+ * - `aws-rds/instance` - RDS instances using this subnet group
+ */
 export class DBSubnetGroup extends AWSRDSLiteEntity<DBSubnetGroupDefinition, DBSubnetGroupState> {
 
 	override create(): void {

@@ -88,6 +88,26 @@ export interface NeonDatabaseState {
     operationId?: string;
 }
 
+/**
+ * @description Neon Database entity.
+ * Creates and manages PostgreSQL databases within a Neon branch.
+ * Each database is a logical container for schemas, tables, and data.
+ * 
+ * ## Secrets
+ * - Reads: `secret_ref` - Neon API key (defaults to `neon-api-key`)
+ * - Writes: none
+ * 
+ * ## State Fields for Composition
+ * - `state.id` - Database ID
+ * - `state.name` - Database name
+ * - `state.owner` - Database owner role
+ * 
+ * ## Composing with Other Entities
+ * Works with:
+ * - `neon/project` - The project containing this database
+ * - `neon/branch` - The branch this database resides on
+ * - `neon/role` - Database roles for access control
+ */
 export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseState> {
     private apiKey: string = "";
     private baseUrl = "https://console.neon.tech/api/v2";

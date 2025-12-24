@@ -3,5 +3,5 @@ namespace: supabase
 supabase-base:
   defines: module
   metadata:
-    version-hash: e92916a78ca8
+    version-hash: 3ba47a0aa194
   source: <<< supabase-base.js

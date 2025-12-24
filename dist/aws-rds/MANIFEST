@@ -1,7 +1,7 @@
 REPO aws-rds
-VERSION_HASH c798c0714936
+VERSION_HASH 0e422af484d6
 DESCRIPTION Managed relational databases (MySQL, Postgres, etc.).
 HOSTING managed
 TAGS aws,database,rds,mysql,postgres
-LOAD lite-base.yaml rds-access-list.yaml common.yaml db-subnet-group.yaml base.yaml security-group.yaml rds-instance.yaml
-RESOURCES rds-access-list-sync.js lite-base.js db-subnet-group-sync.js base.js common.js rds-instance-sync.js security-group.js
+LOAD base.yaml common.yaml db-subnet-group.yaml lite-base.yaml rds-access-list.yaml rds-instance.yaml security-group.yaml
+RESOURCES common.js rds-access-list-sync.js security-group.js lite-base.js db-subnet-group-sync.js base.js rds-instance-sync.js
