@@ -3,7 +3,7 @@ spaces-bucket:
   defines: entity
   metadata:
     name: SpacesBucket
-    version-hash: c52328c0cf16
+    version-hash: 4b86057735b0
   schema:
     region:
       type: string
@@ -22,9 +22,7 @@ spaces-bucket:
       description: 'Enable or disable bucket versioning (default: false)'
     public_read_access:
       type: boolean
-      description: >-
-        Whether to allow public reads/writes (DO doesn't support
-        PublicAccessBlock; logs a warning)
+      description: Whether to allow public reads/writes (DO doesn't support PublicAccessBlock; logs a warning)
     public_write_access:
       type: boolean
     cors_configuration:
@@ -115,9 +113,7 @@ spaces-bucket:
       required:
         - rules
       additionalProperties: false
-      description: >-
-        Lifecycle rules (S3-compatible). Note: lifecycle entity removed;
-        configure via bucket
+      description: 'Lifecycle rules (S3-compatible). Note: lifecycle entity removed; configure via bucket'
     tags:
       type: object
       additionalProperties:

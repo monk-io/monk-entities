@@ -38,7 +38,7 @@ export interface DOSpacesKeysState {
 }
 
 /**
- * DigitalOcean Spaces Keys entity.
+ * @description DigitalOcean Spaces Keys entity.
  * Creates and manages Spaces access keys with full access permissions.
  * Upon creation, stores the access key and secret key into Monk secrets:
  * - `do-spaces-access-key`: The access key ID

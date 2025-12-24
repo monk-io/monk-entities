@@ -32,7 +32,7 @@ BASENAME="$(basename "$INPUT_DIR_ABS")"
 if [ "$1" = "test" ]; then
   # For test, we need to mount the socket and token
   # on linux we may also need to use sudo ./monkec.sh to access the socket
-  exec podman run -ti --rm \
+  exec podman run --pull newer -ti --rm \
     -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
     -v "$MONK_SOCKET:/root/.monk/monkd.sock" \
     -v "$MONK_TOKEN_FOLDER:/root/.monk/" \
@@ -43,7 +43,7 @@ if [ "$1" = "test" ]; then
 else
   # For compile command and others
   # you can go inside the container with ./.monkec.sh sh
-  exec podman run -ti --rm \
+  exec podman run --pull newer -ti --rm \
     -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
     -v "$OUTPUT_DIR_ABS:/monkec/output/" \
     -e INPUT_DIR="/monkec/input/$BASENAME" \
