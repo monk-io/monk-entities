@@ -4,4 +4,4 @@ DESCRIPTION API management for building and securing APIs.
 HOSTING managed
 TAGS aws,api,gateway
 LOAD api-gateway.yaml base.yaml
-RESOURCES base.js api-gateway-sync.js
+RESOURCES api-gateway-sync.js base.js

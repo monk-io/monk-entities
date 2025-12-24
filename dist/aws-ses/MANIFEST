@@ -1,5 +1,5 @@
 REPO aws-ses
 VERSION_HASH 110a78540381
 FILES base.yaml common.yaml email-identity.yaml domain-identity.yaml configuration-set.yaml
-LOAD base.yaml common.yaml ses-configuration-set.yaml ses-domain-identity.yaml ses-email-identity.yaml
-RESOURCES base.js common.js ses-configuration-set-sync.js ses-domain-identity-sync.js ses-email-identity-sync.js
+LOAD ses-domain-identity.yaml ses-configuration-set.yaml common.yaml ses-email-identity.yaml base.yaml
+RESOURCES ses-configuration-set-sync.js ses-domain-identity-sync.js base.js common.js ses-email-identity-sync.js
