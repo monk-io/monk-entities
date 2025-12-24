@@ -3,16 +3,49 @@ import digitalocean from "cloud/digitalocean";
 import secret from "secret";
 import cli from "cli";
 
+/**
+ * Definition interface for DigitalOcean Spaces Keys entity.
+ * This entity creates Spaces access keys with full access to all buckets.
+ * @interface DOSpacesKeysDefinition
+ */
 export interface DOSpacesKeysDefinition {
+    /**
+     * @description Name of the Spaces key. If not provided, a unique name will be generated.
+     */
     name?: string;
 }
 
+/**
+ * State interface for DigitalOcean Spaces Keys entity.
+ * Contains runtime information about the created Spaces key.
+ * @interface DOSpacesKeysState
+ */
 export interface DOSpacesKeysState {
+    /**
+     * @description Unique identifier of the Spaces key (or access_key if id not returned)
+     */
     id?: string;
+
+    /**
+     * @description The access key ID for S3-compatible API access
+     */
     access_key?: string;
+
+    /**
+     * @description Indicates if the resource was successfully created
+     */
     existing?: boolean;
 }
 
+/**
+ * DigitalOcean Spaces Keys entity.
+ * Creates and manages Spaces access keys with full access permissions.
+ * Upon creation, stores the access key and secret key into Monk secrets:
+ * - `do-spaces-access-key`: The access key ID
+ * - `do-spaces-secret-key`: The secret access key
+ *
+ * These secrets can be used by other Spaces entities (e.g., bucket) for S3-compatible API operations.
+ */
 export class SpacesKeys extends MonkEntity<DOSpacesKeysDefinition, DOSpacesKeysState> {
     static readonly readiness = { period: 5, initialDelay: 1, attempts: 10 };
 

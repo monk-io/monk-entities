@@ -3,17 +3,23 @@ spaces-keys:
   defines: entity
   metadata:
     name: SpacesKeys
-    version-hash: a13b3ad512db
+    version-hash: c52328c0cf16
   schema:
     name:
       type: string
+      description: >-
+        Name of the Spaces key. If not provided, a unique name will be
+        generated.
   state-schema:
     id:
       type: string
+      description: Unique identifier of the Spaces key (or access_key if id not returned)
     access_key:
       type: string
+      description: The access key ID for S3-compatible API access
     existing:
       type: boolean
+      description: Indicates if the resource was successfully created
   lifecycle:
     sync: <<< spaces-keys-sync.js
   checks:
