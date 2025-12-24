@@ -450,6 +450,13 @@ Cluster ID: ${this.state.id}
     const backupCreatedAt = args.backup_created_at;
     const restoreTime = args.restore_time;
     const supportsPitr = this.state.engine === "pg" || this.state.engine === "mysql";
+    if (!backupCreatedAt && !restoreTime) {
+      if (supportsPitr) {
+        throw new Error("Either backup_created_at or restore_time is required. Use --backup_created_at=<timestamp> for backup restore or --restore_time=<timestamp> for point-in-time recovery.");
+      } else {
+        throw new Error(`backup_created_at is required for ${this.state.engine}. Use --backup_created_at=<timestamp> from list-backups.`);
+      }
+    }
     if (!supportsPitr && !backupCreatedAt) {
       throw new Error(`backup_created_at is required for ${this.state.engine} (only PostgreSQL and MySQL support point-in-time recovery)`);
     }
@@ -464,11 +471,15 @@ Cluster ID: ${this.state.id}
         database_name: this.state.name
       }
     };
-    if (backupCreatedAt) {
-      forkRequest.backup_restore.backup_created_at = backupCreatedAt;
-    }
+    let actualRestorePoint;
+    let isPitrRestore = false;
     if (restoreTime && supportsPitr) {
       forkRequest.backup_restore.backup_created_at = restoreTime;
+      actualRestorePoint = restoreTime;
+      isPitrRestore = true;
+    } else if (backupCreatedAt) {
+      forkRequest.backup_restore.backup_created_at = backupCreatedAt;
+      actualRestorePoint = backupCreatedAt;
     }
     try {
       cli.output(`\u{1F504} Initiating database restore (fork)...`);
@@ -478,10 +489,12 @@ Cluster ID: ${this.state.id}
       cli.output(`   Region: ${forkRequest.region}`);
       cli.output(`   Size: ${forkRequest.size}`);
       cli.output(`   Nodes: ${forkRequest.num_nodes}`);
-      if (backupCreatedAt) {
-        cli.output(`   Restore Point: ${backupCreatedAt}`);
-      } else if (restoreTime) {
-        cli.output(`   Restore Point (PITR): ${restoreTime}`);
+      if (actualRestorePoint) {
+        if (isPitrRestore) {
+          cli.output(`   Restore Point (PITR): ${actualRestorePoint}`);
+        } else {
+          cli.output(`   Restore Point: ${actualRestorePoint}`);
+        }
       }
       const response = this.makeRequest("POST", "/databases", forkRequest);
       if (response.database) {
