@@ -14,6 +14,56 @@ Manage MongoDB Atlas projects, clusters, and users with Monk.
 ## What Monk manages
 - Project, Cluster, User
 
+## Obtaining Atlas Credentials
+
+Before using MongoDB Atlas with Monk, you'll need to create an Organization API Key in MongoDB Atlas.
+
+### What You'll Need
+
+- **Organization Name** - Your MongoDB Atlas organization name or ID
+- **Service Account Client ID** - Atlas API Public Key
+- **Service Account Client Secret** - Atlas API Private Key
+
+### Step-by-Step
+
+1. **Log into MongoDB Atlas** at https://cloud.mongodb.com
+2. Click your **organization name** in the top left
+3. Go to **Organization Settings** (gear icon)
+4. Navigate to **Access Manager** → **API Keys** tab
+5. Click **Create API Key**
+6. Enter description: "Monk Deployment"
+7. **Set Organization Permissions:**
+   - `Organization Project Creator`
+   - `Project Cluster Manager`
+   - `Project User Admin`
+8. Click **Next**
+9. **Copy the Public Key** (Client ID) - save this
+10. **Copy the Private Key** (Client Secret) - **shown only once, save it now!**
+11. Click **Done**
+12. **Note your Organization Name** from Organization Settings main page
+
+### Required Access Scope
+
+Monk needs these specific permissions:
+
+- **Organization Project Creator** - To create Atlas projects for your deployments
+- **Project Cluster Manager** - To provision and manage database clusters
+- **Project User Admin** - To create database users for your applications
+
+**Monk cannot:**
+- Access existing projects or data outside what it creates
+- Modify organization-level settings
+- Access billing information
+
+This is the minimal scope required for Monk to manage Atlas resources.
+
+### Security Best Practices
+
+✅ **Rotate keys periodically** - Update API keys every 90 days
+✅ **Use project-specific keys when possible** - If you only deploy to one project
+✅ **Monitor API key usage** - Check Atlas Access Tracking logs
+✅ **Revoke unused keys** - Remove old keys when no longer needed
+
 ## Auth
 - Uses a Monk secret for API token (e.g., mongodb-atlas-token) and password secret for users
 
@@ -82,6 +132,15 @@ monk update my-mongodb/my-user
 
 ## Backup & Snapshot Actions (M10+ Clusters)
 
+MongoDB Atlas provides comprehensive backup and restore capabilities for **M10 and higher dedicated clusters**.
+
+<Note type="warning">
+  **M0 free tier does not support backup API.** M2 and M5 shared tiers also
+  lack backup support. For production deployments requiring backups, use M10+
+  dedicated clusters which include automated daily backups and point-in-time
+  restore capabilities.
+</Note>
+
 | Action | Description |
 |--------|-------------|
 | `get-backup-info` | View backup configuration and status |
@@ -92,6 +151,28 @@ monk update my-mongodb/my-user
 | `restore` | Restore from snapshot or point-in-time |
 | `get-restore-status` | Check restore job progress |
 | `list-restore-jobs` | View all restore jobs |
+
+### Using Backups with Monk
+
+**Ask Monk to manage backups:**
+
+```
+back up my MongoDB database
+```
+
+```
+show me available backups
+```
+
+```
+restore from latest backup
+```
+
+Monk translates these natural language requests to the appropriate Atlas API calls.
+
+### CLI Reference (Advanced)
+
+For direct CLI usage:
 
 ```bash
 # View backup configuration
@@ -118,5 +199,3 @@ monk do my-mongodb/my-cluster/describe-snapshot snapshot_id="xxx"
 # Delete a snapshot
 monk do my-mongodb/my-cluster/delete-snapshot snapshot_id="xxx"
 ```
-
-**Note:** Backup API requires M10+ dedicated clusters. M0/M2/M5 shared tiers do not support backup API.

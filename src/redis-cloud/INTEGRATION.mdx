@@ -27,17 +27,65 @@ Steps:
 1) Set Redis Cloud API secrets
 2) monk update \<namespace>/\<name>
 
+## Obtaining Redis Cloud Credentials
+
+To use Redis Cloud with Monk, you'll need API keys from your Redis Cloud account.
+
+### What You'll Need
+
+- **Account Key** - Redis Cloud Account API key
+- **User Key** - Redis Cloud User API key
+- **Database Password** - Password for database access (Monk can generate this)
+
+### Step-by-Step
+
+1. **Log into Redis Cloud** at https://app.redislabs.com/
+2. Navigate to **Account Settings** (gear icon)
+3. Go to **API Keys** section
+4. Find your **Account Key** and **User Key**
+   - If no keys exist, contact Redis Cloud support to enable API access
+5. **Copy both keys** and save them securely
+6. **Choose a database password** - or let Monk generate a secure one
+
+### Providing to Monk
+
+When using Redis Cloud, ask Monk:
+
+```
+use Redis Cloud instead of self-hosted Redis
+```
+
+Monk will request your Redis Cloud credentials if not already configured.
+
+### Security Best Practices
+
+✅ **Keep keys secure** - API keys have full account access
+✅ **Use strong database passwords** - Let Monk generate them
+✅ **Enable IP access lists** - Restrict database access to your application IPs
+✅ **Monitor usage** - Check Redis Cloud activity logs
+
 ## Auth
 - Uses Monk secrets for Redis Cloud API credentials:
   - `redis-cloud-account-key`: Account API key
   - `redis-cloud-user-key`: User API key
+  - `redis-cloud-db-password`: Database password
 
 ## Getting Started
 
-1) Set secrets:
+1) Provide credentials to Monk when deploying:
+
+```
+use Redis Cloud for caching
+```
+
+### CLI Reference (Advanced)
+
+For manual secret management:
+
 ```bash
 monk secrets add -g redis-cloud-account-key="YOUR_ACCOUNT_KEY"
 monk secrets add -g redis-cloud-user-key="YOUR_USER_KEY"
+monk secrets add -g redis-cloud-db-password="SECURE_PASSWORD"
 ```
 
 2) Define an Essentials database (save as redis.yaml):

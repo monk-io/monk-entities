@@ -28,12 +28,75 @@ Steps:
 1) Ensure AWS provider is added: monk cluster provider add -p aws
 2) monk update \<namespace>/\<name>
 
+## Obtaining AWS Credentials
+
+AWS RDS uses your AWS account credentials. You'll need AWS access keys with appropriate permissions.
+
+### What You'll Need
+
+- **AWS Access Key ID**
+- **AWS Secret Access Key**
+- **Optional:** Default region (e.g., `us-east-1`)
+
+### Step-by-Step
+
+1. **Log into AWS Console** at https://console.aws.amazon.com
+2. Navigate to **IAM** → **Users**
+3. Select your IAM user or **Create user** for Monk
+4. Go to **Security credentials** tab
+5. Click **Create access key**
+6. Choose use case: **"Third-party service"**
+7. Click **Next** → **Create access key**
+8. **Copy Access Key ID** and **Secret Access Key**
+9. Save them securely - secret key shown only once
+
+### Required IAM Permissions
+
+Attach these AWS managed policies to the user:
+
+- `AmazonRDSFullAccess` - For RDS management
+- `AmazonEC2FullAccess` - For VPC and security groups
+- `IAMReadOnlyAccess` - For verification
+
+Or create a custom policy with: RDS, EC2 (VPC, security groups), and IAM read access.
+
+### Providing to Monk
+
+When deploying with AWS RDS, ask Monk:
+
+```
+deploy to AWS with RDS for PostgreSQL
+```
+
+```
+use AWS RDS MySQL database
+```
+
+Monk will request AWS credentials if not already configured.
+
+### Security Best Practices
+
+✅ **Use IAM user for Monk** - Not your personal admin account
+✅ **Enable MFA** on the account managing the IAM user
+✅ **Rotate keys every 90 days**
+✅ **Monitor with CloudTrail** - Track API usage
+✅ **Use minimal permissions** - Only grant what Monk needs
+
 ## Auth
-- Uses AWS provider credentials configured via monk cluster provider add -p aws
+- Uses AWS provider credentials (Access Key ID and Secret Access Key)
 
 ## Getting Started
 
-1) Ensure AWS provider is added:
+1) Provide AWS credentials to Monk when deploying:
+
+```
+deploy with AWS RDS
+```
+
+### CLI Reference (Advanced)
+
+For manual provider configuration:
+
 ```bash
 monk cluster provider add -p aws
 ```

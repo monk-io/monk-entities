@@ -42,41 +42,77 @@ Monk handles your complete Vercel deployment pipeline:
 - **Preview deployments**: Automatic branch and PR deployments
 - **Analytics integration**: Performance monitoring and insights
 
-## Step-by-Step Integration Guide
+## Obtaining Vercel Credentials
 
-### Step 1: Set Up Vercel Account
+To deploy to Vercel with Monk, you'll need a Vercel API token.
 
-1. **Create a Vercel account** at [vercel.com](https://vercel.com)
-2. **Install Vercel CLI** for local development and deployment
-3. **Get your API token** from Vercel dashboard settings
+### What You'll Need
 
-```bash
-# Install Vercel CLI globally
-npm install -g vercel
+- **Personal Access Token** - Vercel API token
+- **Optional:** Team ID (for team deployments)
 
-# Login to Vercel (will open browser)
-vercel login
+### Step-by-Step
 
-# Get your token from dashboard or CLI
-vercel token
+1. **Log into Vercel** at https://vercel.com
+2. Navigate to **Settings** → **Tokens**
+3. Click **Create Token**
+4. **Token name:** "Monk Deployment"
+5. **Scope:** Choose "Full Account" or minimal scopes:
+   - Deploy projects
+   - Read project information
+6. **Expiration:** Set based on your security policy (or no expiration)
+7. Click **Create** and **copy the token**
+8. Save it securely
+
+**For team deployments:**
+- Go to your team settings to find **Team ID**
+- Provide both token and Team ID to Monk
+
+### Providing to Monk
+
+When deploying your frontend to Vercel, ask Monk:
+
+```
+deploy my frontend to Vercel
 ```
 
-### Step 2: Configure Monk Secrets
-
-Add your Vercel credentials as Monk secrets:
-
-```bash
-# Vercel API token
-monk secrets add -g vercel-api-token "your_vercel_token_here"
-
-# Optional: Team ID if using Vercel teams
-monk secrets add -g vercel-team-id "your_team_id"
-
-# Optional: GitHub token for automatic deployments
-monk secrets add -g github-token "your_github_token"
+```
+deploy to Vercel with staging and production environments
 ```
 
-### Step 3: Create Your Deployment Configuration
+Monk will request your Vercel credentials if not already configured.
+
+### Security Best Practices
+
+✅ **Use tokens with minimal scopes** - Only grant deploy and read access
+✅ **Set expiration dates** - Rotate tokens regularly
+✅ **Enable 2FA** on your Vercel account
+✅ **Monitor deployments** - Check Vercel dashboard for unauthorized activity
+✅ **Revoke unused tokens** - Remove old tokens when no longer needed
+
+## Using Vercel with Monk
+
+### Deploy Your Frontend
+
+Tell Monk to deploy to Vercel:
+
+```
+deploy my React app to Vercel
+```
+
+```
+put the frontend on Vercel and backend on AWS
+```
+
+Monk handles:
+- Creating Vercel project
+- Configuring build settings
+- Setting up environment variables
+- Deploying to Vercel's global network
+
+### Configuration Examples
+
+Below are template examples for advanced users who want to configure Vercel deployments directly.
 
 Create a file named `frontend-deployment.yaml`:
 
