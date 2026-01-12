@@ -1,4 +1,4 @@
-import { AWSSQSEntity, AWSSQSDefinition, AWSSQSState } from "./base.ts";
+import { AWSSQSEntity, AWSSQSDefinition, AWSSQSState } from "./sqs-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import {

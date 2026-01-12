@@ -1,4 +1,4 @@
-import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
+import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./iam-base.ts";
 import { IAM_ACTIONS } from "./common.ts";
 import cli from "cli";
 

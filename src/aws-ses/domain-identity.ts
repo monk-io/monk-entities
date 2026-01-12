@@ -1,4 +1,4 @@
-import { AWSSESEntity, AWSSESDefinition, AWSSESState } from "./base.ts";
+import { AWSSESEntity, AWSSESDefinition, AWSSESState } from "./ses-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateDomainName, type VerificationStatus, type SESEmailIdentityResponse } from "./common.ts";

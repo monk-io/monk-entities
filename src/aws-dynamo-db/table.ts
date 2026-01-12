@@ -1,4 +1,4 @@
-import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState, action } from "./base.ts";
+import { AWSDynamoDBEntity, AWSDynamoDBDefinition, AWSDynamoDBState, action } from "./dynamo-db-base.ts";
 import cli from "cli";
 
 import {

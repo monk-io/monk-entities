@@ -549,4 +549,5 @@ export abstract class AWSIAMEntity<
         
         return { rawBody: xmlBody };
     }
-} 
+}
+

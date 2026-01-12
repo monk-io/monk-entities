@@ -1,4 +1,4 @@
-import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./base.ts";
+import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./sns-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import { validateTopicName, parseTopicArn, TopicAttributes, type SNSProtocol } from "./common.ts";

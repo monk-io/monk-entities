@@ -2,7 +2,7 @@
  * @fileoverview AWS Lambda Function entity for managing serverless functions.
  */
 
-import { AWSLambdaEntity, AWSLambdaDefinition, AWSLambdaState } from "./base.ts";
+import { AWSLambdaEntity, AWSLambdaDefinition, AWSLambdaState } from "./lambda-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 

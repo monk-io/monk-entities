@@ -2,7 +2,7 @@
  * @fileoverview AWS SNS Subscription entity for managing topic subscriptions.
  */
 
-import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./base.ts";
+import { AWSSNSEntity, AWSSNSDefinition, AWSSNSState } from "./sns-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 

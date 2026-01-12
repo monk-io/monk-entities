@@ -1,4 +1,4 @@
-import { AWSCloudFrontEntity, AWSCloudFrontDefinition, AWSCloudFrontState } from "./base.ts";
+import { AWSCloudFrontEntity, AWSCloudFrontDefinition, AWSCloudFrontState } from "./cloudfront-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import aws from "cloud/aws";

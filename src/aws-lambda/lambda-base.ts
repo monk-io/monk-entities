@@ -352,4 +352,5 @@ export abstract class AWSLambdaEntity<
         
         return false;
     }
-} 
+}
+

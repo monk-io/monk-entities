@@ -1,4 +1,4 @@
-import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
+import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./iam-base.ts";
 
 /**
  * Definition interface for AWS IAM Role entity.

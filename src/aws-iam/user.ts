@@ -1,4 +1,4 @@
-import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./base.ts";
+import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./iam-base.ts";
 import { IAM_ACTIONS, formatIAMResourceName } from "./common.ts";
 import { action } from "monkec/base";
 import cli from "cli";
