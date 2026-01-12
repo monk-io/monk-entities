@@ -26,7 +26,7 @@ ses-domain-identity:
       Works with:
       - `aws-ses/configuration-set` - Associate with a configuration set
       - `cloudflare/dns-record` - Create required DNS records
-    version-hash: 110a78540381
+    version-hash: ae264d3ba9a4
   schema:
     region:
       type: string
@@ -94,7 +94,7 @@ ses-domain-identity:
     liveness:
       period: 300
   requires:
-    - aws-ses/base
+    - aws-ses/ses-base
     - monkec/base
     - cli
     - aws-ses/common

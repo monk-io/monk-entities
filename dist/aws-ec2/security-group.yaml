@@ -21,7 +21,7 @@ security-group:
       - `aws-ec2/vpc` - The VPC containing this security group
       - `aws-rds/instance` - Assign to database instances
       - `aws-lambda/function` - Assign to Lambda functions in VPC
-    version-hash: d4ccad916e47
+    version-hash: 3320bf43b59d
   schema:
     region:
       type: string
@@ -92,4 +92,4 @@ security-group:
   lifecycle:
     sync: <<< security-group-sync.js
   requires:
-    - aws-ec2/base
+    - aws-ec2/ec2-base

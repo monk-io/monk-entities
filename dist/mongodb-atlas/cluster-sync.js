@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/mongodb-atlas/cluster.ts
-const base = require("mongodb-atlas/base");
-const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
+const atlasBase = require("mongodb-atlas/atlas-base");
+const MongoDBAtlasEntity = atlasBase.MongoDBAtlasEntity;
 const cli = require("cli");
 const base = require("monkec/base");
 const action = base.action;

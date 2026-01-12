@@ -6,8 +6,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // input/aws-iam/policy.ts
-const base = require("aws-iam/base");
-const AWSIAMEntity = base.AWSIAMEntity;
+const iamBase = require("aws-iam/iam-base");
+const AWSIAMEntity = iamBase.AWSIAMEntity;
 const common = require("aws-iam/common");
 const IAM_ACTIONS = common.IAM_ACTIONS;
 const cli = require("cli");

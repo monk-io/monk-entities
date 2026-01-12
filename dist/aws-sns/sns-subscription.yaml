@@ -23,7 +23,7 @@ sns-subscription:
       - `aws-sns/topic` - The topic to subscribe to
       - `aws-sqs/queue` - Use queue ARN as endpoint for SQS subscriptions
       - `aws-lambda/function` - Use function ARN for Lambda subscriptions
-    version-hash: d7e5c8b7ad17
+    version-hash: 19c30697f8af
   schema:
     region:
       type: string
@@ -106,6 +106,6 @@ sns-subscription:
     liveness:
       period: 300
   requires:
-    - aws-sns/base
+    - aws-sns/sns-base
     - monkec/base
     - cli

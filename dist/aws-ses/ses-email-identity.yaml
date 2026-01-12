@@ -25,7 +25,7 @@ ses-email-identity:
       Works with:
       - `aws-ses/configuration-set` - Associate with configuration set for tracking
       - `aws-lambda/function` - Send emails from serverless functions
-    version-hash: 110a78540381
+    version-hash: ae264d3ba9a4
   schema:
     region:
       type: string
@@ -84,7 +84,7 @@ ses-email-identity:
     liveness:
       period: 300
   requires:
-    - aws-ses/base
+    - aws-ses/ses-base
     - monkec/base
     - cli
     - aws-ses/common

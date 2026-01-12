@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-iam/user.ts
-const base = require("aws-iam/base");
-const AWSIAMEntity = base.AWSIAMEntity;
+const iamBase = require("aws-iam/iam-base");
+const AWSIAMEntity = iamBase.AWSIAMEntity;
 const common = require("aws-iam/common");
 const IAM_ACTIONS = common.IAM_ACTIONS;
 const formatIAMResourceName = common.formatIAMResourceName;

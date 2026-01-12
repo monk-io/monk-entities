@@ -23,7 +23,7 @@ vpc:
       - `aws-ec2/security-group` - Define network access rules
       - `aws-rds/instance` - Place databases in VPC subnets
       - `aws-lambda/function` - Connect Lambda to VPC resources
-    version-hash: d4ccad916e47
+    version-hash: 3320bf43b59d
   schema:
     region:
       type: string
@@ -63,4 +63,4 @@ vpc:
     liveness:
       period: 300
   requires:
-    - aws-ec2/base
+    - aws-ec2/ec2-base

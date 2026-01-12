@@ -3,5 +3,5 @@ namespace: aws-lambda
 common:
   defines: module
   metadata:
-    version-hash: b22bbc994ed5
+    version-hash: a20663d70a06
   source: <<< common.js

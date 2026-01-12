@@ -4,8 +4,8 @@ var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 // input/mongodb-atlas/user.ts
-const base = require("mongodb-atlas/base");
-const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
+const atlasBase = require("mongodb-atlas/atlas-base");
+const MongoDBAtlasEntity = atlasBase.MongoDBAtlasEntity;
 const secret = require("secret");
 const cli = require("cli");
 var _User = class _User extends MongoDBAtlasEntity {

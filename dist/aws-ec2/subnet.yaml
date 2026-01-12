@@ -21,7 +21,7 @@ subnet:
       - `aws-ec2/vpc` - The parent VPC
       - `aws-rds/instance` - Place database in private subnets
       - `aws-rds/db-subnet-group` - Group subnets for RDS
-    version-hash: d4ccad916e47
+    version-hash: 3320bf43b59d
   schema:
     region:
       type: string
@@ -60,4 +60,4 @@ subnet:
     liveness:
       period: 300
   requires:
-    - aws-ec2/base
+    - aws-ec2/ec2-base

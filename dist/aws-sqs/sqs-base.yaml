@@ -1,0 +1,7 @@
+namespace: aws-sqs
+
+sqs-base:
+  defines: module
+  metadata:
+    version-hash: 79428ecb12e9
+  source: <<< sqs-base.js

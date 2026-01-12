@@ -49,8 +49,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-s3/bucket.ts
-const base = require("aws-s3/base");
-const AWSS3Entity = base.AWSS3Entity;
+const s3Base = require("aws-s3/s3-base");
+const AWSS3Entity = s3Base.AWSS3Entity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");

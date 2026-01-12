@@ -20,7 +20,7 @@ ses-configuration-set:
       Works with:
       - `aws-ses/email-identity` - Associate identities with this configuration set
       - `aws-ses/domain-identity` - Associate domain identities with this configuration set
-    version-hash: 110a78540381
+    version-hash: ae264d3ba9a4
   schema:
     region:
       type: string
@@ -79,7 +79,7 @@ ses-configuration-set:
     liveness:
       period: 300
   requires:
-    - aws-ses/base
+    - aws-ses/ses-base
     - monkec/base
     - cli
     - aws-ses/common

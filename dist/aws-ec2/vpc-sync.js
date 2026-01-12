@@ -4,8 +4,8 @@ var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 // input/aws-ec2/vpc.ts
-const base = require("aws-ec2/base");
-const AWSEC2Entity = base.AWSEC2Entity;
+const ec2Base = require("aws-ec2/ec2-base");
+const AWSEC2Entity = ec2Base.AWSEC2Entity;
 var _VPC = class _VPC extends AWSEC2Entity {
   getVpcId() {
     return this.definition.vpc_id || this.state.vpc_id;

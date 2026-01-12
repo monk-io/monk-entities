@@ -1,0 +1,7 @@
+namespace: aws-api-gateway
+
+api-gateway-base:
+  defines: module
+  metadata:
+    version-hash: c881d0b27306
+  source: <<< api-gateway-base.js

@@ -20,7 +20,7 @@ iam-policy:
       Works with:
       - `aws-iam/role` - Attach policy to roles
       - `aws-iam/user` - Attach policy to users
-    version-hash: 5844b24a6101
+    version-hash: 8b63de20f0b6
   schema:
     region:
       type: string
@@ -70,6 +70,6 @@ iam-policy:
   lifecycle:
     sync: <<< iam-policy-sync.js
   requires:
-    - aws-iam/base
+    - aws-iam/iam-base
     - aws-iam/common
     - cli

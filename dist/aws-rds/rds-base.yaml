@@ -1,0 +1,7 @@
+namespace: aws-rds
+
+rds-base:
+  defines: module
+  metadata:
+    version-hash: 6f5fba69a591
+  source: <<< rds-base.js

@@ -6,8 +6,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // input/mongodb-atlas/project.ts
-const base = require("mongodb-atlas/base");
-const MongoDBAtlasEntity = base.MongoDBAtlasEntity;
+const atlasBase = require("mongodb-atlas/atlas-base");
+const MongoDBAtlasEntity = atlasBase.MongoDBAtlasEntity;
 const common = require("mongodb-atlas/common");
 const getOrganization = common.getOrganization;
 const cli = require("cli");

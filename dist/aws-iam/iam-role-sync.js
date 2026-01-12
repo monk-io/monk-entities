@@ -6,8 +6,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // input/aws-iam/role.ts
-const base = require("aws-iam/base");
-const AWSIAMEntity = base.AWSIAMEntity;
+const iamBase = require("aws-iam/iam-base");
+const AWSIAMEntity = iamBase.AWSIAMEntity;
 var _IAMRole = class _IAMRole extends AWSIAMEntity {
   checkReadiness() {
     try {

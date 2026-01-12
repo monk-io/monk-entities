@@ -21,7 +21,7 @@ s3-bucket:
       - `aws-iam/role` - Create IAM roles with S3 access permissions
       - `aws-lambda/function` - Store Lambda deployment packages
       - `aws-cloudfront/distribution` - Serve static content via CDN
-    version-hash: 2752e45db44d
+    version-hash: b9846217413b
   schema:
     region:
       type: string
@@ -262,7 +262,7 @@ s3-bucket:
     liveness:
       period: 300
   requires:
-    - aws-s3/base
+    - aws-s3/s3-base
     - monkec/base
     - cli
     - cloud/aws

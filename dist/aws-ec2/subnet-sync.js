@@ -4,8 +4,8 @@ var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 // input/aws-ec2/subnet.ts
-const base = require("aws-ec2/base");
-const AWSEC2Entity = base.AWSEC2Entity;
+const ec2Base = require("aws-ec2/ec2-base");
+const AWSEC2Entity = ec2Base.AWSEC2Entity;
 var _Subnet = class _Subnet extends AWSEC2Entity {
   getSubnetId() {
     return this.state.subnet_id;

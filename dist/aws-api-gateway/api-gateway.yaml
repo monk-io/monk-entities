@@ -22,7 +22,7 @@ api-gateway:
       - `aws-lambda/function` - Backend integrations for API routes
       - `aws-cognito/user-pool` - JWT authorizers for authentication
       - `aws-iam/role` - IAM authorization for API access
-    version-hash: 7bfcef74d642
+    version-hash: c881d0b27306
   schema:
     region:
       type: string
@@ -68,6 +68,6 @@ api-gateway:
     liveness:
       period: 300
   requires:
-    - aws-api-gateway/base
+    - aws-api-gateway/api-gateway-base
     - monkec/base
     - cli

@@ -50,9 +50,9 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-dynamo-db/table.ts
-const base = require("aws-dynamo-db/base");
-const AWSDynamoDBEntity = base.AWSDynamoDBEntity;
-const action = base.action;
+const dynamoDbBase = require("aws-dynamo-db/dynamo-db-base");
+const AWSDynamoDBEntity = dynamoDbBase.AWSDynamoDBEntity;
+const action = dynamoDbBase.action;
 const cli = require("cli");
 const common = require("aws-dynamo-db/common");
 const validateTableName = common.validateTableName;

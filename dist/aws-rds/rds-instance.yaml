@@ -23,7 +23,7 @@ rds-instance:
       - `aws-ec2/security-group` - Control network access to the database
       - `aws-ec2/subnet` - Place database in specific VPC subnets
       - `aws-lambda/function` - Connect serverless functions to the database
-    version-hash: e96aa6ffe796
+    version-hash: 6f5fba69a591
   schema:
     region:
       type: string
@@ -189,7 +189,7 @@ rds-instance:
     liveness:
       period: 300
   requires:
-    - aws-rds/base
+    - aws-rds/rds-base
     - monkec/base
     - cli
     - secret

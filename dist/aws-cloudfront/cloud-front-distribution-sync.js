@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-cloudfront/distribution.ts
-const base = require("aws-cloudfront/base");
-const AWSCloudFrontEntity = base.AWSCloudFrontEntity;
+const cloudfrontBase = require("aws-cloudfront/cloudfront-base");
+const AWSCloudFrontEntity = cloudfrontBase.AWSCloudFrontEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");

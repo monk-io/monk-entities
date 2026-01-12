@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-rds/instance.ts
-const base = require("aws-rds/base");
-const AWSRDSEntity = base.AWSRDSEntity;
+const rdsBase = require("aws-rds/rds-base");
+const AWSRDSEntity = rdsBase.AWSRDSEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");

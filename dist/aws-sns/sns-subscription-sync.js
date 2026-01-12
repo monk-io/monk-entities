@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-sns/subscription.ts
-const base = require("aws-sns/base");
-const AWSSNSEntity = base.AWSSNSEntity;
+const snsBase = require("aws-sns/sns-base");
+const AWSSNSEntity = snsBase.AWSSNSEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");

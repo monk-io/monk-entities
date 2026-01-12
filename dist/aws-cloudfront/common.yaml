@@ -3,5 +3,5 @@ namespace: aws-cloudfront
 common:
   defines: module
   metadata:
-    version-hash: f0c2778826f1
+    version-hash: 0a4dca3d773f
   source: <<< common.js

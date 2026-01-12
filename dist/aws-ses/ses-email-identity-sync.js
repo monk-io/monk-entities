@@ -50,8 +50,8 @@ var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
 // input/aws-ses/emailIdentity.ts
-const base = require("aws-ses/base");
-const AWSSESEntity = base.AWSSESEntity;
+const sesBase = require("aws-ses/ses-base");
+const AWSSESEntity = sesBase.AWSSESEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
