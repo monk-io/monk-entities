@@ -69,12 +69,14 @@ var DigitalOceanEntity = class extends import_base.MonkEntity {
   before() {
     this.apiToken = getApiToken(this.definition.secret_ref);
     if (!this.apiToken) {
-      throw new Error(`Failed to retrieve API token from secret: ${this.definition.secret_ref}`);
+      throw new Error(
+        `Failed to retrieve API token from secret: ${this.definition.secret_ref}`
+      );
     }
     this.httpClient = new import_http_client.HttpClient({
       baseUrl: BASE_URL,
       headers: {
-        "Authorization": `Bearer ${this.apiToken}`,
+        Authorization: `Bearer ${this.apiToken}`,
         "Content-Type": "application/json"
       },
       parseJson: true,
@@ -106,7 +108,7 @@ var DigitalOceanEntity = class extends import_base.MonkEntity {
       const response = this.httpClient.request(method, path, {
         body,
         headers: {
-          "Authorization": `Bearer ${this.apiToken}`,
+          Authorization: `Bearer ${this.apiToken}`,
           "Content-Type": "application/json"
         }
       });
@@ -140,7 +142,9 @@ var DigitalOceanEntity = class extends import_base.MonkEntity {
       return responseData;
     } catch (error) {
       if (error instanceof Error) {
-        throw new Error(`DigitalOcean ${method} request to ${path} failed: ${error.message}`);
+        throw new Error(
+          `DigitalOcean ${method} request to ${path} failed: ${error.message}`
+        );
       }
       throw error;
     }
@@ -164,7 +168,9 @@ var DigitalOceanEntity = class extends import_base.MonkEntity {
    */
   deleteResource(path, resourceName) {
     if (this.state.existing) {
-      import_cli.default.output(`${resourceName} wasn't created by this entity, skipping delete`);
+      import_cli.default.output(
+        `${resourceName} wasn't created by this entity, skipping delete`
+      );
       return;
     }
     try {
@@ -175,14 +181,16 @@ var DigitalOceanEntity = class extends import_base.MonkEntity {
         import_cli.default.output(`${resourceName} was already deleted`);
         return;
       }
-      throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(
+        `Failed to delete ${resourceName}: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
   }
 };
 /**
  * Readiness check configuration
  */
-__publicField(DigitalOceanEntity, "readiness", { period: 15, initialDelay: 5, attempts: 40 });
+__publicField(DigitalOceanEntity, "readiness", { period: 15, initialDelay: 5, attempts: 60 });
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   DigitalOceanEntity

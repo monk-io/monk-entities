@@ -22,7 +22,7 @@ database:
       Works with:
       - `digitalocean/database-user` - Create additional database users
       - `digitalocean/database-db` - Create databases within the cluster
-    version-hash: a580a683dd31
+    version-hash: 69a9e1c55866
   schema:
     name:
       type: string

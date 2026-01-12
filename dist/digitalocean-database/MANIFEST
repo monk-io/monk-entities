@@ -1,5 +1,5 @@
 REPO digitalocean-database
-VERSION_HASH a580a683dd31
+VERSION_HASH 69a9e1c55866
 DESCRIPTION Managed databases on DigitalOcean.
 HOSTING managed
 TAGS digitalocean,database,postgres,mysql,redis,mongodb
