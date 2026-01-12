@@ -151,4 +151,5 @@ export abstract class AWSDynamoDBEntity<
             throw error;
         }
     }
-} 
+}
+

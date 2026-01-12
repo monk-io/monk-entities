@@ -1,4 +1,4 @@
-import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./base.ts";
+import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./ec2-base.ts";
 
 export interface SecurityGroupRule {
 	ip_protocol: string; // tcp | udp | icmp | -1

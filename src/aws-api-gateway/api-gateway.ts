@@ -1,4 +1,4 @@
-import { AWSAPIGatewayEntity, AWSAPIGatewayDefinition, AWSAPIGatewayState } from "./base.ts";
+import { AWSAPIGatewayEntity, AWSAPIGatewayDefinition, AWSAPIGatewayState } from "./api-gateway-base.ts";
 import { action } from "monkec/base";
 import cli from "cli";
 

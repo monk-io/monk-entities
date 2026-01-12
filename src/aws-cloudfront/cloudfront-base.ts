@@ -774,3 +774,4 @@ export abstract class AWSCloudFrontEntity<
     protected abstract updateDistribution(distributionId: string, params: any, etag: string): any;
     protected abstract deleteDistribution(distributionId: string, etag: string): any;
 }
+

@@ -1,4 +1,4 @@
-import { AWSS3Entity, AWSS3Definition, AWSS3State } from "./base.ts";
+import { AWSS3Entity, AWSS3Definition, AWSS3State } from "./s3-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import aws from "cloud/aws";

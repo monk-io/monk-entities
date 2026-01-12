@@ -1,4 +1,4 @@
-import { AWSRDSEntity, AWSRDSDefinition, AWSRDSState } from "./base.ts";
+import { AWSRDSEntity, AWSRDSDefinition, AWSRDSState } from "./rds-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import secret from "secret";

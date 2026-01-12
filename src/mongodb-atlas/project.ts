@@ -1,4 +1,4 @@
-import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntityState } from "./base.ts";
+import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntityState } from "./atlas-base.ts";
 import { getOrganization } from "./common.ts";
 import cli from "cli";
 

@@ -1,6 +1,6 @@
 import secret from "secret";
 import cli from "cli";
-import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
+import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./redis-base.ts";
 import { action } from "monkec/base";
 
 /**

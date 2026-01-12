@@ -1,6 +1,6 @@
 import cli from "cli";
 
-import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./base.ts";
+import { RedisCloudEntity, RedisCloudEntityDefinition, RedisCloudEntityState } from "./redis-base.ts";
 
 /**
  * Redis Cloud subscription types
