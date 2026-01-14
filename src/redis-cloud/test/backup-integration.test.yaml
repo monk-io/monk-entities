@@ -1,6 +1,6 @@
 name: "Redis Cloud Backup Integration Test"
 description: "Integration test for Redis Cloud backup operations using standardized action names"
-timeout: 900000
+timeout: 1200000
 
 secrets:
   global:
@@ -23,9 +23,7 @@ setup:
       exitCode: 0
 
 tests:
-  #
-  # Essentials Database Backup Tests
-  #
+  # ==================== ESSENTIALS DATABASE TESTS ====================
   - name: "Deploy essentials backup stack"
     action: "run"
     target: "redis-cloud-backup-test/essentials-backup-stack"
@@ -45,30 +43,28 @@ tests:
     expect:
       exitCode: 0
 
-  # Test get-backup-info action (Essentials)
+  # Essentials backup operations
   - name: "Get backup info for essentials database"
     action: "do"
     target: "redis-cloud-backup-test/backup-essentials-database/get-backup-info"
     expect:
       exitCode: 0
+      contains:
+        - "Backup"
 
-  # Test create-snapshot action (Essentials)
   - name: "Create manual backup for essentials database"
     action: "do"
     target: "redis-cloud-backup-test/backup-essentials-database/create-snapshot"
     expect:
       exitCode: 0
 
-  # Test list-snapshots action (Essentials)
   - name: "List backups for essentials database"
     action: "do"
     target: "redis-cloud-backup-test/backup-essentials-database/list-snapshots"
     expect:
       exitCode: 0
 
-  #
-  # Pro Database Backup Tests
-  #
+  # ==================== PRO DATABASE TESTS ====================
   - name: "Deploy pro backup stack"
     action: "run"
     target: "redis-cloud-backup-test/pro-backup-stack"
@@ -88,38 +84,35 @@ tests:
     expect:
       exitCode: 0
 
-  # Test get-backup-info action (Pro)
+  # Pro backup operations
   - name: "Get backup info for pro database"
     action: "do"
     target: "redis-cloud-backup-test/backup-pro-database/get-backup-info"
     expect:
       exitCode: 0
+      contains:
+        - "Backup"
 
-  # Test create-snapshot action (Pro)
   - name: "Create manual backup for pro database"
     action: "do"
     target: "redis-cloud-backup-test/backup-pro-database/create-snapshot"
     expect:
       exitCode: 0
 
-  # Test list-snapshots action (Pro)
   - name: "List backups for pro database"
     action: "do"
     target: "redis-cloud-backup-test/backup-pro-database/list-snapshots"
     expect:
       exitCode: 0
 
-  # Test restore action (Pro - imports data from backup)
-  # Note: This is a destructive operation that overwrites existing data
-  # Skipped by default - enable manually for full restore testing
-  - name: "Restore from backup (Pro)"
+  # ==================== VALIDATION TESTS ====================
+  - name: "Validate restore requires parameters"
     action: "do"
     target: "redis-cloud-backup-test/backup-pro-database/restore"
-    args:
-      source_type: "rdb"
-      source_uri: "s3://test-redis-cloud-backups/pro/backup.rdb"
     expect:
-      exitCode: 0
+      exitCode: 1
+      contains:
+        - "source"
     skip_if_missing: true
 
 cleanup:

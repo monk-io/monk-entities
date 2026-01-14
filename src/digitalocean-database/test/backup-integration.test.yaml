@@ -1,0 +1,111 @@
+name: "DigitalOcean Database Backup Integration Test"
+description: "Integration test for DigitalOcean managed database backup operations"
+timeout: 1800000
+
+setup:
+  - name: "Load DigitalOcean Database entity manifest"
+    action: "load"
+    target: "dist/input/digitalocean-database/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load backup test template"
+    action: "load"
+    target: "backup-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy PostgreSQL backup stack"
+    action: "run"
+    target: "do-database-backup-test/postgres-backup-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for PostgreSQL database readiness"
+    action: "wait"
+    target: "do-database-backup-test/backup-postgres-db"
+    waitFor:
+      condition: "ready"
+      timeout: 900000
+
+  - name: "Verify PostgreSQL database is running"
+    action: "describe"
+    target: "do-database-backup-test/backup-postgres-db"
+    expect:
+      exitCode: 0
+
+  # Test get-backup-info action
+  - name: "Get backup info for PostgreSQL database"
+    action: "do"
+    target: "do-database-backup-test/backup-postgres-db/get-backup-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Backup Information"
+        - "Point-in-Time Recovery"
+        - "Supported"
+
+  # Test list-backups action
+  - name: "List backups for PostgreSQL database"
+    action: "do"
+    target: "do-database-backup-test/backup-postgres-db/list-backups"
+    expect:
+      exitCode: 0
+      contains:
+        - "Available Backups"
+
+  # Test restore parameter validation - missing timestamp
+  - name: "Validate restore requires timestamp"
+    action: "do"
+    target: "do-database-backup-test/backup-postgres-db/restore"
+    args:
+      new_cluster_name: "test-validation-only"
+    expect:
+      exitCode: 1
+      contains:
+        - "backup_created_at or restore_time is required"
+
+  # Test get-restore-status validation
+  - name: "Validate get-restore-status requires cluster_id"
+    action: "do"
+    target: "do-database-backup-test/backup-postgres-db/get-restore-status"
+    expect:
+      exitCode: 1
+      contains:
+        - "cluster_id is required"
+
+  # Wait for backup availability then test describe-backup
+  - name: "Wait for backup availability"
+    action: "wait-command"
+    target: "monk do do-database-backup-test/backup-postgres-db/list-backups"
+    waitFor:
+      timeout: 120000
+      pollInterval: 30000
+    expect:
+      exitCode: 0
+      contains:
+        - "Created:"
+    skip_if_missing: true
+
+  # Note: describe-backup requires a specific timestamp from list-backups output.
+  # Since the test framework doesn't support variable capture between steps,
+  # this would need to be tested manually:
+  # monk do do-database-backup-test/backup-postgres-db/describe-backup backup_created_at=<timestamp>
+  
+  # Test that describe-backup validates required parameter
+  - name: "Validate describe-backup requires timestamp"
+    action: "do"
+    target: "do-database-backup-test/backup-postgres-db/describe-backup"
+    expect:
+      exitCode: 1
+      contains:
+        - "backup_created_at"
+        - "required"
+
+cleanup:
+  - name: "Delete PostgreSQL backup stack"
+    action: "delete"
+    target: "do-database-backup-test/postgres-backup-stack"
+    expect:
+      exitCode: 0

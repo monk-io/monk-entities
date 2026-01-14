@@ -1,0 +1,21 @@
+namespace: do-database-backup-test
+
+# DigitalOcean Database Backup Test Template
+# PostgreSQL database with PITR (Point-in-Time Recovery) support
+
+backup-postgres-db:
+  defines: digitalocean-database/database
+  name: backup-test-postgres
+  engine: pg
+  version: "16"
+  num_nodes: 1
+  region: nyc1
+  size: db-s-1vcpu-1gb
+  tags:
+    - environment:test
+    - purpose:backup-test
+
+postgres-backup-stack:
+  defines: group
+  members:
+    - do-database-backup-test/backup-postgres-db
