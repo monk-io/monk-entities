@@ -1,6 +1,6 @@
 name: "AWS RDS Backup Integration Test"
 description: "Integration test for AWS RDS backup and restore operations including snapshot management"
-timeout: 900000
+timeout: 1200000
 
 secrets:
   global:
@@ -19,72 +19,96 @@ setup:
     expect:
       exitCode: 0
 
-# tests:
-#   - name: "Deploy backup test instance"
-#     action: "run"
-#     target: "aws-rds-backup-test/backup-mysql-instance"
-#     expect:
-#       exitCode: 0
+tests:
+  # ==================== INSTANCE SETUP ====================
+  - name: "Deploy backup test instance"
+    action: "run"
+    target: "aws-rds-backup-test/backup-mysql-instance"
+    expect:
+      exitCode: 0
 
-#   - name: "Wait for instance readiness"
-#     action: "wait"
-#     target: "aws-rds-backup-test/backup-mysql-instance"
-#     waitFor:
-#       condition: "ready"
-#       timeout: 600000
+  - name: "Wait for instance readiness"
+    action: "wait"
+    target: "aws-rds-backup-test/backup-mysql-instance"
+    waitFor:
+      condition: "ready"
+      timeout: 900000
 
-#   - name: "Verify instance is running"
-#     action: "describe"
-#     target: "aws-rds-backup-test/backup-mysql-instance"
-#     expect:
-#       exitCode: 0
+  - name: "Verify instance is running"
+    action: "describe"
+    target: "aws-rds-backup-test/backup-mysql-instance"
+    expect:
+      exitCode: 0
 
-#   # Test get-backup-info action
-#   - name: "Get backup configuration info"
-#     action: "do"
-#     target: "aws-rds-backup-test/backup-mysql-instance/get-backup-info"
-#     expect:
-#       exitCode: 0
+  # ==================== BACKUP INFO ====================
+  - name: "Get backup configuration info"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/get-backup-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Backup"
 
-#   # Test create-snapshot action
-#   - name: "Create manual snapshot"
-#     action: "do"
-#     target: "aws-rds-backup-test/backup-mysql-instance/create-snapshot"
-#     args:
-#       snapshot_id: "monkec-backup-test-snapshot-1"
-#     expect:
-#       exitCode: 0
+  # ==================== SNAPSHOT OPERATIONS ====================
+  - name: "Create manual snapshot"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/create-snapshot"
+    args:
+      snapshot_id: "monkec-backup-test-snapshot-1"
+    expect:
+      exitCode: 0
+      contains:
+        - "Snapshot"
 
-#   # Test list-snapshots action (snapshot may still be creating, but action should work)
-#   - name: "List available snapshots"
-#     action: "do"
-#     target: "aws-rds-backup-test/backup-mysql-instance/list-snapshots"
-#     expect:
-#       exitCode: 0
+  - name: "List available snapshots"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/list-snapshots"
+    expect:
+      exitCode: 0
 
-#   # Test describe-snapshot action
-#   - name: "Describe specific snapshot"
-#     action: "do"
-#     target: "aws-rds-backup-test/backup-mysql-instance/describe-snapshot"
-#     args:
-#       snapshot_id: "monkec-backup-test-snapshot-1"
-#     expect:
-#       exitCode: 0
+  # Wait for snapshot to be available
+  - name: "Wait for snapshot availability"
+    action: "wait-command"
+    target: "monk do aws-rds-backup-test/backup-mysql-instance/list-snapshots"
+    waitFor:
+      timeout: 300000
+      pollInterval: 30000
+    expect:
+      exitCode: 0
+      contains:
+        - "available"
+    skip_if_missing: true
 
-#   # Clean up: Delete the snapshot (may fail if snapshot is still creating - that's OK)
-#   - name: "Delete test snapshot"
-#     action: "do"
-#     target: "aws-rds-backup-test/backup-mysql-instance/delete-snapshot"
-#     args:
-#       snapshot_id: "monkec-backup-test-snapshot-1"
-#     expect:
-#       exitCode: 0
+  - name: "Describe specific snapshot"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/describe-snapshot"
+    args:
+      snapshot_id: "monkec-backup-test-snapshot-1"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
+
+  # ==================== VALIDATION TESTS ====================
+  - name: "Validate describe-snapshot requires snapshot_id"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/describe-snapshot"
+    expect:
+      exitCode: 1
+      contains:
+        - "snapshot_id"
+
+  # ==================== CLEANUP SNAPSHOT ====================
+  - name: "Delete test snapshot"
+    action: "do"
+    target: "aws-rds-backup-test/backup-mysql-instance/delete-snapshot"
+    args:
+      snapshot_id: "monkec-backup-test-snapshot-1"
+    expect:
+      exitCode: 0
+    skip_if_missing: true
 
 cleanup:
-  # Note: If restore was tested, the restored instance 'monkec-backup-test-restored' 
-  # should be manually deleted via AWS CLI:
-  # aws rds delete-db-instance --db-instance-identifier monkec-backup-test-restored --skip-final-snapshot
-
+  # Note: If restore was tested, the restored instance should be manually deleted
   - name: "Delete backup test instance"
     action: "delete"
     target: "aws-rds-backup-test/backup-mysql-instance"

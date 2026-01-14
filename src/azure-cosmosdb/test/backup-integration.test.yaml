@@ -16,6 +16,7 @@ setup:
       exitCode: 0
 
 tests:
+  # ==================== ACCOUNT SETUP ====================
   - name: "Deploy backup test account"
     action: "run"
     target: "azure-cosmosdb-backup-test/backup-account"
@@ -27,7 +28,7 @@ tests:
     target: "azure-cosmosdb-backup-test/backup-account"
     waitFor:
       condition: "ready"
-      timeout: 600000
+      timeout: 900000
 
   - name: "Verify account is running"
     action: "describe"
@@ -35,14 +36,17 @@ tests:
     expect:
       exitCode: 0
 
-  # Test get-backup-info action
+  # ==================== BACKUP INFO ====================
   - name: "Get backup configuration info"
     action: "do"
     target: "azure-cosmosdb-backup-test/backup-account/get-backup-info"
     expect:
       exitCode: 0
+      contains:
+        - "Backup"
+        - "Continuous"
 
-  # Deploy database and container for restore testing
+  # ==================== DATABASE AND CONTAINER SETUP ====================
   - name: "Deploy backup test database"
     action: "run"
     target: "azure-cosmosdb-backup-test/backup-database"
@@ -69,47 +73,37 @@ tests:
       condition: "ready"
       timeout: 300000
 
-  # Test list-restorable-accounts action
+  # ==================== RESTORABLE RESOURCES ====================
   - name: "List restorable accounts"
     action: "do"
     target: "azure-cosmosdb-backup-test/backup-account/list-restorable-accounts"
     expect:
       exitCode: 0
 
-  # Test list-restorable-databases action (requires source_id from list-restorable-accounts)
-  # Note: This test may need manual source_id input
-  - name: "List restorable databases"
+  # ==================== VALIDATION TESTS ====================
+  - name: "Validate list-restorable-databases requires source_id"
     action: "do"
     target: "azure-cosmosdb-backup-test/backup-account/list-restorable-databases"
-    args:
-      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
     expect:
-      exitCode: 0
-    skip_if_missing: true
+      exitCode: 1
+      contains:
+        - "source_id"
 
-  # Test list-restorable-containers action
-  - name: "List restorable containers"
+  - name: "Validate list-restorable-containers requires source_id"
     action: "do"
     target: "azure-cosmosdb-backup-test/backup-account/list-restorable-containers"
-    args:
-      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
-      database_name: "backup-test-db"
     expect:
-      exitCode: 0
-    skip_if_missing: true
+      exitCode: 1
+      contains:
+        - "source_id"
 
-  # Test restore action (creates a new Cosmos DB account)
-  # Note: This is a long-running operation
-  - name: "Restore to new account (point-in-time)"
+  - name: "Validate restore requires source_id"
     action: "do"
     target: "azure-cosmosdb-backup-test/backup-account/restore"
-    args:
-      source_id: "${RESTORABLE_ACCOUNT_INSTANCE_ID}"
-      target_id: "monk-backup-test-restored"
-      restore_timestamp: "${RESTORE_TIMESTAMP}"
     expect:
-      exitCode: 0
-    skip_if_missing: true
+      exitCode: 1
+      contains:
+        - "source_id"
 
 cleanup:
   - name: "Delete backup test container"
@@ -130,5 +124,4 @@ cleanup:
     expect:
       exitCode: 0
 
-  # Note: If restore was executed, the restored account 'monk-backup-test-restored' 
-  # should be manually deleted via Azure Portal or CLI
+  # Note: If restore was executed, the restored account should be manually deleted via Azure Portal

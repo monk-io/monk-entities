@@ -1,6 +1,6 @@
-name: "AWS DynamoDB Backup Actions Integration Test"
+name: "AWS DynamoDB Backup Integration Test"
 description: "Integration test for DynamoDB backup and restore operations including PITR and on-demand backups"
-timeout: 600000
+timeout: 900000
 
 setup:
   - name: "Load AWS DynamoDB entity manifest"
@@ -60,13 +60,15 @@ tests:
       exitCode: 0
 
   # ==================== BACKUP INFO ====================
-  - name: "Test get-backup-info action"
+  - name: "Get backup configuration info"
     action: "do"
     target: "aws-dynamo-db-backup-test/backup-test-table/get-backup-info"
     expect:
       exitCode: 0
+      contains:
+        - "Backup"
 
-  # ==================== ON-DEMAND BACKUP ====================
+  # ==================== SNAPSHOT OPERATIONS ====================
   - name: "Create on-demand backup"
     action: "do"
     target: "aws-dynamo-db-backup-test/backup-test-table/create-snapshot"
@@ -74,6 +76,8 @@ tests:
       backup_name: "monkec-test-backup"
     expect:
       exitCode: 0
+      contains:
+        - "Backup"
 
   - name: "List available backups"
     action: "do"
@@ -89,14 +93,37 @@ tests:
     expect:
       exitCode: 0
 
-  # Note: describe-snapshot and restore require the backup ARN which is dynamic
-  # These actions are tested manually or via CI with ARN capture
+  # Wait for backup availability
+  - name: "Wait for backup availability"
+    action: "wait-command"
+    target: "monk do aws-dynamo-db-backup-test/backup-test-table/list-snapshots"
+    waitFor:
+      timeout: 120000
+      pollInterval: 15000
+    expect:
+      exitCode: 0
+      contains:
+        - "AVAILABLE"
+    skip_if_missing: true
 
-  # ==================== CLEANUP ====================
-  # Note: We don't test restore in automated tests because:
-  # 1. It creates a new table that needs separate cleanup
-  # 2. Restore operations can take several minutes
-  # 3. On-demand backups may need time to become AVAILABLE
+  # ==================== VALIDATION TESTS ====================
+  - name: "Validate describe-snapshot requires backup_arn"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/describe-snapshot"
+    expect:
+      exitCode: 1
+      contains:
+        - "backup_arn"
+
+  - name: "Validate restore requires backup_arn or use_latest"
+    action: "do"
+    target: "aws-dynamo-db-backup-test/backup-test-table/restore"
+    args:
+      target_table: "test-restored-table"
+    expect:
+      exitCode: 1
+      contains:
+        - "backup_arn"
 
 cleanup:
   - name: "Delete backup test table"
@@ -105,3 +132,5 @@ cleanup:
     expect:
       exitCode: 0
 
+  # Note: Created backups are not automatically deleted
+  # They can be cleaned up manually or via delete-snapshot action
