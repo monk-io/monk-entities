@@ -113,7 +113,6 @@ tests:
       exitCode: 1
       contains:
         - "source"
-    skip_if_missing: true
 
 cleanup:
   - name: "Delete pro backup stack"
