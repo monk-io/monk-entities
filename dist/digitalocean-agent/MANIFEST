@@ -5,4 +5,4 @@ HOSTING managed
 TAGS digitalocean,ai,agent,genai
  
 LOAD agent.yaml gradient-base.yaml
-RESOURCES agent-sync.js gradient-base.js
+RESOURCES gradient-base.js agent-sync.js
