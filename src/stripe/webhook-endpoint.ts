@@ -31,15 +31,40 @@ export interface StripeWebhookState extends StripeEntityState {
  * 
  * ## Secrets
  * - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
- * - Writes: secret name from `signing_secret_ref` property - Webhook signing secret (if specified)
+ * - Writes: secret name from `signing_secret_ref` property - Webhook signing secret (defaults to `stripe-webhook-secret`)
+ *   The signing secret is always created by this entity and stored when the webhook endpoint is created.
  * 
  * ## State Fields for Composition
- * - `state.id` - Webhook endpoint ID
- * - `state.url` - Webhook URL
- * - `state.secret` - Webhook signing secret
+ * - `state.webhook_endpoint_id` - Webhook endpoint ID
+ * - `state.webhook_url` - Webhook URL
+ * - `state.webhook_signing_secret_secret` - Secret name where signing secret is stored
+ * 
+ * ## Building destination_url with Connections
+ * Use `connection-domain-name` or `container-domain-name` to dynamically construct the webhook URL:
+ * 
+ * ```yaml
+ * webhook:
+ *   defines: stripe/webhook-endpoint
+ *   connections:
+ *     backend:
+ *       target: my-namespace/backend
+ *       service: http
+ *   variables:
+ *     backend-public-url:
+ *       type: string
+ *       value: <- "https://" connection-domain-name("backend") concat-all
+ *   destination_url: <- $backend-public-url "/api/stripe/webhook" concat-all
+ * ```
+ * 
+ * For direct runnable references without adding a connection, use `container-domain-name`:
+ * ```yaml
+ *   destination_url: <- "https://" container-domain-name("my-namespace/app", "app-container") "/webhook" concat-all
+ * ```
  * 
  * ## Composing with Other Entities
- * Stripe webhooks are typically standalone, pointing to your application's endpoint.
+ * Works with:
+ * - `stripe/credentials` - Validates API access
+ * - Any runnable/container exposing an HTTP endpoint for webhook delivery
  */
 export class WebhookEndpoint extends StripeEntity<StripeWebhookDefinition, StripeWebhookState> {
     protected getEntityName(): string {

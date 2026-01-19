@@ -13,13 +13,28 @@ price:
       - Writes: none
 
       ## State Fields for Composition
-      - `state.price_id` - Stripe price ID
-      - `state.unit_amount` - Price amount in cents
+      - `state.price_id` - Stripe price ID (price_...)
+      - `state.lookup_key` - Price lookup key for easy reference
+
+      ## Using Price in Runnables
+      ```yaml
+      app:
+      defines: runnable
+      connections:
+      price:
+      target: my-namespace/price
+      service: data
+      variables:
+      STRIPE_PRICE_ID:
+      env: STRIPE_PRICE_ID
+      type: string
+      value: <- connection-target("price") entity-state get-member("price_id")
+      ```
 
       ## Composing with Other Entities
       Works with:
       - `stripe/product` - The product this price is for
-    version-hash: 96e499f07bb8
+    version-hash: c326f768f517
   schema:
     secret_ref:
       type: string

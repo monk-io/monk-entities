@@ -1,7 +1,7 @@
 REPO stripe
-VERSION_HASH 96e499f07bb8
+VERSION_HASH c326f768f517
 DESCRIPTION Payments, products, prices, and webhooks.
 HOSTING managed
 TAGS stripe,payments,billing
-LOAD webhook-endpoint.yaml price.yaml product.yaml stripe-base.yaml credentials.yaml
-RESOURCES product-sync.js price-sync.js webhook-endpoint-sync.js credentials-sync.js stripe-base.js
+LOAD credentials.yaml price.yaml product.yaml stripe-base.yaml webhook-endpoint.yaml
+RESOURCES credentials-sync.js price-sync.js product-sync.js stripe-base.js webhook-endpoint-sync.js
