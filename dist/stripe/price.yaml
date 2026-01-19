@@ -19,16 +19,16 @@ price:
       ## Using Price in Runnables
       ```yaml
       app:
-      defines: runnable
-      connections:
-      price:
-      target: my-namespace/price
-      service: data
-      variables:
-      STRIPE_PRICE_ID:
-      env: STRIPE_PRICE_ID
-      type: string
-      value: <- connection-target("price") entity-state get-member("price_id")
+        defines: runnable
+        connections:
+          price:
+            target: my-namespace/price
+            service: data
+        variables:
+          STRIPE_PRICE_ID:
+            env: STRIPE_PRICE_ID
+            type: string
+            value: <- connection-target("price") entity-state get-member("price_id")
       ```
 
       ## Composing with Other Entities

@@ -11,7 +11,7 @@ webhook-endpoint:
       ## Secrets
       - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
       - Writes: secret name from `signing_secret_ref` property - Webhook signing secret (defaults to `stripe-webhook-secret`)
-      The signing secret is always created by this entity and stored when the webhook endpoint is created.
+        The signing secret is always created by this entity and stored when the webhook endpoint is created.
 
       ## State Fields for Composition
       - `state.webhook_endpoint_id` - Webhook endpoint ID
@@ -23,21 +23,21 @@ webhook-endpoint:
 
       ```yaml
       webhook:
-      defines: stripe/webhook-endpoint
-      connections:
-      backend:
-      target: my-namespace/backend
-      service: http
-      variables:
-      backend-public-url:
-      type: string
-      value: <- "https://" connection-domain-name("backend") concat-all
-      destination_url: <- $backend-public-url "/api/stripe/webhook" concat-all
+        defines: stripe/webhook-endpoint
+        connections:
+          backend:
+            target: my-namespace/backend
+            service: http
+        variables:
+          backend-public-url:
+            type: string
+            value: <- "https://" connection-domain-name("backend") concat-all
+        destination_url: <- $backend-public-url "/api/stripe/webhook" concat-all
       ```
 
       For direct runnable references without adding a connection, use `container-domain-name`:
       ```yaml
-      destination_url: <- "https://" container-domain-name("my-namespace/app", "app-container") "/webhook" concat-all
+        destination_url: <- "https://" container-domain-name("my-namespace/app", "app-container") "/webhook" concat-all
       ```
 
       ## Composing with Other Entities
