@@ -5,4 +5,4 @@ HOSTING managed
 TAGS digitalocean,monitoring,alerts
  
 LOAD common.yaml digital-ocean-monitoring.yaml do-provider-base.yaml
-RESOURCES common.js do-provider-base.js digital-ocean-monitoring-sync.js
+RESOURCES common.js digital-ocean-monitoring-sync.js do-provider-base.js

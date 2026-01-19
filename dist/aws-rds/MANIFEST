@@ -3,5 +3,5 @@ VERSION_HASH 6f5fba69a591
 DESCRIPTION Managed relational databases (MySQL, Postgres, etc.).
 HOSTING managed
 TAGS aws,database,rds,mysql,postgres
-LOAD lite-base.yaml rds-access-list.yaml common.yaml db-subnet-group.yaml rds-base.yaml base.yaml security-group.yaml rds-instance.yaml
-RESOURCES rds-access-list-sync.js lite-base.js db-subnet-group-sync.js rds-base.js base.js common.js rds-instance-sync.js security-group.js
+LOAD base.yaml common.yaml db-subnet-group.yaml lite-base.yaml rds-access-list.yaml rds-base.yaml rds-instance.yaml security-group.yaml
+RESOURCES common.js rds-access-list-sync.js security-group.js lite-base.js db-subnet-group-sync.js base.js rds-base.js rds-instance-sync.js

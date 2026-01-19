@@ -4,5 +4,5 @@ DESCRIPTION S3-compatible object storage.
 HOSTING managed
 TAGS digitalocean,storage,spaces,object-storage
  
-LOAD do-s3-base.yaml spaces-keys.yaml spaces-bucket.yaml
-RESOURCES do-s3-base.js spaces-keys-sync.js spaces-bucket-sync.js
+LOAD do-s3-base.yaml spaces-bucket.yaml spaces-keys.yaml
+RESOURCES do-s3-base.js spaces-bucket-sync.js spaces-keys-sync.js
