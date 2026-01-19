@@ -27,8 +27,29 @@ export interface StripeProductState extends StripeEntityState {
  * - Writes: none
  * 
  * ## State Fields for Composition
- * - `state.product_id` - Stripe product ID
+ * - `state.product_id` - Stripe product ID (prod_...)
  * - `state.name` - Product name
+ * 
+ * ## Referencing Product from Price
+ * ```yaml
+ * product:
+ *   defines: stripe/product
+ *   name: My SaaS Product
+ *   services:
+ *     data:
+ *       protocol: custom
+ * 
+ * price:
+ *   defines: stripe/price
+ *   connections:
+ *     product:
+ *       target: my-namespace/product
+ *       service: data
+ *   product_id: <- connection-target("product") entity-state get-member("product_id")
+ *   currency: usd
+ *   unit_amount: 2900
+ *   recurring_interval: month
+ * ```
  * 
  * ## Composing with Other Entities
  * Works with:
