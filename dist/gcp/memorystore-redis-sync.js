@@ -298,6 +298,7 @@ var _MemorystoreRedis = class _MemorystoreRedis extends (_a = GcpEntity, _getInf
         if (isOperationDone(operation)) {
           if (isOperationFailed(operation)) {
             cli.output(`Operation failed: ${JSON.stringify(operation.error)}`);
+            this.state.operation_name = void 0;
             return false;
           }
           cli.output("Operation completed successfully");

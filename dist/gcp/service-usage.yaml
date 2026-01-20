@@ -22,22 +22,48 @@ service-usage:
       Use this entity as a dependency for other GCP entities that require
       specific APIs to be enabled. No state fields need to be passed to
       dependent entities - they just need to wait for this entity to be ready.
-    version-hash: 8b9fbbcd8f86
+    version-hash: 74cf080e0408
   schema:
     name:
       type: string
+      enum:
+        - sqladmin.googleapis.com
+        - bigquery.googleapis.com
+        - storage.googleapis.com
+        - iam.googleapis.com
+        - cloudresourcemanager.googleapis.com
+        - serviceusage.googleapis.com
+        - cloudfunctions.googleapis.com
+        - run.googleapis.com
+        - firebasehosting.googleapis.com
+        - firestore.googleapis.com
+        - redis.googleapis.com
       description: |-
         Single API name to enable.
         Use this for enabling just one API.
-        Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com")
+        Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com").
+        Service IDs do not include protocol or path.
     apis:
       type: array
       items:
         type: string
+        enum:
+          - sqladmin.googleapis.com
+          - bigquery.googleapis.com
+          - storage.googleapis.com
+          - iam.googleapis.com
+          - cloudresourcemanager.googleapis.com
+          - serviceusage.googleapis.com
+          - cloudfunctions.googleapis.com
+          - run.googleapis.com
+          - firebasehosting.googleapis.com
+          - firestore.googleapis.com
+          - redis.googleapis.com
       description: |-
         Array of API names to batch enable.
         Use this for enabling multiple APIs efficiently.
         APIs are enabled concurrently in a single operation.
+        Service IDs do not include protocol or path.
     project:
       type: string
       description: |-
