@@ -1,0 +1,80 @@
+namespace: gcp
+cloud-storage-hmac-keys:
+  defines: entity
+  metadata:
+    name: CloudStorageHmacKeys
+    description: |-
+      GCP Cloud Storage HMAC Keys entity.
+      Creates and manages HMAC access keys for the Cloud Storage XML API (S3-compatible).
+      Use these keys with S3-compatible tools by pointing to `https://storage.googleapis.com`.
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: secret name from `access_key_secret_ref` property - HMAC access key ID
+      - Writes: secret name from `secret_key_secret_ref` property - HMAC secret key
+
+      ## State Fields for Composition
+      - `state.access_key` - Access key ID for S3-compatible clients
+      - `state.service_account_email` - Service account email used for the key
+
+      ## Dependencies
+      - `gcp/service-account` - Use `state.email` as `service_account_email`
+      - `gcp/service-usage` - Ensure `storage.googleapis.com` is enabled
+
+      ## Definition Fields from Other Entities
+      - `service_account_email` - From `gcp/service-account` `state.email`
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/cloud-storage` - Provision buckets and access them via S3-compatible clients
+    version-hash: cb8703390a1d
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    service_account_email:
+      type: string
+      description: Service account email to create the HMAC key for
+    name:
+      type: string
+      description: Optional display name for logs only
+    access_key_secret_ref:
+      type: string
+      description: Secret name to store the HMAC access key ID
+      default: gcs-hmac-access-key
+    secret_key_secret_ref:
+      type: string
+      description: Secret name to store the HMAC secret key
+      default: gcs-hmac-secret-key
+    required:
+      - service_account_email
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    access_key:
+      type: string
+      description: HMAC access key ID
+    id:
+      type: string
+      description: Full resource name of the HMAC key
+    service_account_email:
+      type: string
+      description: Service account email associated with the key
+  lifecycle:
+    sync: <<< cloud-storage-hmac-keys-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - gcp/gcp-base
+    - gcp/common
+    - secret
+    - cli

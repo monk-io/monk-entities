@@ -1,0 +1,284 @@
+namespace: gcp
+memorystore-redis:
+  defines: entity
+  metadata:
+    name: MemorystoreRedis
+    description: |-
+      GCP Memorystore for Redis entity.
+      Manages Memorystore for Redis instances and supports export/import operations
+      for snapshot-style backups and restores.
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.host` - Redis host for client connections
+      - `state.port` - Redis port (typically 6379)
+      - `state.read_endpoint` - Read endpoint for replicas (if enabled)
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/service-usage` - Enable `redis.googleapis.com` API before create
+    version-hash: cb8703390a1d
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: Instance ID (unique within the region)
+    region:
+      type: string
+      enum:
+        - africa-south1
+        - asia-east1
+        - asia-east2
+        - asia-northeast1
+        - asia-northeast2
+        - asia-northeast3
+        - asia-south1
+        - asia-south2
+        - asia-southeast1
+        - asia-southeast2
+        - australia-southeast1
+        - australia-southeast2
+        - europe-central2
+        - europe-north1
+        - europe-southwest1
+        - europe-west1
+        - europe-west2
+        - europe-west3
+        - europe-west4
+        - europe-west6
+        - europe-west8
+        - europe-west9
+        - europe-west10
+        - europe-west12
+        - me-central1
+        - me-central2
+        - me-west1
+        - northamerica-northeast1
+        - northamerica-northeast2
+        - northamerica-south1
+        - us-central1
+        - us-south1
+        - us-east1
+        - us-east4
+        - us-east5
+        - us-west1
+        - us-west2
+        - us-west3
+        - us-west4
+        - southamerica-east1
+        - southamerica-west1
+      description: GCP region for the instance
+      default: us-central1
+    display_name:
+      type: string
+      description: Display name for the instance
+    tier:
+      type: string
+      enum:
+        - BASIC
+        - STANDARD_HA
+      description: Service tier
+      default: BASIC
+    memory_size_gb:
+      type: number
+      minimum: 1
+      description: Memory size in GB
+    redis_version:
+      anyOf:
+        - type: string
+          const: REDIS_7_2
+        - type: string
+          const: REDIS_7_0
+        - type: string
+          const: REDIS_6_X
+        - type: string
+          const: REDIS_5_0
+        - type: string
+          const: REDIS_4_0
+        - type: string
+          const: REDIS_3_2
+        - type: string
+      description: 'Redis software version (e.g., REDIS_7_0)'
+    authorized_network:
+      type: string
+      description: Authorized VPC network (full resource name)
+    connect_mode:
+      type: string
+      enum:
+        - DIRECT_PEERING
+        - PRIVATE_SERVICE_ACCESS
+      description: Connect mode (DIRECT_PEERING or PRIVATE_SERVICE_ACCESS)
+    reserved_ip_range:
+      type: string
+      description: Reserved IP range for the instance
+    auth_enabled:
+      type: boolean
+      description: Enable Redis AUTH
+      default: false
+    transit_encryption_mode:
+      type: string
+      enum:
+        - TRANSIT_ENCRYPTION_MODE_UNSPECIFIED
+        - DISABLED
+        - SERVER_AUTHENTICATION
+      description: Transit encryption mode
+    redis_configs:
+      type: object
+      additionalProperties:
+        type: string
+        description: Redis configuration parameters
+      description: Redis configuration parameters
+    persistence_config:
+      type: object
+      properties:
+        persistence_mode:
+          type: string
+          enum:
+            - PERSISTENCE_MODE_UNSPECIFIED
+            - DISABLED
+            - RDB
+          description: Persistence mode
+        rdb_snapshot_period:
+          type: string
+          enum:
+            - SNAPSHOT_PERIOD_UNSPECIFIED
+            - ONE_HOUR
+            - SIX_HOURS
+            - TWELVE_HOURS
+            - TWENTY_FOUR_HOURS
+          description: RDB snapshot period
+        rdb_snapshot_start_time:
+          type: string
+          description: RDB snapshot start time (RFC3339)
+      additionalProperties: false
+      description: Persistence configuration (RDB snapshots)
+    maintenance_policy:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Optional maintenance policy description
+        weekly_maintenance_window:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: string
+                enum:
+                  - MONDAY
+                  - TUESDAY
+                  - WEDNESDAY
+                  - THURSDAY
+                  - FRIDAY
+                  - SATURDAY
+                  - SUNDAY
+                description: Day of the week for maintenance
+              start_time:
+                type: object
+                properties:
+                  hours:
+                    type: number
+                    description: Hours in 24h format
+                  minutes:
+                    type: number
+                    description: Minutes
+                  seconds:
+                    type: number
+                    description: Seconds
+                  nanos:
+                    type: number
+                    description: Nanos
+                required:
+                  - hours
+                  - minutes
+                additionalProperties: false
+                description: Start time of the maintenance window
+            required:
+              - day
+              - start_time
+            additionalProperties: false
+          description: Weekly maintenance window preferences
+      additionalProperties: false
+      description: Maintenance policy for weekly maintenance windows
+    read_replicas_mode:
+      type: string
+      enum:
+        - READ_REPLICAS_MODE_UNSPECIFIED
+        - READ_REPLICAS_DISABLED
+        - READ_REPLICAS_ENABLED
+      description: Enable/disable read replicas
+    replica_count:
+      type: number
+      description: Number of read replicas when enabled
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Labels to apply to the instance
+      description: Labels to apply to the instance
+    required:
+      - name
+      - memory_size_gb
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    id:
+      type: string
+      description: Full resource name of the instance
+    host:
+      type: string
+      description: Redis host for connections
+    port:
+      type: number
+      description: Redis port for connections
+    status:
+      anyOf:
+        - type: string
+          enum:
+            - STATE_UNSPECIFIED
+            - CREATING
+            - READY
+            - UPDATING
+            - DELETING
+            - REPAIRING
+            - MAINTENANCE
+            - IMPORTING
+            - FAILING_OVER
+        - type: string
+      description: Instance readiness status
+    read_endpoint:
+      type: string
+      description: Read endpoint (if available)
+    persistence_iam_identity:
+      type: string
+      description: Service account used for import/export
+  lifecycle:
+    sync: <<< memorystore-redis-sync.js
+    get-info: ''
+    get-backup-info: ''
+    create-snapshot: ''
+    list-snapshots: ''
+    restore: ''
+    get-restore-status: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 80
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - cli
+    - gcp/gcp-base
+    - gcp/common

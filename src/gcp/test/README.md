@@ -51,6 +51,7 @@ Defines the test resources that will be created:
 - `test-sql-user`: Database user with auto-generated password
 - `test-bigquery`: BigQuery dataset
 - `test-storage`: Cloud Storage bucket
+- `test-memorystore`: Memorystore for Redis instance
 - `test-service-account`: Service account with viewer role
 - `test-service-account-key`: Key for the service account
 
@@ -68,6 +69,7 @@ The full test suite takes approximately 10-15 minutes due to Cloud SQL instance 
 - Service Usage: ~1-2 minutes
 - BigQuery: ~30 seconds
 - Cloud Storage: ~30 seconds
+- Memorystore: ~3-5 minutes
 - Service Account: ~30 seconds
 - Cloud SQL Instance: ~8-10 minutes
 - Cloud SQL Database/User: ~1 minute each

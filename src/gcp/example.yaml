@@ -17,6 +17,7 @@ enable-apis:
     - bigquery.googleapis.com
     - storage.googleapis.com
     - iam.googleapis.com
+    - redis.googleapis.com
 
 # =============================================================================
 # Step 2: Create Service Account (optional)
@@ -159,6 +160,51 @@ app-bucket:
       runnables:
         - gcp-example/enable-apis
       timeout: 300
+
+# =============================================================================
+# Step 7: Create Memorystore for Redis
+# =============================================================================
+# Managed Redis cache with export/import snapshot support.
+
+redis-cache:
+  defines: gcp/memorystore-redis
+  name: my-app-cache
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  auth_enabled: true
+  persistence_config:
+    persistence_mode: RDB
+    rdb_snapshot_period: SIX_HOURS
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 7: Create Cloud Storage HMAC Keys (S3-compatible)
+# =============================================================================
+# Provides HMAC credentials for S3-compatible clients.
+
+storage-hmac-keys:
+  defines: gcp/cloud-storage-hmac-keys
+  service_account_email: <- connection-target("service-account") entity-state get-member("email")
+  access_key_secret_ref: gcs-hmac-access-key
+  secret_key_secret_ref: gcs-hmac-secret-key
+  permitted-secrets:
+    gcs-hmac-access-key: true
+    gcs-hmac-secret-key: true
+  connections:
+    service-account:
+      runnable: gcp-example/app-service-account
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/app-service-account
+      timeout: 60
 
 # =============================================================================
 # Example: Minimal Cloud SQL Setup

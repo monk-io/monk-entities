@@ -12,7 +12,9 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-sql-user` | Database users with password management |
 | `gcp/big-query` | BigQuery datasets and tables |
 | `gcp/cloud-storage` | Cloud Storage buckets |
+| `gcp/cloud-storage-hmac-keys` | Cloud Storage HMAC keys for S3-compatible access |
 | `gcp/firestore` | Firestore databases with PITR and backup support |
+| `gcp/memorystore-redis` | Memorystore for Redis instances with export/import support |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -275,6 +277,35 @@ my-bucket:
 - `get`: Get bucket details
 - `list-objects`: List objects (args: prefix, max_results)
 
+### cloud-storage-hmac-keys
+
+Create HMAC access keys for the Cloud Storage XML API (S3-compatible).
+These keys are stored in Monk secrets:
+- `gcs-hmac-access-key` (default)
+- `gcs-hmac-secret-key` (default)
+
+Prerequisites:
+- Enable `storage.googleapis.com` with `gcp/service-usage`
+- Use a service account from `gcp/service-account` and pass its `state.email`
+
+```yaml
+storage-hmac-keys:
+  defines: gcp/cloud-storage-hmac-keys
+  service_account_email: <- connection-target("sa") entity-state get-member("email")
+  access_key_secret_ref: gcs-hmac-access-key
+  secret_key_secret_ref: gcs-hmac-secret-key
+  permitted-secrets:
+    gcs-hmac-access-key: true
+    gcs-hmac-secret-key: true
+  connections:
+    sa:
+      runnable: gcp/service-account/my-sa
+      service: service-account
+```
+
+Use these secrets with S3-compatible clients and point the endpoint to
+`https://storage.googleapis.com`.
+
 ### firestore
 
 Create and manage Firestore databases with point-in-time recovery support.
@@ -302,6 +333,42 @@ my-firestore:
 - `delete-backup`: Delete a backup (args: backup_name)
 - `restore`: Restore to a new database from backup (args: backup_name, target_database)
 - `get-restore-status`: Check restore operation progress (args: operation_name)
+
+### memorystore-redis
+
+Create and manage Memorystore for Redis instances.
+
+```yaml
+my-redis:
+  defines: gcp/memorystore-redis
+  name: my-cache
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  auth_enabled: true
+  persistence_config:
+    persistence_mode: RDB
+    rdb_snapshot_period: SIX_HOURS
+  depends:
+    wait-for:
+      runnables:
+        - my-app/enable-apis
+      timeout: 300
+```
+
+**Actions:**
+- `get-info`: Get instance details
+
+**Backup & Restore Actions:**
+- `get-backup-info`: Show persistence and export/import guidance
+- `create-snapshot`: Export to Cloud Storage (args: output_uri)
+- `list-snapshots`: List export/import operations (args: filter, limit)
+- `restore`: Import from Cloud Storage (args: source_uri)
+- `get-restore-status`: Check export/import operation status (args: operation_name)
+
+**Required API:**
+- `redis.googleapis.com` via `gcp/service-usage` 
 
 ### service-account
 
@@ -404,6 +471,7 @@ GCP database entities implement a unified backup and restore interface, providin
 | `gcp/cloud-sql-instance` | Automated + On-demand backups | ✅ Supported (enable via `point_in_time_recovery_enabled`) |
 | `gcp/firestore` | Scheduled backups + Export | ✅ Supported (enable via `point_in_time_recovery`) |
 | `gcp/big-query` | Table snapshots + Time travel | ✅ Built-in (7+ days via `max_time_travel_hours`) |
+| `gcp/memorystore-redis` | RDB snapshots + Export/Import | ❌ Not supported (use export/import for point-in-time) |
 
 ### Common Operations
 
@@ -415,16 +483,19 @@ monk do namespace/entity get-backup-info
 monk do namespace/cloud-sql create-backup description="Pre-migration"
 monk do namespace/firestore export-documents output_uri_prefix="gs://bucket/backup"
 monk do namespace/bigquery create-snapshot table="events" snapshot="events_backup"
+monk do namespace/redis create-snapshot output_uri="gs://bucket/redis-backup.rdb"
 
 # List available backups
 monk do namespace/cloud-sql list-backups
 monk do namespace/firestore list-backups location="nam5"
 monk do namespace/bigquery list-snapshots
+monk do namespace/redis list-snapshots
 
 # Restore from backup
 monk do namespace/cloud-sql restore backup_id="123456789"
 monk do namespace/firestore restore backup_name="projects/.../backups/..." target_database="restored-db"
 monk do namespace/bigquery restore snapshot="events_backup" target="events_restored"
+monk do namespace/redis restore source_uri="gs://bucket/redis-backup.rdb"
 
 # Check restore progress
 monk do namespace/entity get-restore-status operation_name="..."

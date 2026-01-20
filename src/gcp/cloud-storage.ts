@@ -293,7 +293,8 @@ export interface CloudStorageState extends GcpEntityState {
  * Supports storage classes, lifecycle management, versioning, and encryption.
  *
  * ## Secrets
- * This entity does NOT write any secrets.
+ * - Reads: none (authenticated via GCP provider)
+ * - Writes: none
  *
  * ## Dependencies
  * - `storage.googleapis.com` API is typically enabled by default in GCP projects
@@ -316,7 +317,31 @@ export interface CloudStorageState extends GcpEntityState {
  * - GCS URI: `state.gs_uri` + `/path/to/object`
  * - HTTPS URL: `https://storage.googleapis.com/{bucket}/{object}`
  *
+ * ## S3-Compatible (XML API) Access
+ * Cloud Storage supports an S3-compatible XML API for simple migrations.
+ * Use `gcp/cloud-storage-hmac-keys` to generate HMAC credentials and
+ * point your S3-compatible clients to `https://storage.googleapis.com`.
+ * Make sure `storage.googleapis.com` is enabled via `gcp/service-usage`,
+ * and use a `gcp/service-account` email for the HMAC key.
+ *
+ * @example S3-compatible access (HMAC keys)
+ * ```yaml
+ * storage-hmac-keys:
+ *   defines: gcp/cloud-storage-hmac-keys
+ *   service_account_email: <- connection-target("sa") entity-state get-member("email")
+ *   access_key_secret_ref: gcs-hmac-access-key
+ *   secret_key_secret_ref: gcs-hmac-secret-key
+ *   permitted-secrets:
+ *     gcs-hmac-access-key: true
+ *     gcs-hmac-secret-key: true
+ *   connections:
+ *     sa:
+ *       runnable: gcp/service-account/my-sa
+ *       service: service-account
+ * ```
+ *
  * @see https://cloud.google.com/storage/docs/buckets
+ * @see https://cloud.google.com/storage/docs/aws-simple-migration
  *
  * @example Basic bucket
  * ```yaml
