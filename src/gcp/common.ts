@@ -41,6 +41,91 @@ export const FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/
 /** Firestore API base URL */
 export const FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 
+/**
+ * Catalog of common GCP APIs with service name and base URL.
+ * Useful for schema enumerations and documentation references.
+ */
+export const GCP_API_CATALOG = {
+    cloud_sql: {
+        service: "sqladmin.googleapis.com",
+        base_url: CLOUD_SQL_API_URL,
+    },
+    bigquery: {
+        service: "bigquery.googleapis.com",
+        base_url: BIGQUERY_API_URL,
+    },
+    cloud_storage: {
+        service: "storage.googleapis.com",
+        base_url: CLOUD_STORAGE_API_URL,
+    },
+    iam: {
+        service: "iam.googleapis.com",
+        base_url: IAM_API_URL,
+    },
+    resource_manager: {
+        service: "cloudresourcemanager.googleapis.com",
+        base_url: RESOURCE_MANAGER_API_URL,
+    },
+    service_usage: {
+        service: "serviceusage.googleapis.com",
+        base_url: SERVICE_USAGE_API_URL,
+    },
+    cloud_functions: {
+        service: "cloudfunctions.googleapis.com",
+        base_url: CLOUD_FUNCTIONS_API_URL,
+    },
+    cloud_run: {
+        service: "run.googleapis.com",
+        base_url: CLOUD_RUN_API_URL,
+    },
+    firebase_hosting: {
+        service: "firebasehosting.googleapis.com",
+        base_url: FIREBASE_HOSTING_API_URL,
+    },
+    firestore: {
+        service: "firestore.googleapis.com",
+        base_url: FIRESTORE_API_URL,
+    },
+    memorystore_redis: {
+        service: "redis.googleapis.com",
+        base_url: MEMORYSTORE_REDIS_API_URL,
+    },
+} as const;
+
+/**
+ * Base URLs for common GCP APIs.
+ * Keep this in sync with GCP_API_CATALOG.
+ */
+export type GcpApiBaseUrl =
+    | "https://sqladmin.googleapis.com/sql/v1beta4"
+    | "https://bigquery.googleapis.com/bigquery/v2"
+    | "https://storage.googleapis.com/storage/v1"
+    | "https://iam.googleapis.com/v1"
+    | "https://cloudresourcemanager.googleapis.com/v1"
+    | "https://serviceusage.googleapis.com/v1"
+    | "https://cloudfunctions.googleapis.com/v2"
+    | "https://run.googleapis.com/v2"
+    | "https://firebasehosting.googleapis.com/v1beta1"
+    | "https://firestore.googleapis.com/v1"
+    | "https://redis.googleapis.com/v1";
+
+/**
+ * Service IDs for common GCP APIs.
+ * Keep this in sync with GCP_API_CATALOG.
+ */
+export type GcpApiServiceName =
+    | "sqladmin.googleapis.com"
+    | "bigquery.googleapis.com"
+    | "storage.googleapis.com"
+    | "iam.googleapis.com"
+    | "cloudresourcemanager.googleapis.com"
+    | "serviceusage.googleapis.com"
+    | "cloudfunctions.googleapis.com"
+    | "run.googleapis.com"
+    | "firebasehosting.googleapis.com"
+    | "firestore.googleapis.com"
+    | "redis.googleapis.com";
+
 // =============================================================================
 // Common Enums
 // =============================================================================
@@ -703,7 +788,7 @@ export function isOperationDone(operation: { done?: boolean; status?: string } |
  * @param operation - The operation object or status string
  * @returns true if the operation failed
  */
-export function isOperationFailed(operation: { done?: boolean; error?: any; status?: string } | string | undefined): boolean {
+export function isOperationFailed(operation: { done?: boolean; error?: unknown; status?: string } | string | undefined): boolean {
     if (operation === undefined || operation === null) {
         return false;
     }
@@ -741,7 +826,7 @@ export interface GcpOperation {
     /** Legacy status field used by some APIs (e.g., Cloud SQL) */
     status?: string;
     /** Metadata about the operation */
-    metadata?: any;
+    metadata?: Record<string, unknown>;
     /** Operation type (used by some APIs) */
     operationType?: string;
     /** Target resource ID (used by some APIs) */
@@ -750,10 +835,10 @@ export interface GcpOperation {
     error?: {
         code: number;
         message: string;
-        details?: any[];
+        details?: Array<Record<string, unknown>>;
     };
     /** Response payload when operation completes successfully */
-    response?: any;
+    response?: Record<string, unknown>;
 }
 
 /**
