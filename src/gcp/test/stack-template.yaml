@@ -16,6 +16,7 @@ test-enable-apis:
     - bigquery.googleapis.com
     - storage.googleapis.com
     - iam.googleapis.com
+    - redis.googleapis.com
   services:
     data:
       protocol: custom
@@ -126,6 +127,27 @@ test-storage:
       timeout: 300
 
 # =============================================================================
+# Memorystore for Redis
+# =============================================================================
+
+test-memorystore:
+  defines: gcp/memorystore-redis
+  name: test-redis-cache
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  auth_enabled: true
+  persistence_config:
+    persistence_mode: RDB
+    rdb_snapshot_period: SIX_HOURS
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
 # Service Account
 # =============================================================================
 
@@ -166,4 +188,27 @@ test-service-account-key:
     wait-for:
       runnables:
         - gcp-test/test-service-account
+      timeout: 60
+
+# =============================================================================
+# Cloud Storage HMAC Keys
+# =============================================================================
+
+test-storage-hmac-keys:
+  defines: gcp/cloud-storage-hmac-keys
+  service_account_email: <- connection-target("service-account") entity-state get-member("email")
+  access_key_secret_ref: test-gcs-hmac-access-key
+  secret_key_secret_ref: test-gcs-hmac-secret-key
+  permitted-secrets:
+    test-gcs-hmac-access-key: true
+    test-gcs-hmac-secret-key: true
+  connections:
+    service-account:
+      runnable: gcp-test/test-service-account
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-service-account
+        - gcp-test/test-enable-apis
       timeout: 60

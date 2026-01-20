@@ -5,7 +5,7 @@
 
 name: GCP Entities Integration Test
 description: Complete integration test for all GCP entities
-timeout: 900000  # 15 minutes - Cloud SQL takes time
+timeout: 900000 # 15 minutes - Cloud SQL takes time
 
 secrets:
   global: {}
@@ -93,6 +93,45 @@ tests:
       exitCode: 0
 
   # =========================================================================
+  # Memorystore for Redis Tests
+  # =========================================================================
+  - name: Create Memorystore for Redis instance
+    action: run
+    target: gcp-test/test-memorystore
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-memorystore"
+
+  - name: Wait for Memorystore instance to be ready
+    action: wait
+    target: gcp-test/test-memorystore
+    waitFor:
+      condition: ready
+      timeout: 300000 # 5 minutes
+
+  - name: Test Memorystore get-info action
+    action: action
+    target: gcp-test/test-memorystore
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test Memorystore get-backup-info action
+    action: action
+    target: gcp-test/test-memorystore
+    actionName: get-backup-info
+    expect:
+      exitCode: 0
+
+  - name: Test Memorystore list-snapshots action
+    action: action
+    target: gcp-test/test-memorystore
+    actionName: list-snapshots
+    expect:
+      exitCode: 0
+
+  # =========================================================================
   # Service Account Tests
   # =========================================================================
   - name: Create service account
@@ -125,6 +164,21 @@ tests:
       condition: ready
       timeout: 60000
 
+  - name: Create Cloud Storage HMAC keys
+    action: run
+    target: gcp-test/test-storage-hmac-keys
+    expect:
+      exitCode: 0
+      output:
+        - "Started gcp-test/test-storage-hmac-keys"
+
+  - name: Wait for Cloud Storage HMAC keys to be ready
+    action: wait
+    target: gcp-test/test-storage-hmac-keys
+    waitFor:
+      condition: ready
+      timeout: 60000
+
   # =========================================================================
   # Cloud SQL Tests (slowest, run last)
   # =========================================================================
@@ -141,7 +195,7 @@ tests:
     target: gcp-test/test-sql-instance
     waitFor:
       condition: ready
-      timeout: 600000  # 10 minutes for instance creation
+      timeout: 600000 # 10 minutes for instance creation
 
   - name: Test Cloud SQL get-info action
     action: action
@@ -182,6 +236,12 @@ tests:
 
 cleanup:
   # Delete in reverse dependency order
+  - name: Delete Memorystore instance
+    action: delete
+    target: gcp-test/test-memorystore
+    expect:
+      exitCode: 0
+
   - name: Delete Cloud SQL user
     action: delete
     target: gcp-test/test-sql-user
@@ -203,6 +263,12 @@ cleanup:
   - name: Delete service account key
     action: delete
     target: gcp-test/test-service-account-key
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud Storage HMAC keys
+    action: delete
+    target: gcp-test/test-storage-hmac-keys
     expect:
       exitCode: 0
 

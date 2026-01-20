@@ -1,10 +1,10 @@
 ---
 title: Google Cloud Platform
-description: Managed cloud databases and storage (Cloud SQL, Firestore, BigQuery, Cloud Storage).
+description: Managed cloud databases and storage (Cloud SQL, Firestore, BigQuery, Cloud Storage, Memorystore).
 website_url: https://cloud.google.com/
 docs_url: https://cloud.google.com/docs
 primary_category: database
-tags: [gcp, database, cloud-sql, firestore, bigquery, storage, postgresql, mysql]
+tags: [gcp, database, cloud-sql, firestore, bigquery, storage, memorystore, redis, postgresql, mysql]
 hosting_models: [managed]
 ---
 
@@ -15,13 +15,15 @@ Google Cloud Platform (GCP) provides fully managed cloud services including rela
 - Cloud SQL instances, databases, and users
 - Firestore databases with PITR and backup support
 - BigQuery datasets and table snapshots
+- Memorystore for Redis instances with export/import support
 - Cloud Storage buckets
+- Cloud Storage HMAC keys for S3-compatible access
 - Service accounts and IAM bindings
 - API enablement via Service Usage
 
 ## What the Agent can do and how to use it
-- **Database Creation**: Provision PostgreSQL, MySQL, SQL Server (Cloud SQL), Firestore, or BigQuery datasets
-- **Backup & Recovery**: Automated backups, on-demand snapshots, point-in-time recovery, and restore operations
+- **Database Creation**: Provision Cloud SQL, Firestore, BigQuery, and Memorystore for Redis
+- **Backup & Recovery**: Automated backups, on-demand snapshots, export/import, and restore operations
 - **Scaling**: Modify instance tiers, storage, and enable high availability
 - **Security**: Configure authorized networks, SSL, and IAM permissions
 - **Monitoring**: Access instance status and connection information
@@ -71,6 +73,31 @@ monk load gcp-stack.yaml
 monk update my-app/my-postgres
 monk describe my-app/my-postgres
 ```
+
+---
+
+## S3-Compatible Cloud Storage Access (HMAC)
+
+Create HMAC keys to access Cloud Storage using S3-compatible clients.
+Make sure `storage.googleapis.com` is enabled via `gcp/service-usage`, and
+use a service account from `gcp/service-account`:
+```yaml
+storage-hmac-keys:
+  defines: gcp/cloud-storage-hmac-keys
+  service_account_email: <- connection-target("sa") entity-state get-member("email")
+  access_key_secret_ref: gcs-hmac-access-key
+  secret_key_secret_ref: gcs-hmac-secret-key
+  permitted-secrets:
+    gcs-hmac-access-key: true
+    gcs-hmac-secret-key: true
+  connections:
+    sa:
+      runnable: gcp/service-account/my-sa
+      service: service-account
+```
+
+Use `https://storage.googleapis.com` as the S3 endpoint and the secrets
+`gcs-hmac-access-key` / `gcs-hmac-secret-key` as credentials.
 
 ---
 

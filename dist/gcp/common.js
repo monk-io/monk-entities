@@ -28,6 +28,7 @@ __export(common_exports, {
   FIREBASE_HOSTING_API_URL: () => FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL: () => FIRESTORE_API_URL,
   IAM_API_URL: () => IAM_API_URL,
+  MEMORYSTORE_REDIS_API_URL: () => MEMORYSTORE_REDIS_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL: () => SERVICE_USAGE_API_URL,
   getDefaultPort: () => getDefaultPort,
@@ -44,6 +45,7 @@ var RESOURCE_MANAGER_API_URL = "https://cloudresourcemanager.googleapis.com/v1";
 var SERVICE_USAGE_API_URL = "https://serviceusage.googleapis.com/v1";
 var CLOUD_FUNCTIONS_API_URL = "https://cloudfunctions.googleapis.com/v2";
 var CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
+var MEMORYSTORE_REDIS_API_URL = "https://redis.googleapis.com/v1";
 var FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
 var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 function getDefaultPort(databaseVersion) {
@@ -108,6 +110,7 @@ function isOperationFailed(operation) {
   FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL,
   IAM_API_URL,
+  MEMORYSTORE_REDIS_API_URL,
   RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL,
   getDefaultPort,

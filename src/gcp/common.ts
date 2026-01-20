@@ -32,6 +32,9 @@ export const CLOUD_FUNCTIONS_API_URL = "https://cloudfunctions.googleapis.com/v2
 /** Cloud Run API base URL */
 export const CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
 
+/** Memorystore for Redis API base URL */
+export const MEMORYSTORE_REDIS_API_URL = "https://redis.googleapis.com/v1";
+
 /** Firebase Hosting API base URL */
 export const FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
 
@@ -547,6 +550,89 @@ export type CloudFunctionTriggerType =
     | "google.firebase.remoteconfig.remoteConfig.v1.updated"
     /** Cloud Scheduler (via Pub/Sub) */
     | "google.cloud.scheduler.job.v1.executed";
+
+// =============================================================================
+// Memorystore for Redis Enums
+// =============================================================================
+
+/**
+ * Memorystore for Redis tiers
+ * @see https://cloud.google.com/memorystore/docs/redis/reference/rest/v1/projects.locations.instances
+ */
+export type RedisTier =
+    | "BASIC"
+    | "STANDARD_HA";
+
+/**
+ * Memorystore for Redis versions
+ * @see https://cloud.google.com/memorystore/docs/redis/reference/rest/v1/projects.locations.instances
+ */
+export type RedisVersion =
+    | "REDIS_7_2"
+    | "REDIS_7_0"
+    | "REDIS_6_X"
+    | "REDIS_5_0"
+    | "REDIS_4_0"
+    | "REDIS_3_2"
+    | string;
+
+/**
+ * Memorystore for Redis transit encryption modes
+ * @see https://cloud.google.com/memorystore/docs/redis/reference/rest/v1/projects.locations.instances
+ */
+export type RedisTransitEncryptionMode =
+    | "TRANSIT_ENCRYPTION_MODE_UNSPECIFIED"
+    | "DISABLED"
+    | "SERVER_AUTHENTICATION";
+
+/**
+ * Memorystore for Redis persistence modes
+ * @see https://cloud.google.com/memorystore/docs/redis/reference/rest/v1/projects.locations.instances
+ */
+export type RedisPersistenceMode =
+    | "PERSISTENCE_MODE_UNSPECIFIED"
+    | "DISABLED"
+    | "RDB";
+
+/**
+ * Memorystore for Redis snapshot periods
+ * @see https://cloud.google.com/memorystore/docs/redis/reference/rest/v1/projects.locations.instances
+ */
+export type RedisRdbSnapshotPeriod =
+    | "SNAPSHOT_PERIOD_UNSPECIFIED"
+    | "ONE_HOUR"
+    | "SIX_HOURS"
+    | "TWELVE_HOURS"
+    | "TWENTY_FOUR_HOURS";
+
+/**
+ * Memorystore for Redis connect modes
+ */
+export type RedisConnectMode =
+    | "DIRECT_PEERING"
+    | "PRIVATE_SERVICE_ACCESS";
+
+/**
+ * Memorystore for Redis read replicas mode
+ */
+export type RedisReadReplicasMode =
+    | "READ_REPLICAS_MODE_UNSPECIFIED"
+    | "READ_REPLICAS_DISABLED"
+    | "READ_REPLICAS_ENABLED";
+
+/**
+ * Memorystore for Redis instance states
+ */
+export type RedisInstanceState =
+    | "STATE_UNSPECIFIED"
+    | "CREATING"
+    | "READY"
+    | "UPDATING"
+    | "DELETING"
+    | "REPAIRING"
+    | "MAINTENANCE"
+    | "IMPORTING"
+    | "FAILING_OVER";
 
 // =============================================================================
 // Helper Functions

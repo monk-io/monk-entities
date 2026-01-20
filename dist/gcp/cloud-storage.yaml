@@ -10,7 +10,8 @@ cloud-storage:
       Supports storage classes, lifecycle management, versioning, and encryption.
 
       ## Secrets
-      This entity does NOT write any secrets.
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
 
       ## Dependencies
       - `storage.googleapis.com` API is typically enabled by default in GCP projects
@@ -32,7 +33,14 @@ cloud-storage:
       Applications can access bucket objects using:
       - GCS URI: `state.gs_uri` + `/path/to/object`
       - HTTPS URL: `https://storage.googleapis.com/{bucket}/{object}`
-    version-hash: d87fc5c5f384
+
+      ## S3-Compatible (XML API) Access
+      Cloud Storage supports an S3-compatible XML API for simple migrations.
+      Use `gcp/cloud-storage-hmac-keys` to generate HMAC credentials and
+      point your S3-compatible clients to `https://storage.googleapis.com`.
+      Make sure `storage.googleapis.com` is enabled via `gcp/service-usage`,
+      and use a `gcp/service-account` email for the HMAC key.
+    version-hash: cb8703390a1d
   schema:
     project:
       type: string
