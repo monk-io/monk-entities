@@ -22,7 +22,7 @@ service-usage:
       Use this entity as a dependency for other GCP entities that require
       specific APIs to be enabled. No state fields need to be passed to
       dependent entities - they just need to wait for this entity to be ready.
-    version-hash: d95a4277ce84
+    version-hash: f565e827cc09
   schema:
     name:
       type: string

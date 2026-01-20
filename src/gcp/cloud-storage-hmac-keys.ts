@@ -168,6 +168,20 @@ export class CloudStorageHmacKeys extends GcpEntity<
         return this.checkResourceExists(this.getHmacKeyUrl(accessKey)) as HmacKeyMetadata | null;
     }
 
+    private tryDeleteKey(accessKey: string): void {
+        const keyUrl = this.getHmacKeyUrl(accessKey);
+        try {
+            this.put(keyUrl, { state: "INACTIVE" });
+        } catch (error) {
+            cli.output(`Warning: failed to disable key before delete: ${(error as Error).message}`);
+        }
+        try {
+            this.httpDelete(keyUrl);
+        } catch (error) {
+            cli.output(`Warning: failed to delete HMAC key: ${(error as Error).message}`);
+        }
+    }
+
     override create(): void {
         if (!this.definition.service_account_email) {
             throw new Error("service_account_email is required to create HMAC keys");
@@ -197,9 +211,16 @@ export class CloudStorageHmacKeys extends GcpEntity<
             throw new Error(`Unexpected response from HMAC key creation: ${JSON.stringify(result)}`);
         }
 
-        secret.set(this.accessKeySecretName, accessKey);
-        secret.set(this.secretKeySecretName, secretKey);
-        cli.output(`Stored HMAC keys in secrets (${this.accessKeySecretName} / ${this.secretKeySecretName})`);
+        try {
+            secret.set(this.accessKeySecretName, accessKey);
+            secret.set(this.secretKeySecretName, secretKey);
+            cli.output(`Stored HMAC keys in secrets (${this.accessKeySecretName} / ${this.secretKeySecretName})`);
+        } catch (error) {
+            cli.output(`Failed to store HMAC keys in secrets: ${(error as Error).message}`);
+            cli.output(`Cleaning up newly created HMAC key: ${accessKey}`);
+            this.tryDeleteKey(accessKey);
+            throw error;
+        }
 
         this.state.access_key = accessKey;
         this.state.id = metadata?.id || result.id || accessKey;
@@ -236,7 +257,6 @@ export class CloudStorageHmacKeys extends GcpEntity<
             return;
         }
 
-        const keyUrl = this.getHmacKeyUrl(this.state.access_key);
         const existing = this.getExistingKey(this.state.access_key);
         if (!existing) {
             cli.output(`HMAC key ${this.state.access_key} does not exist, cleaning up secrets/state`);
@@ -245,18 +265,7 @@ export class CloudStorageHmacKeys extends GcpEntity<
         }
 
         cli.output(`Disabling HMAC key: ${this.state.access_key}`);
-        try {
-            this.put(keyUrl, { state: "INACTIVE" });
-        } catch (error) {
-            cli.output(`Warning: failed to disable key before delete: ${(error as Error).message}`);
-        }
-
-        cli.output(`Deleting HMAC key: ${this.state.access_key}`);
-        try {
-            this.httpDelete(keyUrl);
-        } catch (error) {
-            cli.output(`Warning: failed to delete HMAC key: ${(error as Error).message}`);
-        }
+        this.tryDeleteKey(this.state.access_key);
         this.cleanupSecretsAndState();
     }
 
@@ -287,6 +296,10 @@ export class CloudStorageHmacKeys extends GcpEntity<
         const key = this.getExistingKey(this.state.access_key);
         if (!key) {
             cli.output("HMAC key not found");
+            return false;
+        }
+        if (key.state && key.state !== "ACTIVE") {
+            cli.output(`HMAC key is not active: ${key.state}`);
             return false;
         }
 
