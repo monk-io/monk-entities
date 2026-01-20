@@ -16,6 +16,7 @@ import gcp from "cloud/gcp";
 import cli from "cli";
 import {
   SERVICE_USAGE_API_URL,
+  GcpApiServiceName,
   parseGcpError,
   isOperationDone,
 } from "./common.ts";
@@ -80,17 +81,21 @@ export interface ServiceUsageDefinition {
   /**
    * @description Single API name to enable.
    * Use this for enabling just one API.
-   * Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com")
+   * Format: {service}.googleapis.com (e.g., "sqladmin.googleapis.com").
+   * Service IDs do not include protocol or path.
+   * @see https://docs.cloud.google.com/service-usage/docs/enable-disable#curl
    */
-  name?: string;
+  name?: GcpApiServiceName;
 
   /**
    * @description Array of API names to batch enable.
    * Use this for enabling multiple APIs efficiently.
    * APIs are enabled concurrently in a single operation.
+   * Service IDs do not include protocol or path.
    * @example ["sqladmin.googleapis.com", "bigquery.googleapis.com"]
+   * @see https://docs.cloud.google.com/service-usage/docs/enable-disable#curl
    */
-  apis?: string[];
+  apis?: GcpApiServiceName[];
 
   /**
    * @description Override the GCP project ID.
@@ -123,6 +128,11 @@ export interface ServiceUsageState {
    * @description Indicates if APIs were already enabled (adopted)
    */
   existing?: boolean;
+}
+
+interface ServiceUsageOperation {
+  name?: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -240,7 +250,7 @@ export class ServiceUsage extends MonkEntity<
   /**
    * Enable a single API
    */
-  private enableApi(apiName: string): any {
+  private enableApi(apiName: string): ServiceUsageOperation {
     cli.output(`Enabling API: ${apiName}`);
     const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/${apiName}:enable`;
     const response = gcp.post(url);
@@ -251,7 +261,7 @@ export class ServiceUsage extends MonkEntity<
       );
     }
 
-    return JSON.parse(response.body);
+    return JSON.parse(response.body) as ServiceUsageOperation;
   }
 
   /**
@@ -289,7 +299,7 @@ export class ServiceUsage extends MonkEntity<
   /**
    * Batch enable multiple APIs
    */
-  private enableApis(apiNames: string[]): any {
+  private enableApis(apiNames: string[]): ServiceUsageOperation {
     cli.output(`Enabling ${apiNames.length} APIs: ${apiNames.join(", ")}`);
 
     const url = `${SERVICE_USAGE_API_URL}/projects/${this.projectId}/services/:batchEnable`;
@@ -302,13 +312,12 @@ export class ServiceUsage extends MonkEntity<
       );
     }
 
-    return JSON.parse(response.body);
+    return JSON.parse(response.body) as ServiceUsageOperation;
   }
 
   override create(): void {
     if (this.definition.apis && this.definition.apis.length > 0) {
       // Batch enable mode
-      // Copy to mutable array
       const apis = [...this.definition.apis];
       const toEnable = this.checkApis(apis);
 
@@ -410,7 +419,7 @@ export class ServiceUsage extends MonkEntity<
     return false;
   }
 
-  checkLiveness(): boolean {
+  override checkLiveness(): boolean {
     return this.checkReadiness();
   }
 }
