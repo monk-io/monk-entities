@@ -459,6 +459,7 @@ export class MemorystoreRedis extends GcpEntity<MemorystoreRedisDefinition, Memo
                 if (isOperationDone(operation)) {
                     if (isOperationFailed(operation)) {
                         cli.output(`Operation failed: ${JSON.stringify(operation.error)}`);
+                        this.state.operation_name = undefined;
                         return false;
                     }
                     cli.output("Operation completed successfully");
