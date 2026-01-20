@@ -78,6 +78,14 @@ var _CloudStorageHmacKeys = class _CloudStorageHmacKeys extends GcpEntity {
       this.create();
       return;
     }
+    const existing = this.getExistingKey(this.state.access_key);
+    if (!existing) {
+      cli.output("HMAC key missing, recreating.");
+      this.create();
+      return;
+    }
+    this.state.service_account_email = existing.serviceAccountEmail || this.state.service_account_email;
+    this.state.id = existing.id || this.state.id;
     cli.output("HMAC keys cannot be updated. Delete and recreate if needed.");
   }
   delete() {
@@ -90,6 +98,12 @@ var _CloudStorageHmacKeys = class _CloudStorageHmacKeys extends GcpEntity {
       return;
     }
     const keyUrl = this.getHmacKeyUrl(this.state.access_key);
+    const existing = this.getExistingKey(this.state.access_key);
+    if (!existing) {
+      cli.output(`HMAC key ${this.state.access_key} does not exist, cleaning up secrets/state`);
+      this.cleanupSecretsAndState();
+      return;
+    }
     cli.output(`Disabling HMAC key: ${this.state.access_key}`);
     try {
       this.put(keyUrl, { state: "INACTIVE" });
@@ -97,7 +111,14 @@ var _CloudStorageHmacKeys = class _CloudStorageHmacKeys extends GcpEntity {
       cli.output(`Warning: failed to disable key before delete: ${error.message}`);
     }
     cli.output(`Deleting HMAC key: ${this.state.access_key}`);
-    this.httpDelete(keyUrl);
+    try {
+      this.httpDelete(keyUrl);
+    } catch (error) {
+      cli.output(`Warning: failed to delete HMAC key: ${error.message}`);
+    }
+    this.cleanupSecretsAndState();
+  }
+  cleanupSecretsAndState() {
     try {
       secret.remove(this.accessKeySecretName);
     } catch {
