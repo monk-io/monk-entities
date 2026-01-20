@@ -40,7 +40,7 @@ cloud-storage:
       point your S3-compatible clients to `https://storage.googleapis.com`.
       Make sure `storage.googleapis.com` is enabled via `gcp/service-usage`,
       and use a `gcp/service-account` email for the HMAC key.
-    version-hash: d95a4277ce84
+    version-hash: f565e827cc09
   schema:
     project:
       type: string
