@@ -22,7 +22,7 @@ service-usage:
       Use this entity as a dependency for other GCP entities that require
       specific APIs to be enabled. No state fields need to be passed to
       dependent entities - they just need to wait for this entity to be ready.
-    version-hash: 74cf080e0408
+    version-hash: d95a4277ce84
   schema:
     name:
       type: string
@@ -30,14 +30,38 @@ service-usage:
         - sqladmin.googleapis.com
         - bigquery.googleapis.com
         - storage.googleapis.com
+        - storage-component.googleapis.com
         - iam.googleapis.com
+        - iamcredentials.googleapis.com
         - cloudresourcemanager.googleapis.com
         - serviceusage.googleapis.com
+        - compute.googleapis.com
+        - container.googleapis.com
         - cloudfunctions.googleapis.com
         - run.googleapis.com
+        - appengine.googleapis.com
         - firebasehosting.googleapis.com
         - firestore.googleapis.com
         - redis.googleapis.com
+        - spanner.googleapis.com
+        - dns.googleapis.com
+        - networkservices.googleapis.com
+        - servicenetworking.googleapis.com
+        - secretmanager.googleapis.com
+        - cloudkms.googleapis.com
+        - logging.googleapis.com
+        - monitoring.googleapis.com
+        - cloudtrace.googleapis.com
+        - clouderrorreporting.googleapis.com
+        - pubsub.googleapis.com
+        - cloudtasks.googleapis.com
+        - cloudscheduler.googleapis.com
+        - eventarc.googleapis.com
+        - aiplatform.googleapis.com
+        - ml.googleapis.com
+        - vision.googleapis.com
+        - language.googleapis.com
+        - cloudbuild.googleapis.com
       description: |-
         Single API name to enable.
         Use this for enabling just one API.
@@ -51,14 +75,38 @@ service-usage:
           - sqladmin.googleapis.com
           - bigquery.googleapis.com
           - storage.googleapis.com
+          - storage-component.googleapis.com
           - iam.googleapis.com
+          - iamcredentials.googleapis.com
           - cloudresourcemanager.googleapis.com
           - serviceusage.googleapis.com
+          - compute.googleapis.com
+          - container.googleapis.com
           - cloudfunctions.googleapis.com
           - run.googleapis.com
+          - appengine.googleapis.com
           - firebasehosting.googleapis.com
           - firestore.googleapis.com
           - redis.googleapis.com
+          - spanner.googleapis.com
+          - dns.googleapis.com
+          - networkservices.googleapis.com
+          - servicenetworking.googleapis.com
+          - secretmanager.googleapis.com
+          - cloudkms.googleapis.com
+          - logging.googleapis.com
+          - monitoring.googleapis.com
+          - cloudtrace.googleapis.com
+          - clouderrorreporting.googleapis.com
+          - pubsub.googleapis.com
+          - cloudtasks.googleapis.com
+          - cloudscheduler.googleapis.com
+          - eventarc.googleapis.com
+          - aiplatform.googleapis.com
+          - ml.googleapis.com
+          - vision.googleapis.com
+          - language.googleapis.com
+          - cloudbuild.googleapis.com
       description: |-
         Array of API names to batch enable.
         Use this for enabling multiple APIs efficiently.
