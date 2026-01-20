@@ -63,9 +63,28 @@ export interface CloudStorageHmacKeysState extends GcpEntityState {
     service_account_email?: string;
 }
 
-interface HmacKeyResource {
+interface HmacKeyMetadata {
+    kind?: string;
+    etag?: string;
     id?: string;
     accessId?: string;
+    projectId?: string;
+    serviceAccountEmail?: string;
+    state?: "ACTIVE" | "INACTIVE" | "DELETED";
+    timeCreated?: string;
+    updated?: string;
+}
+
+interface HmacKeyCreateResponse {
+    kind?: string;
+    etag?: string;
+    secret?: string;
+    secretKey?: string;
+    accessId?: string;
+    accessKey?: string;
+    access_key?: string;
+    metadata?: HmacKeyMetadata;
+    id?: string;
     serviceAccountEmail?: string;
 }
 
@@ -145,8 +164,8 @@ export class CloudStorageHmacKeys extends GcpEntity<
         }
     }
 
-    private getExistingKey(accessKey: string): HmacKeyResource | null {
-        return this.checkResourceExists(this.getHmacKeyUrl(accessKey)) as HmacKeyResource | null;
+    private getExistingKey(accessKey: string): HmacKeyMetadata | null {
+        return this.checkResourceExists(this.getHmacKeyUrl(accessKey)) as HmacKeyMetadata | null;
     }
 
     override create(): void {
@@ -169,8 +188,10 @@ export class CloudStorageHmacKeys extends GcpEntity<
 
         const url = `${this.getHmacKeysUrl()}?serviceAccountEmail=${encodeURIComponent(this.definition.service_account_email)}`;
         cli.output(`Creating Cloud Storage HMAC keys for ${this.definition.service_account_email}`);
-        const result = this.post(url);
-        const accessKey = result.accessId || result.access_key || result.accessKey;
+        const result = this.post(url) as HmacKeyCreateResponse;
+        const metadata = result.metadata;
+        const accessKey =
+            metadata?.accessId || result.accessId || result.access_key || result.accessKey;
         const secretKey = result.secret || result.secretKey;
         if (!accessKey || !secretKey) {
             throw new Error(`Unexpected response from HMAC key creation: ${JSON.stringify(result)}`);
@@ -181,8 +202,11 @@ export class CloudStorageHmacKeys extends GcpEntity<
         cli.output(`Stored HMAC keys in secrets (${this.accessKeySecretName} / ${this.secretKeySecretName})`);
 
         this.state.access_key = accessKey;
-        this.state.id = result.id || accessKey;
-        this.state.service_account_email = result.serviceAccountEmail || this.definition.service_account_email;
+        this.state.id = metadata?.id || result.id || accessKey;
+        this.state.service_account_email =
+            metadata?.serviceAccountEmail ||
+            result.serviceAccountEmail ||
+            this.definition.service_account_email;
         this.state.existing = false;
     }
 

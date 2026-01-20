@@ -60,7 +60,8 @@ var _CloudStorageHmacKeys = class _CloudStorageHmacKeys extends GcpEntity {
     const url = `${this.getHmacKeysUrl()}?serviceAccountEmail=${encodeURIComponent(this.definition.service_account_email)}`;
     cli.output(`Creating Cloud Storage HMAC keys for ${this.definition.service_account_email}`);
     const result = this.post(url);
-    const accessKey = result.accessId || result.access_key || result.accessKey;
+    const metadata = result.metadata;
+    const accessKey = metadata?.accessId || result.accessId || result.access_key || result.accessKey;
     const secretKey = result.secret || result.secretKey;
     if (!accessKey || !secretKey) {
       throw new Error(`Unexpected response from HMAC key creation: ${JSON.stringify(result)}`);
@@ -69,8 +70,8 @@ var _CloudStorageHmacKeys = class _CloudStorageHmacKeys extends GcpEntity {
     secret.set(this.secretKeySecretName, secretKey);
     cli.output(`Stored HMAC keys in secrets (${this.accessKeySecretName} / ${this.secretKeySecretName})`);
     this.state.access_key = accessKey;
-    this.state.id = result.id || accessKey;
-    this.state.service_account_email = result.serviceAccountEmail || this.definition.service_account_email;
+    this.state.id = metadata?.id || result.id || accessKey;
+    this.state.service_account_email = metadata?.serviceAccountEmail || result.serviceAccountEmail || this.definition.service_account_email;
     this.state.existing = false;
   }
   update() {

@@ -27,6 +27,7 @@ __export(common_exports, {
   CLOUD_STORAGE_API_URL: () => CLOUD_STORAGE_API_URL,
   FIREBASE_HOSTING_API_URL: () => FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL: () => FIRESTORE_API_URL,
+  GCP_API_CATALOG: () => GCP_API_CATALOG,
   IAM_API_URL: () => IAM_API_URL,
   MEMORYSTORE_REDIS_API_URL: () => MEMORYSTORE_REDIS_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
@@ -48,6 +49,52 @@ var CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
 var MEMORYSTORE_REDIS_API_URL = "https://redis.googleapis.com/v1";
 var FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
 var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
+var GCP_API_CATALOG = {
+  cloud_sql: {
+    service: "sqladmin.googleapis.com",
+    base_url: CLOUD_SQL_API_URL
+  },
+  bigquery: {
+    service: "bigquery.googleapis.com",
+    base_url: BIGQUERY_API_URL
+  },
+  cloud_storage: {
+    service: "storage.googleapis.com",
+    base_url: CLOUD_STORAGE_API_URL
+  },
+  iam: {
+    service: "iam.googleapis.com",
+    base_url: IAM_API_URL
+  },
+  resource_manager: {
+    service: "cloudresourcemanager.googleapis.com",
+    base_url: RESOURCE_MANAGER_API_URL
+  },
+  service_usage: {
+    service: "serviceusage.googleapis.com",
+    base_url: SERVICE_USAGE_API_URL
+  },
+  cloud_functions: {
+    service: "cloudfunctions.googleapis.com",
+    base_url: CLOUD_FUNCTIONS_API_URL
+  },
+  cloud_run: {
+    service: "run.googleapis.com",
+    base_url: CLOUD_RUN_API_URL
+  },
+  firebase_hosting: {
+    service: "firebasehosting.googleapis.com",
+    base_url: FIREBASE_HOSTING_API_URL
+  },
+  firestore: {
+    service: "firestore.googleapis.com",
+    base_url: FIRESTORE_API_URL
+  },
+  memorystore_redis: {
+    service: "redis.googleapis.com",
+    base_url: MEMORYSTORE_REDIS_API_URL
+  }
+};
 function getDefaultPort(databaseVersion) {
   if (databaseVersion.includes("MYSQL")) {
     return 3306;
@@ -109,6 +156,7 @@ function isOperationFailed(operation) {
   CLOUD_STORAGE_API_URL,
   FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL,
+  GCP_API_CATALOG,
   IAM_API_URL,
   MEMORYSTORE_REDIS_API_URL,
   RESOURCE_MANAGER_API_URL,
