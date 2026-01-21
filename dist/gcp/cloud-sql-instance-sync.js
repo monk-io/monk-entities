@@ -109,12 +109,19 @@ var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInf
     const databaseVersion = this.definition.database_version || "POSTGRES_14";
     const region = this.definition.region || "us-central1";
     const tier = this.definition.tier || "db-f1-micro";
+    const edition = this.definition.edition || "ENTERPRISE";
+    if (edition === "ENTERPRISE_PLUS" && !tier.startsWith("db-perf-optimized-")) {
+      throw new Error(
+        `Invalid tier '${tier}' for ENTERPRISE_PLUS edition. Enterprise Plus requires 'db-perf-optimized-N-*' tiers (e.g., db-perf-optimized-N-2). Use edition: ENTERPRISE for standard tiers like db-f1-micro or db-custom-*.`
+      );
+    }
     const body = {
       name: this.definition.name,
       databaseVersion,
       region,
       settings: {
         tier,
+        edition,
         storageAutoResize: this.definition.storage_auto_resize !== false,
         dataDiskType: this.definition.storage_type || "PD_SSD",
         dataDiskSizeGb: this.definition.storage_size_gb?.toString() || "10",
@@ -148,7 +155,7 @@ var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInf
       body.rootPassword = this.definition.root_password;
     }
     cli.output(`Creating Cloud SQL instance: ${this.definition.name}`);
-    cli.output(`Database version: ${databaseVersion}, Tier: ${tier}, Region: ${region}`);
+    cli.output(`Database version: ${databaseVersion}, Tier: ${tier}, Region: ${region}, Edition: ${edition}`);
     const result = this.post(`${this.apiUrl}/instances`, body);
     this.state.operation_name = result.name;
     this.state.port = getDefaultPort(databaseVersion);

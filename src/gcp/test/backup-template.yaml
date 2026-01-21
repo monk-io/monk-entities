@@ -27,6 +27,7 @@ backup-sql-instance:
   database_version: POSTGRES_14
   tier: db-f1-micro
   region: us-central1
+  edition: ENTERPRISE
   allow_all: true
   storage_size_gb: 10
   # Backup configuration
