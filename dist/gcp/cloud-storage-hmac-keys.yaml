@@ -27,7 +27,7 @@ cloud-storage-hmac-keys:
       ## Composing with Other Entities
       Works with:
       - `gcp/cloud-storage` - Provision buckets and access them via S3-compatible clients
-    version-hash: 562cdb4695d8
+    version-hash: 43eee5349370
   schema:
     project:
       type: string

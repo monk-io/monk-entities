@@ -3,5 +3,5 @@ namespace: gcp
 gcp-base:
   defines: module
   metadata:
-    version-hash: 562cdb4695d8
+    version-hash: 43eee5349370
   source: <<< gcp-base.js

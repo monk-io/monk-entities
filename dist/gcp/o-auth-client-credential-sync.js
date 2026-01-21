@@ -80,17 +80,6 @@ var _OAuthClientCredential = class _OAuthClientCredential extends (_a = GcpEntit
     return `${IAM_API_URL}/projects/${this.projectId}/locations/${this.location}/oauthClients/${this.definition.oauth_client_id}/credentials`;
   }
   /**
-   * Check if the credential exists by checking if secret has content
-   */
-  credentialExists() {
-    try {
-      const existing = secret.get(this.definition.secret);
-      return !!existing;
-    } catch {
-      return false;
-    }
-  }
-  /**
    * Get credential details from API
    */
   getCredential() {
@@ -107,9 +96,11 @@ var _OAuthClientCredential = class _OAuthClientCredential extends (_a = GcpEntit
     this.state.disabled = credential.disabled || false;
   }
   create() {
-    if (this.credentialExists() && this.state.resource_name) {
-      cli.output(`Credential already exists in secret ${this.definition.secret}, adopting...`);
+    const existing = this.getCredential();
+    if (existing) {
+      cli.output(`OAuth client credential ${this.definition.name} already exists, adopting...`);
       this.state.existing = true;
+      this.populateState(existing);
       return;
     }
     const body = {
@@ -119,17 +110,23 @@ var _OAuthClientCredential = class _OAuthClientCredential extends (_a = GcpEntit
     cli.output(`Creating OAuth client credential: ${this.definition.name}`);
     const url = `${this.credentialsApiUrl}?oauthClientCredentialId=${encodeURIComponent(this.definition.name)}`;
     const result = this.post(url, body);
-    if (result.clientSecret) {
-      const credentials = {
-        clientId: this.definition.oauth_client_id,
-        clientSecret: result.clientSecret,
-        credentialId: this.definition.name
-      };
-      secret.set(this.definition.secret, JSON.stringify(credentials, null, 2));
-      cli.output(`Credential stored in secret: ${this.definition.secret}`);
-    } else {
-      cli.output("Warning: No client secret returned from API");
+    if (!result.clientSecret) {
+      try {
+        this.httpDelete(`${this.credentialsApiUrl}/${this.definition.name}`);
+        cli.output("Deleted orphaned credential from GCP to allow retry");
+      } catch {
+      }
+      throw new Error(
+        `GCP API did not return clientSecret for credential ${this.definition.name}. This is unexpected. The credential has been deleted from GCP to allow retry.`
+      );
     }
+    const credentials = {
+      clientId: this.definition.oauth_client_id,
+      clientSecret: result.clientSecret,
+      credentialId: this.definition.name
+    };
+    secret.set(this.definition.secret, JSON.stringify(credentials, null, 2));
+    cli.output(`Credential stored in secret: ${this.definition.secret}`);
     this.populateState(result);
     this.state.existing = false;
     cli.output(`OAuth client credential created: ${this.state.credential_id}`);
@@ -150,11 +147,12 @@ var _OAuthClientCredential = class _OAuthClientCredential extends (_a = GcpEntit
       cli.output(`Credential was not created by this entity, skipping delete`);
       return;
     }
-    if (!this.state.resource_name) {
-      cli.output("No credential to delete");
+    const existing = this.getCredential();
+    if (!existing) {
+      cli.output(`Credential ${this.definition.name} does not exist`);
       return;
     }
-    cli.output(`Deleting OAuth client credential: ${this.state.credential_id}`);
+    cli.output(`Deleting OAuth client credential: ${this.definition.name}`);
     this.httpDelete(`${this.credentialsApiUrl}/${this.definition.name}`);
     try {
       secret.remove(this.definition.secret);
