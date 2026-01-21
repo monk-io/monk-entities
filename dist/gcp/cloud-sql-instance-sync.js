@@ -110,9 +110,10 @@ var _CloudSqlInstance = class _CloudSqlInstance extends (_a = GcpEntity, _getInf
     const region = this.definition.region || "us-central1";
     const tier = this.definition.tier || "db-f1-micro";
     const edition = this.definition.edition || "ENTERPRISE";
-    if (edition === "ENTERPRISE_PLUS" && !tier.startsWith("db-perf-optimized-")) {
+    const isEnterprisePlusTier = tier.startsWith("db-perf-optimized-") || tier.startsWith("db-c4a-highmem-");
+    if (edition === "ENTERPRISE_PLUS" && !isEnterprisePlusTier) {
       throw new Error(
-        `Invalid tier '${tier}' for ENTERPRISE_PLUS edition. Enterprise Plus requires 'db-perf-optimized-N-*' tiers (e.g., db-perf-optimized-N-2). Use edition: ENTERPRISE for standard tiers like db-f1-micro or db-custom-*.`
+        `Invalid tier '${tier}' for ENTERPRISE_PLUS edition. Enterprise Plus requires 'db-perf-optimized-N-*' (e.g., db-perf-optimized-N-2) or 'db-c4a-highmem-*' (e.g., db-c4a-highmem-2) tiers. Use edition: ENTERPRISE for standard tiers like db-f1-micro or db-custom-*.`
       );
     }
     const body = {
