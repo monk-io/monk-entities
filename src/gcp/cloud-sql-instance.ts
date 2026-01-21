@@ -95,6 +95,13 @@ export interface CloudSqlInstanceDefinition extends GcpEntityDefinition {
      * @default ZONAL
      */
     availability_type?: string;
+
+    /**
+     * @description Cloud SQL edition. ENTERPRISE is standard, ENTERPRISE_PLUS offers
+     * enhanced performance. Note: ENTERPRISE_PLUS requires compatible tiers (db-perf-optimized-*).
+     * @default ENTERPRISE
+     */
+    edition?: "ENTERPRISE" | "ENTERPRISE_PLUS";
 }
 
 /**
@@ -273,12 +280,25 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
         const region = this.definition.region || "us-central1";
         const tier = this.definition.tier || "db-f1-micro";
 
+        // Determine edition - default to ENTERPRISE to avoid tier compatibility issues
+        const edition = this.definition.edition || "ENTERPRISE";
+
+        // Validate tier compatibility with edition
+        if (edition === "ENTERPRISE_PLUS" && !tier.startsWith("db-perf-optimized-")) {
+            throw new Error(
+                `Invalid tier '${tier}' for ENTERPRISE_PLUS edition. ` +
+                `Enterprise Plus requires 'db-perf-optimized-N-*' tiers (e.g., db-perf-optimized-N-2). ` +
+                `Use edition: ENTERPRISE for standard tiers like db-f1-micro or db-custom-*.`
+            );
+        }
+
         const body: any = {
             name: this.definition.name,
             databaseVersion: databaseVersion,
             region: region,
             settings: {
                 tier: tier,
+                edition: edition,
                 storageAutoResize: this.definition.storage_auto_resize !== false,
                 dataDiskType: this.definition.storage_type || "PD_SSD",
                 dataDiskSizeGb: this.definition.storage_size_gb?.toString() || "10",
@@ -320,7 +340,7 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
         }
 
         cli.output(`Creating Cloud SQL instance: ${this.definition.name}`);
-        cli.output(`Database version: ${databaseVersion}, Tier: ${tier}, Region: ${region}`);
+        cli.output(`Database version: ${databaseVersion}, Tier: ${tier}, Region: ${region}, Edition: ${edition}`);
 
         const result = this.post(`${this.apiUrl}/instances`, body);
 
