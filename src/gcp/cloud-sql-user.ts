@@ -9,6 +9,7 @@
 import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
 import secret from "secret";
 import cli from "cli";
+import helpers from "helpers";
 import { CLOUD_SQL_API_URL } from "./common.ts";
 
 /**
@@ -236,14 +237,36 @@ export class CloudSqlUser extends GcpEntity<CloudSqlUserDefinition, CloudSqlUser
 
         cli.output(`Creating user ${this.definition.name} on instance ${this.definition.instance}`);
 
-        const result = this.post(this.apiUrl, body);
+        // Retry logic for 409 (operation in progress) errors
+        const maxRetries = 10;
+        const retryDelayMs = 30000; // 30 seconds between retries
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const result = this.post(this.apiUrl, body);
 
-        this.state.name = this.definition.name;
-        this.state.host = this.definition.host;
-        this.state.operation_name = result.name;
-        this.state.existing = false;
+                this.state.name = this.definition.name;
+                this.state.host = this.definition.host;
+                this.state.operation_name = result.name;
+                this.state.existing = false;
 
-        cli.output(`User creation started`);
+                cli.output(`User creation started`);
+                return;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                
+                // Check if it's a 409 conflict (operation in progress)
+                if (errorMessage.includes("409")) {
+                    if (attempt < maxRetries) {
+                        cli.output(`⏳ Another operation is in progress on the instance. Retrying in ${retryDelayMs / 1000}s... (attempt ${attempt}/${maxRetries})`);
+                        helpers.sleep(retryDelayMs);
+                        continue;
+                    }
+                }
+                
+                throw error;
+            }
+        }
     }
 
     override update(): void {
