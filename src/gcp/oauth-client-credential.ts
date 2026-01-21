@@ -195,18 +195,6 @@ export class OAuthClientCredential extends GcpEntity<OAuthClientCredentialDefini
     }
 
     /**
-     * Check if the credential exists by checking if secret has content
-     */
-    private credentialExists(): boolean {
-        try {
-            const existing = secret.get(this.definition.secret);
-            return !!existing;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
      * Get credential details from API
      */
     private getCredential(): any | null {
@@ -225,10 +213,13 @@ export class OAuthClientCredential extends GcpEntity<OAuthClientCredentialDefini
     }
 
     override create(): void {
-        // Check if we already have a credential stored in secret
-        if (this.credentialExists() && this.state.resource_name) {
-            cli.output(`Credential already exists in secret ${this.definition.secret}, adopting...`);
+        // Check if credential already exists in GCP
+        const existing = this.getCredential();
+
+        if (existing) {
+            cli.output(`OAuth client credential ${this.definition.name} already exists, adopting...`);
             this.state.existing = true;
+            this.populateState(existing);
             return;
         }
 
@@ -245,18 +236,33 @@ export class OAuthClientCredential extends GcpEntity<OAuthClientCredentialDefini
         const result = this.post(url, body);
 
         // The response includes the client secret only at creation time
-        if (result.clientSecret) {
-            // Store credentials as JSON
-            const credentials = {
-                clientId: this.definition.oauth_client_id,
-                clientSecret: result.clientSecret,
-                credentialId: this.definition.name,
-            };
-            secret.set(this.definition.secret, JSON.stringify(credentials, null, 2));
-            cli.output(`Credential stored in secret: ${this.definition.secret}`);
-        } else {
-            cli.output("Warning: No client secret returned from API");
+        if (!result.clientSecret) {
+            // This should never happen - GCP API always returns clientSecret on creation.
+            // If it does happen, we must fail because:
+            // 1. The credential exists in GCP but we don't have the secret
+            // 2. checkReadiness() will always fail (no secret stored)
+            // 3. Subsequent create() calls will just adopt the existing credential, still without the secret
+            // Delete the credential to allow retry
+            try {
+                this.httpDelete(`${this.credentialsApiUrl}/${this.definition.name}`);
+                cli.output("Deleted orphaned credential from GCP to allow retry");
+            } catch {
+                // Ignore delete errors
+            }
+            throw new Error(
+                `GCP API did not return clientSecret for credential ${this.definition.name}. ` +
+                `This is unexpected. The credential has been deleted from GCP to allow retry.`
+            );
         }
+
+        // Store credentials as JSON
+        const credentials = {
+            clientId: this.definition.oauth_client_id,
+            clientSecret: result.clientSecret,
+            credentialId: this.definition.name,
+        };
+        secret.set(this.definition.secret, JSON.stringify(credentials, null, 2));
+        cli.output(`Credential stored in secret: ${this.definition.secret}`);
 
         this.populateState(result);
         this.state.existing = false;
@@ -286,12 +292,13 @@ export class OAuthClientCredential extends GcpEntity<OAuthClientCredentialDefini
             return;
         }
 
-        if (!this.state.resource_name) {
-            cli.output("No credential to delete");
+        const existing = this.getCredential();
+        if (!existing) {
+            cli.output(`Credential ${this.definition.name} does not exist`);
             return;
         }
 
-        cli.output(`Deleting OAuth client credential: ${this.state.credential_id}`);
+        cli.output(`Deleting OAuth client credential: ${this.definition.name}`);
 
         // Delete the credential from GCP
         this.httpDelete(`${this.credentialsApiUrl}/${this.definition.name}`);
@@ -342,7 +349,7 @@ export class OAuthClientCredential extends GcpEntity<OAuthClientCredentialDefini
         return true;
     }
 
-    checkLiveness(): boolean {
+    override checkLiveness(): boolean {
         try {
             const credData = secret.get(this.definition.secret);
             if (!credData) return false;
