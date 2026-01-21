@@ -31,7 +31,7 @@ big-query:
       Applications can query BigQuery using:
       - Dataset reference: `{project}.{dataset_id}.{table_name}`
       - Full path: `state.dataset_reference` + `.{table_name}`
-    version-hash: f565e827cc09
+    version-hash: 562cdb4695d8
   schema:
     project:
       type: string
