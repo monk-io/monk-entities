@@ -10,6 +10,7 @@ const gcpBase = require("gcp/gcp-base");
 const GcpEntity = gcpBase.GcpEntity;
 const secret = require("secret");
 const cli = require("cli");
+const helpers = require("helpers");
 const common = require("gcp/common");
 const CLOUD_SQL_API_URL = common.CLOUD_SQL_API_URL;
 var _CloudSqlUser = class _CloudSqlUser extends GcpEntity {
@@ -79,12 +80,29 @@ var _CloudSqlUser = class _CloudSqlUser extends GcpEntity {
       body.type = this.definition.user_type;
     }
     cli.output(`Creating user ${this.definition.name} on instance ${this.definition.instance}`);
-    const result = this.post(this.apiUrl, body);
-    this.state.name = this.definition.name;
-    this.state.host = this.definition.host;
-    this.state.operation_name = result.name;
-    this.state.existing = false;
-    cli.output(`User creation started`);
+    const maxRetries = 10;
+    const retryDelayMs = 3e4;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = this.post(this.apiUrl, body);
+        this.state.name = this.definition.name;
+        this.state.host = this.definition.host;
+        this.state.operation_name = result.name;
+        this.state.existing = false;
+        cli.output(`User creation started`);
+        return;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("409")) {
+          if (attempt < maxRetries) {
+            cli.output(`\u23F3 Another operation is in progress on the instance. Retrying in ${retryDelayMs / 1e3}s... (attempt ${attempt}/${maxRetries})`);
+            helpers.sleep(retryDelayMs);
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
   }
   update() {
     const existing = this.getUser();

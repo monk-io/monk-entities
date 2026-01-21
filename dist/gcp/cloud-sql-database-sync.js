@@ -9,6 +9,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 const gcpBase = require("gcp/gcp-base");
 const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
+const helpers = require("helpers");
 const common = require("gcp/common");
 const CLOUD_SQL_API_URL = common.CLOUD_SQL_API_URL;
 var _CloudSqlDatabase = class _CloudSqlDatabase extends GcpEntity {
@@ -46,11 +47,28 @@ var _CloudSqlDatabase = class _CloudSqlDatabase extends GcpEntity {
       body.collation = this.definition.collation;
     }
     cli.output(`Creating database ${this.definition.name} on instance ${this.definition.instance}`);
-    const result = this.post(this.apiUrl, body);
-    this.state.name = this.definition.name;
-    this.state.operation_name = result.name;
-    this.state.existing = false;
-    cli.output(`Database creation started, operation: ${result.name}`);
+    const maxRetries = 10;
+    const retryDelayMs = 3e4;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = this.post(this.apiUrl, body);
+        this.state.name = this.definition.name;
+        this.state.operation_name = result.name;
+        this.state.existing = false;
+        cli.output(`Database creation started, operation: ${result.name}`);
+        return;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("409")) {
+          if (attempt < maxRetries) {
+            cli.output(`\u23F3 Another operation is in progress on the instance. Retrying in ${retryDelayMs / 1e3}s... (attempt ${attempt}/${maxRetries})`);
+            helpers.sleep(retryDelayMs);
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
   }
   update() {
     const existing = this.getDatabase();

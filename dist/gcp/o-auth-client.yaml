@@ -1,0 +1,144 @@
+namespace: gcp
+o-auth-client:
+  defines: entity
+  metadata:
+    name: OAuthClient
+    description: |-
+      GCP IAM OAuth Client entity
+
+      Creates and manages OAuth clients for Workforce Identity Federation.
+      OAuth clients enable external applications to authenticate users against
+      GCP's identity platform.
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none (use `gcp/oauth-client-credential` for client secrets)
+
+      ## State Fields for Composition
+      - `state.resource_name` - Full resource name for API operations
+      - `state.client_id` - OAuth client ID for use in OAuth flows
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/oauth-client-credential` - Creates client secrets for this OAuth client
+      - `gcp/service-usage` - Enable the IAM API first
+
+      ## Required IAM Permissions
+      - `iam.oauthClients.create`
+      - `iam.oauthClients.get`
+      - `iam.oauthClients.update`
+      - `iam.oauthClients.delete`
+
+      Or use the predefined role: `roles/iam.oauthClientAdmin`
+    version-hash: 562cdb4695d8
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        The OAuth client ID. Must be unique within the project and location.
+        Used to identify this OAuth client.
+    location:
+      type: string
+      description: Location for the OAuth client.
+      default: global
+    display_name:
+      type: string
+      description: |-
+        Human-readable display name for the OAuth client.
+        Shown in the Cloud Console.
+    client_description:
+      type: string
+      description: Description of the OAuth client's purpose.
+    client_type:
+      type: string
+      enum:
+        - CONFIDENTIAL_CLIENT
+        - PUBLIC_CLIENT
+      description: |-
+        The type of OAuth client.
+        - CONFIDENTIAL_CLIENT: Server-side apps that can securely store secrets
+        - PUBLIC_CLIENT: Client-side apps (mobile, SPA) that cannot securely store secrets
+      default: CONFIDENTIAL_CLIENT
+    allowed_grant_types:
+      type: array
+      items:
+        type: string
+        enum:
+          - AUTHORIZATION_CODE_GRANT
+          - REFRESH_TOKEN_GRANT
+          - CLIENT_CREDENTIALS_GRANT
+      description: List of allowed OAuth grant types for this client.
+      default:
+        - AUTHORIZATION_CODE_GRANT
+    allowed_redirect_uris:
+      type: array
+      items:
+        type: string
+      description: |-
+        List of allowed redirect URIs for OAuth flows.
+        Required for authorization code grant type.
+    allowed_scopes:
+      type: array
+      items:
+        type: string
+      description: List of allowed OAuth scopes for this client.
+    disabled:
+      type: boolean
+      description: Whether the OAuth client is disabled.
+      default: false
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: |-
+        Full resource name of the OAuth client.
+        Format: projects/{project}/locations/{location}/oauthClients/{oauthClientId}
+    client_id:
+      type: string
+      description: The OAuth client ID
+    state:
+      type: string
+      description: Current state of the OAuth client
+    display_name:
+      type: string
+      description: Human-readable display name
+    create_time:
+      type: string
+      description: When the OAuth client was created
+    update_time:
+      type: string
+      description: When the OAuth client was last updated
+    expire_time:
+      type: string
+      description: When the OAuth client will expire (if set)
+    disabled:
+      type: boolean
+      description: Whether the OAuth client is disabled
+  lifecycle:
+    sync: <<< o-auth-client-sync.js
+    get-info: ''
+    list-credentials: ''
+    enable: ''
+    disable: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common
