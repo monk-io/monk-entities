@@ -284,10 +284,13 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
         const edition = this.definition.edition || "ENTERPRISE";
 
         // Validate tier compatibility with edition
-        if (edition === "ENTERPRISE_PLUS" && !tier.startsWith("db-perf-optimized-")) {
+        // Enterprise Plus supports: db-perf-optimized-N-* (N2) and db-c4a-highmem-* (C4A Axion)
+        const isEnterprisePlusTier = tier.startsWith("db-perf-optimized-") || tier.startsWith("db-c4a-highmem-");
+        if (edition === "ENTERPRISE_PLUS" && !isEnterprisePlusTier) {
             throw new Error(
                 `Invalid tier '${tier}' for ENTERPRISE_PLUS edition. ` +
-                `Enterprise Plus requires 'db-perf-optimized-N-*' tiers (e.g., db-perf-optimized-N-2). ` +
+                `Enterprise Plus requires 'db-perf-optimized-N-*' (e.g., db-perf-optimized-N-2) or ` +
+                `'db-c4a-highmem-*' (e.g., db-c4a-highmem-2) tiers. ` +
                 `Use edition: ENTERPRISE for standard tiers like db-f1-micro or db-custom-*.`
             );
         }
