@@ -1,0 +1,189 @@
+# GCP Memorystore for Redis Test Template
+#
+# This template defines Memorystore for Redis instances for testing CRUD operations
+# and backup/restore functionality (export/import).
+#
+# Prerequisites:
+# - GCP project with billing enabled
+# - Redis API enabled (redis.googleapis.com)
+# - For export/import: Cloud Storage bucket with appropriate IAM permissions
+#
+# Usage:
+#   monk load src/gcp/test/memorystore-redis-template.yaml
+#   monk update gcp-redis-test/test-stack
+#
+# Backup/Restore operations:
+#   monk do gcp-redis-test/basic-redis get-backup-info
+#   monk do gcp-redis-test/basic-redis create-snapshot output_uri="gs://your-bucket/backup.rdb"
+#   monk do gcp-redis-test/basic-redis list-snapshots
+#   monk do gcp-redis-test/basic-redis restore source_uri="gs://your-bucket/backup.rdb"
+
+namespace: gcp-redis-test
+
+# =============================================================================
+# Service Usage - Enable Required APIs
+# =============================================================================
+
+enable-redis-api:
+  defines: gcp/service-usage
+  apis:
+    - redis.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# =============================================================================
+# Basic Redis Instance (BASIC tier - minimal config)
+# =============================================================================
+# BASIC tier: single node, no failover, best for development/testing
+
+basic-redis:
+  defines: gcp/memorystore-redis
+  name: monkec-test-redis-basic
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  display_name: MonkEC Test Redis Basic
+  labels:
+    environment: test
+    managed-by: monkec
+  depends:
+    wait-for:
+      runnables:
+        - gcp-redis-test/enable-redis-api
+      timeout: 300
+
+# =============================================================================
+# Redis Instance with Persistence (RDB snapshots)
+# =============================================================================
+# Demonstrates RDB persistence configuration for automatic snapshots
+
+redis-with-persistence:
+  defines: gcp/memorystore-redis
+  name: monkec-test-redis-persist
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  display_name: MonkEC Test Redis with Persistence
+  auth_enabled: true
+  persistence_config:
+    persistence_mode: RDB
+    rdb_snapshot_period: TWELVE_HOURS
+  labels:
+    environment: test
+    persistence: enabled
+  depends:
+    wait-for:
+      runnables:
+        - gcp-redis-test/enable-redis-api
+      timeout: 300
+
+# =============================================================================
+# Redis Instance with Maintenance Window
+# =============================================================================
+# Demonstrates maintenance policy configuration
+
+redis-with-maintenance:
+  defines: gcp/memorystore-redis
+  name: monkec-test-redis-maint
+  region: us-central1
+  tier: BASIC
+  memory_size_gb: 1
+  redis_version: REDIS_7_0
+  display_name: MonkEC Test Redis with Maintenance
+  maintenance_policy:
+    description: Weekly maintenance window
+    weekly_maintenance_window:
+      - day: SUNDAY
+        start_time:
+          hours: 3
+          minutes: 0
+  labels:
+    environment: test
+  depends:
+    wait-for:
+      runnables:
+        - gcp-redis-test/enable-redis-api
+      timeout: 300
+
+# =============================================================================
+# High Availability Redis Instance (STANDARD_HA tier)
+# =============================================================================
+# STANDARD_HA tier: includes replica for automatic failover
+# NOTE: More expensive, uncomment only when testing HA features
+
+# ha-redis:
+#   defines: gcp/memorystore-redis
+#   name: monkec-test-redis-ha
+#   region: us-central1
+#   tier: STANDARD_HA
+#   memory_size_gb: 1
+#   redis_version: REDIS_7_0
+#   display_name: MonkEC Test Redis HA
+#   auth_enabled: true
+#   persistence_config:
+#     persistence_mode: RDB
+#     rdb_snapshot_period: SIX_HOURS
+#   labels:
+#     environment: test
+#     ha: enabled
+#   services:
+#     cache:
+#       protocol: tcp
+#       address: <- entity-state get-member("host") default("")
+#       port: <- entity-state get-member("port") default(6379) to-int
+#   depends:
+#     wait-for:
+#       runnables:
+#         - gcp-redis-test/enable-redis-api
+#       timeout: 300
+
+# =============================================================================
+# Redis with Read Replicas (STANDARD_HA tier required)
+# =============================================================================
+# Demonstrates read replicas configuration
+# NOTE: Requires STANDARD_HA tier, uncomment only when needed
+
+# redis-with-replicas:
+#   defines: gcp/memorystore-redis
+#   name: monkec-test-redis-replicas
+#   region: us-central1
+#   tier: STANDARD_HA
+#   memory_size_gb: 5
+#   redis_version: REDIS_7_0
+#   display_name: MonkEC Test Redis with Replicas
+#   auth_enabled: true
+#   read_replicas_mode: READ_REPLICAS_ENABLED
+#   replica_count: 2
+#   labels:
+#     environment: test
+#     replicas: enabled
+#   services:
+#     cache:
+#       protocol: tcp
+#       address: <- entity-state get-member("host") default("")
+#       port: <- entity-state get-member("port") default(6379) to-int
+#     read:
+#       protocol: tcp
+#       address: <- entity-state get-member("read_endpoint") default("")
+#       port: <- entity-state get-member("port") default(6379) to-int
+#   depends:
+#     wait-for:
+#       runnables:
+#         - gcp-redis-test/enable-redis-api
+#       timeout: 300
+
+# =============================================================================
+# Test Stack - Run all enabled instances together
+# =============================================================================
+
+test-stack:
+  defines: process-group
+  runnable-list:
+    - gcp-redis-test/enable-redis-api
+    - gcp-redis-test/basic-redis
+    # Uncomment to include additional instances in the stack:
+    # - gcp-redis-test/redis-with-persistence
+    # - gcp-redis-test/redis-with-maintenance

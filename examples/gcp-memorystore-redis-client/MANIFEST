@@ -1,0 +1,2 @@
+REPO gcp-redis-demo
+LOAD stack.yaml
