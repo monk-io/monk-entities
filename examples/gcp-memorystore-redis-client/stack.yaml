@@ -27,9 +27,9 @@ namespace: gcp-redis-demo
 redis-app:
   defines: group
   members:
-    - enable-apis
-    - redis-cache
-    - redis-client
+    - gcp-redis-demo/enable-apis
+    - gcp-redis-demo/redis-cache
+    - gcp-redis-demo/redis-client
 
 # =============================================================================
 # Step 1: Enable Required APIs
