@@ -47,6 +47,9 @@ export interface RDSInstanceState extends AWSRDSState {
  * - `aws-ec2/security-group` - Control network access to the database
  * - `aws-ec2/subnet` - Place database in specific VPC subnets
  * - `aws-lambda/function` - Connect serverless functions to the database
+ * 
+ * ## Networking 
+ * - Default Monk VPC CIDR 172.31.0.0/16 should be added to the allowed_cidr_blocks list in most cases.
  */
 export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstanceState> {
     
@@ -287,7 +290,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         }
     }
 
-    checkLiveness(): boolean { return this.checkReadiness(); }
+    override checkLiveness(): boolean { return this.checkReadiness(); }
 
     
 

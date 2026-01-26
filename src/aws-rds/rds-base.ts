@@ -65,7 +65,7 @@ export interface AWSRDSDefinition {
     vpc_id?: string;
     /** @description Allowed CIDR blocks for ingress on the DB port */
     allowed_cidr_blocks?: string[];
-    /** @description Allowed security group names for ingress on the DB port */
+    /** @description Allowed security group names for ingress on the DB port, include default Monk VPC CIR 172.31.0.0/16 */
     allowed_security_group_names?: string[];
 }
 

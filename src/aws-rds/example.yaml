@@ -19,6 +19,8 @@ my-mysql-db:
   multi_az: false
   deletion_protection: false
   skip_final_snapshot: true
+  allowed_cidr_blocks:
+    - "172.31.0.0/16"
   tags:
     Environment: development
     Application: my-app
@@ -48,6 +50,8 @@ my-postgres-db:
   deletion_protection: true
   skip_final_snapshot: false
   final_db_snapshot_identifier: my-postgres-final-snapshot
+  allowed_cidr_blocks:
+    - "172.31.0.0/16"
   tags:
     Environment: production
     Application: my-app
@@ -69,9 +73,10 @@ my-secure-mysql:
   security_group_description: "Auto-created security group for MySQL RDS instance"
   # vpc_id: vpc-0123456789abcdef0  # Optional: specify VPC (uses default VPC if omitted)
   # Security access control - at least one must be specified
-  allowed_cidr_blocks:             # Allow access from specific IP ranges
-    - "10.0.0.0/16"               # VPC CIDR
-    - "192.168.1.0/24"            # Office network
+  allowed_cidr_blocks: # Allow access from specific IP ranges
+    - "172.31.0.0/16" # Default Monk VPC CIDR
+    - "10.0.0.0/16" # VPC CIDR
+    - "192.168.1.0/24" # Office network
   tags:
     Environment: development
     AutoCreatedSG: "true"
@@ -91,8 +96,8 @@ my-default-vpc-mysql:
   security_group_description: "Auto-created security group in default VPC"
   # Allow access from specific security groups by name
   allowed_security_group_names:
-    - "app-servers-sg"            # Application servers security group
-    - "web-servers-sg"            # Web servers security group
+    - "app-servers-sg" # Application servers security group
+    - "web-servers-sg" # Web servers security group
   tags:
     Environment: development
     DefaultVPC: "true"
@@ -111,9 +116,9 @@ my-hybrid-access-mysql:
   security_group_description: "Security group with mixed access types"
   # Allow access from both CIDR blocks and security groups
   allowed_cidr_blocks:
-    - "10.0.0.0/16"             # VPC CIDR
+    - "10.0.0.0/16" # VPC CIDR
   allowed_security_group_names:
-    - "app-servers-sg"          # Application servers
+    - "app-servers-sg" # Application servers
   tags:
     Environment: production
     AccessType: "hybrid"
@@ -127,7 +132,7 @@ my-custom-mysql:
   engine: mysql
   master_username: admin
   allocated_storage: 20
-  vpc_security_group_ids:        # Explicitly specify security groups
+  vpc_security_group_ids: # Explicitly specify security groups
     - sg-0123456789abcdef0
     - sg-0987654321fedcba0
   tags:
@@ -146,17 +151,17 @@ updatable-mysql:
   master_username: admin
   password_secret_ref: updatable-mysql-password
   allocated_storage: 20
-  
+
   # Auto-create security group that can be updated
   auto_create_security_group: true
   security_group_name: updatable-mysql-sg
   security_group_description: "MySQL Database with Updatable Access Rules"
   # Initial access: only from development networks
   allowed_cidr_blocks:
-    - "10.0.0.0/16"    # Initial development network
+    - "10.0.0.0/16" # Initial development network
   # To add more access, modify these lists and run 'monk update':
   # allowed_cidr_blocks:
   #   - "10.0.0.0/16"    # Keep existing
-  #   - "172.16.0.0/12"  # Add staging network  
+  #   - "172.16.0.0/12"  # Add staging network
   # allowed_security_group_names:
-  #   - "staging-servers-sg"  # Add staging servers access 
+  #   - "staging-servers-sg"  # Add staging servers access
