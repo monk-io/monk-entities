@@ -23,7 +23,10 @@ rds-instance:
       - `aws-ec2/security-group` - Control network access to the database
       - `aws-ec2/subnet` - Place database in specific VPC subnets
       - `aws-lambda/function` - Connect serverless functions to the database
-    version-hash: 6f5fba69a591
+
+      ## Networking 
+      - Default Monk VPC CIDR 172.31.0.0/16 should be added to the allowed_cidr_blocks list in most cases.
+    version-hash: 66a8c92d7e4e
   schema:
     region:
       type: string
@@ -125,7 +128,7 @@ rds-instance:
       type: array
       items:
         type: string
-      description: Allowed security group names for ingress on the DB port
+      description: 'Allowed security group names for ingress on the DB port, include default Monk VPC CIR 172.31.0.0/16'
     required:
       - region
       - db_instance_identifier
