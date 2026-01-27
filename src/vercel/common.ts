@@ -8,6 +8,8 @@
 export const VERCEL_API_ENDPOINTS = {
     PROJECTS: "/v9/projects",
     PROJECTS_V11: "/v11/projects",
+    PROJECTS_ENV: "/v10/projects",  // For POST env vars
+    PROJECTS_ENV_V9: "/v9/projects", // For GET/PATCH/DELETE env vars
     DEPLOYMENTS: "/v6/deployments",
     DEPLOYMENTS_V13: "/v13/deployments",
     DOMAINS: "/v9/projects",

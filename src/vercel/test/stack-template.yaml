@@ -7,6 +7,8 @@ project:
   secret_ref: vercel-token
   permitted-secrets:
     vercel-token: true
+  env:
+    TEST_ENV_VAR: test-value
   services:
     data:
       protocol: custom

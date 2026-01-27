@@ -177,6 +177,7 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       existing: false
     };
     cli.output(`\u2705 Created Vercel project: ${createObj.name}`);
+    this.syncEnvVars();
     this.syncDomains();
   }
   update() {
@@ -218,9 +219,10 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       hasChanges = true;
     }
     if (!hasChanges) {
+      this.syncEnvVars();
       if (shouldSyncDomains) {
         this.syncDomains();
-      } else {
+      } else if (!this.definition.env || Object.keys(this.definition.env).length === 0) {
         cli.output(`\u2139\uFE0F  No changes detected for project: ${this.definition.name}`);
       }
       return;
@@ -242,6 +244,7 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
       root_directory: updatedProject.rootDirectory
     };
     cli.output(`\u2705 Updated Vercel project: ${updatedProject.name}`);
+    this.syncEnvVars();
     if (shouldSyncDomains) {
       this.syncDomains();
     }
@@ -303,6 +306,59 @@ var _Project = class _Project extends (_a = VercelEntity, _getProject_dec = [act
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       cli.output(`\u26A0\uFE0F  Failed to sync domains: ${msg}`);
+    }
+  }
+  /**
+   * Sync environment variables from definition to the project
+   * Creates new env vars and updates existing ones with changed values
+   */
+  syncEnvVars() {
+    if (!this.state.id) return;
+    const desired = this.definition.env;
+    if (!desired || Object.keys(desired).length === 0) return;
+    try {
+      const teamPath = this.getTeamPath();
+      const existingResponse = this.makeRequest(
+        "GET",
+        `${VERCEL_API_ENDPOINTS.PROJECTS_ENV_V9}/${this.state.id}/env${teamPath}`
+      );
+      const existingEnvs = existingResponse?.envs || [];
+      const existingByKey = /* @__PURE__ */ new Map();
+      for (const env of existingEnvs) {
+        existingByKey.set(env.key, { id: env.id, value: env.value });
+      }
+      for (const [key, value] of Object.entries(desired)) {
+        const existing = existingByKey.get(key);
+        if (existing) {
+          const body = {
+            value,
+            ...this.getTeamBody()
+          };
+          this.makeRequest(
+            "PATCH",
+            `${VERCEL_API_ENDPOINTS.PROJECTS_ENV_V9}/${this.state.id}/env/${existing.id}${teamPath}`,
+            body
+          );
+          cli.output(`\u{1F504} Updated env var: ${key}`);
+        } else {
+          const body = {
+            key,
+            value,
+            target: ["production", "preview", "development"],
+            type: "encrypted",
+            ...this.getTeamBody()
+          };
+          this.makeRequest(
+            "POST",
+            `${VERCEL_API_ENDPOINTS.PROJECTS_ENV}/${this.state.id}/env${teamPath}`,
+            body
+          );
+          cli.output(`\u{1F527} Created env var: ${key}`);
+        }
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      cli.output(`\u26A0\uFE0F  Failed to sync environment variables: ${msg}`);
     }
   }
   getProject() {
