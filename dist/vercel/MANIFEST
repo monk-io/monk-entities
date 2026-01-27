@@ -1,7 +1,7 @@
 REPO vercel
-VERSION_HASH 7fa921fb1912
+VERSION_HASH 0e6146e82788
 DESCRIPTION Frontend hosting and deploys.
 HOSTING managed
 TAGS vercel,hosting,deploy
-LOAD deployment.yaml vercel-base.yaml common.yaml project.yaml
-RESOURCES project-sync.js vercel-base.js common.js deployment-sync.js
+LOAD vercel-base.yaml project.yaml deployment.yaml common.yaml
+RESOURCES common.js project-sync.js vercel-base.js deployment-sync.js

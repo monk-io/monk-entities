@@ -20,7 +20,7 @@ deployment:
       ## Composing with Other Entities
       Works with:
       - `vercel/project` - The project to deploy to
-    version-hash: 7fa921fb1912
+    version-hash: 0e6146e82788
   schema:
     secret_ref:
       type: string
