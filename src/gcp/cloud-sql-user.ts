@@ -9,7 +9,6 @@
 import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
 import secret from "secret";
 import cli from "cli";
-import helpers from "helpers";
 import { CLOUD_SQL_API_URL } from "./common.ts";
 
 /**
@@ -259,7 +258,7 @@ export class CloudSqlUser extends GcpEntity<CloudSqlUserDefinition, CloudSqlUser
                 if (errorMessage.includes("409")) {
                     if (attempt < maxRetries) {
                         cli.output(`⏳ Another operation is in progress on the instance. Retrying in ${retryDelayMs / 1000}s... (attempt ${attempt}/${maxRetries})`);
-                        helpers.sleep(retryDelayMs);
+                        sleep(retryDelayMs);
                         continue;
                     }
                 }

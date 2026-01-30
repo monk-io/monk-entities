@@ -106,7 +106,12 @@ export abstract class GcpEntity<
      * Make a POST request to a GCP API
      */
     protected post(url: string, body?: any): any {
-        const options = body ? { body: JSON.stringify(body) } : undefined;
+        // Always pass an object to gcp.post - the runtime doesn't handle undefined well
+        const options: any = {};
+        if (body) {
+            options.body = JSON.stringify(body);
+            options.headers = { "Content-Type": "application/json" };
+        }
         const response = gcp.post(url, options);
         return this.handleResponse(response, "POST", url);
     }
@@ -115,7 +120,12 @@ export abstract class GcpEntity<
      * Make a PUT request to a GCP API
      */
     protected put(url: string, body?: any): any {
-        const options = body ? { body: JSON.stringify(body) } : undefined;
+        // Always pass an object to gcp.put - the runtime doesn't handle undefined well
+        const options: any = {};
+        if (body) {
+            options.body = JSON.stringify(body);
+            options.headers = { "Content-Type": "application/json" };
+        }
         const response = gcp.put(url, options);
         return this.handleResponse(response, "PUT", url);
     }
@@ -135,6 +145,7 @@ export abstract class GcpEntity<
         const options: any = { method: "PATCH" };
         if (body) {
             options.body = JSON.stringify(body);
+            options.headers = { "Content-Type": "application/json" };
         }
         const response = gcp.do(url, options);
         return this.handleResponse(response, "PATCH", url);
@@ -150,7 +161,22 @@ export abstract class GcpEntity<
         }
 
         if (response.statusCode >= 400) {
-            throw new Error(`GCP ${method} request to ${url} failed with status ${response.statusCode}: ${response.body}`);
+            // Try to parse error details from JSON body
+            let errorDetail = response.body;
+            try {
+                const errorJson = JSON.parse(response.body);
+                if (errorJson.error) {
+                    const e = errorJson.error;
+                    errorDetail = e.message || e.status || response.body;
+                    if (e.details && Array.isArray(e.details)) {
+                        const detailMsgs = e.details.map((d: any) => d.reason || d["@type"] || JSON.stringify(d)).join(", ");
+                        errorDetail += ` [${detailMsgs}]`;
+                    }
+                }
+            } catch {
+                // Use raw body if not JSON
+            }
+            throw new Error(`GCP ${method} request to ${url} failed with status ${response.statusCode}: ${errorDetail}`);
         }
 
         if (!response.body || response.body === "") {

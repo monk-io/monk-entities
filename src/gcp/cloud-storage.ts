@@ -469,7 +469,9 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
         if (this.definition.uniform_bucket_level_access !== false) {
             body.iamConfiguration.uniformBucketLevelAccess = { enabled: true };
         }
-        if (this.definition.public_access_prevention) {
+        // Only include publicAccessPrevention if explicitly set to "enforced"
+        // "inherited" is the default and some API versions don't accept it explicitly
+        if (this.definition.public_access_prevention && this.definition.public_access_prevention !== "inherited") {
             body.iamConfiguration.publicAccessPrevention = this.definition.public_access_prevention;
         }
 
@@ -520,6 +522,8 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
         }
 
         cli.output(`Creating Cloud Storage bucket: ${this.definition.name}`);
+        cli.output(`Request URL: ${url}`);
+        cli.output(`Request body: ${JSON.stringify(body, null, 2)}`);
 
         const result = this.post(url, body);
 
