@@ -252,7 +252,8 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
      */
     private getIamPolicy(): IamPolicy {
         const url = `${RESOURCE_MANAGER_API_URL}/projects/${this.projectId}:getIamPolicy`;
-        return this.post(url);
+        // POST without body - the API accepts an empty GetIamPolicyRequest
+        return this.post(url, null);
     }
 
     /**
@@ -276,9 +277,14 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
         const policy = this.getIamPolicy();
         const member = `serviceAccount:${email}`;
 
+        // Ensure bindings array exists (may be missing for projects with default IAM only)
+        if (!policy.bindings) {
+            policy.bindings = [];
+        }
+
         for (const role of this.definition.roles) {
             // Check if binding already exists
-            let binding = policy.bindings.find(b => b.role === role);
+            const binding = policy.bindings.find(b => b.role === role);
 
             if (binding) {
                 // Add member if not already present
@@ -310,6 +316,12 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
 
         const policy = this.getIamPolicy();
         const member = `serviceAccount:${email}`;
+
+        // Nothing to remove if no bindings exist
+        if (!policy.bindings || policy.bindings.length === 0) {
+            cli.output("No role bindings to remove");
+            return;
+        }
 
         // Remove member from all bindings
         for (let i = policy.bindings.length - 1; i >= 0; i--) {

@@ -96,7 +96,7 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
    */
   getIamPolicy() {
     const url = `${RESOURCE_MANAGER_API_URL}/projects/${this.projectId}:getIamPolicy`;
-    return this.post(url);
+    return this.post(url, null);
   }
   /**
    * Set project IAM policy
@@ -115,8 +115,11 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     cli.output(`Adding ${this.definition.roles.length} role bindings...`);
     const policy = this.getIamPolicy();
     const member = `serviceAccount:${email}`;
+    if (!policy.bindings) {
+      policy.bindings = [];
+    }
     for (const role of this.definition.roles) {
-      let binding = policy.bindings.find((b) => b.role === role);
+      const binding = policy.bindings.find((b) => b.role === role);
       if (binding) {
         if (!binding.members.includes(member)) {
           binding.members.push(member);
@@ -141,6 +144,10 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     cli.output("Removing role bindings...");
     const policy = this.getIamPolicy();
     const member = `serviceAccount:${email}`;
+    if (!policy.bindings || policy.bindings.length === 0) {
+      cli.output("No role bindings to remove");
+      return;
+    }
     for (let i = policy.bindings.length - 1; i >= 0; i--) {
       const binding = policy.bindings[i];
       binding.members = binding.members.filter((m) => m !== member);

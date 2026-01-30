@@ -125,7 +125,11 @@ var GcpEntity = class extends import_base.MonkEntity {
    * Make a POST request to a GCP API
    */
   post(url, body) {
-    const options = body ? { body: JSON.stringify(body) } : void 0;
+    const options = {};
+    if (body) {
+      options.body = JSON.stringify(body);
+      options.headers = { "Content-Type": "application/json" };
+    }
     const response = import_gcp.default.post(url, options);
     return this.handleResponse(response, "POST", url);
   }
@@ -133,7 +137,11 @@ var GcpEntity = class extends import_base.MonkEntity {
    * Make a PUT request to a GCP API
    */
   put(url, body) {
-    const options = body ? { body: JSON.stringify(body) } : void 0;
+    const options = {};
+    if (body) {
+      options.body = JSON.stringify(body);
+      options.headers = { "Content-Type": "application/json" };
+    }
     const response = import_gcp.default.put(url, options);
     return this.handleResponse(response, "PUT", url);
   }
@@ -151,6 +159,7 @@ var GcpEntity = class extends import_base.MonkEntity {
     const options = { method: "PATCH" };
     if (body) {
       options.body = JSON.stringify(body);
+      options.headers = { "Content-Type": "application/json" };
     }
     const response = import_gcp.default.do(url, options);
     return this.handleResponse(response, "PATCH", url);
@@ -164,7 +173,20 @@ var GcpEntity = class extends import_base.MonkEntity {
       throw new Error(`GCP ${method} request to ${url} failed: ${errorMsg}`);
     }
     if (response.statusCode >= 400) {
-      throw new Error(`GCP ${method} request to ${url} failed with status ${response.statusCode}: ${response.body}`);
+      let errorDetail = response.body;
+      try {
+        const errorJson = JSON.parse(response.body);
+        if (errorJson.error) {
+          const e = errorJson.error;
+          errorDetail = e.message || e.status || response.body;
+          if (e.details && Array.isArray(e.details)) {
+            const detailMsgs = e.details.map((d) => d.reason || d["@type"] || JSON.stringify(d)).join(", ");
+            errorDetail += ` [${detailMsgs}]`;
+          }
+        }
+      } catch {
+      }
+      throw new Error(`GCP ${method} request to ${url} failed with status ${response.statusCode}: ${errorDetail}`);
     }
     if (!response.body || response.body === "") {
       return {};
