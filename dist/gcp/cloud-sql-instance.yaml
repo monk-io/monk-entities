@@ -25,7 +25,7 @@ cloud-sql-instance:
       This entity is typically composed with:
       - `gcp/cloud-sql-database` - Pass `definition.name` to its `instance` field
       - `gcp/cloud-sql-user` - Pass `definition.name` to its `instance` field
-    version-hash: 8ed7b70e7799
+    version-hash: e313ae71ccd1
   schema:
     project:
       type: string
