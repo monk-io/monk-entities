@@ -9,7 +9,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 const gcpBase = require("gcp/gcp-base");
 const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
-const helpers = require("helpers");
 const common = require("gcp/common");
 const CLOUD_SQL_API_URL = common.CLOUD_SQL_API_URL;
 var _CloudSqlDatabase = class _CloudSqlDatabase extends GcpEntity {
@@ -62,7 +61,7 @@ var _CloudSqlDatabase = class _CloudSqlDatabase extends GcpEntity {
         if (errorMessage.includes("409")) {
           if (attempt < maxRetries) {
             cli.output(`\u23F3 Another operation is in progress on the instance. Retrying in ${retryDelayMs / 1e3}s... (attempt ${attempt}/${maxRetries})`);
-            helpers.sleep(retryDelayMs);
+            sleep(retryDelayMs);
             continue;
           }
         }

@@ -106,7 +106,7 @@ var _CloudStorage = class _CloudStorage extends (_a = GcpEntity, _getInfo_dec = 
     if (this.definition.uniform_bucket_level_access !== false) {
       body.iamConfiguration.uniformBucketLevelAccess = { enabled: true };
     }
-    if (this.definition.public_access_prevention) {
+    if (this.definition.public_access_prevention && this.definition.public_access_prevention !== "inherited") {
       body.iamConfiguration.publicAccessPrevention = this.definition.public_access_prevention;
     }
     if (this.definition.labels) {
@@ -140,6 +140,8 @@ var _CloudStorage = class _CloudStorage extends (_a = GcpEntity, _getInfo_dec = 
       url += `&predefinedDefaultObjectAcl=${this.definition.predefined_default_object_acl}`;
     }
     cli.output(`Creating Cloud Storage bucket: ${this.definition.name}`);
+    cli.output(`Request URL: ${url}`);
+    cli.output(`Request body: ${JSON.stringify(body, null, 2)}`);
     const result = this.post(url, body);
     this.populateState(result);
     this.state.existing = false;
