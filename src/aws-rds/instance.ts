@@ -41,15 +41,64 @@ export interface RDSInstanceState extends AWSRDSState {
  * - `state.endpoint_address` - Database connection hostname
  * - `state.endpoint_port` - Database connection port
  * - `state.db_instance_arn` - Instance ARN for IAM policies
+ * - `state.created_security_group_id` - ID of auto-created security group (for use with rds-access-list)
  * 
  * ## Composing with Other Entities
  * Works with:
- * - `aws-ec2/security-group` - Control network access to the database
- * - `aws-ec2/subnet` - Place database in specific VPC subnets
- * - `aws-lambda/function` - Connect serverless functions to the database
+ * - `aws-rds/rds-access-list` - Manage security group rules dynamically at runtime (recommended)
  * 
- * ## Networking 
- * - Default Monk VPC CIDR 172.31.0.0/16 should be added to the allowed_cidr_blocks list in most cases.
+ * Alternative (manual configuration via definition properties):
+ * - `vpc_security_group_ids` - Attach existing security groups directly
+ * - `db_subnet_group_name` - Place database in specific VPC subnets
+ * 
+ * ---
+ * ## RDS Access Patterns
+ * 
+ * Always deploy with `aws-rds/rds-access-list` for dynamic access control.
+ * Choose pattern based on where client runs:
+ * 
+ * ### Pattern 1: Private Access (client on AWS nodes, same VPC)
+ * ```yaml
+ * database:
+ *   defines: aws-rds/rds-instance
+ *   publicly_accessible: false           # No public endpoint
+ *   auto_create_security_group: true     # Creates empty SG
+ * 
+ * access-list:
+ *   defines: aws-rds/rds-access-list
+ *   security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+ *   port: <- connection-target("db") entity-state get-member("endpoint_port")
+ *   allowed_security_group_names: <- runnable-peers("ns/client")  # SG-to-SG access
+ *   depends:
+ *     wait-for:
+ *       runnables: [ns/database, ns/client]
+ * ```
+ * 
+ * ### Pattern 2: Public Access (client on other cloud/region)
+ * ```yaml
+ * database:
+ *   defines: aws-rds/rds-instance
+ *   publicly_accessible: true            # Public endpoint required
+ *   auto_create_security_group: true
+ * 
+ * access-list:
+ *   defines: aws-rds/rds-access-list
+ *   security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+ *   port: <- connection-target("db") entity-state get-member("endpoint_port")
+ *   allowed_cidr_blocks: <- runnable-peers-public-ips("ns/client")  # Public IP access
+ *   depends:
+ *     wait-for:
+ *       runnables: [ns/database, ns/client]
+ * ```
+ * 
+ * ### Deployment Order (CRITICAL)
+ * 1. **RDS Instance** → creates DB + empty security group
+ * 2. **Client** → deploys to nodes (gets assigned security groups)
+ * 3. **Access List** → reads client's node SGs/IPs, opens access
+ * 
+ * access-list MUST depend on both database AND client.
+ * If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
+ * ---
  */
 export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstanceState> {
     
