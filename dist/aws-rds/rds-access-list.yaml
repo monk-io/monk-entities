@@ -18,8 +18,65 @@ rds-access-list:
       ## Composing with Other Entities
       Works with:
       - `aws-ec2/security-group` - The security group to modify
-      - `aws-rds/instance` - The RDS instance protected by the security group
-    version-hash: 66a8c92d7e4e
+      - `aws-rds/rds-instance` - The RDS instance protected by the security group
+
+      ---
+      ## Dynamic Access Control
+
+      Use this entity to open database access AFTER client is deployed.
+      Choose access method based on where client runs:
+
+      ### Option 1: allowed_security_group_names (Private VPC access)
+      Use when client runs on AWS nodes in the same VPC as RDS.
+      ```yaml
+      access-list:
+        defines: aws-rds/rds-access-list
+        region: <- connection-target("db") entity get-member("region")
+        security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+        port: <- connection-target("db") entity-state get-member("endpoint_port")
+        allowed_security_group_names: <- runnable-peers("ns/client")
+        connections:
+          db:
+            runnable: ns/database
+            service: default
+        depends:
+          wait-for:
+            runnables: [ns/database, ns/client]  # MUST wait for both
+            timeout: 600
+      ```
+
+      ### Option 2: allowed_cidr_blocks (Public IP access)
+      Use when client runs on other cloud providers, different regions, or on-prem.
+      Requires RDS `publicly_accessible: true`.
+      ```yaml
+      access-list:
+        defines: aws-rds/rds-access-list
+        region: <- connection-target("db") entity get-member("region")
+        security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+        port: <- connection-target("db") entity-state get-member("endpoint_port")
+        allowed_cidr_blocks: <- runnable-peers-public-ips("ns/client")
+        connections:
+          db:
+            runnable: ns/database
+            service: default
+        depends:
+          wait-for:
+            runnables: [ns/database, ns/client]
+            timeout: 600
+      ```
+
+      ### Why depends on BOTH database AND client?
+      - `security_group_id` comes from database state (needs database deployed first)
+      - `runnable-peers()` returns client's node SGs (needs client deployed first)
+      - If deployed before client: returns empty list → no access rules → connection fails
+
+      ### When to use each option:
+      | Client Location | RDS Setting | Access Method |
+      |-----------------|-------------|---------------|
+      | AWS (same VPC)  | `publicly_accessible: false` | `allowed_security_group_names` |
+      | Other cloud/region | `publicly_accessible: true` | `allowed_cidr_blocks` |
+      ---
+    version-hash: 0776f9bfe4c7
   schema:
     region:
       type: string
