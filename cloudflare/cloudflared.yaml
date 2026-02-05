@@ -4,11 +4,11 @@ namespace: cloudflare
 cloudflared:
   defines: runnable
   permitted-secrets:
-    cloudflared-token: true
+    cloudflare-tunnel-token: true
   variables:
     token_secret_ref:
       type: string
-      value: cloudflared-token
+      value: cloudflare-tunnel-token
       description: Secret name that stores the tunnel token
     CLOUDFLARED_TOKEN:
       type: string
@@ -22,4 +22,4 @@ cloudflared:
     cloudflared:
       image: cloudflare/cloudflared:latest
       restart: always
-      cmd: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN} ${extra_args}`
+      command: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN} ${extra_args}`

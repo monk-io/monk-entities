@@ -20,7 +20,7 @@ cloudflare-dns-zone:
       ## Composing with Other Entities
       Works with:
       - `cloudflare/dns-record` - Create DNS records in this zone
-    version-hash: c0ab197f550f
+    version-hash: 5626226fcd22
   schema:
     secret_ref:
       type: string

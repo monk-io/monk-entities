@@ -114,6 +114,7 @@ interface CloudflareTunnelApplicationDefinition {
 - Grant with `permitted-secrets` in templates
 - Cloudflare account ID is the account tag/UUID from the dashboard URL: `/accounts/<ACCOUNT_ID>`
 - Create a Cloudflare API token with account tunnel edit and DNS edit permissions
+- Tunnel token secret (`cloudflare-tunnel-token`) is created by the tunnel entity and is distinct from the API token
 
 ## Example template
 

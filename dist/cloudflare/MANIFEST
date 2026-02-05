@@ -1,5 +1,5 @@
 REPO cloudflare
-VERSION_HASH c0ab197f550f
+VERSION_HASH 5626226fcd22
 DESCRIPTION Managed DNS and CDN.
 HOSTING managed
 TAGS cloudflare,dns,cdn
