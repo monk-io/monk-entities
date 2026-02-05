@@ -132,7 +132,7 @@ var _CloudflareTunnel = class _CloudflareTunnel extends (_a = CloudflareEntity, 
       cli.output("Tunnel existed before this entity; skipping delete");
       return;
     }
-    const accountId = this.definition.account_id;
+    const accountId = this.state.account_id || this.definition.account_id;
     this.request("DELETE", `/accounts/${accountId}/cfd_tunnel/${this.state.id}`);
     cli.output(`\u{1F5D1}\uFE0F Deleted Cloudflare Tunnel ${this.state.id}`);
   }

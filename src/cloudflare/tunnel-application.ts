@@ -266,11 +266,7 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
   }
 
   private getCanonicalHostname(): string {
-    const raw = this.definition.hostname;
-    const zoneName = this.definition.zone_name;
-    if (raw === "@" && zoneName) return zoneName;
-    if (!raw.includes(".") && zoneName) return `${raw}.${zoneName}`;
-    return raw;
+    return this.canonicalizeHostname(this.definition.hostname, this.definition.zone_name);
   }
 
   private findDnsRecord(zoneId: string, name: string): { id: string; content?: string; proxied?: boolean } | null {

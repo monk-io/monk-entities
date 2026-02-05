@@ -85,6 +85,11 @@ var CloudflareEntity = class extends import_base.MonkEntity {
       return null;
     }
   }
+  canonicalizeHostname(raw, zoneName) {
+    if (raw === "@" && zoneName) return zoneName;
+    if (!raw.includes(".") && zoneName) return `${raw}.${zoneName}`;
+    return raw;
+  }
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

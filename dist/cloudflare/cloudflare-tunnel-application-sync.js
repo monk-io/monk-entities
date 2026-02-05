@@ -170,11 +170,7 @@ var _CloudflareTunnelApplication = class _CloudflareTunnelApplication extends Cl
     return z?.id;
   }
   getCanonicalHostname() {
-    const raw = this.definition.hostname;
-    const zoneName = this.definition.zone_name;
-    if (raw === "@" && zoneName) return zoneName;
-    if (!raw.includes(".") && zoneName) return `${raw}.${zoneName}`;
-    return raw;
+    return this.canonicalizeHostname(this.definition.hostname, this.definition.zone_name);
   }
   findDnsRecord(zoneId, name) {
     try {

@@ -144,7 +144,7 @@ export class CloudflareTunnel extends CloudflareEntity<CloudflareTunnelDefinitio
       cli.output("Tunnel existed before this entity; skipping delete");
       return;
     }
-    const accountId = this.definition.account_id;
+    const accountId = this.state.account_id || this.definition.account_id;
     this.request("DELETE", `/accounts/${accountId}/cfd_tunnel/${this.state.id}`);
     cli.output(`🗑️ Deleted Cloudflare Tunnel ${this.state.id}`);
   }

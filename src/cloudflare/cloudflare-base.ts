@@ -77,6 +77,12 @@ export abstract class CloudflareEntity<
       return null;
     }
   }
+
+  protected canonicalizeHostname(raw: string, zoneName?: string): string {
+    if (raw === "@" && zoneName) return zoneName;
+    if (!raw.includes(".") && zoneName) return `${raw}.${zoneName}`;
+    return raw;
+  }
 }
 
 
