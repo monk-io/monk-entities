@@ -63,6 +63,20 @@ export abstract class CloudflareEntity<
     }
     return res.data as T;
   }
+
+  protected findZoneByName(name: string): { id: string; status?: string } | null {
+    try {
+      const res = this.request<{ result?: Array<{ id?: string; status?: string }> }>(
+        "GET",
+        `/zones?name=${encodeURIComponent(name)}`
+      );
+      const first = res?.result?.[0];
+      if (first?.id) return { id: first.id, status: first.status };
+      return null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 

@@ -246,18 +246,6 @@ export class CloudflareDNSRecord extends CloudflareEntity<CloudflareDNSRecordDef
     return z.id;
   }
 
-  private findZoneByName(name?: string): { id: string } | null {
-    if (!name) return null;
-    try {
-      const res = this.request<any>("GET", `/zones?name=${encodeURIComponent(name)}`);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id };
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
   private findRecord(zoneId: string, recordType: string, name: string): { id: string; type: string; name: string } | null {
     const candidateNames: string[] = [name];
     const zoneName = this.definition.zone_name;

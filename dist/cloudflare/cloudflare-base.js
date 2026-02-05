@@ -72,6 +72,19 @@ var CloudflareEntity = class extends import_base.MonkEntity {
     }
     return res.data;
   }
+  findZoneByName(name) {
+    try {
+      const res = this.request(
+        "GET",
+        `/zones?name=${encodeURIComponent(name)}`
+      );
+      const first = res?.result?.[0];
+      if (first?.id) return { id: first.id, status: first.status };
+      return null;
+    } catch {
+      return null;
+    }
+  }
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

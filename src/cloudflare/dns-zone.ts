@@ -112,16 +112,7 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
     cli.output(JSON.stringify(res?.result || [], null, 2));
   }
 
-  private findZoneByName(name: string): { id: string; status: string } | null {
-    try {
-      const res = this.request<any>("GET", `/zones?name=${encodeURIComponent(name)}`);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id, status: first.status };
-      return null;
-    } catch {
-      return null;
-    }
-  }
+  // uses shared findZoneByName from base class
 }
 
 

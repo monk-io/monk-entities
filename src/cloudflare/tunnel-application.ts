@@ -95,12 +95,21 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
     const desiredHostname = this.getCanonicalHostname();
     const desiredZoneId = this.resolveZoneId();
     const hostnameChanged = Boolean(this.state.applied_hostname && this.state.applied_hostname !== desiredHostname);
+    const tunnelChanged = Boolean(this.state.tunnel_id && this.state.tunnel_id !== this.definition.tunnel_id);
     const zoneChanged = Boolean(this.state.applied_zone_id && this.state.applied_zone_id !== desiredZoneId);
     const shouldRemoveOldRecord = Boolean(
       this.state.dns_record_id &&
       this.state.dns_record_existing === false &&
       (hostnameChanged || zoneChanged)
     );
+
+    if (hostnameChanged || tunnelChanged) {
+      const oldTunnelId = this.state.tunnel_id;
+      const oldHostname = this.state.applied_hostname;
+      if (oldTunnelId && oldHostname) {
+        this.removeIngressConfig(oldTunnelId, oldHostname);
+      }
+    }
 
     if (shouldRemoveOldRecord) {
       const zoneId = this.state.applied_zone_id;
@@ -117,7 +126,9 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
   }
 
   override delete(): void {
-    this.removeIngressConfig();
+    if (this.state.tunnel_id && this.state.applied_hostname) {
+      this.removeIngressConfig(this.state.tunnel_id, this.state.applied_hostname);
+    }
     if (this.state.dns_record_id && this.state.dns_record_existing === false && this.state.applied_zone_id) {
       try {
         this.request("DELETE", `/zones/${this.state.applied_zone_id}/dns_records/${this.state.dns_record_id}`);
@@ -170,13 +181,12 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
 
     this.state.hostname = hostname;
     this.state.tunnel_id = tunnelId;
+    this.state.applied_hostname = hostname;
     this.state.tunnel_domain = `${tunnelId}.cfargotunnel.com`;
   }
 
-  private removeIngressConfig(): void {
+  private removeIngressConfig(tunnelId: string, hostname: string): void {
     const accountId = this.definition.account_id;
-    const tunnelId = this.definition.tunnel_id;
-    const hostname = this.getCanonicalHostname();
     try {
       const current = this.request<any>("GET", `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`);
       const existingIngress = current?.result?.config?.ingress || [];
@@ -255,17 +265,6 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
     if (!this.definition.zone_name) return undefined;
     const z = this.findZoneByName(this.definition.zone_name);
     return z?.id;
-  }
-
-  private findZoneByName(name: string): { id: string } | null {
-    try {
-      const res = this.request<any>("GET", `/zones?name=${encodeURIComponent(name)}`);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id };
-      return null;
-    } catch {
-      return null;
-    }
   }
 
   private getCanonicalHostname(): string {
