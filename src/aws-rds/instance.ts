@@ -106,7 +106,6 @@ export interface RDSInstanceState extends AWSRDSState {
  * access-list MUST depend on both database AND client.
  * If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
  * 
- * 📖 **Full playbook:** See PLAYBOOK.md in this directory for complete examples.
  * ---
  */
 export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstanceState> {
