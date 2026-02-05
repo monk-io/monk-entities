@@ -54,7 +54,14 @@ export interface RDSInstanceState extends AWSRDSState {
  * ---
  * ## RDS Access Patterns
  * 
- * Always deploy with `aws-rds/rds-access-list` for dynamic access control.
+ * ⚠️ **DO NOT** use hardcoded `allowed_cidr_blocks` on this entity:
+ * ```yaml
+ * # ❌ WRONG - opens access to entire VPC, not just client nodes
+ * database:
+ *   allowed_cidr_blocks: ["172.31.0.0/16"]  # DO NOT DO THIS
+ * ```
+ * 
+ * ✅ **ALWAYS** use `aws-rds/rds-access-list` for dynamic access control.
  * Choose pattern based on where client runs:
  * 
  * ### Pattern 1: Private Access (client on AWS nodes, same VPC)
@@ -98,6 +105,8 @@ export interface RDSInstanceState extends AWSRDSState {
  * 
  * access-list MUST depend on both database AND client.
  * If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
+ * 
+ * 📖 **Full playbook:** See PLAYBOOK.md in this directory for complete examples.
  * ---
  */
 export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstanceState> {

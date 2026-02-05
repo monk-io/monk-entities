@@ -3,79 +3,8 @@ rds-instance:
   defines: entity
   metadata:
     name: RDSInstance
-    description: |-
-      AWS RDS Instance entity.
-      Creates and manages Amazon RDS database instances for relational databases.
-      Supports MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server engines.
-
-      ## Secrets
-      - Reads: none (authenticated via AWS provider)
-      - Writes: secret name from `password_secret_ref` property - Master password (defaults to `{db_instance_identifier}-master-password`)
-
-      ## State Fields for Composition
-      - `state.db_instance_identifier` - Instance identifier
-      - `state.endpoint_address` - Database connection hostname
-      - `state.endpoint_port` - Database connection port
-      - `state.db_instance_arn` - Instance ARN for IAM policies
-      - `state.created_security_group_id` - ID of auto-created security group (for use with rds-access-list)
-
-      ## Composing with Other Entities
-      Works with:
-      - `aws-rds/rds-access-list` - Manage security group rules dynamically at runtime (recommended)
-
-      Alternative (manual configuration via definition properties):
-      - `vpc_security_group_ids` - Attach existing security groups directly
-      - `db_subnet_group_name` - Place database in specific VPC subnets
-
-      ---
-      ## RDS Access Patterns
-
-      Always deploy with `aws-rds/rds-access-list` for dynamic access control.
-      Choose pattern based on where client runs:
-
-      ### Pattern 1: Private Access (client on AWS nodes, same VPC)
-      ```yaml
-      database:
-        defines: aws-rds/rds-instance
-        publicly_accessible: false           # No public endpoint
-        auto_create_security_group: true     # Creates empty SG
-
-      access-list:
-        defines: aws-rds/rds-access-list
-        security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
-        port: <- connection-target("db") entity-state get-member("endpoint_port")
-        allowed_security_group_names: <- runnable-peers("ns/client")  # SG-to-SG access
-        depends:
-          wait-for:
-            runnables: [ns/database, ns/client]
-      ```
-
-      ### Pattern 2: Public Access (client on other cloud/region)
-      ```yaml
-      database:
-        defines: aws-rds/rds-instance
-        publicly_accessible: true            # Public endpoint required
-        auto_create_security_group: true
-
-      access-list:
-        defines: aws-rds/rds-access-list
-        security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
-        port: <- connection-target("db") entity-state get-member("endpoint_port")
-        allowed_cidr_blocks: <- runnable-peers-public-ips("ns/client")  # Public IP access
-        depends:
-          wait-for:
-            runnables: [ns/database, ns/client]
-      ```
-
-      ### Deployment Order (CRITICAL)
-      1. **RDS Instance** → creates DB + empty security group
-      2. **Client** → deploys to nodes (gets assigned security groups)
-      3. **Access List** → reads client's node SGs/IPs, opens access
-
-      access-list MUST depend on both database AND client.
-      If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
-      ---
-    version-hash: 0776f9bfe4c7
+    description: "AWS RDS Instance entity.\nCreates and manages Amazon RDS database instances for relational databases.\nSupports MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server engines.\n\n## Secrets\n- Reads: none (authenticated via AWS provider)\n- Writes: secret name from `password_secret_ref` property - Master password (defaults to `{db_instance_identifier}-master-password`)\n\n## State Fields for Composition\n- `state.db_instance_identifier` - Instance identifier\n- `state.endpoint_address` - Database connection hostname\n- `state.endpoint_port` - Database connection port\n- `state.db_instance_arn` - Instance ARN for IAM policies\n- `state.created_security_group_id` - ID of auto-created security group (for use with rds-access-list)\n\n## Composing with Other Entities\nWorks with:\n- `aws-rds/rds-access-list` - Manage security group rules dynamically at runtime (recommended)\n\nAlternative (manual configuration via definition properties):\n- `vpc_security_group_ids` - Attach existing security groups directly\n- `db_subnet_group_name` - Place database in specific VPC subnets\n\n---\n## RDS Access Patterns\n\n⚠️ **DO NOT** use hardcoded `allowed_cidr_blocks` on this entity:\n```yaml\n# ❌ WRONG - opens access to entire VPC, not just client nodes\ndatabase:\n  allowed_cidr_blocks: [\"172.31.0.0/16\"]  # DO NOT DO THIS\n```\n\n✅ **ALWAYS** use `aws-rds/rds-access-list` for dynamic access control.\nChoose pattern based on where client runs:\n\n### Pattern 1: Private Access (client on AWS nodes, same VPC)\n```yaml\ndatabase:\n  defines: aws-rds/rds-instance\n  publicly_accessible: false           # No public endpoint\n  auto_create_security_group: true     # Creates empty SG\n\naccess-list:\n  defines: aws-rds/rds-access-list\n  security_group_id: <- connection-target(\"db\") entity-state get-member(\"created_security_group_id\")\n  port: <- connection-target(\"db\") entity-state get-member(\"endpoint_port\")\n  allowed_security_group_names: <- runnable-peers(\"ns/client\")  # SG-to-SG access\n  depends:\n    wait-for:\n      runnables: [ns/database, ns/client]\n```\n\n### Pattern 2: Public Access (client on other cloud/region)\n```yaml\ndatabase:\n  defines: aws-rds/rds-instance\n  publicly_accessible: true            # Public endpoint required\n  auto_create_security_group: true\n\naccess-list:\n  defines: aws-rds/rds-access-list\n  security_group_id: <- connection-target(\"db\") entity-state get-member(\"created_security_group_id\")\n  port: <- connection-target(\"db\") entity-state get-member(\"endpoint_port\")\n  allowed_cidr_blocks: <- runnable-peers-public-ips(\"ns/client\")  # Public IP access\n  depends:\n    wait-for:\n      runnables: [ns/database, ns/client]\n```\n\n### Deployment Order (CRITICAL)\n1. **RDS Instance** → creates DB + empty security group\n2. **Client** → deploys to nodes (gets assigned security groups)\n3. **Access List** → reads client's node SGs/IPs, opens access\n\naccess-list MUST depend on both database AND client.\nIf deployed before client: `runnable-peers()` returns empty → no access → connection fails.\n\n\U0001F4D6 **Full playbook:** See PLAYBOOK.md in this directory for complete examples.\n---"
+    version-hash: e50a32312a63
   schema:
     region:
       type: string
