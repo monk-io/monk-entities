@@ -121,15 +121,19 @@ tunnel-app:
   defines: cloudflare/cloudflare-tunnel-application
   account_id: <- secret("cloudflare-account-id")
   tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
-  zone_name: example.com
-  hostname: app.example.com
-  service: http://app:80
+  zone_name: thisbetterbe.online
+  hostname: app.thisbetterbe.online
+  service: <- "http://" connection-ip("app") ":" connection-port("app") concat-all
   permitted-secrets:
     cloudflare-api-token: true
+    cloudflare-account-id: true
   connections:
     tunnel:
       runnable: cloudflare-tunnel-example/tunnel
       service: data
+    app:
+      runnable: cloudflare-tunnel-example/app
+      service: http
   depends:
     wait-for:
       runnables:
@@ -140,6 +144,10 @@ cloudflared:
   defines: runnable
   permitted-secrets:
     cloudflare-tunnel-token: true
+  connections:
+    app:
+      runnable: cloudflare-tunnel-example/app
+      service: http
   variables:
     CLOUDFLARED_TOKEN:
       type: string
@@ -149,7 +157,7 @@ cloudflared:
     cloudflared:
       image: cloudflare/cloudflared:latest
       restart: always
-      command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+      cmd: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}`
   depends:
     wait-for:
       runnables:
