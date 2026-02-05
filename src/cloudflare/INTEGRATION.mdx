@@ -142,6 +142,7 @@ tunnel-app:
 
 cloudflared:
   defines: runnable
+  inherits: cloudflare/cloudflared
   permitted-secrets:
     cloudflare-tunnel-token: true
   connections:
@@ -149,15 +150,9 @@ cloudflared:
       runnable: cloudflare-tunnel-example/app
       service: http
   variables:
-    CLOUDFLARED_TOKEN:
+    token_secret_ref:
       type: string
-      env: CLOUDFLARED_TOKEN
-      value: <- secret("cloudflare-tunnel-token")
-  containers:
-    cloudflared:
-      image: cloudflare/cloudflared:latest
-      restart: always
-      cmd: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}`
+      value: cloudflare-tunnel-token
   depends:
     wait-for:
       runnables:

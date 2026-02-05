@@ -1,0 +1,25 @@
+namespace: cloudflare
+
+# Base runnable for cloudflared tunnel agent
+cloudflared:
+  defines: runnable
+  permitted-secrets:
+    cloudflared-token: true
+  variables:
+    token_secret_ref:
+      type: string
+      value: cloudflared-token
+      description: Secret name that stores the tunnel token
+    CLOUDFLARED_TOKEN:
+      type: string
+      env: CLOUDFLARED_TOKEN
+      value: <- secret($token_secret_ref)
+    extra_args:
+      type: string
+      value: ""
+      description: Extra arguments for cloudflared (optional)
+  containers:
+    cloudflared:
+      image: cloudflare/cloudflared:latest
+      restart: always
+      cmd: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN} ${extra_args}`
