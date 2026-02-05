@@ -16,34 +16,20 @@ Cloudflare provides globally distributed DNS, CDN, and edge services.
 - Cloudflare Tunnel
 - Cloudflare Tunnel Application
 
-## What the Agent can do and how to use it
-- **DNS Management**: Create, update, and delete DNS zones and records (A, CNAME, MX, TXT, etc.)
-- **Tunnel Management**: Create Cloudflare Tunnels and store tunnel tokens for cloudflared
-- **Tunnel Publishing**: Configure tunnel ingress and DNS records for public applications
-- **CDN Configuration**: Set up page rules, caching, and content optimization
-- **SSL/TLS**: Configure SSL certificates and security settings
-- **Firewall**: Manage firewall rules and DDoS protection settings
-- **Load Balancing**: Configure load balancers and health checks
-- **Workers**: Deploy and manage serverless functions at the edge
-- **Analytics**: Enable traffic analytics and performance monitoring
-
-## Auth
-- Set `cloudflare-api-token` secret (Cloudflare API token with account/tunnel and DNS edit permissions; create it in the Cloudflare dashboard)
-- Set `cloudflare-account-id` secret (your account tag/UUID from the Cloudflare dashboard URL: `/accounts/<ACCOUNT_ID>`)
+## Credentials
+- `cloudflare-api-token`: Cloudflare API token with account/tunnel and DNS edit permissions
+- `cloudflare-account-id`: Account tag/UUID from the dashboard URL (`/accounts/<ACCOUNT_ID>`)
+- `cloudflare-tunnel-token`: Tunnel token created by `cloudflare/cloudflare-tunnel` on first run (distinct from API token)
 
 ## Links
 - Provider docs: https://developers.cloudflare.com/dns/
 - Tunnel API docs: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel-api/
 
-## Getting Started
+## Templates
 
-1) Set Cloudflare API token and account ID as secrets:
-```bash
-monk secrets add -g cloudflare-api-token "your_api_token_here"
-monk secrets add -g cloudflare-account-id "your_account_id_here"
-```
+### DNS record template
 
-2) Define a DNS record (save as example-record.yaml):
+Save as `example-record.yaml` (see `src/cloudflare/example-record.yaml`):
 ```yaml
 namespace: cloudflare-examples
 
@@ -56,7 +42,7 @@ example-record:
   zone_name: example.com
   name: www
   record_type: CNAME
-  content: \<- connection-domain-name("nginx")
+  content: <- connection-domain-name("nginx")
   ttl: 1
   proxied: true
   services:
@@ -71,23 +57,17 @@ example-record:
       runnables:
         - cloudflare-examples/nginx
       timeout: 60
+
+stack:
+  defines: group
+  members:
+    - cloudflare-examples/nginx
+    - cloudflare-examples/example-record
 ```
 
-3) Create/update:
-```bash
-monk update cloudflare-examples/nginx
-monk update cloudflare-examples/example-record
-```
+### Tunnel: single app
 
-## Cloudflare Tunnel Example
-
-1) Add Cloudflare API token and account ID:
-```bash
-monk secrets add -g cloudflare-api-token "your_api_token_here"
-monk secrets add -g cloudflare-account-id "your_account_id_here"
-```
-
-2) Define a tunnel + cloudflared runnable (save as example-tunnel.yaml):
+Save as `example-tunnel.yaml` (see `src/cloudflare/example-tunnel.yaml`):
 ```yaml
 namespace: cloudflare-tunnel-example
 
@@ -122,7 +102,7 @@ tunnel-app:
   account_id: <- secret("cloudflare-account-id")
   tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
   zone_name: example.com
-  hostname: app.example.com
+  hostname: app.example.com # use "@" for apex domain
   service: <- "http://" connection-ip("app") ":" connection-port("app") concat-all
   permitted-secrets:
     cloudflare-api-token: true
@@ -143,30 +123,115 @@ tunnel-app:
 cloudflared:
   defines: runnable
   inherits: cloudflare/cloudflared
-  permitted-secrets:
-    cloudflare-tunnel-token: true
   connections:
     app:
       runnable: cloudflare-tunnel-example/app
       service: http
-  variables:
-    token_secret_ref:
-      type: string
-      value: cloudflare-tunnel-token
   depends:
     wait-for:
       runnables:
         - cloudflare-tunnel-example/tunnel
         - cloudflare-tunnel-example/app
       timeout: 60
+
+stack:
+  defines: group
+  members:
+    - cloudflare-tunnel-example/app
+    - cloudflare-tunnel-example/tunnel
+    - cloudflare-tunnel-example/tunnel-app
+    - cloudflare-tunnel-example/cloudflared
 ```
 
-3) Create/update:
-```bash
-monk update cloudflare-tunnel-example/app
-monk update cloudflare-tunnel-example/tunnel
-monk update cloudflare-tunnel-example/tunnel-app
-monk update cloudflare-tunnel-example/cloudflared
+### Tunnel: multiple apps through one tunnel
+
+```yaml
+namespace: cloudflare-multi-app
+
+tunnel:
+  defines: cloudflare/cloudflare-tunnel
+  account_id: <- secret("cloudflare-account-id")
+  name: "multi-app-tunnel"
+  token_secret_ref: cloudflare-tunnel-token
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-tunnel-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+frontend:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  services:
+    http:
+      container: app
+      port: 3000
+
+frontend-tunnel:
+  defines: cloudflare/cloudflare-tunnel-application
+  account_id: <- secret("cloudflare-account-id")
+  tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
+  zone_name: example.com
+  hostname: app.example.com
+  service: <- "http://" connection-ip("frontend") ":" connection-port("frontend") concat-all
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    tunnel:
+      runnable: cloudflare-multi-app/tunnel
+      service: data
+    app:
+      runnable: cloudflare-multi-app/frontend
+      service: http
+
+api:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  services:
+    http:
+      container: app
+      port: 8000
+
+api-tunnel:
+  defines: cloudflare/cloudflare-tunnel-application
+  account_id: <- secret("cloudflare-account-id")
+  tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
+  zone_name: example.com
+  hostname: api.example.com
+  service: <- "http://" connection-ip("api") ":" connection-port("api") concat-all
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    tunnel:
+      runnable: cloudflare-multi-app/tunnel
+      service: data
+    app:
+      runnable: cloudflare-multi-app/api
+      service: http
+
+cloudflared:
+  defines: runnable
+  inherits: cloudflare/cloudflared
+  connections:
+    frontend:
+      runnable: cloudflare-multi-app/frontend
+      service: http
+    api:
+      runnable: cloudflare-multi-app/api
+      service: http
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-multi-app/tunnel
+      timeout: 60
 ```
 
 ## Advanced Configuration Examples

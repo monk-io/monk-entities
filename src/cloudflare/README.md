@@ -174,7 +174,7 @@ tunnel-app:
   account_id: <- secret("cloudflare-account-id")
   tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
   zone_name: example.com
-  hostname: app.example.com
+  hostname: app.example.com # use "@" for apex domain
   service: http://app:80
   permitted-secrets:
     cloudflare-api-token: true
