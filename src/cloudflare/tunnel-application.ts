@@ -208,6 +208,10 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
     const zoneId = this.resolveZoneId();
     if (!zoneId) {
       this.state.zone_id = undefined;
+      this.state.dns_record_id = undefined;
+      this.state.dns_record_existing = undefined;
+      this.state.applied_zone_id = undefined;
+      this.state.applied_hostname = undefined;
       return;
     }
 
