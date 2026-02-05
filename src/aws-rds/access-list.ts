@@ -35,7 +35,7 @@ export interface AWSRDSAccessListState {
  * ---
  * ## Dynamic Access Control
  * 
- * ⚠️ **This entity is REQUIRED** for proper RDS access control.
+ * **This entity is REQUIRED** for proper RDS access control.
  * DO NOT use hardcoded `allowed_cidr_blocks` on `rds-instance` entity.
  * 
  * Use this entity to open database access AFTER client is deployed.
@@ -91,7 +91,6 @@ export interface AWSRDSAccessListState {
  * | AWS (same VPC)  | `publicly_accessible: false` | `allowed_security_group_names` |
  * | Other cloud/region | `publicly_accessible: true` | `allowed_cidr_blocks` |
  * 
- * 📖 **Full playbook:** See PLAYBOOK.md in this directory for complete examples.
  * ---
  */
 export class RDSAccessList extends MonkEntity<AWSRDSAccessListDefinition, AWSRDSAccessListState> {

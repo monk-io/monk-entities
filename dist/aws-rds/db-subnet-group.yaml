@@ -20,7 +20,7 @@ db-subnet-group:
       Works with:
       - `aws-ec2/subnet` - Subnets to include in the group
       - `aws-rds/instance` - RDS instances using this subnet group
-    version-hash: e50a32312a63
+    version-hash: b1b42637c427
   schema:
     region:
       type: string
