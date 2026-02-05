@@ -120,6 +120,10 @@ var _CloudflareTunnelApplication = class _CloudflareTunnelApplication extends Cl
     const zoneId = this.resolveZoneId();
     if (!zoneId) {
       this.state.zone_id = void 0;
+      this.state.dns_record_id = void 0;
+      this.state.dns_record_existing = void 0;
+      this.state.applied_zone_id = void 0;
+      this.state.applied_hostname = void 0;
       return;
     }
     const hostname = this.getCanonicalHostname();
