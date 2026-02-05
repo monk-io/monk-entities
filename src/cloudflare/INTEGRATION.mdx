@@ -121,8 +121,8 @@ tunnel-app:
   defines: cloudflare/cloudflare-tunnel-application
   account_id: <- secret("cloudflare-account-id")
   tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
-  zone_name: thisbetterbe.online
-  hostname: app.thisbetterbe.online
+  zone_name: example.com
+  hostname: app.example.com
   service: <- "http://" connection-ip("app") ":" connection-port("app") concat-all
   permitted-secrets:
     cloudflare-api-token: true
