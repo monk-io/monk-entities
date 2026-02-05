@@ -1,0 +1,83 @@
+namespace: cloudflare
+cloudflare-tunnel:
+  defines: entity
+  metadata:
+    name: CloudflareTunnel
+    description: |-
+      Cloudflare Tunnel entity.
+      Creates and manages Cloudflare Tunnels for secure connectivity.
+      Stores the tunnel token in a Monk secret for use with cloudflared.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Cloudflare API token (defaults to `cloudflare-api-token`)
+      - Writes: secret name from `token_secret_ref` property - Tunnel token (defaults to `cloudflare-tunnel-token`)
+
+      ## State Fields for Composition
+      - `state.id` - Tunnel ID for routing and config updates
+      - `state.tunnel_domain` - CNAME target (<tunnel-id>.cfargotunnel.com)
+      - `state.token_secret_ref` - Secret name where token is stored
+
+      ## Composing with Other Entities
+      Works with:
+      - `cloudflare/cloudflare-tunnel-application` - Publish applications through the tunnel
+    version-hash: 0d29ae2f96ff
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    account_id:
+      type: string
+      description: Cloudflare account ID that owns the tunnel
+    name:
+      type: string
+      description: Human-readable tunnel name
+    config_src:
+      type: string
+      enum:
+        - cloudflare
+        - local
+      description: Config source for the tunnel ("cloudflare" or "local")
+      default: cloudflare
+    token_secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name to store the tunnel token; defaults to cloudflare-tunnel-token
+    required:
+      - account_id
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Tunnel ID
+    name:
+      type: string
+      description: Tunnel name
+    status:
+      type: string
+      description: 'Current tunnel status (inactive, healthy, etc.)'
+    account_id:
+      type: string
+      description: Account ID that owns the tunnel
+    token_secret_ref:
+      type: string
+      description: Secret name where the tunnel token is stored
+    tunnel_domain:
+      type: string
+      description: Tunnel domain for CNAME records (<tunnel-id>.cfargotunnel.com)
+  lifecycle:
+    sync: <<< cloudflare-tunnel-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 30
+  requires:
+    - monkec/base
+    - cli
+    - secret
+    - cloudflare/cloudflare-base
