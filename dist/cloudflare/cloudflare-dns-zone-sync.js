@@ -107,16 +107,7 @@ var _CloudflareDNSZone = class _CloudflareDNSZone extends (_a = CloudflareEntity
     const res = this.request("GET", `/zones?per_page=10&page=1`);
     cli.output(JSON.stringify(res?.result || [], null, 2));
   }
-  findZoneByName(name) {
-    try {
-      const res = this.request("GET", `/zones?name=${encodeURIComponent(name)}`);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id, status: first.status };
-      return null;
-    } catch {
-      return null;
-    }
-  }
+  // uses shared findZoneByName from base class
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudflareDNSZone);

@@ -221,17 +221,6 @@ var _CloudflareDNSRecord = class _CloudflareDNSRecord extends (_a = CloudflareEn
     this.state.zone_id = z.id;
     return z.id;
   }
-  findZoneByName(name) {
-    if (!name) return null;
-    try {
-      const res = this.request("GET", `/zones?name=${encodeURIComponent(name)}`);
-      const first = res?.result?.[0];
-      if (first?.id) return { id: first.id };
-      return null;
-    } catch {
-      return null;
-    }
-  }
   findRecord(zoneId, recordType, name) {
     const candidateNames = [name];
     const zoneName = this.definition.zone_name;
