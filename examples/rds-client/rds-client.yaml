@@ -41,12 +41,6 @@ mysql-database:
   auto_create_security_group: true
   security_group_name: mysql-database-sg
   security_group_description: "MySQL Database Security Group"
-  # # Allow access from specific security groups by name
-  # allowed_security_group_names:
-  #   - "test-rds" # AWS node security group (node name)
-  #   - "test-rds2"
-  # # allowed_cidr_blocks:
-  # #   - "0.0.0.0/0"
 
   # Backup and maintenance
   backup_retention_period: 7

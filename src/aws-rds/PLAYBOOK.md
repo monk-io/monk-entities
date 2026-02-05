@@ -1,5 +1,33 @@
 # AWS RDS Access Control Playbook
 
+> **Entity:** `aws-rds/rds-instance`, `aws-rds/rds-access-list`  
+> **Category:** Database, Security  
+> **Difficulty:** Medium  
+> **Prerequisites:** AWS credentials with RDS permissions, Monk cluster with AWS nodes
+
+---
+
+## TL;DR
+
+```yaml
+# 1. RDS Instance - NO access rules here
+database:
+  defines: aws-rds/rds-instance
+  publicly_accessible: false
+  auto_create_security_group: true
+
+# 2. Access List - manages access AFTER client deploys
+access-list:
+  defines: aws-rds/rds-access-list
+  security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+  allowed_security_group_names: <- runnable-peers("ns/client")
+  depends:
+    wait-for:
+      runnables: [ns/database, ns/client]  # CRITICAL: both!
+```
+
+---
+
 ## Problem Statement
 
 When deploying RDS databases, agents often use a **simple but insecure approach**:
