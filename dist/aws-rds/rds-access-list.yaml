@@ -80,7 +80,7 @@ rds-access-list:
       | Other cloud/region | `publicly_accessible: true` | `allowed_cidr_blocks` |
 
       ---
-    version-hash: b1b42637c427
+    version-hash: e3e917ffb0c7
   schema:
     region:
       type: string

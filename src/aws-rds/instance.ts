@@ -54,14 +54,14 @@ export interface RDSInstanceState extends AWSRDSState {
  * ---
  * ## RDS Access Patterns
  * 
- * ⚠️ **DO NOT** use hardcoded `allowed_cidr_blocks` on this entity:
+ * **DO NOT** use hardcoded `allowed_cidr_blocks` on this entity:
  * ```yaml
- * # ❌ WRONG - opens access to entire VPC, not just client nodes
+ * # WRONG - opens access to entire VPC, not just client nodes
  * database:
  *   allowed_cidr_blocks: ["172.31.0.0/16"]  # DO NOT DO THIS
  * ```
  * 
- * ✅ **ALWAYS** use `aws-rds/rds-access-list` for dynamic access control.
+ * **ALWAYS** use `aws-rds/rds-access-list` for dynamic access control.
  * Choose pattern based on where client runs:
  * 
  * ### Pattern 1: Private Access (client on AWS nodes, same VPC)
