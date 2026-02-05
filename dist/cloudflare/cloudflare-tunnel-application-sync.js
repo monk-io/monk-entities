@@ -11,6 +11,10 @@ const cloudflareBase = require("cloudflare/cloudflare-base");
 const CloudflareEntity = cloudflareBase.CloudflareEntity;
 var _CloudflareTunnelApplication = class _CloudflareTunnelApplication extends CloudflareEntity {
   create() {
+    if (!this.definition.tunnel_id) {
+      cli.output("Tunnel ID missing; skipping create");
+      return;
+    }
     this.ensureIngressConfig();
     this.ensureDnsRecord();
   }
@@ -121,18 +125,18 @@ var _CloudflareTunnelApplication = class _CloudflareTunnelApplication extends Cl
     const hostname = this.getCanonicalHostname();
     const tunnelDomain = `${this.definition.tunnel_id}.cfargotunnel.com`;
     const proxied = typeof this.definition.proxied === "boolean" ? this.definition.proxied : true;
+    const payload = {
+      type: "CNAME",
+      name: hostname,
+      content: tunnelDomain,
+      proxied,
+      ttl: 1
+    };
     const existing = this.findDnsRecord(zoneId, hostname);
     if (existing) {
       if (existing.content !== tunnelDomain || existing.proxied !== proxied) {
-        const payload2 = {
-          type: "CNAME",
-          name: hostname,
-          content: tunnelDomain,
-          proxied,
-          ttl: 1
-        };
         try {
-          this.request("PUT", `/zones/${zoneId}/dns_records/${existing.id}`, payload2);
+          this.request("PUT", `/zones/${zoneId}/dns_records/${existing.id}`, payload);
         } catch {
         }
       }
@@ -147,13 +151,6 @@ var _CloudflareTunnelApplication = class _CloudflareTunnelApplication extends Cl
       };
       return;
     }
-    const payload = {
-      type: "CNAME",
-      name: hostname,
-      content: tunnelDomain,
-      proxied,
-      ttl: 1
-    };
     const created = this.request("POST", `/zones/${zoneId}/dns_records`, payload);
     const recordId = created?.result?.id;
     this.state = {

@@ -83,6 +83,10 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
   static readonly readiness = { period: 10, initialDelay: 2, attempts: 20 };
 
   override create(): void {
+    if (!this.definition.tunnel_id) {
+      cli.output("Tunnel ID missing; skipping create");
+      return;
+    }
     this.ensureIngressConfig();
     this.ensureDnsRecord();
   }
@@ -211,16 +215,17 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
     const tunnelDomain = `${this.definition.tunnel_id}.cfargotunnel.com`;
     const proxied = typeof this.definition.proxied === "boolean" ? this.definition.proxied : true;
 
+    const payload = {
+      type: "CNAME",
+      name: hostname,
+      content: tunnelDomain,
+      proxied,
+      ttl: 1,
+    };
+
     const existing = this.findDnsRecord(zoneId, hostname);
     if (existing) {
       if (existing.content !== tunnelDomain || existing.proxied !== proxied) {
-        const payload = {
-          type: "CNAME",
-          name: hostname,
-          content: tunnelDomain,
-          proxied,
-          ttl: 1,
-        };
         try {
           this.request("PUT", `/zones/${zoneId}/dns_records/${existing.id}`, payload);
         } catch {
@@ -239,13 +244,6 @@ export class CloudflareTunnelApplication extends CloudflareEntity<
       return;
     }
 
-    const payload = {
-      type: "CNAME",
-      name: hostname,
-      content: tunnelDomain,
-      proxied,
-      ttl: 1,
-    };
     const created = this.request<any>("POST", `/zones/${zoneId}/dns_records`, payload);
     const recordId = created?.result?.id;
 
