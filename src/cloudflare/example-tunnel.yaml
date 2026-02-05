@@ -1,0 +1,81 @@
+namespace: cloudflare-tunnel-example
+
+app:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  services:
+    http:
+      container: app
+      port: 80
+      protocol: tcp
+
+tunnel:
+  defines: cloudflare/cloudflare-tunnel
+  account_id: <- secret("cloudflare-account-id")
+  name: "example-tunnel"
+  token_secret_ref: cloudflare-tunnel-token
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-tunnel-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+tunnel-app:
+  defines: cloudflare/cloudflare-tunnel-application
+  account_id: <- secret("cloudflare-account-id")
+  tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
+  zone_name: thisbetterbe.online
+  hostname: app.thisbetterbe.online
+  service: <- "http://" connection-ip("app") ":" connection-port("app") concat-all
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    tunnel:
+      runnable: cloudflare-tunnel-example/tunnel
+      service: data
+    app:
+      runnable: cloudflare-tunnel-example/app
+      service: http
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-tunnel-example/tunnel
+      timeout: 60
+
+cloudflared:
+  defines: runnable
+  permitted-secrets:
+    cloudflare-tunnel-token: true
+  connections:
+    app:
+      runnable: cloudflare-tunnel-example/app
+      service: http
+  variables:
+    CLOUDFLARED_TOKEN:
+      type: string
+      env: CLOUDFLARED_TOKEN
+      value: <- secret("cloudflare-tunnel-token")
+  containers:
+    cloudflared:
+      image: cloudflare/cloudflared:latest
+      restart: always
+      cmd: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}`
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-tunnel-example/tunnel
+        - cloudflare-tunnel-example/app
+      timeout: 60
+
+stack:
+  defines: group
+  members:
+    - cloudflare-tunnel-example/app
+    - cloudflare-tunnel-example/tunnel
+    - cloudflare-tunnel-example/tunnel-app
+    - cloudflare-tunnel-example/cloudflared

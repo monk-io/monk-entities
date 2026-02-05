@@ -1,0 +1,101 @@
+namespace: cloudflare
+cloudflare-tunnel-application:
+  defines: entity
+  metadata:
+    name: CloudflareTunnelApplication
+    description: |-
+      Cloudflare Tunnel Application entity.
+      Publishes a service through a Cloudflare Tunnel and creates a DNS record.
+      Updates the tunnel ingress configuration for the target hostname.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Cloudflare API token (defaults to `cloudflare-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.hostname` - Public hostname for consumers
+      - `state.dns_record_id` - DNS record ID for reference
+
+      ## Composing with Other Entities
+      Works with:
+      - `cloudflare/cloudflare-tunnel` - Provides tunnel ID and token
+      - `cloudflare/cloudflare-dns-record` - Alternative DNS management
+    version-hash: 0d29ae2f96ff
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    account_id:
+      type: string
+      description: Cloudflare account ID that owns the tunnel
+    tunnel_id:
+      type: string
+      description: Tunnel ID to attach the application to
+    hostname:
+      type: string
+      description: 'Public hostname for the application (e.g., app.example.com)'
+    service:
+      type: string
+      description: 'Origin service URL for the application (e.g., http://localhost:8001)'
+    zone_id:
+      type: string
+      description: Zone ID for DNS record creation; alternatively provide zone_name
+    zone_name:
+      type: string
+      description: Zone name for DNS record creation; used to resolve zone_id
+    proxied:
+      type: boolean
+      description: Whether the DNS record is proxied by Cloudflare
+      default: true
+    origin_request:
+      type: object
+      additionalProperties:
+        description: Optional origin request settings for Cloudflare Tunnel
+      description: Optional origin request settings for Cloudflare Tunnel
+    catch_all_service:
+      type: string
+      description: Catch-all ingress service for unmatched requests
+      default: 'http_status:404'
+    required:
+      - account_id
+      - tunnel_id
+      - hostname
+      - service
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    tunnel_id:
+      type: string
+      description: Tunnel ID for the application
+    hostname:
+      type: string
+      description: Application hostname
+    zone_id:
+      type: string
+      description: Zone ID for DNS record
+    dns_record_id:
+      type: string
+      description: DNS record ID
+    dns_record_existing:
+      type: boolean
+      description: Whether the DNS record existed before creation
+    applied_hostname:
+      type: string
+      description: Last applied hostname
+    applied_zone_id:
+      type: string
+      description: Last applied zone ID
+    tunnel_domain:
+      type: string
+      description: Tunnel domain for DNS content
+  lifecycle:
+    sync: <<< cloudflare-tunnel-application-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - cli
+    - cloudflare/cloudflare-base

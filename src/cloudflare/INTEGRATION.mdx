@@ -1,6 +1,6 @@
 ---
-title: Cloudflare DNS
-description: Managed DNS and CDN with edge network.
+title: Cloudflare DNS and Tunnel
+description: Managed DNS and Cloudflare Tunnel for secure connectivity.
 website_url: https://www.cloudflare.com/
 docs_url: https://developers.cloudflare.com/dns/
 primary_category: cdn-dns
@@ -13,9 +13,13 @@ Cloudflare provides globally distributed DNS, CDN, and edge services.
 
 ## What Monk manages
 - DNS Zone and DNS Record
+- Cloudflare Tunnel
+- Cloudflare Tunnel Application
 
 ## What the Agent can do and how to use it
 - **DNS Management**: Create, update, and delete DNS zones and records (A, CNAME, MX, TXT, etc.)
+- **Tunnel Management**: Create Cloudflare Tunnels and store tunnel tokens for cloudflared
+- **Tunnel Publishing**: Configure tunnel ingress and DNS records for public applications
 - **CDN Configuration**: Set up page rules, caching, and content optimization
 - **SSL/TLS**: Configure SSL certificates and security settings
 - **Firewall**: Manage firewall rules and DDoS protection settings
@@ -24,19 +28,22 @@ Cloudflare provides globally distributed DNS, CDN, and edge services.
 - **Analytics**: Enable traffic analytics and performance monitoring
 
 ## Auth
-- Set cloudflare-api-token secret
+- Set `cloudflare-api-token` secret (Cloudflare API token with account/tunnel and DNS edit permissions; create it in the Cloudflare dashboard)
+- Set `cloudflare-account-id` secret (your account tag/UUID from the Cloudflare dashboard URL: `/accounts/<ACCOUNT_ID>`)
 
 ## Links
 - Provider docs: https://developers.cloudflare.com/dns/
+- Tunnel API docs: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel-api/
 
 ## Getting Started
 
-1) Set Cloudflare API token as secret:
+1) Set Cloudflare API token and account ID as secrets:
 ```bash
 monk secrets add -g cloudflare-api-token "your_api_token_here"
+monk secrets add -g cloudflare-account-id "your_account_id_here"
 ```
 
-2) Define a DNS record (save as cloudflare.yaml):
+2) Define a DNS record (save as example-record.yaml):
 ```yaml
 namespace: cloudflare-examples
 
@@ -70,6 +77,93 @@ example-record:
 ```bash
 monk update cloudflare-examples/nginx
 monk update cloudflare-examples/example-record
+```
+
+## Cloudflare Tunnel Example
+
+1) Add Cloudflare API token and account ID:
+```bash
+monk secrets add -g cloudflare-api-token "your_api_token_here"
+monk secrets add -g cloudflare-account-id "your_account_id_here"
+```
+
+2) Define a tunnel + cloudflared runnable (save as example-tunnel.yaml):
+```yaml
+namespace: cloudflare-tunnel-example
+
+app:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  services:
+    http:
+      container: app
+      port: 80
+      protocol: tcp
+
+tunnel:
+  defines: cloudflare/cloudflare-tunnel
+  account_id: <- secret("cloudflare-account-id")
+  name: "example-tunnel"
+  token_secret_ref: cloudflare-tunnel-token
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-tunnel-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+# cloudflare-tunnel-token is created by the tunnel entity on first run
+
+tunnel-app:
+  defines: cloudflare/cloudflare-tunnel-application
+  account_id: <- secret("cloudflare-account-id")
+  tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
+  zone_name: example.com
+  hostname: app.example.com
+  service: http://app:80
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    tunnel:
+      runnable: cloudflare-tunnel-example/tunnel
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-tunnel-example/tunnel
+      timeout: 60
+
+cloudflared:
+  defines: runnable
+  permitted-secrets:
+    cloudflare-tunnel-token: true
+  variables:
+    CLOUDFLARED_TOKEN:
+      type: string
+      env: CLOUDFLARED_TOKEN
+      value: <- secret("cloudflare-tunnel-token")
+  containers:
+    cloudflared:
+      image: cloudflare/cloudflared:latest
+      restart: always
+      command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-tunnel-example/tunnel
+        - cloudflare-tunnel-example/app
+      timeout: 60
+```
+
+3) Create/update:
+```bash
+monk update cloudflare-tunnel-example/app
+monk update cloudflare-tunnel-example/tunnel
+monk update cloudflare-tunnel-example/tunnel-app
+monk update cloudflare-tunnel-example/cloudflared
 ```
 
 ## Advanced Configuration Examples
