@@ -170,6 +170,7 @@ frontend:
     http:
       container: app
       port: 3000
+      protocol: tcp
 
 frontend-tunnel:
   defines: cloudflare/cloudflare-tunnel-application
@@ -198,6 +199,7 @@ api:
     http:
       container: app
       port: 8000
+      protocol: tcp
 
 api-tunnel:
   defines: cloudflare/cloudflare-tunnel-application
@@ -232,6 +234,85 @@ cloudflared:
       runnables:
         - cloudflare-multi-app/tunnel
       timeout: 60
+
+stack:
+  defines: group
+  members:
+    - cloudflare-multi-app/tunnel
+    - cloudflare-multi-app/frontend
+    - cloudflare-multi-app/frontend-tunnel
+    - cloudflare-multi-app/api
+    - cloudflare-multi-app/api-tunnel
+    - cloudflare-multi-app/cloudflared
+```
+
+### Tunnel: cloudflared only (tunnel connector already exists)
+
+Use this when you already have a tunnel token (in this case it's in global secret cloudflare-tunnel-token) and just need to run cloudflared. You must create the tunnel and DNS records manually in Cloudflare for the hostname(s) in your ingress. Each hostname should have a CNAME record pointing to `<tunnel-id>.cfargotunnel.com`. For a full setup that creates tunnels and DNS records, use the `cloudflare/cloudflare-tunnel` and `cloudflare/cloudflare-tunnel-application` entities instead.
+
+```yaml
+namespace: example
+
+app:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  services:
+    http:
+      container: app
+      protocol: tcp
+      port: 3000
+
+cloudflare-tunnel:
+  defines: runnable
+  inherits: cloudflare/cloudflared
+  files:
+    config:
+      container: cloudflared
+      path: /etc/cloudflared/config.yml
+      mode: 0644
+      contents: |
+        ingress:
+          - hostname: mysite.example.com
+            service: {{ v "app-url" }}
+          - service: http_status:404
+  connections:
+    app:
+      runnable: example/app
+      service: http
+  depends:
+    wait-for:
+      runnables:
+        - example/app
+      timeout: 60
+  variables:
+    token_secret_ref:
+      type: string
+      value: cloudflare-tunnel-token
+    command_options:
+      type: string
+      value: --config /etc/cloudflared/config.yml # options before "tunnel"
+    subcommand_options:
+      type: string
+      value: "" # options after "tunnel" (e.g., --cred-file)
+    app-host:
+      type: string
+      value: <- connection-ip("app")
+    app-port:
+      type: int
+      value: <- connection-port("app")
+    app-url:
+      type: string
+      value: <- "http://" $app-host ":" $app-port concat-all
+  permitted-secrets:
+    cloudflare-tunnel-token: true
+
+stack:
+  defines: group
+  members:
+    - example/app
+    - example/cloudflare-tunnel
 ```
 
 ## Advanced Configuration Examples

@@ -14,12 +14,16 @@ cloudflared:
       type: string
       env: CLOUDFLARED_TOKEN
       value: <- secret($token_secret_ref)
-    extra_args:
+    command_options:
       type: string
       value: ""
-      description: Extra arguments for cloudflared (optional)
+      description: Options before the "tunnel" keyword (e.g., --config)
+    subcommand_options:
+      type: string
+      value: ""
+      description: Options after "tunnel" keyword (e.g., --cred-file)
   containers:
     cloudflared:
       image: cloudflare/cloudflared:latest
       restart: always
-      command: <- `tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN} ${extra_args}`
+      cmd: <- `${command_options} tunnel run ${subcommand_options} --token ${CLOUDFLARED_TOKEN}`
