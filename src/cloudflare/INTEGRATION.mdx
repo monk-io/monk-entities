@@ -292,10 +292,10 @@ cloudflare-tunnel:
       value: cloudflare-tunnel-token
     command_options:
       type: string
-      value: --config /etc/cloudflared/config.yml # options before "tunnel"
+      value: --config /etc/cloudflared/config.yml --no-autoupdate # options after "tunnel"
     subcommand_options:
       type: string
-      value: "" # options after "tunnel" (e.g., --cred-file)
+      value: "" # options after "run" (e.g., --cred-file)
     app-host:
       type: string
       value: <- connection-ip("app")
