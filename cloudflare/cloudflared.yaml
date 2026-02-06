@@ -16,14 +16,14 @@ cloudflared:
       value: <- secret($token_secret_ref)
     command_options:
       type: string
-      value: ""
-      description: Options before the "tunnel" keyword (e.g., --config)
+      value: --no-autoupdate
+      description: Options after "tunnel" (before "run"), e.g., --config
     subcommand_options:
       type: string
       value: ""
-      description: Options after "tunnel" keyword (e.g., --cred-file)
+      description: Options after "run" (e.g., --cred-file)
   containers:
     cloudflared:
       image: cloudflare/cloudflared:latest
       restart: always
-      cmd: <- `${command_options} tunnel run ${subcommand_options} --token ${CLOUDFLARED_TOKEN}`
+      cmd: <- `tunnel ${command_options} run ${subcommand_options} --token ${CLOUDFLARED_TOKEN}`
