@@ -117,3 +117,53 @@ monk do digitalocean-database-example/my-postgres-db/restore \
 ```
 
 **Note:** Restore creates a NEW independent cluster (no in-place restore). PITR is supported for PostgreSQL and MySQL only.
+
+## Composing with Other Entities
+
+Use `connection-target` to wire your app to a DigitalOcean managed database and read connection details from its state:
+
+```yaml
+namespace: my-infra
+
+my-postgres-db:
+  defines: digitalocean-database/database
+  name: my-app-db
+  engine: pg
+  version: "16"
+  num_nodes: 1
+  region: nyc1
+  size: db-s-1vcpu-1gb
+
+my-app:
+  defines: runnable
+  variables:
+    db-host:
+      type: string
+      value: <- connection-target("database") entity-state get-member("connection_host")
+      env: DB_HOST
+    db-port:
+      type: string
+      value: <- connection-target("database") entity-state get-member("connection_port")
+      env: DB_PORT
+    db-user:
+      type: string
+      value: <- connection-target("database") entity-state get-member("connection_user")
+      env: DB_USER
+    db-password:
+      type: string
+      value: <- connection-target("database") entity-state get-member("connection_password")
+      env: DB_PASSWORD
+    db-name:
+      type: string
+      value: <- connection-target("database") entity-state get-member("connection_database")
+      env: DB_NAME
+  connections:
+    database:
+      runnable: my-infra/my-postgres-db
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - my-infra/my-postgres-db
+      timeout: 120
+```
