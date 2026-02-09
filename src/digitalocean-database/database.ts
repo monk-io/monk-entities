@@ -119,15 +119,6 @@ export interface DigitalOceanDatabaseState extends DOProviderStateBase {
     /**
      * Database connection details
      */
-    connection?: { // outdated: use connection_* instead
-        uri?: string;
-        host?: string;
-        port?: number;
-        user?: string;
-        password?: string;
-        database?: string;
-        ssl?: boolean;
-    };
     connection_uri?: string;
     connection_password?: string;
     connection_host?: string;
@@ -304,7 +295,13 @@ export class Database extends DOProviderEntity<
         // Clear state after successful deletion
         this.state.id = undefined;
         this.state.status = undefined;
-        this.state.connection = undefined;
+        this.state.connection_uri = undefined;
+        this.state.connection_password = undefined;
+        this.state.connection_host = undefined;
+        this.state.connection_port = undefined;
+        this.state.connection_user = undefined;
+        this.state.connection_database = undefined;
+        this.state.connection_ssl = undefined;
     }
 
     checkReadiness(): boolean {
@@ -364,12 +361,12 @@ export class Database extends DOProviderEntity<
                 cli.output(`   Nodes: ${response.database.num_nodes}`);
                 cli.output(`   Created: ${response.database.created_at}`);
                 
-                if (response.database.connection) {
+                if (this.state.connection_host) {
                     cli.output(`\n🔗 Connection Details:`);
-                    cli.output(`   Host: ${response.database.connection.host}`);
-                    cli.output(`   Port: ${response.database.connection.port}`);
-                    cli.output(`   User: ${response.database.connection.user}`);
-                    cli.output(`   SSL: ${response.database.connection.ssl ? 'enabled' : 'disabled'}`);
+                    cli.output(`   Host: ${this.state.connection_host}`);
+                    cli.output(`   Port: ${this.state.connection_port}`);
+                    cli.output(`   User: ${this.state.connection_user}`);
+                    cli.output(`   SSL: ${this.state.connection_ssl ? 'enabled' : 'disabled'}`);
                 }
             } else {
                 throw new Error("Database not found");
@@ -483,7 +480,7 @@ export class Database extends DOProviderEntity<
      */
     @action("getConnectionInfo")
     getConnectionInfo(_args: Args): void {
-        if (!this.state.connection) {
+        if (!this.state.connection_host) {
             throw new Error("No connection information available");
         }
 
@@ -861,26 +858,5 @@ export class Database extends DOProviderEntity<
         this.state.connection_user = database.connection.user;
         this.state.connection_database = database.connection.database;
         this.state.connection_ssl = database.connection.ssl;
-
-        // Update connection information if available
-        if (database.connection) {
-            const connection = this.state.connection || {};
-            // Never overwrite once set in state
-            if (!connection.uri) {
-                    connection.uri = database.connection.uri;
-
-            }
-            if (!connection.password) {
-                connection.password = database.connection.password
-            }
-
-            // Merge others: use API value when present, otherwise keep previous
-            connection.host = database.connection.host !== undefined ? database.connection.host : connection.host,
-            connection.port = database.connection.port !== undefined ? database.connection.port : connection.port,
-            connection.user = database.connection.user !== undefined ? database.connection.user : connection.user,
-            connection.database = database.connection.database !== undefined ? database.connection.database : connection.database,
-            connection.ssl = database.connection.ssl !== undefined ? database.connection.ssl : connection.ssl
-            this.state.connection = connection;
-        }
     }
 }
