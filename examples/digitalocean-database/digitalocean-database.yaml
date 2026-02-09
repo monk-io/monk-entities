@@ -36,6 +36,9 @@ my-app:
     database:
       runnable: my-infra/my-postgres-db
       service: data
+  containers:
+    app:
+      image: alpine:latest
   depends:
     wait-for:
       runnables:
