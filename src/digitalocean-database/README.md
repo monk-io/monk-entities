@@ -338,7 +338,13 @@ The entity maintains the following state:
 - `num_nodes` - Number of nodes
 - `region` - Deployment region
 - `size` - Cluster size
-- `connection` - Connection details (URI, host, port, credentials)
+- `connection_uri` - Connection URI
+- `connection_host` - Database hostname
+- `connection_port` - Database port
+- `connection_user` - Database user
+- `connection_password` - Database password
+- `connection_database` - Default database name
+- `connection_ssl` - Whether SSL is enabled
 - `created_at` - Creation timestamp
 - `tags` - Applied tags
 
