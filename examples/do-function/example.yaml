@@ -1,0 +1,22 @@
+# Example usage of the DigitalOcean Functions deployment runnable
+
+namespace: do-function-example
+
+python-function:
+  defines: runnable
+  inherits: do-function/deploy
+
+  containers:
+    deploy:
+      paths:
+        - blobs://example-python-function:/functions
+
+  variables:
+    function-name: my-python-api
+    runtime: python:3.9
+    memory: "256"
+    timeout: "60"
+    namespace-name: production
+    region: nyc1
+    environment-vars: <- `{"NODE_ENV":"production","API_VERSION":"v1"}`
+    post-deploy: <- `echo "Python function deployed successfully!"`
