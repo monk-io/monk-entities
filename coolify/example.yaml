@@ -1,0 +1,58 @@
+namespace: coolify-example
+
+# root node where we install coolify
+root-node:
+  defines: coolify/node
+  provider: azure
+  name: root-node
+  region: polandcentral
+  instance: Standard_B2s
+  os: ubuntu2404
+  diskSize: 50
+  diskType: hdd
+  rootUser: # admin GUI user
+    username: root
+    email: <- secret("root-email")
+    passwordSecret: root-password
+  tokenSecret: coolify-token # secret where to save PAT for api
+  publicPorts: # exposed ports
+    - "22/tcp"
+    - "8000/tcp"
+    - "6001/tcp"
+    - "6002/tcp"
+  permitted-secrets:
+    coolify-token: true
+  services:
+    data:
+      protocol: custom
+
+join-node:
+  defines: coolify/node
+  provider: azure
+  name: join-node
+  region: polandcentral
+  instance: Standard_B2s
+  os: ubuntu2404
+  diskSize: 50
+  diskType: hdd
+  tokenSecret: coolify-token
+  apiUrl: <- connection-target("root") entity-state get-member("apiUrl")
+  publicPorts: # exposed ports
+    - "22/tcp"
+  permitted-secrets:
+    coolify-token: true
+  connections:
+    root:
+      runnable: coolify-example/root-node
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - coolify-example/root-node
+      timeout: 600
+
+stack:
+  defines: process-group
+  runnable-list:
+    - coolify-example/root-node
+    - coolify-example/join-node

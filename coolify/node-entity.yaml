@@ -1,0 +1,46 @@
+namespace: coolify
+
+node:
+  defines: entity
+  schema:
+    required: ["provider", "name", "region", "instance"]
+    provider:
+      type: string
+    name:
+      type: string
+    region:
+      type: string
+    instance:
+      type: string
+    os:
+      enum:
+        - ubuntu2404
+        - debian12
+    diskSize:
+      type: integer
+    diskType:
+      type: string
+    tokenSecret:
+      type: string
+    apiUrl: # url to the api of the root node
+      type: string
+    rootUser: # user to configure for the root node
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        passwordSecret:
+          type: string
+    publicPorts:
+      type: array
+      items:
+        type: string
+  lifecycle:
+    sync: <<< node-sync.js
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
