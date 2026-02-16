@@ -4,5 +4,5 @@ DESCRIPTION Managed DNS via DigitalOcean.
 HOSTING managed
 TAGS digitalocean,dns,domains
  
-LOAD common.yaml domain.yaml
+LOAD domain.yaml common.yaml
 RESOURCES domain-sync.js common.js

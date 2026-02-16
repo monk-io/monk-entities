@@ -166,7 +166,13 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
     this.deleteResource(`/databases/${this.state.id}`, `database cluster ${this.state.name || this.state.id}`);
     this.state.id = void 0;
     this.state.status = void 0;
-    this.state.connection = void 0;
+    this.state.connection_uri = void 0;
+    this.state.connection_password = void 0;
+    this.state.connection_host = void 0;
+    this.state.connection_port = void 0;
+    this.state.connection_user = void 0;
+    this.state.connection_database = void 0;
+    this.state.connection_ssl = void 0;
   }
   checkReadiness() {
     if (!this.state.id) {
@@ -210,13 +216,13 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
         cli.output(`   Size: ${response.database.size}`);
         cli.output(`   Nodes: ${response.database.num_nodes}`);
         cli.output(`   Created: ${response.database.created_at}`);
-        if (response.database.connection) {
+        if (this.state.connection_host) {
           cli.output(`
 \u{1F517} Connection Details:`);
-          cli.output(`   Host: ${response.database.connection.host}`);
-          cli.output(`   Port: ${response.database.connection.port}`);
-          cli.output(`   User: ${response.database.connection.user}`);
-          cli.output(`   SSL: ${response.database.connection.ssl ? "enabled" : "disabled"}`);
+          cli.output(`   Host: ${this.state.connection_host}`);
+          cli.output(`   Port: ${this.state.connection_port}`);
+          cli.output(`   User: ${this.state.connection_user}`);
+          cli.output(`   SSL: ${this.state.connection_ssl ? "enabled" : "disabled"}`);
         }
       } else {
         throw new Error("Database not found");
@@ -300,7 +306,7 @@ Cluster ID: ${this.state.id}
     }
   }
   getConnectionInfo(_args) {
-    if (!this.state.connection) {
+    if (!this.state.connection_host) {
       throw new Error("No connection information available");
     }
     cli.output(`\u{1F517} Connection Information for "${this.state.name}":`);
@@ -600,17 +606,6 @@ Cluster ID: ${this.state.id}
     this.state.connection_user = database.connection.user;
     this.state.connection_database = database.connection.database;
     this.state.connection_ssl = database.connection.ssl;
-    if (database.connection) {
-      const connection = this.state.connection || {};
-      if (!connection.uri) {
-        connection.uri = database.connection.uri;
-      }
-      if (!connection.password) {
-        connection.password = database.connection.password;
-      }
-      connection.host = database.connection.host !== void 0 ? database.connection.host : connection.host, connection.port = database.connection.port !== void 0 ? database.connection.port : connection.port, connection.user = database.connection.user !== void 0 ? database.connection.user : connection.user, connection.database = database.connection.database !== void 0 ? database.connection.database : connection.database, connection.ssl = database.connection.ssl !== void 0 ? database.connection.ssl : connection.ssl;
-      this.state.connection = connection;
-    }
   }
 };
 _init = __decoratorStart(_a);

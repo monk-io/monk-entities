@@ -3,5 +3,5 @@ VERSION_HASH a20663d70a06
 DESCRIPTION Serverless compute functions on AWS.
 HOSTING managed
 TAGS aws,serverless,lambda,functions
-LOAD lambda-function.yaml common.yaml base.yaml lambda-base.yaml
-RESOURCES lambda-function-sync.js lambda-base.js base.js common.js
+LOAD lambda-base.yaml lambda-function.yaml base.yaml common.yaml
+RESOURCES lambda-function-sync.js base.js lambda-base.js common.js

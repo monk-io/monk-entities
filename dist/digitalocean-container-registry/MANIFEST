@@ -4,5 +4,5 @@ DESCRIPTION Private container registries.
 HOSTING managed
 TAGS digitalocean,registry,docker
 digital-ocean-container-registry: registry.ts
-LOAD common.yaml registry.yaml do-provider-base.yaml
+LOAD registry.yaml do-provider-base.yaml common.yaml
 RESOURCES common.js do-provider-base.js registry-sync.js

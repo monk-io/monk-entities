@@ -4,5 +4,5 @@ DESCRIPTION Monitoring and alert policies.
 HOSTING managed
 TAGS digitalocean,monitoring,alerts
  
-LOAD common.yaml digital-ocean-monitoring.yaml do-provider-base.yaml
+LOAD digital-ocean-monitoring.yaml do-provider-base.yaml common.yaml
 RESOURCES common.js do-provider-base.js digital-ocean-monitoring-sync.js
