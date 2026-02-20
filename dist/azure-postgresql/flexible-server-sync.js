@@ -172,7 +172,14 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       if (this.definition.network?.delegated_subnet_resource_id || this.definition.network?.private_dns_zone_resource_id) {
         throw new Error("Cannot use both vnet_integration and manual network.delegated_subnet_resource_id/private_dns_zone_resource_id. Choose one approach.");
       }
-      vnetNetworkConfig = this.setupVNetIntegration();
+      try {
+        vnetNetworkConfig = this.setupVNetIntegration();
+      } catch (error) {
+        cli.output(`
+\u26A0\uFE0F  VNet integration setup failed, cleaning up partial resources...`);
+        this.cleanupVNetIntegration();
+        throw error;
+      }
     }
     if (vnetNetworkConfig) {
       body.properties.network = {
@@ -224,19 +231,13 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       }
       const responseData = this.parseResponseBody(response);
       const properties = responseData?.properties;
-      this.state = {
-        server_name: this.definition.server_name,
-        provisioning_state: typeof properties?.state === "string" ? properties.state : "Creating",
-        server_state: typeof properties?.state === "string" ? properties.state : "Creating",
-        fqdn: typeof properties?.fullyQualifiedDomainName === "string" ? properties.fullyQualifiedDomainName : void 0,
-        version: typeof properties?.version === "string" ? properties.version : this.definition.version || "16",
-        administrator_login: this.definition.administrator_login,
-        existing: false,
-        // Store VNet resource IDs for cleanup
-        created_subnet_id: vnetNetworkConfig?.delegatedSubnetResourceId,
-        created_dns_zone_id: vnetNetworkConfig?.privateDnsZoneArmResourceId,
-        created_dns_link_id: this.state.created_dns_link_id
-      };
+      this.state.server_name = this.definition.server_name;
+      this.state.provisioning_state = typeof properties?.state === "string" ? properties.state : "Creating";
+      this.state.server_state = typeof properties?.state === "string" ? properties.state : "Creating";
+      this.state.fqdn = typeof properties?.fullyQualifiedDomainName === "string" ? properties.fullyQualifiedDomainName : void 0;
+      this.state.version = typeof properties?.version === "string" ? properties.version : this.definition.version || "16";
+      this.state.administrator_login = this.definition.administrator_login;
+      this.state.existing = false;
       cli.output(`\u2705 Created PostgreSQL Flexible Server: ${this.definition.server_name}`);
     } catch (error) {
       if (vnetNetworkConfig) {
@@ -333,17 +334,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       const properties = server.properties;
       const state = typeof properties?.state === "string" ? properties.state : "unknown";
       cli.output(`\u23F3 Server still exists (state: ${state}), waiting... (attempt ${attempt}/${maxAttempts})`);
-      this.sleep(pollIntervalMs);
+      sleep(pollIntervalMs);
     }
     cli.output(`\u26A0\uFE0F  Server deletion timed out after ${maxAttempts} attempts. Attempting VNet cleanup anyway...`);
-  }
-  /**
-   * Sleep for specified milliseconds
-   */
-  sleep(ms) {
-    const start = Date.now();
-    while (Date.now() - start < ms) {
-    }
   }
   checkReadiness() {
     if (!this.state.server_name) {
@@ -384,8 +377,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
         if (this.definition.vnet_integration) {
           cli.output(`\u{1F9F9} Cleaning up VNet integration resources...`);
           this.cleanupVNetIntegration();
+          throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} is in failed state: ${serverState}. VNet resources have been cleaned up.`);
         }
-        throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} is in failed state: ${serverState}. VNet resources have been cleaned up.`);
+        throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} is in failed state: ${serverState}.`);
       }
       const isReady = serverState === "Ready";
       if (isReady) {
@@ -408,6 +402,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
   }
   /**
    * Populate connection string secret if reference is provided
+   * Format: postgresql://username:password@host:5432/database?sslmode=require
    */
   populateConnectionString() {
     if (!this.definition.connection_string_secret_ref || !this.state.fqdn) {
@@ -415,7 +410,19 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     }
     try {
       const adminLogin = this.state.administrator_login || this.definition.administrator_login || "postgres";
-      const connectionString = `postgresql://${adminLogin}@${this.state.fqdn}:5432/postgres?sslmode=require`;
+      let password = "";
+      if (this.definition.administrator_password_secret_ref) {
+        try {
+          const secretValue = secret.get(this.definition.administrator_password_secret_ref);
+          if (secretValue) {
+            password = secretValue;
+          }
+        } catch {
+          cli.output(`\u26A0\uFE0F  Could not retrieve password from secret for connection string`);
+        }
+      }
+      const encodedPassword = encodeURIComponent(password);
+      const connectionString = password ? `postgresql://${adminLogin}:${encodedPassword}@${this.state.fqdn}:5432/postgres?sslmode=require` : `postgresql://${adminLogin}@${this.state.fqdn}:5432/postgres?sslmode=require`;
       secret.set(this.definition.connection_string_secret_ref, connectionString);
       cli.output(`\u{1F511} Saved connection string to secret: ${this.definition.connection_string_secret_ref}`);
     } catch (error) {
@@ -424,7 +431,10 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
   }
   /**
    * Setup VNet integration by creating subnet, DNS zone, and DNS link
-   * Returns the network configuration to use for server creation
+   * Returns all created resource IDs for state storage and cleanup
+   * 
+   * Note: Resource IDs are stored in state immediately after creation
+   * to enable cleanup of partial resources if a later step fails.
    */
   setupVNetIntegration() {
     const vnetConfig = this.definition.vnet_integration;
@@ -466,7 +476,8 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     cli.output(`   DNS Link ID: ${dnsLinkId}`);
     return {
       delegatedSubnetResourceId: subnetId,
-      privateDnsZoneArmResourceId: dnsZoneId
+      privateDnsZoneArmResourceId: dnsZoneId,
+      dnsLinkId
     };
   }
   /**
@@ -488,13 +499,31 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       }
     };
     const response = this.makeAzureRequest("PUT", path, body);
-    if (response.error && response.statusCode !== 200 && response.statusCode !== 201) {
+    if (response.error && response.statusCode !== 200 && response.statusCode !== 201 && response.statusCode !== 202) {
       throw new Error(`Failed to create delegated subnet: ${response.error}, body: ${response.body}`);
     }
     const responseData = this.parseResponseBody(response);
-    const subnetId = responseData?.id;
+    let subnetId = responseData?.id;
     if (!subnetId) {
-      throw new Error(`Failed to get subnet ID from response: ${response.body}`);
+      subnetId = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${resourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetName}/subnets/${subnetName}`;
+      cli.output(`   \u23F3 Subnet creation accepted (async): ${subnetName}`);
+      const checkPath = `${subnetId}?api-version=${this.networkApiVersion}`;
+      const maxAttempts = 30;
+      const pollInterval = 2e3;
+      for (let i = 0; i < maxAttempts; i++) {
+        const pollResponse = this.makeAzureRequest("GET", checkPath);
+        if (!pollResponse.error && pollResponse.statusCode === 200) {
+          const pollData = this.parseResponseBody(pollResponse);
+          const provisioningState = pollData?.properties?.provisioningState;
+          if (provisioningState === "Succeeded") {
+            cli.output(`   \u2705 Created delegated subnet: ${subnetName}`);
+            return subnetId;
+          }
+        }
+        sleep(pollInterval);
+      }
+      cli.output(`   \u26A0\uFE0F  Subnet creation may still be in progress: ${subnetName}`);
+      return subnetId;
     }
     cli.output(`   \u2705 Created delegated subnet: ${subnetName}`);
     return subnetId;
@@ -538,9 +567,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
             return zoneId;
           }
         }
-        const start = Date.now();
-        while (Date.now() - start < pollInterval) {
-        }
+        sleep(pollInterval);
       }
       cli.output(`   \u26A0\uFE0F  DNS zone creation may still be in progress: ${zoneName}`);
       return zoneId;
@@ -594,9 +621,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
             return linkId;
           }
         }
-        const start = Date.now();
-        while (Date.now() - start < pollInterval) {
-        }
+        sleep(pollInterval);
       }
       cli.output(`   \u26A0\uFE0F  DNS link creation may still be in progress: ${linkName}`);
       return linkId;
@@ -606,6 +631,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
   }
   /**
    * Clean up VNet integration resources created by this entity
+   * Only clears state tracking for resources that were successfully deleted
    */
   cleanupVNetIntegration() {
     if (!this.definition.vnet_integration) {
@@ -618,21 +644,26 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     cli.output(`
 \u{1F9F9} Cleaning up VNet integration resources...`);
     if (this.state.created_dns_link_id) {
-      this.deleteResourceById(this.state.created_dns_link_id, this.privateDnsApiVersion, "DNS zone VNet link");
-      this.state.created_dns_link_id = void 0;
+      const deleted = this.deleteResourceById(this.state.created_dns_link_id, this.privateDnsApiVersion, "DNS zone VNet link");
+      if (deleted) {
+        this.state.created_dns_link_id = void 0;
+      }
     }
     if (this.state.created_dns_zone_id) {
       cli.output(`   \u2139\uFE0F  Keeping private DNS zone (shared resource)`);
       this.state.created_dns_zone_id = void 0;
     }
     if (this.state.created_subnet_id) {
-      this.deleteResourceById(this.state.created_subnet_id, this.networkApiVersion, "delegated subnet");
-      this.state.created_subnet_id = void 0;
+      const deleted = this.deleteResourceById(this.state.created_subnet_id, this.networkApiVersion, "delegated subnet");
+      if (deleted) {
+        this.state.created_subnet_id = void 0;
+      }
     }
     cli.output(`\u2705 VNet integration cleanup complete`);
   }
   /**
    * Delete an Azure resource by its full resource ID
+   * @returns true if resource was deleted or didn't exist, false if deletion failed
    */
   deleteResourceById(resourceId, apiVersion, resourceType) {
     try {
@@ -640,13 +671,19 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       const response = this.makeAzureRequest("DELETE", path);
       if (response.error && response.statusCode !== 200 && response.statusCode !== 202 && response.statusCode !== 204 && response.statusCode !== 404) {
         cli.output(`\u26A0\uFE0F  Failed to delete ${resourceType}: ${response.error}`);
+        cli.output(`   \u26A0\uFE0F  Resource ID retained in state for manual cleanup: ${resourceId}`);
+        return false;
       } else if (response.statusCode === 404) {
         cli.output(`   \u2139\uFE0F  ${resourceType} not found (may have been already deleted)`);
+        return true;
       } else {
         cli.output(`   \u2705 Deleted ${resourceType}`);
+        return true;
       }
     } catch (error) {
       cli.output(`\u26A0\uFE0F  Error deleting ${resourceType}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      cli.output(`   \u26A0\uFE0F  Resource ID retained in state for manual cleanup: ${resourceId}`);
+      return false;
     }
   }
   getInfo(_args) {

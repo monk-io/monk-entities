@@ -57,25 +57,6 @@ namespace: azure-pg-client-demo
 #    - Monk creates VNets with naming format: {resource_group}{region}-vn
 #    - Example: resource group "ivan-test" in "westeurope" → VNet "ivan-testwesteurope-vn"
 # 2. Deploy your Monk nodes in the same VNet or a peered VNet
-# 3. Configure CoreDNS to forward Azure DNS queries (see DNS Configuration below)
-#
-# DNS Configuration for Private Access:
-# On Azure nodes, update /var/lib/monkd/coredns/Corefile to forward Azure DNS:
-#
-#   database.azure.com:53 {
-#       forward . 168.63.129.16
-#       cache 30
-#   }
-#   privatelink.postgres.database.azure.com:53 {
-#       forward . 168.63.129.16
-#       cache 30
-#   }
-#   . {
-#       forward . 8.8.8.8 8.8.4.4
-#       cache 30
-#   }
-#
-# Then restart: sudo podman restart monk_dns
 #
 # Usage:
 #   # Option 1: Let the entity auto-generate a password (recommended)
