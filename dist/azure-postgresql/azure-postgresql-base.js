@@ -84,7 +84,7 @@ var AzurePostgreSQLEntity = class extends import_base.MonkEntity {
         response = import_azure.default.delete(url, { headers });
         break;
       case "PATCH":
-        response = import_azure.default.put(url, { headers, body: bodyString });
+        response = import_azure.default.do(url, { method: "PATCH", headers, body: bodyString });
         break;
       default:
         throw new Error(`Unsupported HTTP method: ${method}`);

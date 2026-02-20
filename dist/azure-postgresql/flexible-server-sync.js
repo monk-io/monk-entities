@@ -311,6 +311,10 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       cli.output("PostgreSQL Flexible Server does not exist, nothing to delete");
       return;
     }
+    if (this.state.existing) {
+      cli.output(`PostgreSQL Flexible Server ${this.definition.server_name} wasn't created by this entity, skipping delete`);
+      return;
+    }
     this.deleteResource(this.definition.server_name);
     if (this.definition.vnet_integration) {
       cli.output(`\u23F3 Waiting for server deletion to complete before cleaning up VNet resources...`);
@@ -393,7 +397,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       }
       return isReady;
     } catch (error) {
-      if (error instanceof Error && error.message.includes("is in failed state")) {
+      if (error instanceof Error && (error.message.includes("is in failed state") || error.message.includes("creation failed"))) {
         throw error;
       }
       cli.output(`\u26A0\uFE0F  Failed to check PostgreSQL Flexible Server readiness: ${error instanceof Error ? error.message : "Unknown error"}`);

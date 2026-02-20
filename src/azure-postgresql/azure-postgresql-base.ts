@@ -124,7 +124,8 @@ export abstract class AzurePostgreSQLEntity<
                 response = azure.delete(url, { headers });
                 break;
             case "PATCH":
-                response = azure.put(url, { headers, body: bodyString });
+                // Use azure.do() for PATCH since there's no dedicated patch() method
+                response = azure.do(url, { method: "PATCH", headers, body: bodyString });
                 break;
             default:
                 throw new Error(`Unsupported HTTP method: ${method}`);
