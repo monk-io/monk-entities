@@ -1,0 +1,99 @@
+namespace: azure-postgresql-test
+
+# ============================================================================
+# Azure PostgreSQL Test Stack
+# ============================================================================
+# This is a test template for the azure-postgresql entities.
+# Uses environment variables for Azure credentials.
+#
+# Required environment variables:
+#   - AZURE_SUBSCRIPTION_ID: Your Azure subscription ID
+#   - AZURE_RESOURCE_GROUP_NAME: Your Azure resource group name
+#
+# Required secrets:
+#   - postgres-admin-password: Database admin password
+#     (auto-generated if not pre-created)
+#
+# Usage:
+#   export AZURE_SUBSCRIPTION_ID=your-subscription-id
+#   export AZURE_RESOURCE_GROUP_NAME=your-resource-group
+#   monk run azure-postgresql-test/stack
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Test PostgreSQL Flexible Server
+# ----------------------------------------------------------------------------
+flexible-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  server_name: monk-test-pg-server
+  location: East US
+  version: "16"
+  sku:
+    name: Standard_B1ms
+    tier: Burstable
+  storage:
+    storage_size_gb: 32
+    auto_grow: Disabled
+  backup:
+    backup_retention_days: 7
+    geo_redundant_backup: Disabled
+  administrator_login: pgadmin
+  administrator_password_secret_ref: postgres-admin-password  # Required - auto-generates if secret doesn't exist
+  tags:
+    Environment: Test
+    ManagedBy: MonkEC
+  permitted-secrets:
+    postgres-admin-password: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Test PostgreSQL Database
+# ----------------------------------------------------------------------------
+test-database:
+  defines: azure-postgresql/database
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  server_name: monk-test-pg-server
+  database_name: testdb
+  charset: UTF8
+  collation: en_US.utf8
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-test/flexible-server
+      timeout: 900
+  connections:
+    server:
+      runnable: azure-postgresql-test/flexible-server
+      service: data
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Data service provider for connections (test helper)
+# ----------------------------------------------------------------------------
+data-provider:
+  defines: runnable
+  containers:
+    provider:
+      image: alpine:latest
+      bash: |
+        echo "Data provider ready"
+        sleep 3600
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Test stack (server + database)
+# ----------------------------------------------------------------------------
+stack:
+  defines: process-group
+  runnable-list:
+    - azure-postgresql-test/flexible-server
+    - azure-postgresql-test/test-database

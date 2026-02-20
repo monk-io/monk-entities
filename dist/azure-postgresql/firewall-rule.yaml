@@ -1,0 +1,85 @@
+namespace: azure-postgresql
+firewall-rule:
+  defines: entity
+  metadata:
+    name: FirewallRule
+    description: |-
+      Azure PostgreSQL Firewall Rule entity.
+      Creates and manages firewall rules for Azure Database for PostgreSQL Flexible Servers.
+      Use this to allow access from specific IP addresses or ranges.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.rule_name` - Firewall rule name
+      - `state.server_name` - Parent server name
+      - `state.start_ip_address` - Start of allowed IP range
+      - `state.end_ip_address` - End of allowed IP range
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-postgresql/flexible-server` - Parent server to configure firewall for
+    version-hash: b31aefc94fd7
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    server_name:
+      type: string
+      description: Name of the parent PostgreSQL Flexible Server
+    rule_name:
+      type: string
+      description: Firewall rule name
+    start_ip_address:
+      type: string
+      description: Start IP address of the firewall rule range
+    end_ip_address:
+      type: string
+      description: End IP address of the firewall rule range
+    required:
+      - subscription_id
+      - resource_group_name
+      - server_name
+      - rule_name
+      - start_ip_address
+      - end_ip_address
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    rule_name:
+      type: string
+      description: Firewall rule name (primary identifier)
+    server_name:
+      type: string
+      description: Parent server name
+    start_ip_address:
+      type: string
+      description: Start IP address
+    end_ip_address:
+      type: string
+      description: End IP address
+  lifecycle:
+    sync: <<< firewall-rule-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - azure-postgresql/azure-postgresql-base
+    - cli
+    - monkec/base

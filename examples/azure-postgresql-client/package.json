@@ -1,0 +1,36 @@
+{
+  "name": "azure-postgresql-client",
+  "version": "1.0.0",
+  "description": "TypeScript client demonstrating database connection and operations with Azure Database for PostgreSQL Flexible Server",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "clean": "rm -rf dist",
+    "test": "npm run build && npm start"
+  },
+  "keywords": [
+    "azure",
+    "postgresql",
+    "flexible-server",
+    "database",
+    "monk",
+    "typescript"
+  ],
+  "author": "Monk Azure PostgreSQL Client",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.10.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

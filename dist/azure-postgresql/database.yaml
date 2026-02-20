@@ -1,0 +1,82 @@
+namespace: azure-postgresql
+database:
+  defines: entity
+  metadata:
+    name: Database
+    description: |-
+      Azure PostgreSQL Database entity.
+      Creates and manages databases within Azure Database for PostgreSQL Flexible Servers.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.database_name` - Database name for connection strings
+      - `state.server_name` - Parent server name
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-postgresql/flexible-server` - Parent server that hosts the database
+    version-hash: b31aefc94fd7
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    server_name:
+      type: string
+      description: Name of the parent PostgreSQL Flexible Server
+    database_name:
+      type: string
+      description: 'Database name (1-63 chars, alphanumeric and underscores)'
+    charset:
+      type: string
+      description: Character set for the database
+      default: UTF8
+    collation:
+      type: string
+      description: Collation for the database
+      default: en_US.utf8
+    required:
+      - subscription_id
+      - resource_group_name
+      - server_name
+      - database_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    database_name:
+      type: string
+      description: Database name (primary identifier)
+    server_name:
+      type: string
+      description: Parent server name
+    charset:
+      type: string
+      description: Character set
+    collation:
+      type: string
+      description: Collation
+  lifecycle:
+    sync: <<< database-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+  requires:
+    - azure-postgresql/azure-postgresql-base
+    - cli
+    - monkec/base

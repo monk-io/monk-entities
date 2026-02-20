@@ -1,0 +1,138 @@
+namespace: azure-postgresql
+access-list:
+  defines: entity
+  metadata:
+    name: AccessList
+    description: |-
+      Azure PostgreSQL Access List entity.
+      Manages firewall rules for Azure Database for PostgreSQL Flexible Servers.
+      Creates firewall rules dynamically based on client IPs from runnable-peers-public-ips.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.server_name` - Parent server name
+      - `state.created_rules` - List of created firewall rule names
+      - `state.allowed_cidr_blocks` - List of allowed CIDR blocks
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-postgresql/flexible-server` - Parent server to configure firewall for (must have `network.public_network_access: Enabled`)
+
+      ---
+      ## Dynamic Access Control for Public Access Pattern
+
+      **This entity is REQUIRED** for proper PostgreSQL access control with public access.
+      DO NOT hardcode IP addresses - use `runnable-peers-public-ips()` for dynamic access.
+
+      Use this entity to open database access AFTER client is deployed.
+
+      ### Usage with runnable-peers-public-ips (Cross-cloud access)
+      Use when client runs on other cloud providers, different regions, or on-prem.
+      Requires server with public network access enabled.
+      ```yaml
+      # Server with public access enabled
+      postgres-server:
+        defines: azure-postgresql/flexible-server
+        network:
+          public_network_access: Enabled  # Required for public access
+        # ... other config
+
+      # Access list creates firewall rules for client IPs
+      access-list:
+        defines: azure-postgresql/access-list
+        subscription_id: <- connection-target("server") entity get-member("subscription_id")
+        resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+        server_name: <- connection-target("server") entity-state get-member("server_name")
+        allowed_cidr_blocks: <- runnable-peers-public-ips("ns/client")
+        connections:
+          server:
+            runnable: ns/postgres-server
+            service: data
+        depends:
+          wait-for:
+            runnables: [ns/postgres-server, ns/client]  # MUST wait for both
+            timeout: 1800
+      ```
+
+      ### Deployment Order (CRITICAL)
+      1. **PostgreSQL Server** → creates DB with public endpoint
+      2. **Client** → deploys to nodes (gets public IPs)
+      3. **Access List** → reads client's node IPs, creates firewall rules
+
+      ### Why depends on BOTH server AND client?
+      - `server_name` comes from server state (needs server deployed first)
+      - `runnable-peers-public-ips()` returns client's node IPs (needs client deployed first)
+      - If deployed before client: returns empty list → no firewall rules → connection fails
+
+      ### When to use this entity:
+      | Client Location | Server Config | Use access-list? |
+      |-----------------|---------------|------------------|
+      | Azure (same VNet) | `vnet_integration` | NO - use private access |
+      | Other cloud/region | `network.public_network_access: Enabled` | YES |
+
+      ---
+    version-hash: b31aefc94fd7
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    server_name:
+      type: string
+      description: Name of the parent PostgreSQL Flexible Server
+    allowed_cidr_blocks:
+      type: array
+      items:
+        type: string
+      description: |-
+        List of CIDR blocks to allow access from (e.g., from runnable-peers-public-ips)
+        Each IP will create a firewall rule allowing access
+    rule_name_prefix:
+      type: string
+      description: |-
+        Prefix for firewall rule names (default: "monk-access")
+        Rules will be named: {prefix}-{index}
+      default: monk-access
+    required:
+      - subscription_id
+      - resource_group_name
+      - server_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    server_name:
+      type: string
+      description: Parent server name
+    created_rules:
+      type: array
+      items:
+        type: string
+      description: List of created firewall rule names
+    allowed_cidr_blocks:
+      type: array
+      items:
+        type: string
+      description: List of allowed CIDR blocks
+  lifecycle:
+    sync: <<< access-list-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 20
+  requires:
+    - azure-postgresql/azure-postgresql-base
+    - cli

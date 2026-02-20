@@ -1,0 +1,53 @@
+name: Azure PostgreSQL Flexible Server Integration Test
+
+timeout: 1200000
+
+secrets:
+  global:
+    postgres-admin-password: "$POSTGRES_ADMIN_PASSWORD"
+
+setup:
+  - { action: load, target: dist/input/azure-postgresql/MANIFEST, expect: { exitCode: 0 } }
+  - { action: load, target: test/stack-template.yaml, expect: { exitCode: 0 } }
+
+tests:
+  # Test flexible server creation
+  - { action: run, target: azure-postgresql-test/flexible-server, expect: { exitCode: 0 } }
+  
+  # Wait for flexible server to be ready (can take 5-15 minutes)
+  - { action: wait, target: azure-postgresql-test/flexible-server, waitFor: { condition: ready, timeout: 900000 } }
+  
+  # Test get-info action
+  - { action: do, target: azure-postgresql-test/flexible-server/get-info, expect: { exitCode: 0 } }
+
+  # Test get-connection-string action
+  - { action: do, target: azure-postgresql-test/flexible-server/get-connection-string, expect: { exitCode: 0 } }
+
+  # Test database creation
+  - { action: run, target: azure-postgresql-test/test-database, expect: { exitCode: 0 } }
+  
+  # Wait for database to be ready
+  - { action: wait, target: azure-postgresql-test/test-database, waitFor: { condition: ready, timeout: 120000 } }
+
+  # Test database get-info action
+  - { action: do, target: azure-postgresql-test/test-database/get-info, expect: { exitCode: 0 } }
+
+  # Test firewall rule creation
+  - { action: run, target: azure-postgresql-test/firewall-azure, expect: { exitCode: 0 } }
+  
+  # Wait for firewall rule to be ready
+  - { action: wait, target: azure-postgresql-test/firewall-azure, waitFor: { condition: ready, timeout: 60000 } }
+
+  # Test firewall rule get-info action
+  - { action: do, target: azure-postgresql-test/firewall-azure/get-info, expect: { exitCode: 0 } }
+
+  # Test server update (should be idempotent)
+  - { action: run, target: azure-postgresql-test/flexible-server, expect: { exitCode: 0 } }
+
+  # Verify the server is still ready after update
+  - { action: wait, target: azure-postgresql-test/flexible-server, waitFor: { condition: ready, timeout: 180000 } }
+
+cleanup:
+  - { action: delete, target: azure-postgresql-test/firewall-azure, expect: { exitCode: 0 } }
+  - { action: delete, target: azure-postgresql-test/test-database, expect: { exitCode: 0 } }
+  - { action: delete, target: azure-postgresql-test/flexible-server, expect: { exitCode: 0 } }
