@@ -736,6 +736,12 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             return;
         }
 
+        // Skip deletion for pre-existing servers (not created by this entity)
+        if (this.state.existing) {
+            cli.output(`PostgreSQL Flexible Server ${this.definition.server_name} wasn't created by this entity, skipping delete`);
+            return;
+        }
+
         // Delete the PostgreSQL server first
         this.deleteResource(this.definition.server_name);
 
@@ -865,8 +871,10 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             
             return isReady;
         } catch (error) {
-            // Re-throw errors for failed states so they propagate properly
-            if (error instanceof Error && error.message.includes("is in failed state")) {
+            // Re-throw intentional fail-fast errors so they propagate properly
+            // These include: "is in failed state" and "creation failed"
+            if (error instanceof Error && 
+                (error.message.includes("is in failed state") || error.message.includes("creation failed"))) {
                 throw error;
             }
             cli.output(`⚠️  Failed to check PostgreSQL Flexible Server readiness: ${error instanceof Error ? error.message : 'Unknown error'}`);
