@@ -52,7 +52,6 @@ flexible-server:
 
       **Requirements for VNet Integration:**
       - Client must run on Azure nodes in the same VNet or a peered VNet
-      - Configure Monk CoreDNS to forward Azure DNS queries to 168.63.129.16
       - VNet naming convention: `{resource_group}{region}-vn` (no spaces in region)
 
       ### Pattern 2: Public Access with IP Firewall (Cross-Cloud)
@@ -98,7 +97,7 @@ flexible-server:
       | Other cloud/region | `network.public_network_access: Enabled` | `access-list` with `runnable-peers-public-ips` |
 
       ---
-    version-hash: b31aefc94fd7
+    version-hash: 56ed6b53fc09
   schema:
     subscription_id:
       type: string

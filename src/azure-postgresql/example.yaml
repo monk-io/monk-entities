@@ -309,13 +309,6 @@ production-stack:
 # - A DNS zone VNet link
 #
 # IMPORTANT: Client must run in same VNet or peered VNet to connect.
-#
-# DNS Configuration Required on Azure nodes:
-# Update /var/lib/monkd/coredns/Corefile to forward Azure DNS:
-#   database.azure.com:53 { forward . 168.63.129.16; cache 30 }
-#   privatelink.postgres.database.azure.com:53 { forward . 168.63.129.16; cache 30 }
-#   . { forward . 8.8.8.8 8.8.4.4; cache 30 }
-# Then: sudo podman restart monk_dns
 # ----------------------------------------------------------------------------
 vnet-integrated-server:
   defines: azure-postgresql/flexible-server
