@@ -1,0 +1,512 @@
+namespace: azure-pg-client-demo
+
+# ============================================================================
+# Azure PostgreSQL Client Application Examples
+# ============================================================================
+#
+# This file demonstrates TWO deployment patterns for Azure PostgreSQL:
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ PATTERN 1: VNet Integration (Private Access) - Maximum Security            │
+# │ - Server has NO public IP, accessible only from within VNet                 │
+# │ - Client MUST run on Azure nodes in same/peered VNet                        │
+# │ - Uses: azure-pg-demo-app (process-group)                                   │
+# │ - Entities: postgres-server, postgres-database, postgres-client             │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ PATTERN 2: Public Access with IP Firewall - Cross-Cloud Connectivity       │
+# │ - Server has public IP with firewall rules                                  │
+# │ - Client can run on ANY cloud (AWS, GCP, on-prem, etc.)                     │
+# │ - Uses: azure-pg-public-demo (process-group)                                │
+# │ - Entities: public-postgres-server, public-postgres-database,               │
+# │             public-postgres-client, postgres-access-list                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ============================================================================
+# DECISION GUIDE: Which Pattern to Use?
+# ============================================================================
+#
+# ┌──────────────────────┬─────────────────────┬─────────────────────────────┐
+# │ Client Location      │ Pattern             │ Key Configuration           │
+# ├──────────────────────┼─────────────────────┼─────────────────────────────┤
+# │ Azure (same VNet)    │ 1: VNet Integration │ vnet_integration: {...}     │
+# │ Azure (peered VNet)  │ 1: VNet Integration │ vnet_integration: {...}     │
+# │ AWS, GCP, other      │ 2: Public Access    │ network.public_network_     │
+# │                      │                     │   access: Enabled           │
+# │ On-premises          │ 2: Public Access    │ + access-list entity        │
+# │ Different Azure      │ 2: Public Access    │                             │
+# │   region             │                     │                             │
+# └──────────────────────┴─────────────────────┴─────────────────────────────┘
+#
+# ============================================================================
+# PATTERN 1: VNet Integration (Private Access)
+# ============================================================================
+#
+# How it works:
+# 1. Server is created with vnet_integration config
+# 2. Entity automatically creates:
+#    - A delegated subnet for PostgreSQL (Microsoft.DBforPostgreSQL/flexibleServers)
+#    - A private DNS zone (privatelink.postgres.database.azure.com)
+#    - A DNS zone VNet link
+# 3. Server gets a private IP, accessible only from within the VNet
+# 4. Client connects using the FQDN which resolves to private IP via Private DNS
+#
+# Prerequisites:
+# 1. Have an existing VNet in Azure
+#    - Monk creates VNets with naming format: {resource_group}{region}-vn
+#    - Example: resource group "ivan-test" in "westeurope" → VNet "ivan-testwesteurope-vn"
+# 2. Deploy your Monk nodes in the same VNet or a peered VNet
+# 3. Configure CoreDNS to forward Azure DNS queries (see DNS Configuration below)
+#
+# DNS Configuration for Private Access:
+# On Azure nodes, update /var/lib/monkd/coredns/Corefile to forward Azure DNS:
+#
+#   database.azure.com:53 {
+#       forward . 168.63.129.16
+#       cache 30
+#   }
+#   privatelink.postgres.database.azure.com:53 {
+#       forward . 168.63.129.16
+#       cache 30
+#   }
+#   . {
+#       forward . 8.8.8.8 8.8.4.4
+#       cache 30
+#   }
+#
+# Then restart: sudo podman restart monk_dns
+#
+# Usage:
+#   # Option 1: Let the entity auto-generate a password (recommended)
+#   monk run azure-pg-client-demo/azure-pg-demo-app
+#   # Password will be auto-generated and saved to the secret specified in administrator_password_secret_ref
+#
+#   # Option 2: Provide your own password before deployment
+#   monk secrets add -g postgres-admin-password='YourSecurePassword123!'
+#   monk run azure-pg-client-demo/azure-pg-demo-app
+#
+# ============================================================================
+
+azure-pg-demo-app:
+  defines: process-group
+  runnable-list:
+    - azure-pg-client-demo/postgres-server
+    - azure-pg-client-demo/postgres-database
+    - azure-pg-client-demo/postgres-client
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Flexible Server with Automatic VNet Integration
+# ----------------------------------------------------------------------------
+# Just provide VNet name and subnet prefix - everything else is created automatically.
+#
+# The entity creates:
+# - Delegated subnet: postgres-subnet-{server_name}
+# - Private DNS zone: privatelink.postgres.database.azure.com (shared)
+# - DNS zone link: postgres-dns-link-{server_name}
+#
+# VNet naming convention: {resource_group}{region}-vn (no spaces in region)
+# Examples:
+#   - ivan-test + eastus    → ivan-testeastus-vn
+#   - my-rg + westeurope    → my-rgwesteurope-vn
+#   - prod-rg + northeurope → prod-rgnortheurope-vn
+# ----------------------------------------------------------------------------
+postgres-server:
+  defines: azure-postgresql/flexible-server
+  permitted-secrets:
+    postgres-admin-password: true
+
+  # Replace these values with your Azure configuration
+  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
+  resource_group_name: "ivan-test"
+  server_name: "prod-pg-server-eu3"
+  location: "West Europe"
+  version: "16"
+
+  # Production SKU (General Purpose for better performance)
+  sku:
+    name: Standard_D2s_v3
+    tier: GeneralPurpose
+
+  # Production storage with auto-grow
+  storage:
+    storage_size_gb: 128
+    auto_grow: Enabled
+
+  # Production backup (geo-redundancy not available in all regions with zone-redundant HA)
+  backup:
+    backup_retention_days: 35
+    geo_redundant_backup: Disabled
+
+  # High availability (ZoneRedundant not available in all regions)
+  high_availability:
+    mode: Disabled
+
+  # AUTOMATIC VNet Integration
+  # Just provide VNet name and subnet prefix - the entity creates:
+  # - Delegated subnet for PostgreSQL
+  # - Private DNS zone (privatelink.postgres.database.azure.com)
+  # - DNS zone VNet link
+  vnet_integration:
+    vnet_name: "ivan-testwesteurope-vn"     # Format: {resource_group}{region}-vn
+    # vnet_resource_group: "my-vnet-rg"     # Optional: if VNet is in different resource group
+    subnet_address_prefix: "172.19.0.0/24"  # Must be within VNet's address space
+    # subnet_name: "postgres-subnet"        # Optional: custom subnet name
+    # dns_link_name: "postgres-dns-link"    # Optional: custom DNS link name
+
+  # Authentication
+  auth_config:
+    password_auth_enabled: true
+    active_directory_auth_enabled: false
+
+  administrator_login: pgadmin
+  # Password secret reference (required)
+  # If secret exists, uses the stored password
+  # If secret doesn't exist, auto-generates a secure password and saves it to this secret
+  administrator_password_secret_ref: postgres-admin-password
+  connection_string_secret_ref: postgres-connection-string
+
+  tags:
+    Environment: production
+    Application: azure-pg-client
+    ManagedBy: MonkEC
+
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Database
+# ----------------------------------------------------------------------------
+# Creates a database within the Flexible Server.
+# Uses connections to get server details dynamically.
+# ----------------------------------------------------------------------------
+postgres-database:
+  defines: azure-postgresql/database
+  connections:
+    server:
+      runnable: azure-pg-client-demo/postgres-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-pg-client-demo/postgres-server
+      timeout: 1800
+
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  database_name: appdb
+  charset: UTF8
+  collation: en_US.utf8
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Client Application (Private Access)
+# ----------------------------------------------------------------------------
+# IMPORTANT: Must run in the same VNet or a peered VNet to connect.
+# The FQDN resolves to private IP via Private DNS Zone.
+# ----------------------------------------------------------------------------
+postgres-client:
+  defines: runnable
+  permitted-secrets:
+    postgres-admin-password: true
+  connections:
+    server:
+      runnable: azure-pg-client-demo/postgres-server
+      service: data
+    database:
+      runnable: azure-pg-client-demo/postgres-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-pg-client-demo/postgres-server
+        - azure-pg-client-demo/postgres-database
+      timeout: 1800
+
+  variables:
+    postgres_host:
+      env: DB_HOST
+      # FQDN resolves to private IP via Private DNS Zone
+      value: <- connection-target("server") entity-state get-member("fqdn")
+      type: string
+    postgres_port:
+      env: DB_PORT
+      value: "5432"
+      type: string
+    postgres_database:
+      env: DB_NAME
+      value: <- connection-target("database") entity get-member("database_name")
+      type: string
+    postgres_user:
+      env: DB_USER
+      value: <- connection-target("server") entity-state get-member("administrator_login")
+      type: string
+    postgres_password_secret:
+      value: <- connection-target("server") entity get-member("administrator_password_secret_ref")
+      type: string
+    postgres_password:
+      env: DB_PASSWORD
+      value: <- secret($postgres_password_secret)
+      type: string
+
+  containers:
+    client:
+      image: monkimages.azurecr.io/azure-postgresql-client:latest
+      environment:
+        - DB_SSL_MODE=require
+        - DB_CONNECTION_LIMIT=10
+        - DB_TIMEOUT=15000
+        - OPERATION_INTERVAL_MS=30000
+        - SAMPLE_TABLE_NAME=app_users
+
+# ============================================================================
+# PATTERN 2: Public Access with IP Firewall (Cross-Cloud)
+# ============================================================================
+#
+# How it works:
+# 1. Server is created with public network access enabled (no vnet_integration)
+# 2. Server gets a public IP address
+# 3. Client deploys to nodes (can be on ANY cloud provider)
+# 4. access-list entity reads client's public IPs using runnable-peers-public-ips()
+# 5. access-list creates firewall rules allowing those IPs to connect
+#
+# DEPLOYMENT ORDER IS CRITICAL:
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ 1. public-postgres-server  → Creates DB with public endpoint               │
+# │ 2. public-postgres-database → Creates database                             │
+# │ 3. public-postgres-client  → Deploys to nodes (gets public IPs)            │
+# │ 4. postgres-access-list    → Reads client IPs, creates firewall rules      │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# WHY THIS ORDER?
+# - access-list uses runnable-peers-public-ips("ns/client") to get client IPs
+# - If client isn't deployed yet, this returns empty list → no firewall rules
+# - No firewall rules → client can't connect → connection fails
+#
+# Prerequisites:
+# 1. Azure subscription and resource group
+# 2. Client nodes can be on ANY cloud provider
+#
+# Usage:
+#   # Option 1: Let the entity auto-generate a password (recommended)
+#   monk run azure-pg-client-demo/azure-pg-public-demo
+#   # Password will be auto-generated and saved to the secret specified in administrator_password_secret_ref
+#
+#   # Option 2: Provide your own password before deployment
+#   monk secrets add -g postgres-admin-password='YourSecurePassword123!'
+#   monk run azure-pg-client-demo/azure-pg-public-demo
+#
+# Or step by step:
+#   monk run azure-pg-client-demo/public-postgres-server
+#   monk run azure-pg-client-demo/public-postgres-database
+#   monk run -t <client-tag> azure-pg-client-demo/public-postgres-client
+#   monk run azure-pg-client-demo/postgres-access-list
+#
+# ============================================================================
+
+azure-pg-public-demo:
+  defines: process-group
+  runnable-list:
+    - azure-pg-client-demo/public-postgres-server
+    - azure-pg-client-demo/public-postgres-database
+    - azure-pg-client-demo/public-postgres-client
+    - azure-pg-client-demo/postgres-access-list
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Flexible Server with Public Access
+# ----------------------------------------------------------------------------
+# No VNet integration - uses firewall rules for access control.
+# Server will have a public IP, access controlled by firewall rules.
+#
+# IMPORTANT: Do NOT add allowed_cidr_blocks here!
+# Use the access-list entity to dynamically manage firewall rules.
+# ----------------------------------------------------------------------------
+public-postgres-server:
+  defines: azure-postgresql/flexible-server
+  permitted-secrets:
+    postgres-admin-password: true
+
+  # Replace these values with your Azure configuration
+  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
+  resource_group_name: "ivan-test"
+  server_name: "public-pg-server-1"
+  location: "West Europe"
+  version: "16"
+
+  # Development/Test SKU (use GeneralPurpose for production)
+  sku:
+    name: Standard_B1ms
+    tier: Burstable
+
+  # Storage configuration
+  storage:
+    storage_size_gb: 32
+    auto_grow: Enabled
+
+  # Backup configuration
+  backup:
+    backup_retention_days: 7
+    geo_redundant_backup: Disabled
+
+  # No high availability for cost savings
+  high_availability:
+    mode: Disabled
+
+  # PUBLIC ACCESS - No VNet integration
+  # Server will have a public IP, access controlled by firewall rules
+  network:
+    public_network_access: Enabled
+
+  # Authentication
+  auth_config:
+    password_auth_enabled: true
+    active_directory_auth_enabled: false
+
+  administrator_login: pgadmin
+  # Password secret reference (required)
+  # If secret exists, uses the stored password
+  # If secret doesn't exist, auto-generates a secure password and saves it to this secret
+  administrator_password_secret_ref: postgres-admin-password
+  connection_string_secret_ref: public-postgres-connection-string
+
+  tags:
+    Environment: development
+    Application: azure-pg-public-client
+    ManagedBy: MonkEC
+    AccessType: public
+
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Database for public server
+# ----------------------------------------------------------------------------
+public-postgres-database:
+  defines: azure-postgresql/database
+  connections:
+    server:
+      runnable: azure-pg-client-demo/public-postgres-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-pg-client-demo/public-postgres-server
+      timeout: 1800
+
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  database_name: appdb
+  charset: UTF8
+  collation: en_US.utf8
+
+# ----------------------------------------------------------------------------
+# PostgreSQL Client Application (Public Access)
+# ----------------------------------------------------------------------------
+# Can run on ANY cloud provider - access controlled by firewall rules.
+# The FQDN resolves to public IP.
+# ----------------------------------------------------------------------------
+public-postgres-client:
+  defines: runnable
+  permitted-secrets:
+    postgres-admin-password: true
+  connections:
+    server:
+      runnable: azure-pg-client-demo/public-postgres-server
+      service: data
+    database:
+      runnable: azure-pg-client-demo/public-postgres-database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-pg-client-demo/public-postgres-server
+        - azure-pg-client-demo/public-postgres-database
+      timeout: 1800
+
+  variables:
+    postgres_host:
+      env: DB_HOST
+      # Public FQDN - resolves to public IP
+      value: <- connection-target("server") entity-state get-member("fqdn")
+      type: string
+    postgres_port:
+      env: DB_PORT
+      value: "5432"
+      type: string
+    postgres_database:
+      env: DB_NAME
+      value: <- connection-target("database") entity get-member("database_name")
+      type: string
+    postgres_user:
+      env: DB_USER
+      value: <- connection-target("server") entity-state get-member("administrator_login")
+      type: string
+    postgres_password_secret:
+      value: <- connection-target("server") entity get-member("administrator_password_secret_ref")
+      type: string
+    postgres_password:
+      env: DB_PASSWORD
+      value: <- secret($postgres_password_secret)
+      type: string
+
+  containers:
+    client:
+      image: monkimages.azurecr.io/azure-postgresql-client:latest
+      environment:
+        - DB_SSL_MODE=require
+        - DB_CONNECTION_LIMIT=10
+        - DB_TIMEOUT=15000
+        - OPERATION_INTERVAL_MS=30000
+        - SAMPLE_TABLE_NAME=public_app_users
+
+# ----------------------------------------------------------------------------
+# Access List - Creates firewall rules for client node IPs
+# ----------------------------------------------------------------------------
+# CRITICAL: Must wait for BOTH server AND client to be deployed!
+#
+# Why?
+# - server_name comes from server state (needs server deployed first)
+# - runnable-peers-public-ips() returns client node IPs (needs client deployed first)
+#
+# What happens if deployed too early?
+# - runnable-peers-public-ips() returns empty list
+# - No firewall rules are created
+# - Client can't connect to database
+#
+# How it works:
+# 1. Waits for server and client to be deployed
+# 2. Calls runnable-peers-public-ips("azure-pg-client-demo/public-postgres-client")
+# 3. Gets list of public IPs where client is running (e.g., ["20.224.193.55/32"])
+# 4. Creates firewall rules for each IP (e.g., "monk-client-0" allowing 20.224.193.55)
+# 5. Client can now connect to database
+#
+# On update:
+# - If client scales to new nodes, run `monk update` on access-list
+# - New IPs will be detected and firewall rules created
+# ----------------------------------------------------------------------------
+postgres-access-list:
+  defines: azure-postgresql/access-list
+  connections:
+    server:
+      runnable: azure-pg-client-demo/public-postgres-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-pg-client-demo/public-postgres-server
+        - azure-pg-client-demo/public-postgres-client
+      timeout: 1800
+
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  
+  # Dynamic IP list from client nodes - works across clouds!
+  # runnable-peers-public-ips returns IPs in CIDR format (e.g., "1.2.3.4/32")
+  allowed_cidr_blocks: <- runnable-peers-public-ips("azure-pg-client-demo/public-postgres-client")
+  
+  # Optional: custom rule name prefix (default: "monk-access")
+  rule_name_prefix: "monk-client"

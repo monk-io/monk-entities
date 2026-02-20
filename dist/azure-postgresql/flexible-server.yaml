@@ -1,0 +1,350 @@
+namespace: azure-postgresql
+flexible-server:
+  defines: entity
+  metadata:
+    name: FlexibleServer
+    description: |-
+      Azure PostgreSQL Flexible Server entity.
+      Creates and manages Azure Database for PostgreSQL Flexible Servers with configurable compute, storage, and networking.
+      Supports high availability, backup policies, and both public and private network access.
+
+      ## Secrets
+      - Reads: secret name from `administrator_password_secret_ref` property - Administrator password
+      - Writes: 
+        - Administrator password to `administrator_password_secret_ref` (auto-generated if secret doesn't exist)
+        - Connection string to `connection_string_secret_ref` (if specified)
+
+      ## State Fields for Composition
+      - `state.server_name` - Server name for database operations
+      - `state.fqdn` - Fully qualified domain name for connections
+      - `state.administrator_login` - Admin username for connections
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-postgresql/database` - Create databases within the server
+      - `azure-postgresql/access-list` - Manage firewall rules dynamically at runtime (for public access)
+
+      ---
+      ## Azure PostgreSQL Access Patterns
+
+      Choose pattern based on where client runs and security requirements:
+
+      ### Pattern 1: VNet Integration (Private Access) - Maximum Security
+      Use when client runs on Azure nodes in the same or peered VNet.
+      Server has no public IP - accessible only from within VNet.
+
+      ```yaml
+      postgres-server:
+        defines: azure-postgresql/flexible-server
+        subscription_id: "your-subscription-id"
+        resource_group_name: "your-resource-group"
+        server_name: "my-pg-server"
+        location: "West Europe"
+        
+        # AUTOMATIC VNet Integration - just provide VNet name and subnet prefix
+        vnet_integration:
+          vnet_name: "my-rgwesteurope-vn"      # Format: {resource_group}{region}-vn
+          subnet_address_prefix: "172.17.0.0/24"  # Must be within VNet's address space
+        
+        administrator_login: pgadmin
+        administrator_password_secret_ref: postgres-admin-password  # Required - auto-generates if secret doesn't exist
+      ```
+
+      **Requirements for VNet Integration:**
+      - Client must run on Azure nodes in the same VNet or a peered VNet
+      - Configure Monk CoreDNS to forward Azure DNS queries to 168.63.129.16
+      - VNet naming convention: `{resource_group}{region}-vn` (no spaces in region)
+
+      ### Pattern 2: Public Access with IP Firewall (Cross-Cloud)
+      Use when client runs on other cloud providers, different regions, or on-prem.
+      Server has public IP with firewall rules controlling access.
+
+      ```yaml
+      postgres-server:
+        defines: azure-postgresql/flexible-server
+        subscription_id: "your-subscription-id"
+        resource_group_name: "your-resource-group"
+        server_name: "my-pg-server"
+        location: "West Europe"
+        
+        # PUBLIC ACCESS - No VNet integration
+        network:
+          public_network_access: Enabled
+        
+        administrator_login: pgadmin
+        administrator_password_secret_ref: postgres-admin-password  # Required - auto-generates if secret doesn't exist
+
+      access-list:
+        defines: azure-postgresql/access-list
+        server_name: <- connection-target("server") entity-state get-member("server_name")
+        allowed_cidr_blocks: <- runnable-peers-public-ips("ns/client")  # Dynamic IPs
+        depends:
+          wait-for:
+            runnables: [ns/postgres-server, ns/client]  # MUST wait for both
+      ```
+
+      ### Deployment Order (CRITICAL for Public Access)
+      1. **PostgreSQL Server** → creates DB with public endpoint
+      2. **Client** → deploys to nodes (gets public IPs)
+      3. **Access List** → reads client's node IPs, creates firewall rules
+
+      access-list MUST depend on both server AND client.
+      If deployed before client: `runnable-peers-public-ips()` returns empty → no firewall rules → connection fails.
+
+      ### When to use each pattern:
+      | Client Location | Server Config | Access Method |
+      |-----------------|---------------|---------------|
+      | Azure (same VNet) | `vnet_integration` | Direct private access |
+      | Other cloud/region | `network.public_network_access: Enabled` | `access-list` with `runnable-peers-public-ips` |
+
+      ---
+    version-hash: b31aefc94fd7
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    server_name:
+      type: string
+      description: 'PostgreSQL Flexible Server name (3-63 chars, lowercase, alphanumeric and hyphens)'
+    location:
+      type: string
+      description: Azure region for the server
+    version:
+      type: string
+      enum:
+        - '11'
+        - '12'
+        - '13'
+        - '14'
+        - '15'
+        - '16'
+      description: PostgreSQL version
+      default: '16'
+    sku:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 'The name of the SKU (e.g., Standard_B1ms, Standard_D2s_v3)'
+        tier:
+          type: string
+          enum:
+            - Burstable
+            - GeneralPurpose
+            - MemoryOptimized
+          description: The tier of the SKU
+          default: GeneralPurpose
+      required:
+        - name
+      additionalProperties: false
+      description: SKU configuration (compute tier and size)
+    storage:
+      type: object
+      properties:
+        storage_size_gb:
+          type: number
+          minimum: 32
+          maximum: 16384
+          description: Storage size in GB
+          default: 32
+        auto_grow:
+          type: string
+          enum:
+            - Enabled
+            - Disabled
+          description: Storage auto grow enabled
+          default: Disabled
+        storage_tier:
+          type: string
+          description: 'Storage tier (P4, P6, P10, P15, P20, P30, P40, P50, P60, P70, P80)'
+      additionalProperties: false
+      description: Storage configuration
+    backup:
+      type: object
+      properties:
+        backup_retention_days:
+          type: number
+          minimum: 7
+          maximum: 35
+          description: Backup retention days (7-35)
+          default: 7
+        geo_redundant_backup:
+          type: string
+          enum:
+            - Enabled
+            - Disabled
+          description: Geo-redundant backup
+          default: Disabled
+      additionalProperties: false
+      description: Backup configuration
+    high_availability:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - Disabled
+            - ZoneRedundant
+            - SameZone
+          description: High availability mode
+          default: Disabled
+        standby_availability_zone:
+          type: string
+          description: Standby availability zone
+      additionalProperties: false
+      description: High availability configuration
+    network:
+      type: object
+      properties:
+        delegated_subnet_resource_id:
+          type: string
+          description: Delegated subnet resource ID for private access
+        private_dns_zone_resource_id:
+          type: string
+          description: Private DNS zone resource ID
+        public_network_access:
+          type: string
+          enum:
+            - Enabled
+            - Disabled
+          description: Public network access
+          default: Enabled
+      additionalProperties: false
+      description: Network configuration (manual - use either this OR vnet_integration)
+    vnet_integration:
+      type: object
+      properties:
+        vnet_name:
+          type: string
+          description: Name of the existing Virtual Network to integrate with
+        vnet_resource_group:
+          type: string
+          description: Resource group containing the VNet (defaults to server's resource group)
+        subnet_name:
+          type: string
+          description: Name for the delegated subnet to create (defaults to "postgres-subnet")
+        subnet_address_prefix:
+          type: string
+          description: |-
+            Address prefix for the delegated subnet (e.g., "172.17.0.0/24")
+            Must be within the VNet's address space
+        dns_link_name:
+          type: string
+          description: Name for the private DNS zone link (defaults to "postgres-dns-link")
+      required:
+        - vnet_name
+        - subnet_address_prefix
+      additionalProperties: false
+      description: |-
+        VNet integration configuration for automatic private network setup.
+        When provided, automatically creates delegated subnet, private DNS zone, and DNS link.
+        Use this for simple VNet integration - just provide VNet name and subnet address prefix.
+        Cannot be used together with network.delegated_subnet_resource_id.
+    auth_config:
+      type: object
+      properties:
+        active_directory_auth_enabled:
+          type: boolean
+          description: Enable Active Directory authentication
+          default: false
+        password_auth_enabled:
+          type: boolean
+          description: Enable password authentication
+          default: true
+        tenant_id:
+          type: string
+          description: Tenant ID for Active Directory authentication
+      additionalProperties: false
+      description: Authentication configuration
+    administrator_login:
+      type: string
+      description: Administrator login name
+    administrator_password_secret_ref:
+      type: string
+      description: |-
+        Secret reference for administrator password.
+        If the secret exists, the password will be read from it.
+        If the secret doesn't exist, a secure password will be auto-generated and saved to this secret.
+    availability_zone:
+      type: string
+      description: Availability zone for the server
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    connection_string_secret_ref:
+      type: string
+      description: |-
+        Secret reference to store the connection string
+        If provided, the connection string will be saved to this secret
+    required:
+      - subscription_id
+      - resource_group_name
+      - server_name
+      - location
+      - administrator_password_secret_ref
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    server_name:
+      type: string
+      description: Server name (primary identifier)
+    fqdn:
+      type: string
+      description: Fully qualified domain name for the server
+    server_state:
+      type: string
+      description: 'Server state (Ready, Stopped, etc.)'
+    version:
+      type: string
+      description: PostgreSQL version
+    administrator_login:
+      type: string
+      description: Administrator login name
+    connection_string_populated:
+      type: boolean
+      description: Whether connection string secret has been populated
+    created_subnet_id:
+      type: string
+      description: Resource ID of the created delegated subnet (for cleanup)
+    created_dns_zone_id:
+      type: string
+      description: Resource ID of the created private DNS zone (for cleanup)
+    created_dns_link_id:
+      type: string
+      description: Resource ID of the created DNS zone VNet link (for cleanup)
+    not_found_count:
+      type: number
+      description: |-
+        Counter for consecutive "NotFound" responses during readiness check
+        Used to detect async creation failures
+  lifecycle:
+    sync: <<< flexible-server-sync.js
+    get-info: ''
+    start-server: ''
+    stop-server: ''
+    restart-server: ''
+    get-connection-string: ''
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 15
+      attempts: 60
+  requires:
+    - azure-postgresql/azure-postgresql-base
+    - cli
+    - secret
+    - monkec/base

@@ -1,0 +1,475 @@
+namespace: azure-postgresql-example
+
+# ============================================================================
+# Azure PostgreSQL Entity Examples
+# ============================================================================
+#
+# This file contains examples for the azure-postgresql entity package.
+# Available entities:
+#   - azure-postgresql/flexible-server  : Azure Database for PostgreSQL Flexible Server
+#   - azure-postgresql/database         : Database within a Flexible Server
+#   - azure-postgresql/access-list      : Dynamic firewall rules for client IPs
+#
+# ============================================================================
+# TWO ACCESS PATTERNS
+# ============================================================================
+#
+# PATTERN 1: VNet Integration (Private Access) - Maximum Security
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ - Server has NO public IP, accessible only from within VNet                 │
+# │ - Client MUST run on Azure nodes in same/peered VNet                        │
+# │ - Use: vnet_integration: { vnet_name: "...", subnet_address_prefix: "..." } │
+# │ - Entity auto-creates: delegated subnet, private DNS zone, DNS link         │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# PATTERN 2: Public Access with IP Firewall - Cross-Cloud Connectivity
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ - Server has public IP with firewall rules                                  │
+# │ - Client can run on ANY cloud (AWS, GCP, on-prem, etc.)                     │
+# │ - Use: network: { public_network_access: Enabled }                          │
+# │ - Use: azure-postgresql/access-list to manage firewall rules dynamically    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ============================================================================
+# MONK VNET NAMING CONVENTION
+# ============================================================================
+# When Monk creates Azure nodes, it creates a VNet with this naming format:
+#   {resource_group}{region}-vn  (region has no spaces)
+#
+# Examples:
+#   - Resource group "ivan-test" in "East US"     → VNet: "ivan-testeastus-vn"
+#   - Resource group "my-rg" in "West Europe"     → VNet: "my-rgwesteurope-vn"
+#   - Resource group "prod-rg" in "North Europe"  → VNet: "prod-rgnortheurope-vn"
+#
+# VNet Address Space (predefined by Monk):
+#   - VNet address space: 172.16.0.0/12
+#   - Default node subnet: 172.16.0.0/16
+#   - Available for PostgreSQL: 172.17.0.0/24, 172.18.0.0/24, 172.19.0.0/24, etc.
+#
+# ============================================================================
+# PASSWORD MANAGEMENT
+# ============================================================================
+# administrator_password_secret_ref is REQUIRED.
+# Two options:
+#   1. Pre-create secret: monk secrets add -g postgres-admin-password='YourPassword!'
+#   2. Auto-generate: If secret doesn't exist, entity generates a 16-char password
+#      and saves it to the specified secret name.
+#
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Example 1: Basic PostgreSQL Flexible Server (Public Access, no firewall)
+# ----------------------------------------------------------------------------
+# Minimal configuration for development/testing.
+# WARNING: No firewall rules = no external access by default.
+# ----------------------------------------------------------------------------
+basic-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  server_name: "my-postgres-server"
+  location: "East US"
+  version: "16"
+  sku:
+    name: "Standard_B1ms"
+    tier: "Burstable"
+  storage:
+    storage_size_gb: 32
+    auto_grow: "Disabled"
+  backup:
+    backup_retention_days: 7
+    geo_redundant_backup: "Disabled"
+  administrator_login: "pgadmin"
+  administrator_password_secret_ref: "postgres-admin-password"  # Required - auto-generates if secret doesn't exist
+  tags:
+    Environment: "Development"
+    Project: "MyApp"
+  permitted-secrets:
+    postgres-admin-password: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 2: Production PostgreSQL with High Availability
+# ----------------------------------------------------------------------------
+# Zone-redundant HA with geo-redundant backups.
+# NOTE: geo_redundant_backup + ZoneRedundant HA not available in all regions.
+# If you get GeoZoneRedundantStorageAccountSkusNotFound error, disable one.
+# ----------------------------------------------------------------------------
+production-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
+  server_name: "prod-postgres-ha"
+  location: "East US"
+  version: "16"
+  sku:
+    name: "Standard_D4s_v3"
+    tier: "GeneralPurpose"
+  storage:
+    storage_size_gb: 256
+    auto_grow: "Enabled"
+  backup:
+    backup_retention_days: 35
+    geo_redundant_backup: "Enabled"
+  high_availability:
+    mode: "ZoneRedundant"
+    standby_availability_zone: "2"
+  availability_zone: "1"
+  administrator_login: "pgadmin"
+  administrator_password_secret_ref: "prod-postgres-password"  # Required - auto-generates if secret doesn't exist
+  connection_string_secret_ref: "prod-postgres-connection-string"
+  tags:
+    Environment: "Production"
+    HighAvailability: "true"
+    CostCenter: "Engineering"
+  permitted-secrets:
+    prod-postgres-password: true
+    prod-postgres-connection-string: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 3: Memory-optimized server for analytics
+# ----------------------------------------------------------------------------
+analytics-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "analytics-rg" # Replace with your resource group
+  server_name: "analytics-postgres"
+  location: "West US 2"
+  version: "16"
+  sku:
+    name: "Standard_E4s_v3"
+    tier: "MemoryOptimized"
+  storage:
+    storage_size_gb: 512
+    auto_grow: "Enabled"
+  backup:
+    backup_retention_days: 14
+    geo_redundant_backup: "Disabled"
+  administrator_login: "analytics_admin"
+  administrator_password_secret_ref: "analytics-postgres-password"  # Required - auto-generates if secret doesn't exist
+  tags:
+    Environment: "Production"
+    Purpose: "Analytics"
+    Team: "DataScience"
+  permitted-secrets:
+    analytics-postgres-password: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 4: Database within a server
+# ----------------------------------------------------------------------------
+# Creates a database inside an existing Flexible Server.
+# Uses connections to get server details dynamically.
+# ----------------------------------------------------------------------------
+app-database:
+  defines: azure-postgresql/database
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  server_name: "my-postgres-server"
+  database_name: "myapp"
+  charset: "UTF8"
+  collation: "en_US.utf8"
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-example/basic-server
+      timeout: 900
+  connections:
+    server:
+      runnable: azure-postgresql-example/basic-server
+      service: data
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 5: Additional database for analytics
+# ----------------------------------------------------------------------------
+analytics-database:
+  defines: azure-postgresql/database
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  server_name: "my-postgres-server"
+  database_name: "analytics"
+  charset: "UTF8"
+  collation: "en_US.utf8"
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-example/basic-server
+      timeout: 900
+  connections:
+    server:
+      runnable: azure-postgresql-example/basic-server
+      service: data
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 6: Application using the PostgreSQL database
+# ----------------------------------------------------------------------------
+# Shows how to connect a runnable to PostgreSQL using:
+#   - connection-target("name") entity-state get-member("field") for runtime values
+#   - connection-target("name") entity get-member("field") for definition values
+#   - secret($variable) for password retrieval
+# ----------------------------------------------------------------------------
+web-app:
+  defines: runnable
+  containers:
+    api:
+      image: node:20-alpine
+      bash: |
+        echo "🚀 Starting Web Application..."
+        echo "PostgreSQL Server: $PG_SERVER"
+        echo "PostgreSQL FQDN: $PG_HOST"
+        echo "Database: $PG_DATABASE"
+        echo "Environment: $APP_ENV"
+        # Simulate application
+        echo "Application connected to PostgreSQL"
+        sleep 3600
+      ports:
+        - 3000:3000
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-example/basic-server
+        - azure-postgresql-example/app-database
+      timeout: 900
+  connections:
+    postgres-server:
+      runnable: azure-postgresql-example/basic-server
+      service: data
+    postgres-database:
+      runnable: azure-postgresql-example/app-database
+      service: data
+  variables:
+    PG_SERVER:
+      type: string
+      env: PG_SERVER
+      # entity-state = runtime values (available after creation)
+      value: <- connection-target("postgres-server") entity-state get-member("server_name")
+    PG_HOST:
+      type: string
+      env: PG_HOST
+      # fqdn = fully qualified domain name (e.g., my-server.postgres.database.azure.com)
+      value: <- connection-target("postgres-server") entity-state get-member("fqdn")
+    PG_DATABASE:
+      type: string
+      env: PG_DATABASE
+      # entity-state for database_name (runtime value)
+      value: <- connection-target("postgres-database") entity-state get-member("database_name")
+    PG_USER:
+      type: string
+      env: PG_USER
+      value: <- connection-target("postgres-server") entity-state get-member("administrator_login")
+    APP_ENV:
+      type: string
+      env: APP_ENV
+      value: "development"
+
+# ----------------------------------------------------------------------------
+# Example 7: Complete development stack
+# ----------------------------------------------------------------------------
+dev-stack:
+  defines: process-group
+  runnable-list:
+    - azure-postgresql-example/basic-server
+    - azure-postgresql-example/app-database
+    - azure-postgresql-example/web-app
+
+# ----------------------------------------------------------------------------
+# Example 8: Production stack with HA
+# ----------------------------------------------------------------------------
+production-stack:
+  defines: process-group
+  runnable-list:
+    - azure-postgresql-example/production-server
+
+# ============================================================================
+# PATTERN 1: VNet Integration Examples (Private Access)
+# ============================================================================
+# Use when clients run on Azure nodes in the same VNet.
+# Maximum security - no public IP exposure.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Example 9: PostgreSQL with VNet Integration (Private Access Only)
+# ----------------------------------------------------------------------------
+# This example automatically creates:
+# - A delegated subnet for PostgreSQL (Microsoft.DBforPostgreSQL/flexibleServers)
+# - A private DNS zone (privatelink.postgres.database.azure.com)
+# - A DNS zone VNet link
+#
+# IMPORTANT: Client must run in same VNet or peered VNet to connect.
+#
+# DNS Configuration Required on Azure nodes:
+# Update /var/lib/monkd/coredns/Corefile to forward Azure DNS:
+#   database.azure.com:53 { forward . 168.63.129.16; cache 30 }
+#   privatelink.postgres.database.azure.com:53 { forward . 168.63.129.16; cache 30 }
+#   . { forward . 8.8.8.8 8.8.4.4; cache 30 }
+# Then: sudo podman restart monk_dns
+# ----------------------------------------------------------------------------
+vnet-integrated-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  server_name: "my-private-postgres"
+  location: "East US"
+  version: "16"
+  sku:
+    name: "Standard_B1ms"
+    tier: "Burstable"
+  storage:
+    storage_size_gb: 32
+    auto_grow: "Disabled"
+  # VNet integration - just provide VNet name and subnet address prefix
+  # The entity will automatically create all required networking resources
+  vnet_integration:
+    vnet_name: "my-vnet"                    # Name of your existing VNet (format: {resource_group}{region}-vn)
+    # vnet_resource_group: "my-vnet-rg"     # Optional: if VNet is in different resource group
+    subnet_address_prefix: "172.17.0.0/24"  # Must be within VNet's address space, not overlapping with 172.16.0.0/16
+    # subnet_name: "postgres-subnet"        # Optional: custom subnet name (default: postgres-subnet-{server_name})
+    # dns_link_name: "postgres-dns-link"    # Optional: custom DNS link name
+  administrator_login: "pgadmin"
+  administrator_password_secret_ref: "postgres-admin-password"  # Required - auto-generates if secret doesn't exist
+  tags:
+    Environment: "Production"
+    NetworkAccess: "Private"
+  permitted-secrets:
+    postgres-admin-password: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 10: Application connecting to VNet-integrated PostgreSQL
+# ----------------------------------------------------------------------------
+# IMPORTANT: This application MUST be deployed on Azure nodes in the same VNet
+# or a peered VNet. The FQDN resolves to private IP via Private DNS Zone.
+# ----------------------------------------------------------------------------
+vnet-app:
+  defines: runnable
+  containers:
+    api:
+      image: node:20-alpine
+      bash: |
+        echo "🚀 Starting Application in VNet..."
+        echo "PostgreSQL Server: $PG_SERVER"
+        echo "PostgreSQL FQDN: $PG_HOST (private DNS)"
+        echo "Note: This app must run in the same VNet to connect"
+        sleep 3600
+      ports:
+        - 3000:3000
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-example/vnet-integrated-server
+      timeout: 1200  # VNet integration takes longer
+  connections:
+    postgres-server:
+      runnable: azure-postgresql-example/vnet-integrated-server
+      service: data
+  variables:
+    PG_SERVER:
+      type: string
+      env: PG_SERVER
+      value: <- connection-target("postgres-server") entity-state get-member("server_name")
+    PG_HOST:
+      type: string
+      env: PG_HOST
+      value: <- connection-target("postgres-server") entity-state get-member("fqdn")
+    PG_USER:
+      type: string
+      env: PG_USER
+      value: <- connection-target("postgres-server") entity-state get-member("administrator_login")
+
+# ============================================================================
+# PATTERN 2: Public Access with Dynamic Firewall (Cross-Cloud)
+# ============================================================================
+# Use when clients run on other clouds (AWS, GCP) or on-premises.
+# Uses access-list entity to dynamically manage firewall rules.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Example 11: PostgreSQL with Public Access
+# ----------------------------------------------------------------------------
+# Server has public IP, access controlled by firewall rules.
+# Use azure-postgresql/access-list to dynamically add client IPs.
+# ----------------------------------------------------------------------------
+public-server:
+  defines: azure-postgresql/flexible-server
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  server_name: "my-public-postgres"
+  location: "East US"
+  version: "16"
+  sku:
+    name: "Standard_B1ms"
+    tier: "Burstable"
+  storage:
+    storage_size_gb: 32
+    auto_grow: "Disabled"
+  # PUBLIC ACCESS - No VNet integration
+  # Server will have a public IP, access controlled by firewall rules
+  network:
+    public_network_access: Enabled
+  administrator_login: "pgadmin"
+  administrator_password_secret_ref: "postgres-admin-password"  # Required - auto-generates if secret doesn't exist
+  tags:
+    Environment: "Development"
+    NetworkAccess: "Public"
+  permitted-secrets:
+    postgres-admin-password: true
+  services:
+    data:
+      protocol: custom
+
+# ----------------------------------------------------------------------------
+# Example 12: Access List for Dynamic Firewall Rules
+# ----------------------------------------------------------------------------
+# Creates firewall rules for client node IPs automatically.
+# Uses runnable-peers-public-ips() to get IPs of deployed clients.
+#
+# DEPLOYMENT ORDER IS CRITICAL:
+# 1. Deploy server first
+# 2. Deploy client (to get its public IP)
+# 3. Deploy access-list (reads client IPs, creates firewall rules)
+#
+# Why this order?
+# - runnable-peers-public-ips() returns empty list if client not deployed
+# - No firewall rules = client can't connect
+# ----------------------------------------------------------------------------
+public-access-list:
+  defines: azure-postgresql/access-list
+  connections:
+    server:
+      runnable: azure-postgresql-example/public-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - azure-postgresql-example/public-server
+        # Also wait for client to be deployed so we can get its IPs
+        # - azure-postgresql-example/public-client
+      timeout: 1800
+
+  # Get server details from connection
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  
+  # Dynamic IP list from client nodes - works across clouds!
+  # runnable-peers-public-ips returns IPs in CIDR format (e.g., "1.2.3.4/32")
+  # Replace with your client runnable path
+  allowed_cidr_blocks: <- runnable-peers-public-ips("azure-postgresql-example/public-client")
+  
+  # Optional: custom rule name prefix (default: "monk-access")
+  rule_name_prefix: "monk-client"
