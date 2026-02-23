@@ -3,5 +3,5 @@ namespace: azure-postgresql
 azure-postgresql-base:
   defines: module
   metadata:
-    version-hash: 3d8dbb6b9559
+    version-hash: 2470224d7151
   source: <<< azure-postgresql-base.js

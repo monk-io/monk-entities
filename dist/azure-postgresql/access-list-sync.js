@@ -38,25 +38,31 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
     }
     cli.output(`\u{1F525} Creating ${allowedCidrs.length} firewall rule(s) for server ${this.definition.server_name}`);
     const createdRules = [];
+    const successfulCidrs = [];
     for (let i = 0; i < allowedCidrs.length; i++) {
       const cidr = allowedCidrs[i];
       const ruleName = `${prefix}-${i}`;
-      const ip = this.cidrToIp(cidr);
       try {
+        const ip = this.parseCidrToSingleIp(cidr);
         this.createFirewallRule(ruleName, ip, ip);
         createdRules.push(ruleName);
+        successfulCidrs.push(cidr);
         cli.output(`   \u2705 Created rule ${ruleName}: ${ip}`);
       } catch (error) {
-        cli.output(`   \u26A0\uFE0F  Failed to create rule ${ruleName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        cli.output(`   \u274C Failed to create rule ${ruleName} for "${cidr}": ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
     this.state = {
       server_name: this.definition.server_name,
       created_rules: createdRules,
-      allowed_cidr_blocks: [...allowedCidrs],
+      allowed_cidr_blocks: successfulCidrs,
       existing: false
     };
-    cli.output(`\u2705 Created ${createdRules.length} firewall rule(s) for server ${this.definition.server_name}`);
+    if (createdRules.length < allowedCidrs.length) {
+      cli.output(`\u26A0\uFE0F  Created ${createdRules.length}/${allowedCidrs.length} firewall rule(s) - some failed, will retry on next update`);
+    } else {
+      cli.output(`\u2705 Created ${createdRules.length} firewall rule(s) for server ${this.definition.server_name}`);
+    }
   }
   update() {
     const currentRules = this.state.created_rules || [];
@@ -77,21 +83,27 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
       }
     }
     const createdRules = [];
+    const successfulCidrs = [];
     for (let i = 0; i < desiredCidrs.length; i++) {
       const cidr = desiredCidrs[i];
       const ruleName = `${prefix}-${i}`;
-      const ip = this.cidrToIp(cidr);
       try {
+        const ip = this.parseCidrToSingleIp(cidr);
         this.createFirewallRule(ruleName, ip, ip);
         createdRules.push(ruleName);
+        successfulCidrs.push(cidr);
         cli.output(`   \u2705 Created rule ${ruleName}: ${ip}`);
       } catch (error) {
-        cli.output(`   \u26A0\uFE0F  Failed to create rule ${ruleName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        cli.output(`   \u274C Failed to create rule ${ruleName} for "${cidr}": ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
     this.state.created_rules = createdRules;
-    this.state.allowed_cidr_blocks = [...desiredCidrs];
-    cli.output(`\u2705 Updated firewall rules: ${createdRules.length} rule(s) active`);
+    this.state.allowed_cidr_blocks = successfulCidrs;
+    if (createdRules.length < desiredCidrs.length) {
+      cli.output(`\u26A0\uFE0F  Updated firewall rules: ${createdRules.length}/${desiredCidrs.length} rule(s) active - some failed, will retry on next update`);
+    } else {
+      cli.output(`\u2705 Updated firewall rules: ${createdRules.length} rule(s) active`);
+    }
   }
   delete() {
     const rules = this.state.created_rules || [];
@@ -161,12 +173,36 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
     }
   }
   /**
-   * Convert CIDR notation to IP address
-   * runnable-peers-public-ips returns IPs in CIDR format (e.g., "1.2.3.4/32")
+   * Parse CIDR notation and validate it's a single IP (/32).
+   * 
+   * Azure PostgreSQL firewall rules require explicit start/end IP addresses.
+   * This entity is designed to work with `runnable-peers-public-ips()` which
+   * returns /32 CIDRs (single IPs). Non-/32 CIDRs are not supported because
+   * Azure firewall rules don't accept CIDR notation directly.
+   * 
+   * @param cidr - CIDR notation string (e.g., "1.2.3.4/32" or "1.2.3.4")
+   * @returns The IP address if valid /32 or bare IP
+   * @throws Error if CIDR is not /32 (would silently allow wrong IPs)
    */
-  cidrToIp(cidr) {
-    const parts = cidr.split("/");
-    return parts[0];
+  parseCidrToSingleIp(cidr) {
+    const trimmed = cidr.trim();
+    if (trimmed.includes("/")) {
+      const parts = trimmed.split("/");
+      const ip = parts[0];
+      const prefix = parseInt(parts[1], 10);
+      if (isNaN(prefix)) {
+        throw new Error(
+          `Invalid CIDR notation "${cidr}": prefix must be a number`
+        );
+      }
+      if (prefix !== 32) {
+        throw new Error(
+          `Unsupported CIDR range "${cidr}": Azure PostgreSQL firewall rules require individual IPs. Only /32 CIDRs (single IPs) are supported. Got /${prefix} which represents ${Math.pow(2, 32 - prefix)} IPs. Use runnable-peers-public-ips() which returns /32 CIDRs, or specify individual IPs.`
+        );
+      }
+      return ip;
+    }
+    return trimmed;
   }
   /**
    * Compare two arrays for equality

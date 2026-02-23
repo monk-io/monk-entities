@@ -38,7 +38,7 @@ module.exports = __toCommonJS(azure_postgresql_base_exports);
 var import_base = require("monkec/base");
 var import_cli = __toESM(require("cli"));
 var import_azure = __toESM(require("cloud/azure"));
-var AzurePostgreSQLEntity = class extends import_base.MonkEntity {
+var _AzurePostgreSQLEntity = class _AzurePostgreSQLEntity extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
     __publicField(this, "apiVersion", "2024-08-01");
@@ -57,6 +57,33 @@ var AzurePostgreSQLEntity = class extends import_base.MonkEntity {
     import_cli.default.output(`Stopping Azure PostgreSQL operations for: ${this.getEntityName()}`);
   }
   /**
+   * Redact sensitive fields from an object for safe logging
+   */
+  redactSensitiveFields(obj) {
+    if (obj === null || obj === void 0) {
+      return obj;
+    }
+    if (typeof obj !== "object") {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.redactSensitiveFields(item));
+    }
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (_AzurePostgreSQLEntity.SENSITIVE_FIELDS.some(
+        (field) => key.toLowerCase().includes(field.toLowerCase())
+      )) {
+        result[key] = "[REDACTED]";
+      } else if (typeof value === "object" && value !== null) {
+        result[key] = this.redactSensitiveFields(value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+  /**
    * Helper method to make authenticated Azure API requests with consistent error handling
    */
   makeAzureRequest(method, path, body) {
@@ -66,8 +93,9 @@ var AzurePostgreSQLEntity = class extends import_base.MonkEntity {
     };
     import_cli.default.output(`\u{1F527} Making ${method} request to: ${url}`);
     const bodyString = body ? JSON.stringify(body) : void 0;
-    if (bodyString && (method === "PUT" || method === "POST" || method === "PATCH")) {
-      import_cli.default.output(`\u{1F4E6} Request body: ${bodyString}`);
+    if (body && (method === "PUT" || method === "POST" || method === "PATCH")) {
+      const redactedBody = this.redactSensitiveFields(body);
+      import_cli.default.output(`\u{1F4E6} Request body: ${JSON.stringify(redactedBody)}`);
     }
     let response;
     switch (method.toUpperCase()) {
@@ -169,7 +197,20 @@ var AzurePostgreSQLEntity = class extends import_base.MonkEntity {
 };
 // Azure PostgreSQL Flexible Server typically takes 5-15 minutes to provision
 // Total timeout: 15s initial + (60 attempts × 30s) = ~30 minutes
-__publicField(AzurePostgreSQLEntity, "readiness", { period: 30, initialDelay: 15, attempts: 60 });
+__publicField(_AzurePostgreSQLEntity, "readiness", { period: 30, initialDelay: 15, attempts: 60 });
+/**
+ * Sensitive field names that should be redacted from logs
+ */
+__publicField(_AzurePostgreSQLEntity, "SENSITIVE_FIELDS", [
+  "administratorLoginPassword",
+  "password",
+  "secret",
+  "connectionString",
+  "accessKey",
+  "primaryKey",
+  "secondaryKey"
+]);
+var AzurePostgreSQLEntity = _AzurePostgreSQLEntity;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   AzurePostgreSQLEntity
