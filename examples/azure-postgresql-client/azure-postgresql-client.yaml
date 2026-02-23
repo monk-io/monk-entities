@@ -98,9 +98,9 @@ postgres-server:
     postgres-admin-password: true
 
   # Replace these values with your Azure configuration
-  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
-  resource_group_name: "ivan-test"
-  server_name: "prod-pg-server-eu3"
+  subscription_id: "<your-azure-subscription-id>"
+  resource_group_name: "<your-resource-group>"
+  server_name: "my-pg-server"
   location: "West Europe"
   version: "16"
 
@@ -129,9 +129,9 @@ postgres-server:
   # - Private DNS zone (privatelink.postgres.database.azure.com)
   # - DNS zone VNet link
   vnet_integration:
-    vnet_name: "ivan-testwesteurope-vn"     # Format: {resource_group}{region}-vn
-    # vnet_resource_group: "my-vnet-rg"     # Optional: if VNet is in different resource group
-    subnet_address_prefix: "172.19.0.0/24"  # Must be within VNet's address space
+    vnet_name: "<your-resource-group>westeurope-vn"  # Format: {resource_group}{region}-vn
+    # vnet_resource_group: "my-vnet-rg"              # Optional: if VNet is in different resource group
+    subnet_address_prefix: "172.17.0.0/24"           # Must be within VNet's address space (172.16.0.0/12)
     # subnet_name: "postgres-subnet"        # Optional: custom subnet name
     # dns_link_name: "postgres-dns-link"    # Optional: custom DNS link name
 
@@ -309,9 +309,9 @@ public-postgres-server:
     postgres-admin-password: true
 
   # Replace these values with your Azure configuration
-  subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
-  resource_group_name: "ivan-test"
-  server_name: "public-pg-server-1"
+  subscription_id: "<your-azure-subscription-id>"
+  resource_group_name: "<your-resource-group>"
+  server_name: "my-public-pg-server"
   location: "West Europe"
   version: "16"
 

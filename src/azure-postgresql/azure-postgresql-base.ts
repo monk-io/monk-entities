@@ -93,6 +93,50 @@ export abstract class AzurePostgreSQLEntity<
     }
 
     /**
+     * Sensitive field names that should be redacted from logs
+     */
+    private static readonly SENSITIVE_FIELDS = [
+        'administratorLoginPassword',
+        'password',
+        'secret',
+        'connectionString',
+        'accessKey',
+        'primaryKey',
+        'secondaryKey'
+    ];
+
+    /**
+     * Redact sensitive fields from an object for safe logging
+     */
+    private redactSensitiveFields(obj: unknown): unknown {
+        if (obj === null || obj === undefined) {
+            return obj;
+        }
+        
+        if (typeof obj !== 'object') {
+            return obj;
+        }
+        
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.redactSensitiveFields(item));
+        }
+        
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+            if (AzurePostgreSQLEntity.SENSITIVE_FIELDS.some(field => 
+                key.toLowerCase().includes(field.toLowerCase())
+            )) {
+                result[key] = '[REDACTED]';
+            } else if (typeof value === 'object' && value !== null) {
+                result[key] = this.redactSensitiveFields(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    /**
      * Helper method to make authenticated Azure API requests with consistent error handling
      */
     protected makeAzureRequest(method: string, path: string, body?: unknown): AzureResponse {
@@ -104,8 +148,10 @@ export abstract class AzurePostgreSQLEntity<
         cli.output(`🔧 Making ${method} request to: ${url}`);
         
         const bodyString = body ? JSON.stringify(body) : undefined;
-        if (bodyString && (method === "PUT" || method === "POST" || method === "PATCH")) {
-            cli.output(`📦 Request body: ${bodyString}`);
+        if (body && (method === "PUT" || method === "POST" || method === "PATCH")) {
+            // Redact sensitive fields before logging
+            const redactedBody = this.redactSensitiveFields(body);
+            cli.output(`📦 Request body: ${JSON.stringify(redactedBody)}`);
         }
 
         let response: AzureResponse;
