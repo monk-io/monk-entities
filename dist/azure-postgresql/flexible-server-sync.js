@@ -678,17 +678,19 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     try {
       const path = `${resourceId}?api-version=${apiVersion}`;
       const response = this.makeAzureRequest("DELETE", path);
-      if (response.error && response.statusCode !== 200 && response.statusCode !== 202 && response.statusCode !== 204 && response.statusCode !== 404) {
-        cli.output(`\u26A0\uFE0F  Failed to delete ${resourceType}: ${response.error}`);
-        cli.output(`   \u26A0\uFE0F  Resource ID retained in state for manual cleanup: ${resourceId}`);
-        return false;
-      } else if (response.statusCode === 404) {
+      const isSuccess = response.statusCode === 200 || response.statusCode === 202 || response.statusCode === 204;
+      const isNotFound = response.statusCode === 404;
+      if (isNotFound) {
         cli.output(`   \u2139\uFE0F  ${resourceType} not found (may have been already deleted)`);
         return true;
-      } else {
-        cli.output(`   \u2705 Deleted ${resourceType}`);
-        return true;
       }
+      if (response.error || !isSuccess) {
+        cli.output(`\u26A0\uFE0F  Failed to delete ${resourceType}: ${response.error || `status ${response.statusCode}`}`);
+        cli.output(`   \u26A0\uFE0F  Resource ID retained in state for manual cleanup: ${resourceId}`);
+        return false;
+      }
+      cli.output(`   \u2705 Deleted ${resourceType}`);
+      return true;
     } catch (error) {
       cli.output(`\u26A0\uFE0F  Error deleting ${resourceType}: ${error instanceof Error ? error.message : "Unknown error"}`);
       cli.output(`   \u26A0\uFE0F  Resource ID retained in state for manual cleanup: ${resourceId}`);
