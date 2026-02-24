@@ -1,0 +1,20 @@
+namespace: supabase
+
+organization:
+  defines: entity
+  schema:
+    required: ["secret_ref", "name"]
+    secret_ref:
+      type: string
+    name:
+      type: string
+    slug:
+      description: Resource identifier (Organization slug) OPTIONAL, if specified, all management will be delegated to supabase dashboard
+      type: string
+  lifecycle:
+    sync: <<< organization-sync.js
+    list: <<< organization-list.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
