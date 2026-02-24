@@ -759,23 +759,30 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
     /**
      * Wait for the PostgreSQL server to be fully deleted
      * Polls until the server returns 404 Not Found
+     * Only treats definitive 404 responses as "deleted" - transient errors are retried
      */
     private waitForServerDeletion(): void {
         const maxAttempts = 60; // 60 attempts * 30 seconds = 30 minutes max
         const pollIntervalMs = 30000; // 30 seconds
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const server = this.checkResourceExists(this.definition.server_name);
+            const checkResult = this.checkResourceExistsWithStatus(this.definition.server_name);
             
-            if (!server) {
+            if (checkResult.notFound) {
+                // Definitive 404 - server is deleted
                 cli.output(`✅ Server deletion confirmed (attempt ${attempt})`);
                 return;
             }
-
-            const properties = server.properties as Record<string, unknown> | undefined;
-            const state = typeof properties?.state === 'string' ? properties.state : 'unknown';
             
-            cli.output(`⏳ Server still exists (state: ${state}), waiting... (attempt ${attempt}/${maxAttempts})`);
+            if (checkResult.resource) {
+                // Server still exists
+                const properties = checkResult.resource.properties as Record<string, unknown> | undefined;
+                const state = typeof properties?.state === 'string' ? properties.state : 'unknown';
+                cli.output(`⏳ Server still exists (state: ${state}), waiting... (attempt ${attempt}/${maxAttempts})`);
+            } else {
+                // Transient API error - not a definitive deletion confirmation
+                cli.output(`⚠️  API error checking server status: ${checkResult.error || 'Unknown error'} (attempt ${attempt}/${maxAttempts})`);
+            }
             
             // Sleep before next check
             sleep(pollIntervalMs);
@@ -1057,6 +1064,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
                         cli.output(`   ✅ Created delegated subnet: ${subnetName}`);
                         return subnetId;
                     }
+                    if (provisioningState === "Failed") {
+                        throw new Error(`Delegated subnet ${subnetName} provisioning failed`);
+                    }
                 }
                 // Sleep before next poll
                 sleep(pollInterval);
@@ -1121,6 +1131,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
                     if (provisioningState === "Succeeded") {
                         cli.output(`   ✅ Created private DNS zone: ${zoneName}`);
                         return zoneId;
+                    }
+                    if (provisioningState === "Failed") {
+                        throw new Error(`Private DNS zone ${zoneName} provisioning failed`);
                     }
                 }
                 // Sleep before next poll
@@ -1198,6 +1211,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
                     if (provisioningState === "Succeeded") {
                         cli.output(`   ✅ Created DNS zone VNet link: ${linkName}`);
                         return linkId;
+                    }
+                    if (provisioningState === "Failed") {
+                        throw new Error(`DNS zone VNet link ${linkName} provisioning failed`);
                     }
                 }
                 // Sleep before next poll

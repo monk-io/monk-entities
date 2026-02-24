@@ -325,19 +325,24 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
   /**
    * Wait for the PostgreSQL server to be fully deleted
    * Polls until the server returns 404 Not Found
+   * Only treats definitive 404 responses as "deleted" - transient errors are retried
    */
   waitForServerDeletion() {
     const maxAttempts = 60;
     const pollIntervalMs = 3e4;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const server = this.checkResourceExists(this.definition.server_name);
-      if (!server) {
+      const checkResult = this.checkResourceExistsWithStatus(this.definition.server_name);
+      if (checkResult.notFound) {
         cli.output(`\u2705 Server deletion confirmed (attempt ${attempt})`);
         return;
       }
-      const properties = server.properties;
-      const state = typeof properties?.state === "string" ? properties.state : "unknown";
-      cli.output(`\u23F3 Server still exists (state: ${state}), waiting... (attempt ${attempt}/${maxAttempts})`);
+      if (checkResult.resource) {
+        const properties = checkResult.resource.properties;
+        const state = typeof properties?.state === "string" ? properties.state : "unknown";
+        cli.output(`\u23F3 Server still exists (state: ${state}), waiting... (attempt ${attempt}/${maxAttempts})`);
+      } else {
+        cli.output(`\u26A0\uFE0F  API error checking server status: ${checkResult.error || "Unknown error"} (attempt ${attempt}/${maxAttempts})`);
+      }
       sleep(pollIntervalMs);
     }
     cli.output(`\u26A0\uFE0F  Server deletion timed out after ${maxAttempts} attempts. Attempting VNet cleanup anyway...`);
@@ -528,6 +533,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
             cli.output(`   \u2705 Created delegated subnet: ${subnetName}`);
             return subnetId;
           }
+          if (provisioningState === "Failed") {
+            throw new Error(`Delegated subnet ${subnetName} provisioning failed`);
+          }
         }
         sleep(pollInterval);
       }
@@ -574,6 +582,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
           if (provisioningState === "Succeeded") {
             cli.output(`   \u2705 Created private DNS zone: ${zoneName}`);
             return zoneId;
+          }
+          if (provisioningState === "Failed") {
+            throw new Error(`Private DNS zone ${zoneName} provisioning failed`);
           }
         }
         sleep(pollInterval);
@@ -628,6 +639,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
           if (provisioningState === "Succeeded") {
             cli.output(`   \u2705 Created DNS zone VNet link: ${linkName}`);
             return linkId;
+          }
+          if (provisioningState === "Failed") {
+            throw new Error(`DNS zone VNet link ${linkName} provisioning failed`);
           }
         }
         sleep(pollInterval);
