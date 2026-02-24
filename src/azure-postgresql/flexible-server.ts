@@ -798,38 +798,47 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
 
         try {
             // Check if server exists and is ready
-            const server = this.checkResourceExists(this.definition.server_name);
+            const checkResult = this.checkResourceExistsWithStatus(this.definition.server_name);
             
-            if (!server) {
-                // Server not found - track consecutive NotFound responses
-                // This happens when Azure accepts the request but async provisioning fails
-                this.state.not_found_count = (this.state.not_found_count || 0) + 1;
-                
-                // After 5 consecutive NotFound responses (with 30s period = ~2.5 minutes),
-                // assume async creation failed and clean up VNet resources
-                const notFoundThreshold = 5;
-                if (this.state.not_found_count >= notFoundThreshold && this.definition.vnet_integration) {
-                    cli.output(`❌ PostgreSQL Flexible Server ${this.definition.server_name} not found after ${this.state.not_found_count} checks - async creation likely failed`);
-                    cli.output(`🧹 Cleaning up VNet integration resources...`);
-                    this.cleanupVNetIntegration();
+            if (!checkResult.resource) {
+                // Only count definitive 404 "not found" responses toward the threshold
+                // Transient errors (500, 429, network issues) should NOT trigger VNet cleanup
+                if (checkResult.notFound) {
+                    // Server definitively not found (404) - track consecutive NotFound responses
+                    // This happens when Azure accepts the request but async provisioning fails
+                    this.state.not_found_count = (this.state.not_found_count || 0) + 1;
                     
-                    this.state.provisioning_state = "Failed";
-                    this.state.server_state = "Failed";
+                    // After 5 consecutive NotFound responses (with 30s period = ~2.5 minutes),
+                    // assume async creation failed and clean up VNet resources
+                    const notFoundThreshold = 5;
+                    if (this.state.not_found_count >= notFoundThreshold && this.definition.vnet_integration) {
+                        cli.output(`❌ PostgreSQL Flexible Server ${this.definition.server_name} not found after ${this.state.not_found_count} checks - async creation likely failed`);
+                        cli.output(`🧹 Cleaning up VNet integration resources...`);
+                        this.cleanupVNetIntegration();
+                        
+                        this.state.provisioning_state = "Failed";
+                        this.state.server_state = "Failed";
+                        
+                        throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} creation failed - server not found after ${this.state.not_found_count} readiness checks. VNet resources have been cleaned up.`);
+                    }
                     
-                    throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} creation failed - server not found after ${this.state.not_found_count} readiness checks. VNet resources have been cleaned up.`);
+                    cli.output(`⏳ PostgreSQL Flexible Server ${this.definition.server_name} not found - may still be provisioning (check ${this.state.not_found_count}/${notFoundThreshold})`);
+                    
+                    // Update state to reflect the server doesn't exist
+                    this.state.provisioning_state = "NotFound";
+                    this.state.server_state = "NotFound";
+                } else {
+                    // Transient API error (500, 429, etc.) - do NOT count toward not_found threshold
+                    // This prevents VNet cleanup due to temporary Azure API issues
+                    cli.output(`⚠️  API error checking PostgreSQL Flexible Server ${this.definition.server_name}: ${checkResult.error || 'Unknown error'} (not counting toward failure threshold)`);
                 }
-                
-                cli.output(`⏳ PostgreSQL Flexible Server ${this.definition.server_name} not found - may still be provisioning (check ${this.state.not_found_count}/${notFoundThreshold})`);
-                
-                // Update state to reflect the server doesn't exist
-                this.state.provisioning_state = "NotFound";
-                this.state.server_state = "NotFound";
                 
                 return false;
             }
             
             // Reset not_found_count when server is found
             this.state.not_found_count = 0;
+            const server = checkResult.resource;
 
             const properties = server.properties as Record<string, unknown> | undefined;
             const serverState = typeof properties?.state === 'string' ? properties.state : undefined;

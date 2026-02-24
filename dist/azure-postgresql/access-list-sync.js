@@ -131,8 +131,12 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
       try {
         const path = this.buildFirewallRulePath(ruleName);
         const response = this.makeAzureRequest("GET", path);
-        if (response.statusCode === 404) {
-          cli.output(`\u23F3 Firewall rule ${ruleName} not found yet`);
+        if (response.error || response.statusCode === 404) {
+          if (response.statusCode === 404) {
+            cli.output(`\u23F3 Firewall rule ${ruleName} not found yet`);
+          } else {
+            cli.output(`\u26A0\uFE0F  Error checking firewall rule ${ruleName}: ${response.error || `status ${response.statusCode}`}`);
+          }
           return false;
         }
       } catch (error) {

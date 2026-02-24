@@ -135,19 +135,35 @@ var _AzurePostgreSQLEntity = class _AzurePostgreSQLEntity extends import_base.Mo
    * Returns the resource data if it exists, null otherwise
    */
   checkResourceExists(resourceName) {
+    const result = this.checkResourceExistsWithStatus(resourceName);
+    return result.resource;
+  }
+  /**
+   * Check if a resource exists by making a GET request
+   * Returns detailed status including whether it was a definitive 404 or another error
+   * @returns Object with:
+   *   - resource: The resource data if found, null otherwise
+   *   - notFound: True only if the resource was definitively not found (404)
+   *   - error: Error message if there was an API error (non-404)
+   */
+  checkResourceExistsWithStatus(resourceName) {
     try {
       const path = this.buildResourcePath(resourceName);
       const response = this.makeAzureRequest("GET", path);
-      if (response.error || response.statusCode === 404) {
-        return null;
+      if (response.statusCode === 404) {
+        return { resource: null, notFound: true };
+      }
+      if (response.error) {
+        return { resource: null, notFound: false, error: response.error };
       }
       if (response.body) {
-        return JSON.parse(response.body);
+        return { resource: JSON.parse(response.body), notFound: false };
       }
-      return null;
+      return { resource: null, notFound: false, error: "Empty response body" };
     } catch (error) {
-      import_cli.default.output(`\u26A0\uFE0F  Error checking if resource exists: ${error instanceof Error ? error.message : "Unknown error"}`);
-      return null;
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      import_cli.default.output(`\u26A0\uFE0F  Error checking if resource exists: ${errorMsg}`);
+      return { resource: null, notFound: false, error: errorMsg };
     }
   }
   /**
