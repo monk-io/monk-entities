@@ -162,8 +162,9 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
     };
     const path = this.buildFirewallRulePath(ruleName);
     const response = this.makeAzureRequest("PUT", path, body);
-    if (response.error && response.statusCode !== 200 && response.statusCode !== 201 && response.statusCode !== 202) {
-      throw new Error(`${response.error}, body: ${response.body}`);
+    const isSuccess = response.statusCode === 200 || response.statusCode === 201 || response.statusCode === 202;
+    if (response.error || !isSuccess) {
+      throw new Error(`Failed to create firewall rule: ${response.error || `status ${response.statusCode}`}, body: ${response.body}`);
     }
   }
   /**
@@ -172,8 +173,9 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
   deleteFirewallRule(ruleName) {
     const path = this.buildFirewallRulePath(ruleName);
     const response = this.makeAzureRequest("DELETE", path);
-    if (response.error && response.statusCode !== 200 && response.statusCode !== 202 && response.statusCode !== 204 && response.statusCode !== 404) {
-      throw new Error(`${response.error}, body: ${response.body}`);
+    const isSuccess = response.statusCode === 200 || response.statusCode === 202 || response.statusCode === 204 || response.statusCode === 404;
+    if (response.error || !isSuccess) {
+      throw new Error(`Failed to delete firewall rule: ${response.error || `status ${response.statusCode}`}, body: ${response.body}`);
     }
   }
   /**
