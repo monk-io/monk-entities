@@ -350,24 +350,29 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       return false;
     }
     try {
-      const server = this.checkResourceExists(this.definition.server_name);
-      if (!server) {
-        this.state.not_found_count = (this.state.not_found_count || 0) + 1;
-        const notFoundThreshold = 5;
-        if (this.state.not_found_count >= notFoundThreshold && this.definition.vnet_integration) {
-          cli.output(`\u274C PostgreSQL Flexible Server ${this.definition.server_name} not found after ${this.state.not_found_count} checks - async creation likely failed`);
-          cli.output(`\u{1F9F9} Cleaning up VNet integration resources...`);
-          this.cleanupVNetIntegration();
-          this.state.provisioning_state = "Failed";
-          this.state.server_state = "Failed";
-          throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} creation failed - server not found after ${this.state.not_found_count} readiness checks. VNet resources have been cleaned up.`);
+      const checkResult = this.checkResourceExistsWithStatus(this.definition.server_name);
+      if (!checkResult.resource) {
+        if (checkResult.notFound) {
+          this.state.not_found_count = (this.state.not_found_count || 0) + 1;
+          const notFoundThreshold = 5;
+          if (this.state.not_found_count >= notFoundThreshold && this.definition.vnet_integration) {
+            cli.output(`\u274C PostgreSQL Flexible Server ${this.definition.server_name} not found after ${this.state.not_found_count} checks - async creation likely failed`);
+            cli.output(`\u{1F9F9} Cleaning up VNet integration resources...`);
+            this.cleanupVNetIntegration();
+            this.state.provisioning_state = "Failed";
+            this.state.server_state = "Failed";
+            throw new Error(`PostgreSQL Flexible Server ${this.definition.server_name} creation failed - server not found after ${this.state.not_found_count} readiness checks. VNet resources have been cleaned up.`);
+          }
+          cli.output(`\u23F3 PostgreSQL Flexible Server ${this.definition.server_name} not found - may still be provisioning (check ${this.state.not_found_count}/${notFoundThreshold})`);
+          this.state.provisioning_state = "NotFound";
+          this.state.server_state = "NotFound";
+        } else {
+          cli.output(`\u26A0\uFE0F  API error checking PostgreSQL Flexible Server ${this.definition.server_name}: ${checkResult.error || "Unknown error"} (not counting toward failure threshold)`);
         }
-        cli.output(`\u23F3 PostgreSQL Flexible Server ${this.definition.server_name} not found - may still be provisioning (check ${this.state.not_found_count}/${notFoundThreshold})`);
-        this.state.provisioning_state = "NotFound";
-        this.state.server_state = "NotFound";
         return false;
       }
       this.state.not_found_count = 0;
+      const server = checkResult.resource;
       const properties = server.properties;
       const serverState = typeof properties?.state === "string" ? properties.state : void 0;
       this.state.provisioning_state = serverState;
