@@ -211,13 +211,14 @@ export class FirewallRule extends AzurePostgreSQLEntity<FirewallRuleDefinition, 
     }
 
     override checkReadiness(): boolean {
-        if (!this.state.rule_name) {
-            return false;
+        // If create_when_missing is false and resource doesn't exist, consider it ready
+        // This check must come first because state.rule_name won't be set in this case
+        if (this.definition.create_when_missing === false && this.state.existing === false) {
+            return true;
         }
 
-        // If create_when_missing is false and resource doesn't exist, consider it ready
-        if (this.definition.create_when_missing === false && !this.state.existing) {
-            return true;
+        if (!this.state.rule_name) {
+            return false;
         }
 
         try {
