@@ -343,11 +343,11 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     cli.output(`\u26A0\uFE0F  Server deletion timed out after ${maxAttempts} attempts. Attempting VNet cleanup anyway...`);
   }
   checkReadiness() {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      return true;
+    }
     if (!this.state.server_name) {
       return false;
-    }
-    if (this.definition.create_when_missing === false && !this.state.existing) {
-      return true;
     }
     try {
       const server = this.checkResourceExists(this.definition.server_name);

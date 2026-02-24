@@ -161,11 +161,11 @@ var _FirewallRule = class _FirewallRule extends (_a = AzurePostgreSQLEntity, _ge
     }
   }
   checkReadiness() {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      return true;
+    }
     if (!this.state.rule_name) {
       return false;
-    }
-    if (this.definition.create_when_missing === false && !this.state.existing) {
-      return true;
     }
     try {
       const rule = this.checkResourceExists(this.definition.rule_name);

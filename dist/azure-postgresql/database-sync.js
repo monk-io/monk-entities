@@ -148,11 +148,11 @@ var _Database = class _Database extends (_a = AzurePostgreSQLEntity, _getInfo_de
     }
   }
   checkReadiness() {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      return true;
+    }
     if (!this.state.database_name) {
       return false;
-    }
-    if (this.definition.create_when_missing === false && !this.state.existing) {
-      return true;
     }
     try {
       const db = this.checkResourceExists(this.definition.database_name);
