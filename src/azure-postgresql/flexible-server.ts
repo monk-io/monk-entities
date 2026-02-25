@@ -1464,7 +1464,11 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
      * 
      * Usage:
      *   monk do namespace/server restart-server
+     *   monk do namespace/server restart-server failover_mode="PlannedFailover"
      *   monk do namespace/server restart-server failover_mode="ForcedFailover"
+     * 
+     * @param args.failover_mode - Optional failover mode: "PlannedFailover" or "ForcedFailover"
+     *                             When specified, triggers a restart with failover (for HA-enabled servers)
      */
     @action("restart-server")
     restartServer(args?: Args): void {
@@ -1481,7 +1485,12 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             const body: Record<string, unknown> = {};
             
             if (failoverMode) {
-                body.restartWithFailover = failoverMode;
+                // Azure RestartParameter API expects:
+                // - restartWithFailover: boolean (whether to restart with failover)
+                // - failoverMode: string ("PlannedFailover" or "ForcedFailover")
+                body.restartWithFailover = true;
+                body.failoverMode = failoverMode;
+                cli.output(`   Restart with Failover: true`);
                 cli.output(`   Failover Mode: ${failoverMode}`);
             }
 

@@ -841,7 +841,9 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       const failoverMode = args?.failover_mode;
       const body = {};
       if (failoverMode) {
-        body.restartWithFailover = failoverMode;
+        body.restartWithFailover = true;
+        body.failoverMode = failoverMode;
+        cli.output(`   Restart with Failover: true`);
         cli.output(`   Failover Mode: ${failoverMode}`);
       }
       const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/restart?api-version=${this.apiVersion}`;
