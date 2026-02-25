@@ -122,20 +122,20 @@ var _Database = class _Database extends (_a = AzurePostgreSQLEntity, _getInfo_de
       return;
     }
     if (this.state.existing) {
-      cli.output(`Database ${this.definition.database_name} wasn't created by this entity, skipping delete`);
+      cli.output(`Database ${this.state.database_name} wasn't created by this entity, skipping delete`);
       return;
     }
     try {
-      const path = this.buildResourcePath(this.definition.database_name);
+      const path = this.buildResourcePath(this.state.database_name);
       const response = this.makeAzureRequest("DELETE", path);
       if (response.error) {
         if (response.statusCode === 404) {
-          cli.output(`\u26A0\uFE0F  Database ${this.definition.database_name} not found, may have been already deleted`);
+          cli.output(`\u26A0\uFE0F  Database ${this.state.database_name} not found, may have been already deleted`);
           return;
         }
         throw new Error(`${response.error}, body: ${response.body}`);
       }
-      cli.output(`\u2705 Successfully initiated deletion of database ${this.definition.database_name}`);
+      cli.output(`\u2705 Successfully initiated deletion of database ${this.state.database_name}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       throw new Error(`Failed to delete database: ${errorMessage}`);
@@ -149,12 +149,12 @@ var _Database = class _Database extends (_a = AzurePostgreSQLEntity, _getInfo_de
       return false;
     }
     try {
-      const db = this.checkResourceExists(this.definition.database_name);
+      const db = this.checkResourceExists(this.state.database_name);
       if (!db) {
-        cli.output(`\u23F3 PostgreSQL Database ${this.definition.database_name} not found`);
+        cli.output(`\u23F3 PostgreSQL Database ${this.state.database_name} not found`);
         return false;
       }
-      cli.output(`\u2705 PostgreSQL Database ${this.definition.database_name} is ready`);
+      cli.output(`\u2705 PostgreSQL Database ${this.state.database_name} is ready`);
       const properties = db.properties;
       this.state.charset = typeof properties?.charset === "string" ? properties.charset : void 0;
       this.state.collation = typeof properties?.collation === "string" ? properties.collation : void 0;
@@ -172,9 +172,9 @@ var _Database = class _Database extends (_a = AzurePostgreSQLEntity, _getInfo_de
       throw new Error("Database does not exist. Create the database first.");
     }
     try {
-      const db = this.checkResourceExists(this.definition.database_name);
+      const db = this.checkResourceExists(this.state.database_name);
       if (!db) {
-        throw new Error(`Database ${this.definition.database_name} not found`);
+        throw new Error(`Database ${this.state.database_name} not found`);
       }
       const properties = db.properties;
       cli.output(`
