@@ -218,6 +218,7 @@ export interface FlexibleServerDefinition extends AzurePostgreSQLDefinition {
 
     /**
      * @description Administrator login name
+     * @default "postgres"
      */
     administrator_login?: string;
 
@@ -594,9 +595,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
         }
 
         // Add administrator credentials
-        if (this.definition.administrator_login) {
-            body.properties.administratorLogin = this.definition.administrator_login;
-        }
+        // Azure requires both administratorLogin and administratorLoginPassword for password-based auth (default)
+        const adminLogin = this.definition.administrator_login || "postgres";
+        body.properties.administratorLogin = adminLogin;
         if (administratorPassword) {
             body.properties.administratorLoginPassword = administratorPassword;
         }
@@ -633,7 +634,7 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             this.state.server_state = typeof properties?.state === 'string' ? properties.state : "Creating";
             this.state.fqdn = typeof properties?.fullyQualifiedDomainName === 'string' ? properties.fullyQualifiedDomainName : undefined;
             this.state.version = typeof properties?.version === 'string' ? properties.version : this.definition.version || "16";
-            this.state.administrator_login = this.definition.administrator_login;
+            this.state.administrator_login = adminLogin;
             this.state.existing = false;
 
             cli.output(`✅ Created PostgreSQL Flexible Server: ${this.definition.server_name}`);

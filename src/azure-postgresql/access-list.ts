@@ -137,13 +137,6 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
         return `flexibleServers/${this.definition.server_name}/firewallRules`;
     }
 
-    /**
-     * Build the resource path for firewall rule operations
-     */
-    private buildFirewallRulePath(ruleName: string): string {
-        return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/firewallRules/${ruleName}?api-version=${this.apiVersion}`;
-    }
-
     /** Create firewall rules for all allowed CIDR blocks */
     override create(): void {
         const allowedCidrs = this.definition.allowed_cidr_blocks || [];
@@ -309,7 +302,7 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
         // Check if all rules exist
         for (const ruleName of rules) {
             try {
-                const path = this.buildFirewallRulePath(ruleName);
+                const path = this.buildResourcePath(ruleName);
                 const response = this.makeAzureRequest("GET", path);
                 
                 // Check for any error response (404, 500, 403, etc.)
@@ -346,7 +339,7 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
             }
         };
 
-        const path = this.buildFirewallRulePath(ruleName);
+        const path = this.buildResourcePath(ruleName);
         const response = this.makeAzureRequest("PUT", path, body);
 
         // Check for failure: either explicit error OR non-success status code
@@ -360,7 +353,7 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
      * Delete a firewall rule
      */
     private deleteFirewallRule(ruleName: string): void {
-        const path = this.buildFirewallRulePath(ruleName);
+        const path = this.buildResourcePath(ruleName);
         const response = this.makeAzureRequest("DELETE", path);
 
         // Check for failure: either explicit error OR non-success status code

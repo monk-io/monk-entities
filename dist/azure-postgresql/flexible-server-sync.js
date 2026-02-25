@@ -211,9 +211,8 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
         body.properties.authConfig.tenantId = this.definition.auth_config.tenant_id;
       }
     }
-    if (this.definition.administrator_login) {
-      body.properties.administratorLogin = this.definition.administrator_login;
-    }
+    const adminLogin = this.definition.administrator_login || "postgres";
+    body.properties.administratorLogin = adminLogin;
     if (administratorPassword) {
       body.properties.administratorLoginPassword = administratorPassword;
     }
@@ -236,7 +235,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       this.state.server_state = typeof properties?.state === "string" ? properties.state : "Creating";
       this.state.fqdn = typeof properties?.fullyQualifiedDomainName === "string" ? properties.fullyQualifiedDomainName : void 0;
       this.state.version = typeof properties?.version === "string" ? properties.version : this.definition.version || "16";
-      this.state.administrator_login = this.definition.administrator_login;
+      this.state.administrator_login = adminLogin;
       this.state.existing = false;
       cli.output(`\u2705 Created PostgreSQL Flexible Server: ${this.definition.server_name}`);
     } catch (error) {
