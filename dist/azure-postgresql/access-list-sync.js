@@ -16,12 +16,6 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
   getResourceType() {
     return `flexibleServers/${this.definition.server_name}/firewallRules`;
   }
-  /**
-   * Build the resource path for firewall rule operations
-   */
-  buildFirewallRulePath(ruleName) {
-    return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/firewallRules/${ruleName}?api-version=${this.apiVersion}`;
-  }
   /** Create firewall rules for all allowed CIDR blocks */
   create() {
     const allowedCidrs = this.definition.allowed_cidr_blocks || [];
@@ -143,7 +137,7 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
     }
     for (const ruleName of rules) {
       try {
-        const path = this.buildFirewallRulePath(ruleName);
+        const path = this.buildResourcePath(ruleName);
         const response = this.makeAzureRequest("GET", path);
         if (response.error || response.statusCode === 404) {
           if (response.statusCode === 404) {
@@ -174,7 +168,7 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
         endIpAddress: endIp
       }
     };
-    const path = this.buildFirewallRulePath(ruleName);
+    const path = this.buildResourcePath(ruleName);
     const response = this.makeAzureRequest("PUT", path, body);
     const isSuccess = response.statusCode === 200 || response.statusCode === 201 || response.statusCode === 202;
     if (response.error || !isSuccess) {
@@ -185,7 +179,7 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
    * Delete a firewall rule
    */
   deleteFirewallRule(ruleName) {
-    const path = this.buildFirewallRulePath(ruleName);
+    const path = this.buildResourcePath(ruleName);
     const response = this.makeAzureRequest("DELETE", path);
     const isSuccess = response.statusCode === 200 || response.statusCode === 202 || response.statusCode === 204 || response.statusCode === 404;
     if (response.error || !isSuccess) {
