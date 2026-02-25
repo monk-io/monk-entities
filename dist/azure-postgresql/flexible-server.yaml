@@ -97,7 +97,7 @@ flexible-server:
       | Other cloud/region | `network.public_network_access: Enabled` | `access-list` with `runnable-peers-public-ips` |
 
       ---
-    version-hash: dfcd26524f8f
+    version-hash: ed5967bfc124
   schema:
     subscription_id:
       type: string
