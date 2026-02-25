@@ -67,12 +67,6 @@ var _Database = class _Database extends (_a = AzurePostgreSQLEntity, _getInfo_de
   getResourceType() {
     return `flexibleServers/${this.definition.server_name}/databases`;
   }
-  /**
-   * Build the resource path for database operations
-   */
-  buildResourcePath(resourceName) {
-    return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/databases/${resourceName}?api-version=${this.apiVersion}`;
-  }
   /** Create a new PostgreSQL database */
   create() {
     const existingDb = this.checkResourceExists(this.definition.database_name);

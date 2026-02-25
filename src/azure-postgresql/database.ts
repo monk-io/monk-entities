@@ -86,13 +86,6 @@ export class Database extends AzurePostgreSQLEntity<DatabaseDefinition, Database
         return `flexibleServers/${this.definition.server_name}/databases`;
     }
 
-    /**
-     * Build the resource path for database operations
-     */
-    protected override buildResourcePath(resourceName: string): string {
-        return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/databases/${resourceName}?api-version=${this.apiVersion}`;
-    }
-
     /** Create a new PostgreSQL database */
     override create(): void {
         // Check if database already exists
