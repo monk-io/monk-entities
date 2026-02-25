@@ -180,23 +180,24 @@ export class FirewallRule extends AzurePostgreSQLEntity<FirewallRuleDefinition, 
         }
 
         if (this.state.existing) {
-            cli.output(`Firewall rule ${this.definition.rule_name} wasn't created by this entity, skipping delete`);
+            cli.output(`Firewall rule ${this.state.rule_name} wasn't created by this entity, skipping delete`);
             return;
         }
 
         try {
-            const path = this.buildResourcePath(this.definition.rule_name);
+            // Use state.rule_name for API calls - it contains the canonical name from Azure
+            const path = this.buildResourcePath(this.state.rule_name);
             const response = this.makeAzureRequest("DELETE", path);
             
             if (response.error) {
                 if (response.statusCode === 404) {
-                    cli.output(`⚠️  Firewall rule ${this.definition.rule_name} not found, may have been already deleted`);
+                    cli.output(`⚠️  Firewall rule ${this.state.rule_name} not found, may have been already deleted`);
                     return;
                 }
                 throw new Error(`${response.error}, body: ${response.body}`);
             }
             
-            cli.output(`✅ Successfully deleted firewall rule ${this.definition.rule_name}`);
+            cli.output(`✅ Successfully deleted firewall rule ${this.state.rule_name}`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to delete firewall rule: ${errorMessage}`);
@@ -215,16 +216,16 @@ export class FirewallRule extends AzurePostgreSQLEntity<FirewallRuleDefinition, 
         }
 
         try {
-            // Check if rule exists
-            const rule = this.checkResourceExists(this.definition.rule_name);
+            // Check if rule exists - use state.rule_name for API calls (canonical name from Azure)
+            const rule = this.checkResourceExists(this.state.rule_name);
             
             if (!rule) {
-                cli.output(`⏳ Firewall rule ${this.definition.rule_name} not found`);
+                cli.output(`⏳ Firewall rule ${this.state.rule_name} not found`);
                 return false;
             }
 
             // Rule exists, it's ready
-            cli.output(`✅ Firewall rule ${this.definition.rule_name} is ready`);
+            cli.output(`✅ Firewall rule ${this.state.rule_name} is ready`);
             
             // Update state with current information
             const properties = rule.properties as Record<string, unknown> | undefined;
@@ -259,10 +260,11 @@ export class FirewallRule extends AzurePostgreSQLEntity<FirewallRuleDefinition, 
         }
 
         try {
-            const rule = this.checkResourceExists(this.definition.rule_name);
+            // Use state.rule_name for API calls - it contains the canonical name from Azure
+            const rule = this.checkResourceExists(this.state.rule_name!);
             
             if (!rule) {
-                throw new Error(`Firewall rule ${this.definition.rule_name} not found`);
+                throw new Error(`Firewall rule ${this.state.rule_name} not found`);
             }
 
             const properties = rule.properties as Record<string, unknown> | undefined;

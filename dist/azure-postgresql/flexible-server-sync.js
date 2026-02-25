@@ -321,8 +321,14 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
     cli.output(`\u2705 Updated PostgreSQL Flexible Server: ${this.definition.server_name}`);
   }
   delete() {
+    const hasVNetResources = this.state.created_subnet_id || this.state.created_dns_link_id || this.state.created_dns_zone_id;
     if (!this.state.server_name) {
-      cli.output("PostgreSQL Flexible Server does not exist, nothing to delete");
+      if (hasVNetResources) {
+        cli.output("PostgreSQL Flexible Server does not exist, but VNet resources need cleanup");
+        this.cleanupVNetIntegration();
+      } else {
+        cli.output("PostgreSQL Flexible Server does not exist, nothing to delete");
+      }
       return;
     }
     if (this.state.existing) {
@@ -330,7 +336,7 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       return;
     }
     this.deleteResource(this.definition.server_name);
-    if (this.definition.vnet_integration) {
+    if (hasVNetResources) {
       cli.output(`\u23F3 Waiting for server deletion to complete before cleaning up VNet resources...`);
       this.waitForServerDeletion();
     }

@@ -128,6 +128,8 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
         `Failed to delete ${failedRules.length}/${rules.length} firewall rule(s): ${failedRules.join(", ")}. Rules retained in state for retry.`
       );
     }
+    this.state.created_rules = [];
+    this.state.allowed_cidr_blocks = [];
     cli.output(`\u2705 Deleted firewall rules for server ${this.definition.server_name}`);
   }
   checkReadiness() {

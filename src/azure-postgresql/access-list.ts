@@ -288,6 +288,10 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
             );
         }
 
+        // Clear state on successful deletion to prevent stale data
+        this.state.created_rules = [];
+        this.state.allowed_cidr_blocks = [];
+
         cli.output(`✅ Deleted firewall rules for server ${this.definition.server_name}`);
     }
 

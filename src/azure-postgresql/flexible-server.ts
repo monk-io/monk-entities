@@ -747,8 +747,17 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
     }
 
     override delete(): void {
+        // Check if there are VNet resources to clean up even if server doesn't exist
+        // This handles the case where server creation failed after VNet setup succeeded
+        const hasVNetResources = this.state.created_subnet_id || this.state.created_dns_link_id || this.state.created_dns_zone_id;
+
         if (!this.state.server_name) {
-            cli.output("PostgreSQL Flexible Server does not exist, nothing to delete");
+            if (hasVNetResources) {
+                cli.output("PostgreSQL Flexible Server does not exist, but VNet resources need cleanup");
+                this.cleanupVNetIntegration();
+            } else {
+                cli.output("PostgreSQL Flexible Server does not exist, nothing to delete");
+            }
             return;
         }
 
@@ -763,7 +772,7 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
 
         // Wait for server deletion to complete before cleaning up VNet resources
         // The subnet has a service association link that can't be deleted until server is gone
-        if (this.definition.vnet_integration) {
+        if (hasVNetResources) {
             cli.output(`⏳ Waiting for server deletion to complete before cleaning up VNet resources...`);
             this.waitForServerDeletion();
         }
