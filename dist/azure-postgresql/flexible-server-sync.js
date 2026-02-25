@@ -265,20 +265,35 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
       hasChanges = true;
     }
     if (this.definition.storage) {
-      body.properties.storage = {
-        storageSizeGB: this.definition.storage.storage_size_gb,
-        autoGrow: this.definition.storage.auto_grow
-      };
-      hasChanges = true;
+      const storageUpdate = {};
+      if (this.definition.storage.storage_size_gb !== void 0) {
+        storageUpdate.storageSizeGB = this.definition.storage.storage_size_gb;
+      }
+      if (this.definition.storage.auto_grow !== void 0) {
+        storageUpdate.autoGrow = this.definition.storage.auto_grow;
+      }
+      if (this.definition.storage.storage_tier !== void 0) {
+        storageUpdate.tier = this.definition.storage.storage_tier;
+      }
+      if (Object.keys(storageUpdate).length > 0) {
+        body.properties.storage = storageUpdate;
+        hasChanges = true;
+      }
     }
     if (this.definition.backup) {
-      body.properties.backup = {
-        backupRetentionDays: this.definition.backup.backup_retention_days,
-        geoRedundantBackup: this.definition.backup.geo_redundant_backup
-      };
-      hasChanges = true;
+      const backupUpdate = {};
+      if (this.definition.backup.backup_retention_days !== void 0) {
+        backupUpdate.backupRetentionDays = this.definition.backup.backup_retention_days;
+      }
+      if (this.definition.backup.geo_redundant_backup !== void 0) {
+        backupUpdate.geoRedundantBackup = this.definition.backup.geo_redundant_backup;
+      }
+      if (Object.keys(backupUpdate).length > 0) {
+        body.properties.backup = backupUpdate;
+        hasChanges = true;
+      }
     }
-    if (this.definition.high_availability) {
+    if (this.definition.high_availability && this.definition.high_availability.mode !== void 0) {
       body.properties.highAvailability = {
         mode: this.definition.high_availability.mode
       };
