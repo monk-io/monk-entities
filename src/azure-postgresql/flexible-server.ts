@@ -673,26 +673,41 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             hasChanges = true;
         }
 
-        // Update storage if provided
+        // Update storage if provided - only include fields that are explicitly set
         if (this.definition.storage) {
-            body.properties.storage = {
-                storageSizeGB: this.definition.storage.storage_size_gb,
-                autoGrow: this.definition.storage.auto_grow
-            };
-            hasChanges = true;
+            const storageUpdate: Record<string, unknown> = {};
+            if (this.definition.storage.storage_size_gb !== undefined) {
+                storageUpdate.storageSizeGB = this.definition.storage.storage_size_gb;
+            }
+            if (this.definition.storage.auto_grow !== undefined) {
+                storageUpdate.autoGrow = this.definition.storage.auto_grow;
+            }
+            if (this.definition.storage.storage_tier !== undefined) {
+                storageUpdate.tier = this.definition.storage.storage_tier;
+            }
+            if (Object.keys(storageUpdate).length > 0) {
+                body.properties.storage = storageUpdate;
+                hasChanges = true;
+            }
         }
 
-        // Update backup if provided
+        // Update backup if provided - only include fields that are explicitly set
         if (this.definition.backup) {
-            body.properties.backup = {
-                backupRetentionDays: this.definition.backup.backup_retention_days,
-                geoRedundantBackup: this.definition.backup.geo_redundant_backup
-            };
-            hasChanges = true;
+            const backupUpdate: Record<string, unknown> = {};
+            if (this.definition.backup.backup_retention_days !== undefined) {
+                backupUpdate.backupRetentionDays = this.definition.backup.backup_retention_days;
+            }
+            if (this.definition.backup.geo_redundant_backup !== undefined) {
+                backupUpdate.geoRedundantBackup = this.definition.backup.geo_redundant_backup;
+            }
+            if (Object.keys(backupUpdate).length > 0) {
+                body.properties.backup = backupUpdate;
+                hasChanges = true;
+            }
         }
 
-        // Update high availability if provided
-        if (this.definition.high_availability) {
+        // Update high availability if provided - only include fields that are explicitly set
+        if (this.definition.high_availability && this.definition.high_availability.mode !== undefined) {
             body.properties.highAvailability = {
                 mode: this.definition.high_availability.mode
             };

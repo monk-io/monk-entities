@@ -272,13 +272,24 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
 
         cli.output(`🗑️  Deleting ${rules.length} firewall rule(s) for server ${this.definition.server_name}`);
 
+        const failedRules: string[] = [];
         for (const ruleName of rules) {
             try {
                 this.deleteFirewallRule(ruleName);
                 cli.output(`   ✅ Deleted rule ${ruleName}`);
             } catch (error) {
                 cli.output(`   ⚠️  Failed to delete rule ${ruleName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                failedRules.push(ruleName);
             }
+        }
+
+        if (failedRules.length > 0) {
+            // Keep failed rules in state so they can be retried
+            this.state.created_rules = failedRules;
+            throw new Error(
+                `Failed to delete ${failedRules.length}/${rules.length} firewall rule(s): ${failedRules.join(', ')}. ` +
+                `Rules retained in state for retry.`
+            );
         }
 
         cli.output(`✅ Deleted firewall rules for server ${this.definition.server_name}`);
@@ -367,10 +378,18 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
      * 
      * @param cidr - CIDR notation string (e.g., "1.2.3.4/32" or "1.2.3.4")
      * @returns The IP address if valid /32 or bare IP
-     * @throws Error if CIDR is not /32 (would silently allow wrong IPs)
+     * @throws Error if CIDR is null/undefined, empty, or not /32
      */
     private parseCidrToSingleIp(cidr: string): string {
+        if (cidr === null || cidr === undefined) {
+            throw new Error(`Invalid CIDR: value is ${cidr === null ? 'null' : 'undefined'}`);
+        }
+        
         const trimmed = cidr.trim();
+        
+        if (trimmed === '') {
+            throw new Error(`Invalid CIDR: value is empty string`);
+        }
         
         // Check if it's CIDR notation
         if (trimmed.includes('/')) {
