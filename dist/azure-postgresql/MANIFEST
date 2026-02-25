@@ -1,4 +1,4 @@
 REPO azure-postgresql
-VERSION_HASH 1c157858abdd
+VERSION_HASH dfcd26524f8f
 LOAD firewall-rule.yaml azure-postgresql-base.yaml flexible-server.yaml access-list.yaml database.yaml
 RESOURCES database-sync.js flexible-server-sync.js azure-postgresql-base.js access-list-sync.js firewall-rule-sync.js

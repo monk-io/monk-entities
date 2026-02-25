@@ -672,11 +672,12 @@ var _FlexibleServer = class _FlexibleServer extends (_a = AzurePostgreSQLEntity,
    * Only clears state tracking for resources that were successfully deleted
    */
   cleanupVNetIntegration() {
-    if (!this.definition.vnet_integration) {
-      return;
-    }
     if (this.state.existing) {
       cli.output(`\u2139\uFE0F  Skipping VNet integration cleanup - server was pre-existing`);
+      return;
+    }
+    const hasVNetResources = this.state.created_subnet_id || this.state.created_dns_link_id || this.state.created_dns_zone_id;
+    if (!hasVNetResources) {
       return;
     }
     cli.output(`

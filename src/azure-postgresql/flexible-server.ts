@@ -1248,13 +1248,16 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
      * Only clears state tracking for resources that were successfully deleted
      */
     private cleanupVNetIntegration(): void {
-        if (!this.definition.vnet_integration) {
-            return;
-        }
-
         // Skip cleanup if resources weren't created by us (pre-existing server)
         if (this.state.existing) {
             cli.output(`ℹ️  Skipping VNet integration cleanup - server was pre-existing`);
+            return;
+        }
+
+        // Check if there are any VNet resources to clean up based on state, not definition.
+        // This handles the case where vnet_integration was removed from definition after creation.
+        const hasVNetResources = this.state.created_subnet_id || this.state.created_dns_link_id || this.state.created_dns_zone_id;
+        if (!hasVNetResources) {
             return;
         }
 

@@ -21,7 +21,7 @@ firewall-rule:
       ## Composing with Other Entities
       Works with:
       - `azure-postgresql/flexible-server` - Parent server to configure firewall for
-    version-hash: 1c157858abdd
+    version-hash: dfcd26524f8f
   schema:
     subscription_id:
       type: string
