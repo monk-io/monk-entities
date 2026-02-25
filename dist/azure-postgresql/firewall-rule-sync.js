@@ -67,12 +67,6 @@ var _FirewallRule = class _FirewallRule extends (_a = AzurePostgreSQLEntity, _ge
   getResourceType() {
     return `flexibleServers/${this.definition.server_name}/firewallRules`;
   }
-  /**
-   * Build the resource path for firewall rule operations
-   */
-  buildResourcePath(resourceName) {
-    return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/firewallRules/${resourceName}?api-version=${this.apiVersion}`;
-  }
   /** Create a new firewall rule */
   create() {
     const existingRule = this.checkResourceExists(this.definition.rule_name);

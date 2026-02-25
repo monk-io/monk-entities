@@ -74,12 +74,14 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
       return;
     }
     cli.output(`\u{1F504} Updating firewall rules for server ${this.definition.server_name}`);
+    const failedToDeleteRules = [];
     for (const ruleName of currentRules) {
       try {
         this.deleteFirewallRule(ruleName);
         cli.output(`   \u{1F5D1}\uFE0F  Deleted old rule ${ruleName}`);
       } catch (error) {
         cli.output(`   \u26A0\uFE0F  Failed to delete rule ${ruleName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        failedToDeleteRules.push(ruleName);
       }
     }
     const createdRules = [];
@@ -97,8 +99,11 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
         cli.output(`   \u274C Failed to create rule ${ruleName} for "${cidr}": ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
-    this.state.created_rules = createdRules;
+    this.state.created_rules = [...createdRules, ...failedToDeleteRules];
     this.state.allowed_cidr_blocks = successfulCidrs;
+    if (failedToDeleteRules.length > 0) {
+      cli.output(`   \u26A0\uFE0F  ${failedToDeleteRules.length} old rule(s) failed to delete and are still tracked: ${failedToDeleteRules.join(", ")}`);
+    }
     if (createdRules.length < desiredCidrs.length) {
       cli.output(`\u26A0\uFE0F  Updated firewall rules: ${createdRules.length}/${desiredCidrs.length} rule(s) active - some failed, will retry on next update`);
     } else {

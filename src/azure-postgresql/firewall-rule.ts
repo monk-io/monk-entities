@@ -87,13 +87,6 @@ export class FirewallRule extends AzurePostgreSQLEntity<FirewallRuleDefinition, 
         return `flexibleServers/${this.definition.server_name}/firewallRules`;
     }
 
-    /**
-     * Build the resource path for firewall rule operations
-     */
-    protected override buildResourcePath(resourceName: string): string {
-        return `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/firewallRules/${resourceName}?api-version=${this.apiVersion}`;
-    }
-
     /** Create a new firewall rule */
     override create(): void {
         // Check if rule already exists

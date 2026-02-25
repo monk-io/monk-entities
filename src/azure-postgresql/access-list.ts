@@ -214,13 +214,15 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
 
         cli.output(`🔄 Updating firewall rules for server ${this.definition.server_name}`);
 
-        // Delete old rules
+        // Delete old rules, tracking any that fail to delete
+        const failedToDeleteRules: string[] = [];
         for (const ruleName of currentRules) {
             try {
                 this.deleteFirewallRule(ruleName);
                 cli.output(`   🗑️  Deleted old rule ${ruleName}`);
             } catch (error) {
                 cli.output(`   ⚠️  Failed to delete rule ${ruleName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                failedToDeleteRules.push(ruleName);
             }
         }
 
@@ -244,10 +246,14 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
             }
         }
 
-        // Only store CIDRs that were successfully created as rules.
-        // This ensures the next update() will detect the mismatch and retry failed rules.
-        this.state.created_rules = createdRules;
+        // Include rules that failed to delete in state so they can be cleaned up later.
+        // This prevents orphaned firewall rules that grant unintended network access.
+        this.state.created_rules = [...createdRules, ...failedToDeleteRules];
         this.state.allowed_cidr_blocks = successfulCidrs;
+        
+        if (failedToDeleteRules.length > 0) {
+            cli.output(`   ⚠️  ${failedToDeleteRules.length} old rule(s) failed to delete and are still tracked: ${failedToDeleteRules.join(', ')}`);
+        }
 
         if (createdRules.length < desiredCidrs.length) {
             cli.output(`⚠️  Updated firewall rules: ${createdRules.length}/${desiredCidrs.length} rule(s) active - some failed, will retry on next update`);
