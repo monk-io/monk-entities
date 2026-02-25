@@ -153,6 +153,18 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
             return;
         }
 
+        // Skip creation if create_when_missing is false
+        if (this.definition.create_when_missing === false) {
+            cli.output(`⚠️  Access list for server ${this.definition.server_name} - create_when_missing is false, skipping creation`);
+            this.state = {
+                server_name: this.definition.server_name,
+                created_rules: [],
+                allowed_cidr_blocks: [],
+                existing: false
+            };
+            return;
+        }
+
         cli.output(`🔥 Creating ${allowedCidrs.length} firewall rule(s) for server ${this.definition.server_name}`);
 
         const createdRules: string[] = [];
@@ -296,6 +308,12 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
     }
 
     override checkReadiness(): boolean {
+        // If create_when_missing is false and nothing was created, consider it ready
+        // This check must come first to handle the skip-creation case
+        if (this.definition.create_when_missing === false && this.state.existing === false) {
+            return true;
+        }
+
         const rules = this.state.created_rules || [];
         
         if (rules.length === 0) {
