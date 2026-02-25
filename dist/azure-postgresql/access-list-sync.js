@@ -99,10 +99,11 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
         cli.output(`   \u274C Failed to create rule ${ruleName} for "${cidr}": ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
-    this.state.created_rules = [...createdRules, ...failedToDeleteRules];
+    const orphanedRules = failedToDeleteRules.filter((rule) => !createdRules.includes(rule));
+    this.state.created_rules = [...createdRules, ...orphanedRules];
     this.state.allowed_cidr_blocks = successfulCidrs;
-    if (failedToDeleteRules.length > 0) {
-      cli.output(`   \u26A0\uFE0F  ${failedToDeleteRules.length} old rule(s) failed to delete and are still tracked: ${failedToDeleteRules.join(", ")}`);
+    if (orphanedRules.length > 0) {
+      cli.output(`   \u26A0\uFE0F  ${orphanedRules.length} orphaned rule(s) from previous config still tracked: ${orphanedRules.join(", ")}`);
     }
     if (createdRules.length < desiredCidrs.length) {
       cli.output(`\u26A0\uFE0F  Updated firewall rules: ${createdRules.length}/${desiredCidrs.length} rule(s) active - some failed, will retry on next update`);

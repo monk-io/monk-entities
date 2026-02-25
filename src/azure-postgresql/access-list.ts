@@ -248,11 +248,14 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
 
         // Include rules that failed to delete in state so they can be cleaned up later.
         // This prevents orphaned firewall rules that grant unintended network access.
-        this.state.created_rules = [...createdRules, ...failedToDeleteRules];
+        // Filter out duplicates: if a new rule was created with the same name as a failed-to-delete rule,
+        // the new rule overwrote it in Azure, so we only need to track it once.
+        const orphanedRules = failedToDeleteRules.filter(rule => !createdRules.includes(rule));
+        this.state.created_rules = [...createdRules, ...orphanedRules];
         this.state.allowed_cidr_blocks = successfulCidrs;
         
-        if (failedToDeleteRules.length > 0) {
-            cli.output(`   ⚠️  ${failedToDeleteRules.length} old rule(s) failed to delete and are still tracked: ${failedToDeleteRules.join(', ')}`);
+        if (orphanedRules.length > 0) {
+            cli.output(`   ⚠️  ${orphanedRules.length} orphaned rule(s) from previous config still tracked: ${orphanedRules.join(', ')}`);
         }
 
         if (createdRules.length < desiredCidrs.length) {
