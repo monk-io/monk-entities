@@ -30,6 +30,16 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
       };
       return;
     }
+    if (this.definition.create_when_missing === false) {
+      cli.output(`\u26A0\uFE0F  Access list for server ${this.definition.server_name} - create_when_missing is false, skipping creation`);
+      this.state = {
+        server_name: this.definition.server_name,
+        created_rules: [],
+        allowed_cidr_blocks: [],
+        existing: false
+      };
+      return;
+    }
     cli.output(`\u{1F525} Creating ${allowedCidrs.length} firewall rule(s) for server ${this.definition.server_name}`);
     const createdRules = [];
     const successfulCidrs = [];
@@ -133,6 +143,9 @@ var _AccessList = class _AccessList extends AzurePostgreSQLEntity {
     cli.output(`\u2705 Deleted firewall rules for server ${this.definition.server_name}`);
   }
   checkReadiness() {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      return true;
+    }
     const rules = this.state.created_rules || [];
     if (rules.length === 0) {
       return (this.definition.allowed_cidr_blocks || []).length === 0;

@@ -18,7 +18,7 @@ database:
       ## Composing with Other Entities
       Works with:
       - `azure-postgresql/flexible-server` - Parent server that hosts the database
-    version-hash: 63e629e69596
+    version-hash: a61f1eedff68
   schema:
     subscription_id:
       type: string
