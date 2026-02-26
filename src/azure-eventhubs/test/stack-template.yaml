@@ -1,0 +1,64 @@
+# Azure Event Hubs Test Stack Template
+# This template creates a complete Event Hubs setup for integration testing
+
+namespace: azure-eventhubs-test-stack
+
+# Variables for test configuration
+variables:
+  subscription_id:
+    type: string
+    env: AZURE_SUBSCRIPTION_ID
+  resource_group_name:
+    type: string
+    env: AZURE_RESOURCE_GROUP
+  namespace_name:
+    type: string
+    env: AZURE_EVENTHUBS_NAMESPACE
+    default: "monkec-test-eh"
+  location:
+    type: string
+    default: "East US"
+
+# Event Hubs Namespace
+test-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  location: <- $location
+  sku:
+    name: "Standard"
+    capacity: 1
+  minimum_tls_version: "1.2"
+  tags:
+    Environment: "Test"
+    ManagedBy: "MonkEC"
+    TestSuite: "Integration"
+
+# Test Event Hub
+test-eventhub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  eventhub_name: "integration-test-hub"
+  partition_count: 2
+  message_retention_in_days: 1
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-test-stack/test-namespace
+
+# Test Consumer Group
+test-consumer-group:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  eventhub_name: "integration-test-hub"
+  consumer_group_name: "test-consumer"
+  user_metadata: "Integration test consumer group"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-test-stack/test-eventhub

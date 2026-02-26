@@ -1,0 +1,42 @@
+name: Azure Storage Account Integration Test
+
+timeout: 600000
+
+setup:
+  - { action: load, target: dist/input/azure-storage-account/MANIFEST, expect: { exitCode: 0 } }
+  - { action: load, target: test/stack-template.yaml, expect: { exitCode: 0 } }
+
+tests:
+  # Test storage account creation
+  - { action: run, target: azure-storage-test/storage-account, expect: { exitCode: 0 } }
+  
+  # Wait for storage account to be ready
+  - { action: wait, target: azure-storage-test/storage-account, waitFor: { condition: ready, timeout: 300000 } }
+  
+  # Test get-info action
+  - { action: do, target: azure-storage-test/storage-account/get-info, expect: { exitCode: 0 } }
+  
+  # Test list-containers action (should be empty initially)
+  - { action: do, target: azure-storage-test/storage-account/list-containers, expect: { exitCode: 0 } }
+  
+  # Test blob container creation
+  - { action: run, target: azure-storage-test/blob-container, expect: { exitCode: 0 } }
+  
+  # Wait for blob container to be ready
+  - { action: wait, target: azure-storage-test/blob-container, waitFor: { condition: ready, timeout: 120000 } }
+  
+  # Test blob container get-info action
+  - { action: do, target: azure-storage-test/blob-container/get-info, expect: { exitCode: 0 } }
+  
+  # Test list-containers action again (should show the container)
+  - { action: do, target: azure-storage-test/storage-account/list-containers, expect: { exitCode: 0 } }
+  
+  # Test storage account update (should be idempotent)
+  - { action: run, target: azure-storage-test/storage-account, expect: { exitCode: 0 } }
+
+  # Verify the account is still ready after update
+  - { action: wait, target: azure-storage-test/storage-account, waitFor: { condition: ready, timeout: 120000 } }
+
+cleanup:
+  - { action: delete, target: azure-storage-test/blob-container, expect: { exitCode: 0 } }
+  - { action: delete, target: azure-storage-test/storage-account, expect: { exitCode: 0 } }

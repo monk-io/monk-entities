@@ -1,0 +1,8 @@
+REPO azure-storage-account
+VERSION_HASH 741756ae9033
+DESCRIPTION Azure Storage Account entities for MonkEC
+AUTHOR monk
+VERSION 1.0.0
+TAGS azure,storage,blob,cloud
+LOAD storage-account.yaml blob-container.yaml azure-storage-account-base.yaml
+RESOURCES storage-account-sync.js blob-container-sync.js azure-storage-account-base.js

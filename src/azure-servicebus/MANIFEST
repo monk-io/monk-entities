@@ -1,0 +1,7 @@
+namespace: azure-servicebus
+
+entities:
+  - namespace
+  - queue
+  - topic
+  - subscription

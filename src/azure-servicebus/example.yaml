@@ -1,0 +1,327 @@
+# Azure Service Bus Entity Examples
+# This file demonstrates various configurations for Service Bus entities
+
+namespace: azure-servicebus-example
+
+# =============================================================================
+# Basic Service Bus Namespace (Standard Tier)
+# =============================================================================
+basic-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  location: "East US"
+  sku:
+    name: "Standard"
+  tags:
+    Environment: "Development"
+    ManagedBy: "MonkEC"
+
+# =============================================================================
+# Premium Service Bus Namespace with Zone Redundancy
+# =============================================================================
+premium-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-premium"
+  location: "East US"
+  sku:
+    name: "Premium"
+    capacity: 1
+  zone_redundant: true
+  minimum_tls_version: "1.2"
+  disable_local_auth: false
+  public_network_access: "Enabled"
+  primary_connection_string_secret_ref: "servicebus-primary-connection"
+  secondary_connection_string_secret_ref: "servicebus-secondary-connection"
+  tags:
+    Environment: "Production"
+    ManagedBy: "MonkEC"
+
+# =============================================================================
+# Basic Queue
+# =============================================================================
+basic-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  queue_name: "orders-queue"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P14D"
+  max_delivery_count: 10
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-namespace
+
+# =============================================================================
+# Queue with Dead-Lettering and Sessions
+# =============================================================================
+session-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  queue_name: "session-orders-queue"
+  max_size_in_megabytes: 2048
+  default_message_time_to_live: "P7D"
+  lock_duration: "PT2M"
+  requires_session: true
+  requires_duplicate_detection: true
+  duplicate_detection_history_time_window: "PT10M"
+  dead_lettering_on_message_expiration: true
+  max_delivery_count: 5
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-namespace
+
+# =============================================================================
+# Queue with Message Forwarding
+# =============================================================================
+forwarding-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  queue_name: "incoming-queue"
+  max_size_in_megabytes: 1024
+  forward_to: "orders-queue"
+  forward_dead_lettered_messages_to: "dead-letter-queue"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-queue
+
+# =============================================================================
+# Dead Letter Queue
+# =============================================================================
+dead-letter-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  queue_name: "dead-letter-queue"
+  max_size_in_megabytes: 5120
+  default_message_time_to_live: "P30D"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-namespace
+
+# =============================================================================
+# Basic Topic
+# =============================================================================
+basic-topic:
+  defines: azure-servicebus/topic
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "events-topic"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P14D"
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-namespace
+
+# =============================================================================
+# Topic with Partitioning and Duplicate Detection
+# =============================================================================
+partitioned-topic:
+  defines: azure-servicebus/topic
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "high-throughput-topic"
+  max_size_in_megabytes: 5120
+  default_message_time_to_live: "P7D"
+  enable_partitioning: true
+  requires_duplicate_detection: true
+  duplicate_detection_history_time_window: "PT10M"
+  support_ordering: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-namespace
+
+# =============================================================================
+# Basic Subscription (receives all messages)
+# =============================================================================
+all-events-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "events-topic"
+  subscription_name: "all-events"
+  max_delivery_count: 10
+  default_message_time_to_live: "P14D"
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-topic
+
+# =============================================================================
+# Filtered Subscription (SQL filter)
+# =============================================================================
+high-priority-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "events-topic"
+  subscription_name: "high-priority"
+  max_delivery_count: 5
+  default_message_time_to_live: "P7D"
+  dead_lettering_on_message_expiration: true
+  dead_lettering_on_filter_evaluation_exceptions: true
+  default_rule_filter: "priority = 'high' OR priority = 'critical'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-topic
+
+# =============================================================================
+# Session-enabled Subscription
+# =============================================================================
+ordered-events-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "events-topic"
+  subscription_name: "ordered-events"
+  requires_session: true
+  lock_duration: "PT2M"
+  max_delivery_count: 10
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-topic
+
+# =============================================================================
+# Subscription with Forwarding
+# =============================================================================
+forwarding-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myservicebus-basic"
+  topic_name: "events-topic"
+  subscription_name: "forward-to-queue"
+  forward_to: "orders-queue"
+  forward_dead_lettered_messages_to: "dead-letter-queue"
+  default_rule_filter: "type = 'order'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/basic-topic
+          - azure-servicebus-example/basic-queue
+          - azure-servicebus-example/dead-letter-queue
+
+# =============================================================================
+# Complete Messaging Solution Example
+# =============================================================================
+# This demonstrates a complete pub/sub architecture:
+# 1. A namespace for all resources
+# 2. A topic for publishing events
+# 3. Multiple subscriptions for different consumers
+# 4. A dead-letter queue for failed messages
+
+messaging-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  location: "East US"
+  sku:
+    name: "Standard"
+  minimum_tls_version: "1.2"
+  tags:
+    Application: "MessagingSolution"
+    Environment: "Production"
+
+messaging-dlq:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  queue_name: "messaging-dlq"
+  max_size_in_megabytes: 5120
+  default_message_time_to_live: "P30D"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/messaging-namespace
+
+messaging-topic:
+  defines: azure-servicebus/topic
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  topic_name: "business-events"
+  max_size_in_megabytes: 5120
+  default_message_time_to_live: "P7D"
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/messaging-namespace
+
+# Subscription for order processing service
+orders-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  topic_name: "business-events"
+  subscription_name: "orders-processor"
+  max_delivery_count: 5
+  dead_lettering_on_message_expiration: true
+  forward_dead_lettered_messages_to: "messaging-dlq"
+  default_rule_filter: "eventType = 'OrderCreated' OR eventType = 'OrderUpdated'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/messaging-topic
+          - azure-servicebus-example/messaging-dlq
+
+# Subscription for notification service
+notifications-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  topic_name: "business-events"
+  subscription_name: "notifications"
+  max_delivery_count: 3
+  dead_lettering_on_message_expiration: true
+  forward_dead_lettered_messages_to: "messaging-dlq"
+  default_rule_filter: "requiresNotification = true"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/messaging-topic
+          - azure-servicebus-example/messaging-dlq
+
+# Subscription for analytics service (receives all events)
+analytics-subscription:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "messaging-solution"
+  topic_name: "business-events"
+  subscription_name: "analytics"
+  max_delivery_count: 10
+  auto_delete_on_idle: "P7D"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-example/messaging-topic

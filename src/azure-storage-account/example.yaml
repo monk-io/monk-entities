@@ -1,0 +1,287 @@
+namespace: azure-storage-example
+
+# Example 1: Basic Storage Account with Standard LRS
+basic-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  account_name: "mybasicstorage123"
+  location: "East US"
+  sku:
+    name: "Standard_LRS"
+  account_kind: "StorageV2"
+  access_tier: "Hot"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  allow_blob_public_access: false
+  tags:
+    Environment: "Development"
+    Project: "MyApp"
+    Owner: "DevTeam"
+
+# Example 2: Production Storage Account with Geo-Redundancy
+production-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "production-rg" # Replace with your resource group
+  account_name: "prodstorageha123"
+  location: "East US"
+  sku:
+    name: "Standard_GRS"
+  account_kind: "StorageV2"
+  access_tier: "Hot"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  allow_blob_public_access: false
+  allow_shared_key_access: true
+  tags:
+    Environment: "Production"
+    HighAvailability: "true"
+    CostCenter: "Engineering"
+
+# Example 3: Premium Block Blob Storage for high-performance workloads
+premium-blob-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "premium-rg" # Replace with your resource group
+  account_name: "premiumblobstorage"
+  location: "West US 2"
+  sku:
+    name: "Premium_LRS"
+  account_kind: "BlockBlobStorage"
+  access_tier: "Premium"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  tags:
+    Environment: "Production"
+    Tier: "Premium"
+    UseCase: "HighPerformance"
+
+# Example 4: Data Lake Storage Gen2 (Hierarchical Namespace)
+datalake-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "analytics-rg" # Replace with your resource group
+  account_name: "mydatalakestorage"
+  location: "Central US"
+  sku:
+    name: "Standard_LRS"
+  account_kind: "StorageV2"
+  access_tier: "Hot"
+  enable_hns: true
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  tags:
+    Environment: "Analytics"
+    Purpose: "DataLake"
+    Team: "DataEngineering"
+
+# Example 5: Storage Account with Network Rules (Firewall)
+secure-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "secure-rg" # Replace with your resource group
+  account_name: "securestorage123"
+  location: "East US"
+  sku:
+    name: "Standard_ZRS"
+  account_kind: "StorageV2"
+  access_tier: "Hot"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  allow_blob_public_access: false
+  network_rule_set:
+    default_action: "Deny"
+    bypass: "AzureServices"
+    ip_rules:
+      - value: "203.0.113.0/24"
+        action: "Allow"
+      - value: "198.51.100.10"
+        action: "Allow"
+  tags:
+    Environment: "Production"
+    Security: "Restricted"
+    Compliance: "SOC2"
+
+# Example 6: Storage Account with Secret Population
+storage-with-secrets:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "app-rg" # Replace with your resource group
+  account_name: "appstorage123"
+  location: "East US"
+  sku:
+    name: "Standard_LRS"
+  account_kind: "StorageV2"
+  access_tier: "Hot"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  # Secret references - keys and connection string will be automatically populated
+  primary_key_secret_ref: "storage-primary-key"
+  secondary_key_secret_ref: "storage-secondary-key"
+  connection_string_secret_ref: "storage-connection-string"
+  tags:
+    Environment: "Production"
+    Security: "SecretManaged"
+  permitted-secrets:
+    storage-primary-key: true
+    storage-secondary-key: true
+    storage-connection-string: true
+
+# Example 7: Basic Blob Container
+app-data-container:
+  defines: azure-storage-account/blob-container
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  storage_account_name: "mybasicstorage123"
+  container_name: "app-data"
+  public_access: "None"
+  metadata:
+    purpose: "application-data"
+    team: "backend"
+
+# Example 8: Public Blob Container for Static Assets
+static-assets-container:
+  defines: azure-storage-account/blob-container
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "my-resource-group" # Replace with your resource group
+  storage_account_name: "mybasicstorage123"
+  container_name: "static-assets"
+  public_access: "Blob"
+  metadata:
+    purpose: "static-website-assets"
+    cdn-enabled: "true"
+
+# Example 9: Immutable Storage Container for Compliance
+compliance-container:
+  defines: azure-storage-account/blob-container
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "secure-rg" # Replace with your resource group
+  storage_account_name: "securestorage123"
+  container_name: "audit-logs"
+  public_access: "None"
+  enable_immutable_storage_with_versioning: true
+  metadata:
+    purpose: "audit-logs"
+    retention: "7-years"
+    compliance: "SOC2"
+
+# Example 10: Application using Storage Account
+web-app:
+  defines: runnable
+  containers:
+    api:
+      image: node:18-alpine
+      bash: |
+        echo "🚀 Starting Web Application..."
+        echo "Storage Account: $STORAGE_ACCOUNT"
+        echo "Blob Endpoint: $BLOB_ENDPOINT"
+        echo "Container: $CONTAINER_NAME"
+        # Simulate application
+        echo "Application ready"
+        sleep 3600
+      ports:
+        - 3000:3000
+  depends:
+    wait-for:
+      runnables:
+        - azure-storage-example/basic-storage
+        - azure-storage-example/app-data-container
+  connections:
+    storage:
+      runnable: azure-storage-example/basic-storage
+      service: data
+    container:
+      runnable: azure-storage-example/app-data-container
+      service: data
+  variables:
+    STORAGE_ACCOUNT:
+      type: string
+      env: STORAGE_ACCOUNT
+      value: <- connection-target("storage") entity-state get-member("account_name")
+    BLOB_ENDPOINT:
+      type: string
+      env: BLOB_ENDPOINT
+      value: <- connection-target("storage") entity-state get-member("primary_blob_endpoint")
+    CONTAINER_NAME:
+      type: string
+      env: CONTAINER_NAME
+      value: <- connection-target("container") entity-state get-member("container_name")
+
+# Example 11: Analytics Service using Data Lake Storage
+analytics-service:
+  defines: runnable
+  containers:
+    analytics:
+      image: python:3.11-slim
+      bash: |
+        echo "📊 Starting Analytics Service..."
+        echo "Data Lake Endpoint: $DATALAKE_ENDPOINT"
+        echo "Processing data..."
+        python3 -c "
+        import time
+        print('Analytics service running...')
+        while True:
+            print('Processing batch...')
+            time.sleep(30)
+        "
+  depends:
+    wait-for:
+      runnables:
+        - azure-storage-example/datalake-storage
+  connections:
+    datalake:
+      runnable: azure-storage-example/datalake-storage
+      service: data
+  variables:
+    DATALAKE_ENDPOINT:
+      type: string
+      env: DATALAKE_ENDPOINT
+      value: <- connection-target("datalake") entity-state get-member("primary_dfs_endpoint")
+
+# Example 12: Complete Application Stack
+app-stack:
+  defines: group
+  members:
+    # Infrastructure
+    - azure-storage-example/basic-storage
+    - azure-storage-example/app-data-container
+    - azure-storage-example/static-assets-container
+    # Application
+    - azure-storage-example/web-app
+
+# Example 13: Cool Storage for Archival
+archive-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "archive-rg" # Replace with your resource group
+  account_name: "archivestorage123"
+  location: "East US"
+  sku:
+    name: "Standard_LRS"
+  account_kind: "BlobStorage"
+  access_tier: "Cool"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  allow_blob_public_access: false
+  tags:
+    Environment: "Archive"
+    Purpose: "LongTermStorage"
+    CostOptimized: "true"
+
+# Example 14: File Storage for SMB Shares
+file-storage:
+  defines: azure-storage-account/storage-account
+  subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
+  resource_group_name: "files-rg" # Replace with your resource group
+  account_name: "filestorage123"
+  location: "West Europe"
+  sku:
+    name: "Premium_LRS"
+  account_kind: "FileStorage"
+  https_only: true
+  minimum_tls_version: "TLS1_2"
+  tags:
+    Environment: "Production"
+    Purpose: "FileShares"
+    Protocol: "SMB"

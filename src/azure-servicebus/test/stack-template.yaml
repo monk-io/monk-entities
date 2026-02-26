@@ -1,0 +1,96 @@
+# Azure Service Bus Test Stack Template
+# This template creates a complete Service Bus setup for integration testing
+
+namespace: azure-servicebus-test-stack
+
+# Variables for test configuration
+variables:
+  subscription_id:
+    type: string
+    env: AZURE_SUBSCRIPTION_ID
+  resource_group_name:
+    type: string
+    env: AZURE_RESOURCE_GROUP
+  namespace_name:
+    type: string
+    env: AZURE_SERVICEBUS_NAMESPACE
+    default: "monkec-test-sb"
+  location:
+    type: string
+    default: "East US"
+
+# Service Bus Namespace
+test-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  location: <- $location
+  sku:
+    name: "Standard"
+  minimum_tls_version: "1.2"
+  tags:
+    Environment: "Test"
+    ManagedBy: "MonkEC"
+    TestSuite: "Integration"
+
+# Test Queue
+test-queue:
+  defines: azure-servicebus/queue
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  queue_name: "integration-test-queue"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P1D"
+  max_delivery_count: 5
+  dead_lettering_on_message_expiration: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-test-stack/test-namespace
+
+# Test Topic
+test-topic:
+  defines: azure-servicebus/topic
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  topic_name: "integration-test-topic"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P1D"
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-test-stack/test-namespace
+
+# Test Subscription (all messages)
+test-subscription-all:
+  defines: azure-servicebus/subscription
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  topic_name: "integration-test-topic"
+  subscription_name: "all-messages"
+  max_delivery_count: 5
+  dead_lettering_on_message_expiration: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-test-stack/test-topic
+
+# Test Subscription (filtered)
+test-subscription-filtered:
+  defines: azure-servicebus/subscription
+  subscription_id: <- $subscription_id
+  resource_group_name: <- $resource_group_name
+  namespace_name: <- $namespace_name
+  topic_name: "integration-test-topic"
+  subscription_name: "filtered-messages"
+  max_delivery_count: 3
+  default_rule_filter: "type = 'test'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-test-stack/test-topic
