@@ -1,0 +1,245 @@
+# Azure Event Hubs Entity Examples
+# This file demonstrates various configurations for Event Hubs entities
+
+namespace: azure-eventhubs-example
+
+# =============================================================================
+# Basic Event Hubs Namespace (Standard Tier)
+# =============================================================================
+basic-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  location: "East US"
+  sku:
+    name: "Standard"
+    capacity: 1
+  tags:
+    Environment: "Development"
+    ManagedBy: "MonkEC"
+
+# =============================================================================
+# Standard Namespace with Auto-Inflate
+# =============================================================================
+autoinflate-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-autoinflate"
+  location: "East US"
+  sku:
+    name: "Standard"
+    capacity: 1
+  is_auto_inflate_enabled: true
+  maximum_throughput_units: 10
+  kafka_enabled: true
+  minimum_tls_version: "1.2"
+  tags:
+    Environment: "Production"
+    ManagedBy: "MonkEC"
+
+# =============================================================================
+# Premium Namespace with Zone Redundancy
+# =============================================================================
+premium-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-premium"
+  location: "East US"
+  sku:
+    name: "Premium"
+    capacity: 1
+  zone_redundant: true
+  minimum_tls_version: "1.2"
+  disable_local_auth: false
+  public_network_access: "Enabled"
+  primary_connection_string_secret_ref: "eventhubs-primary-connection"
+  secondary_connection_string_secret_ref: "eventhubs-secondary-connection"
+  tags:
+    Environment: "Production"
+    ManagedBy: "MonkEC"
+
+# =============================================================================
+# Basic Event Hub
+# =============================================================================
+basic-eventhub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  eventhub_name: "events"
+  partition_count: 4
+  message_retention_in_days: 1
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/basic-namespace
+
+# =============================================================================
+# Event Hub with Extended Retention
+# =============================================================================
+extended-retention-eventhub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  eventhub_name: "audit-events"
+  partition_count: 8
+  message_retention_in_days: 7
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/basic-namespace
+
+# =============================================================================
+# Event Hub with Capture to Blob Storage
+# =============================================================================
+capture-eventhub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  eventhub_name: "captured-events"
+  partition_count: 4
+  message_retention_in_days: 1
+  capture:
+    enabled: true
+    encoding: "Avro"
+    interval_in_seconds: 300
+    size_limit_in_bytes: 314572800
+    skip_empty_archives: true
+    destination_storage_account_resource_id: "/subscriptions/your-subscription-id/resourceGroups/your-resource-group/providers/Microsoft.Storage/storageAccounts/yourstorageaccount"
+    destination_blob_container: "eventhubs-capture"
+    destination_archive_name_format: "{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/basic-namespace
+
+# =============================================================================
+# Basic Consumer Group
+# =============================================================================
+basic-consumer-group:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  eventhub_name: "events"
+  consumer_group_name: "processor"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/basic-eventhub
+
+# =============================================================================
+# Consumer Group with Metadata
+# =============================================================================
+metadata-consumer-group:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "myeventhubs-basic"
+  eventhub_name: "events"
+  consumer_group_name: "analytics"
+  user_metadata: "Consumer group for analytics processing pipeline"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/basic-eventhub
+
+# =============================================================================
+# Complete Event Streaming Solution Example
+# =============================================================================
+# This demonstrates a complete event streaming architecture:
+# 1. A namespace for all resources
+# 2. Multiple event hubs for different event types
+# 3. Consumer groups for different processing pipelines
+
+streaming-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  location: "East US"
+  sku:
+    name: "Standard"
+    capacity: 2
+  is_auto_inflate_enabled: true
+  maximum_throughput_units: 20
+  kafka_enabled: true
+  minimum_tls_version: "1.2"
+  tags:
+    Application: "StreamingSolution"
+    Environment: "Production"
+
+# Event hub for user activity events
+user-activity-hub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  eventhub_name: "user-activity"
+  partition_count: 8
+  message_retention_in_days: 3
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/streaming-namespace
+
+# Event hub for system metrics
+metrics-hub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  eventhub_name: "system-metrics"
+  partition_count: 4
+  message_retention_in_days: 1
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/streaming-namespace
+
+# Consumer group for real-time dashboard
+dashboard-consumer:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  eventhub_name: "user-activity"
+  consumer_group_name: "dashboard"
+  user_metadata: "Real-time dashboard consumer"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/user-activity-hub
+
+# Consumer group for batch analytics
+analytics-consumer:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  eventhub_name: "user-activity"
+  consumer_group_name: "batch-analytics"
+  user_metadata: "Batch analytics processing consumer"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/user-activity-hub
+
+# Consumer group for metrics alerting
+alerting-consumer:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "streaming-solution"
+  eventhub_name: "system-metrics"
+  consumer_group_name: "alerting"
+  user_metadata: "Alerting system consumer"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-example/metrics-hub

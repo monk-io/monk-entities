@@ -1,0 +1,53 @@
+namespace: azure-storage-test
+
+# Test Storage Account
+storage-account:
+  defines: azure-storage-account/storage-account
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  account_name: monkteststorage${RANDOM_SUFFIX}
+  location: East US
+  sku:
+    name: Standard_LRS
+  account_kind: StorageV2
+  access_tier: Hot
+  https_only: true
+  minimum_tls_version: TLS1_2
+  allow_blob_public_access: false
+  tags:
+    Environment: Test
+    ManagedBy: MonkEC
+
+# Test Blob Container
+blob-container:
+  defines: azure-storage-account/blob-container
+  subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
+  storage_account_name: monkteststorage${RANDOM_SUFFIX}
+  container_name: test-container
+  public_access: None
+  metadata:
+    purpose: integration-test
+    managed-by: monkec
+  depends:
+    wait-for:
+      runnables:
+        - azure-storage-test/storage-account
+      timeout: 300
+  connections:
+    storage:
+      runnable: azure-storage-test/storage-account
+      service: data
+
+# Data service provider for connections
+data-provider:
+  defines: runnable
+  containers:
+    provider:
+      image: alpine:latest
+      bash: |
+        echo "Data provider ready"
+        sleep 3600
+  services:
+    data:
+      protocol: custom

@@ -1,0 +1,74 @@
+# Azure Event Hubs Integration Tests
+# Tests the complete lifecycle of Event Hubs entities
+
+namespace: azure-eventhubs-integration-tests
+
+tests:
+  - name: "Namespace should be created and become ready"
+    target: azure-eventhubs-test-stack/test-namespace
+    assertions:
+      - type: state
+        path: provisioning_state
+        equals: "Succeeded"
+      - type: state
+        path: namespace_name
+        not_empty: true
+      - type: readiness
+        ready: true
+
+  - name: "Event Hub should be created and become active"
+    target: azure-eventhubs-test-stack/test-eventhub
+    assertions:
+      - type: state
+        path: status
+        equals: "Active"
+      - type: state
+        path: eventhub_name
+        equals: "integration-test-hub"
+      - type: state
+        path: partition_count
+        equals: 2
+      - type: readiness
+        ready: true
+
+  - name: "Consumer Group should be created"
+    target: azure-eventhubs-test-stack/test-consumer-group
+    assertions:
+      - type: state
+        path: consumer_group_name
+        equals: "test-consumer"
+      - type: state
+        path: provisioning_state
+        equals: "Succeeded"
+      - type: readiness
+        ready: true
+
+  - name: "Namespace get-info action should work"
+    target: azure-eventhubs-test-stack/test-namespace
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Namespace list-eventhubs action should work"
+    target: azure-eventhubs-test-stack/test-namespace
+    action: list-eventhubs
+    assertions:
+      - type: success
+
+  - name: "Event Hub get-info action should work"
+    target: azure-eventhubs-test-stack/test-eventhub
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Event Hub list-consumer-groups action should work"
+    target: azure-eventhubs-test-stack/test-eventhub
+    action: list-consumer-groups
+    assertions:
+      - type: success
+
+  - name: "Consumer Group get-info action should work"
+    target: azure-eventhubs-test-stack/test-consumer-group
+    action: get-info
+    assertions:
+      - type: success

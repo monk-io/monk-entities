@@ -1,0 +1,8 @@
+namespace: azure-storage-account
+
+azure-storage-account-base:
+  defines: module
+  metadata:
+    version: 1.0.0
+    version-hash: 741756ae9033
+  source: <<< azure-storage-account-base.js

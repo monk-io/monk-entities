@@ -1,0 +1,5 @@
+REPO azure-storage-account
+DESCRIPTION Azure Storage Account entities for MonkEC
+AUTHOR monk
+VERSION 1.0.0
+TAGS azure,storage,blob,cloud

@@ -1,0 +1,122 @@
+namespace: azure-storage-account
+blob-container:
+  defines: entity
+  metadata:
+    name: BlobContainer
+    description: |-
+      Azure Blob Container entity.
+      Creates and manages Azure Blob Storage containers within a storage account.
+      Supports public access configuration, encryption scopes, and immutable storage.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.container_name` - Blob container name
+      - `state.storage_account_name` - Parent storage account name
+      - `state.public_access` - Current public access level
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-storage-account/storage-account` - Parent storage account
+    version: 1.0.0
+    version-hash: 741756ae9033
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    storage_account_name:
+      type: string
+      description: Name of the parent storage account
+    container_name:
+      type: string
+      minLength: 3
+      maxLength: 63
+      pattern: '^[a-z0-9](-?[a-z0-9])*$'
+      description: 'Blob container name (3-63 chars, lowercase letters, numbers, and hyphens)'
+    public_access:
+      type: string
+      enum:
+        - None
+        - Blob
+        - Container
+      description: |-
+        Public access level for the container
+        - None: No public access (default)
+        - Blob: Public read access for blobs only
+        - Container: Public read access for container and blobs
+      default: None
+    default_encryption_scope:
+      type: string
+      description: Default encryption scope for the container
+    deny_encryption_scope_override:
+      type: boolean
+      description: Deny encryption scope override (requires default_encryption_scope to be set)
+    enable_immutable_storage_with_versioning:
+      type: boolean
+      description: Enable immutable storage with versioning
+    metadata:
+      type: object
+      additionalProperties:
+        type: string
+        description: Container metadata as key-value pairs
+      description: Container metadata as key-value pairs
+    required:
+      - subscription_id
+      - resource_group_name
+      - storage_account_name
+      - container_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    container_name:
+      type: string
+      description: Container name (primary identifier)
+    storage_account_name:
+      type: string
+      description: Parent storage account name
+    etag:
+      type: string
+      description: Container ETag
+    last_modified:
+      type: string
+      description: Last modified time
+    lease_state:
+      type: string
+      description: Lease state of the container
+    public_access:
+      type: string
+      description: Public access level
+    has_immutability_policy:
+      type: boolean
+      description: Whether the container has immutability policy
+    has_legal_hold:
+      type: boolean
+      description: Whether the container has legal hold
+  lifecycle:
+    sync: <<< blob-container-sync.js
+    get-info: ''
+    set-legal-hold: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - azure-storage-account/azure-storage-account-base
+    - cli
+    - monkec/base

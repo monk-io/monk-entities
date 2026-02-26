@@ -1,0 +1,7 @@
+namespace: azure-servicebus
+
+azure-servicebus-base:
+  defines: module
+  metadata:
+    version-hash: d1a44b5c91f9
+  source: <<< azure-servicebus-base.js

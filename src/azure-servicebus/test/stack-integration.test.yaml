@@ -1,0 +1,150 @@
+# Azure Service Bus Integration Tests
+# Tests the complete lifecycle of Service Bus entities
+
+namespace: azure-servicebus-integration-tests
+
+tests:
+  # Test 1: Namespace Creation and Readiness
+  - name: "Namespace should be created and ready"
+    target: azure-servicebus-test-stack/test-namespace
+    assertions:
+      - type: ready
+        timeout: 300
+      - type: state
+        path: provisioning_state
+        equals: "Succeeded"
+      - type: state
+        path: namespace_name
+        not_empty: true
+
+  # Test 2: Queue Creation and Readiness
+  - name: "Queue should be created and ready"
+    target: azure-servicebus-test-stack/test-queue
+    assertions:
+      - type: ready
+        timeout: 120
+      - type: state
+        path: queue_name
+        equals: "integration-test-queue"
+      - type: state
+        path: status
+        equals: "Active"
+
+  # Test 3: Topic Creation and Readiness
+  - name: "Topic should be created and ready"
+    target: azure-servicebus-test-stack/test-topic
+    assertions:
+      - type: ready
+        timeout: 120
+      - type: state
+        path: topic_name
+        equals: "integration-test-topic"
+      - type: state
+        path: status
+        equals: "Active"
+
+  # Test 4: Subscription Creation and Readiness
+  - name: "Subscription (all) should be created and ready"
+    target: azure-servicebus-test-stack/test-subscription-all
+    assertions:
+      - type: ready
+        timeout: 120
+      - type: state
+        path: subscription_name
+        equals: "all-messages"
+      - type: state
+        path: status
+        equals: "Active"
+
+  # Test 5: Filtered Subscription Creation
+  - name: "Filtered subscription should be created and ready"
+    target: azure-servicebus-test-stack/test-subscription-filtered
+    assertions:
+      - type: ready
+        timeout: 120
+      - type: state
+        path: subscription_name
+        equals: "filtered-messages"
+
+  # Test 6: Namespace Actions
+  - name: "Namespace get-info action should work"
+    target: azure-servicebus-test-stack/test-namespace
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Namespace list-queues action should work"
+    target: azure-servicebus-test-stack/test-namespace
+    action: list-queues
+    assertions:
+      - type: success
+
+  - name: "Namespace list-topics action should work"
+    target: azure-servicebus-test-stack/test-namespace
+    action: list-topics
+    assertions:
+      - type: success
+
+  # Test 7: Queue Actions
+  - name: "Queue get-info action should work"
+    target: azure-servicebus-test-stack/test-queue
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Queue get-runtime-info action should work"
+    target: azure-servicebus-test-stack/test-queue
+    action: get-runtime-info
+    assertions:
+      - type: success
+
+  # Test 8: Topic Actions
+  - name: "Topic get-info action should work"
+    target: azure-servicebus-test-stack/test-topic
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Topic list-subscriptions action should work"
+    target: azure-servicebus-test-stack/test-topic
+    action: list-subscriptions
+    assertions:
+      - type: success
+
+  # Test 9: Subscription Actions
+  - name: "Subscription get-info action should work"
+    target: azure-servicebus-test-stack/test-subscription-all
+    action: get-info
+    assertions:
+      - type: success
+
+  - name: "Subscription list-rules action should work"
+    target: azure-servicebus-test-stack/test-subscription-filtered
+    action: list-rules
+    assertions:
+      - type: success
+
+  # Test 10: Update Operations
+  - name: "Queue should be updatable"
+    target: azure-servicebus-test-stack/test-queue
+    update:
+      max_delivery_count: 8
+    assertions:
+      - type: ready
+        timeout: 60
+
+  - name: "Topic should be updatable"
+    target: azure-servicebus-test-stack/test-topic
+    update:
+      enable_batched_operations: false
+    assertions:
+      - type: ready
+        timeout: 60
+
+cleanup:
+  # Delete in reverse order of dependencies
+  - azure-servicebus-test-stack/test-subscription-filtered
+  - azure-servicebus-test-stack/test-subscription-all
+  - azure-servicebus-test-stack/test-topic
+  - azure-servicebus-test-stack/test-queue
+  - azure-servicebus-test-stack/test-namespace

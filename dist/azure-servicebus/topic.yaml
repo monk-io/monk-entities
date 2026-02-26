@@ -1,0 +1,127 @@
+namespace: azure-servicebus
+topic:
+  defines: entity
+  metadata:
+    name: Topic
+    description: |-
+      Azure Service Bus Topic entity.
+      Creates and manages topics within a Service Bus namespace for publish-subscribe messaging.
+      Topics allow multiple subscribers to receive copies of messages.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.topic_name` - Topic name
+      - `state.namespace_name` - Parent namespace name
+      - `state.subscription_count` - Number of subscriptions
+
+      ## Composing with Other Entities
+      Depends on:
+      - `azure-servicebus/namespace` - Parent namespace must exist
+      Works with:
+      - `azure-servicebus/subscription` - Create subscriptions to receive messages
+    version-hash: d1a44b5c91f9
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      description: Service Bus namespace name
+    topic_name:
+      type: string
+      minLength: 1
+      maxLength: 260
+      description: 'Topic name (1-260 chars, alphanumeric, hyphens, underscores, periods)'
+    max_size_in_megabytes:
+      type: number
+      description: 'Maximum topic size in megabytes (1024, 2048, 3072, 4096, 5120, 10240, 20480, 40960, 81920)'
+      default: 1024
+    default_message_time_to_live:
+      type: string
+      description: 'Default message time to live (ISO 8601 duration, e.g., PT1H, P14D)'
+      default: P14D
+    requires_duplicate_detection:
+      type: boolean
+      description: Enable duplicate detection
+    duplicate_detection_history_time_window:
+      type: string
+      description: Duplicate detection history time window (ISO 8601 duration)
+    enable_partitioning:
+      type: boolean
+      description: Enable partitioning for high throughput
+    enable_express:
+      type: boolean
+      description: 'Enable express entities (in-memory, not persisted)'
+    auto_delete_on_idle:
+      type: string
+      description: 'Auto-delete idle duration (ISO 8601 duration, min P5M)'
+    enable_batched_operations:
+      type: boolean
+      description: Enable batched operations
+      default: true
+    support_ordering:
+      type: boolean
+      description: Support ordering of messages
+    max_subscriptions_per_topic:
+      type: number
+      description: Maximum subscriptions per topic (default 2000)
+    max_message_size_in_kilobytes:
+      type: number
+      description: 'Maximum message size in kilobytes (Premium tier: up to 100MB)'
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - topic_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    topic_name:
+      type: string
+      description: Topic name (primary identifier)
+    namespace_name:
+      type: string
+      description: Namespace name
+    status:
+      type: string
+      description: Topic status
+    subscription_count:
+      type: number
+      description: Number of subscriptions
+    size_in_bytes:
+      type: number
+      description: Topic size in bytes
+    created_at:
+      type: string
+      description: Topic creation time
+    updated_at:
+      type: string
+      description: Topic last updated time
+  lifecycle:
+    sync: <<< topic-sync.js
+    get-info: ''
+    list-subscriptions: ''
+    get-runtime-info: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-servicebus/azure-servicebus-base
+    - cli
+    - monkec/base

@@ -1,0 +1,89 @@
+namespace: azure-eventhubs
+consumer-group:
+  defines: entity
+  metadata:
+    name: ConsumerGroup
+    description: |-
+      Azure Event Hubs Consumer Group entity.
+      Creates and manages consumer groups within an Event Hub.
+      Consumer groups enable multiple consuming applications to read the event stream independently.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.consumer_group_name` - Consumer group name
+      - `state.eventhub_name` - Parent event hub name
+      - `state.namespace_name` - Parent namespace name
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-eventhubs/eventhubs-namespace` - Parent namespace
+      - `azure-eventhubs/eventhub` - Parent event hub
+    version-hash: ad31b513b19e
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      description: Event Hubs namespace name
+    eventhub_name:
+      type: string
+      description: Event Hub name
+    consumer_group_name:
+      type: string
+      minLength: 1
+      maxLength: 50
+      description: Consumer group name (1-50 chars)
+    user_metadata:
+      type: string
+      description: User metadata for the consumer group
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - eventhub_name
+      - consumer_group_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    consumer_group_name:
+      type: string
+      description: The consumer group name
+    eventhub_name:
+      type: string
+      description: The event hub name
+    namespace_name:
+      type: string
+      description: The namespace name
+    created_at:
+      type: string
+      description: Creation timestamp
+    updated_at:
+      type: string
+      description: Last update timestamp
+  lifecycle:
+    sync: <<< consumer-group-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-eventhubs/azure-eventhubs-base
+    - cli
+    - monkec/base
