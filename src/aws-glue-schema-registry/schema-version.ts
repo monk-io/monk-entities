@@ -199,7 +199,7 @@ export class SchemaVersion extends AWSGlueSchemaRegistryEntity<SchemaVersionDefi
             // Remove metadata keys that are no longer present
             for (const key of Object.keys(currentMetadata)) {
                 if (!(key in newMetadata)) {
-                    this.removeMetadataKey(key);
+                    this.removeMetadataKey(key, currentMetadata);
                 }
             }
 
@@ -304,10 +304,17 @@ export class SchemaVersion extends AWSGlueSchemaRegistryEntity<SchemaVersionDefi
 
     /**
      * Remove a metadata key from this version
+     * Note: AWS API requires the actual stored value to match for deletion
      */
-    private removeMetadataKey(key: string): void {
+    private removeMetadataKey(key: string, currentMetadata: Record<string, string>): void {
         if (!this.state.schema_version_id) {
             return;
+        }
+
+        // AWS API requires the actual value to match for removal
+        const currentValue = currentMetadata[key];
+        if (currentValue === undefined) {
+            return; // Key doesn't exist, nothing to remove
         }
 
         try {
@@ -315,7 +322,7 @@ export class SchemaVersion extends AWSGlueSchemaRegistryEntity<SchemaVersionDefi
                 SchemaVersionId: this.state.schema_version_id,
                 MetadataKeyValue: {
                     MetadataKey: key,
-                    MetadataValue: '' // Value is required but ignored for removal
+                    MetadataValue: currentValue // Must match the actual stored value
                 }
             });
         } catch (error) {

@@ -78,7 +78,7 @@ neptune-access-list:
       - Via VPC peering
 
       ---
-    version-hash: 75312a2900cc
+    version-hash: ff653fe1a1db
   schema:
     region:
       type: string

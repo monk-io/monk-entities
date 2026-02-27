@@ -69,24 +69,37 @@ function validateInstanceIdentifier(identifier) {
 }
 var NEPTUNE_DEFAULT_PORT = 8182;
 var NEPTUNE_ENGINE = "neptune";
+function normalizeToCidr(ipOrCidr) {
+  if (ipOrCidr.includes("/")) {
+    return ipOrCidr;
+  }
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipPattern.test(ipOrCidr)) {
+    return `${ipOrCidr}/32`;
+  }
+  return ipOrCidr;
+}
+function normalizeCidrArray(ipAddresses) {
+  return ipAddresses.map((ip) => normalizeToCidr(ip.trim()));
+}
 function addParamsToFormData(formParams, params, prefix = "") {
   for (const [key, value] of Object.entries(params)) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
+    const paramKey = prefix ? `${prefix}.${key}` : key;
     if (value === null || value === void 0) {
       continue;
     }
     if (Array.isArray(value)) {
       value.forEach((item, index) => {
-        if (typeof item === "object" && item !== null) {
-          addParamsToFormData(formParams, item, `${fullKey}.${index + 1}`);
+        if (typeof item === "object") {
+          addParamsToFormData(formParams, item, `${paramKey}.member.${index + 1}`);
         } else {
-          formParams[`${fullKey}.${index + 1}`] = String(item);
+          formParams[`${paramKey}.member.${index + 1}`] = String(item);
         }
       });
     } else if (typeof value === "object") {
-      addParamsToFormData(formParams, value, fullKey);
+      addParamsToFormData(formParams, value, paramKey);
     } else {
-      formParams[fullKey] = String(value);
+      formParams[paramKey] = String(value);
     }
   }
 }
@@ -107,13 +120,13 @@ function makeEC2Request(region, action, params = {}) {
     body: formBody
   });
   if (response.statusCode >= 400) {
-    let errorMessage = `EC2 API error: ${response.statusCode} ${response.status}`;
+    let errorMessage = `AWS EC2 API error: ${response.statusCode} ${response.status}`;
     try {
-      const msgMatch = /<Message>(.*?)<\/Message>/.exec(response.body);
-      if (msgMatch) {
-        errorMessage += ` - ${msgMatch[1]}`;
+      const errorMatch = /<message>(.*?)<\/message>/i.exec(response.body);
+      if (errorMatch) {
+        errorMessage += ` - ${errorMatch[1]}`;
       }
-      const codeMatch = /<Code>(.*?)<\/Code>/.exec(response.body);
+      const codeMatch = /<code>(.*?)<\/code>/i.exec(response.body);
       if (codeMatch) {
         errorMessage += ` (${codeMatch[1]})`;
       }
@@ -122,20 +135,138 @@ function makeEC2Request(region, action, params = {}) {
     }
     throw new Error(errorMessage);
   }
-  return response.body;
+  const parsedResponse = parseEC2Response(response.body);
+  return parsedResponse;
 }
-function normalizeToCidr(ipOrCidr) {
-  if (ipOrCidr.includes("/")) {
-    return ipOrCidr;
+function parseEC2Response(xmlBody) {
+  const result = {};
+  const groupIdMatch = /<groupId>(.*?)<\/groupId>/.exec(xmlBody);
+  if (groupIdMatch) {
+    result.GroupId = groupIdMatch[1];
   }
-  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipPattern.test(ipOrCidr)) {
-    return `${ipOrCidr}/32`;
+  const groupNameMatch = /<groupName>(.*?)<\/groupName>/.exec(xmlBody);
+  if (groupNameMatch) {
+    result.GroupName = groupNameMatch[1];
   }
-  return ipOrCidr;
+  const descriptionMatch = /<groupDescription>(.*?)<\/groupDescription>/.exec(xmlBody);
+  if (descriptionMatch) {
+    result.Description = descriptionMatch[1];
+  }
+  const vpcIdMatch = /<vpcId>(.*?)<\/vpcId>/.exec(xmlBody);
+  if (vpcIdMatch) {
+    result.VpcId = vpcIdMatch[1];
+  }
+  const isDefaultMatch = /<isDefault>true<\/isDefault>/.exec(xmlBody);
+  if (isDefaultMatch && vpcIdMatch) {
+    result.IsDefault = true;
+  }
+  const securityGroupInfoMatch = /<securityGroupInfo>(.*?)<\/securityGroupInfo>/s.exec(xmlBody);
+  if (securityGroupInfoMatch) {
+    const securityGroupInfoXml = securityGroupInfoMatch[1];
+    const sgMatches = extractNestedItems(securityGroupInfoXml);
+    if (sgMatches.length > 0) {
+      result.SecurityGroups = [];
+      sgMatches.forEach((sgItemXml) => {
+        const sgContentMatch = /<item>(.*?)<\/item>/s.exec(sgItemXml);
+        if (!sgContentMatch) return;
+        const sgXml = sgContentMatch[1];
+        const sgIdMatch = /<groupId>(.*?)<\/groupId>/.exec(sgXml);
+        const sgNameMatch = /<groupName>(.*?)<\/groupName>/.exec(sgXml);
+        if (sgIdMatch && sgNameMatch) {
+          const sgVpcIdMatch = /<vpcId>(.*?)<\/vpcId>/.exec(sgXml);
+          const securityGroup = {
+            GroupId: sgIdMatch[1],
+            GroupName: sgNameMatch[1],
+            VpcId: sgVpcIdMatch ? sgVpcIdMatch[1] : void 0
+          };
+          const ipPermissionsMatch = /<ipPermissions>(.*?)<\/ipPermissions>/s.exec(sgItemXml);
+          if (ipPermissionsMatch) {
+            const ipPermissionsXml = ipPermissionsMatch[1];
+            const permissionItems = extractNestedItems(ipPermissionsXml);
+            if (permissionItems.length > 0) {
+              securityGroup.IpPermissions = [];
+              permissionItems.forEach((permXml) => {
+                const protocolMatch = /<ipProtocol>(.*?)<\/ipProtocol>/.exec(permXml);
+                const fromPortMatch = /<fromPort>(.*?)<\/fromPort>/.exec(permXml);
+                const toPortMatch = /<toPort>(.*?)<\/toPort>/.exec(permXml);
+                if (protocolMatch) {
+                  const permission = {
+                    IpProtocol: protocolMatch[1],
+                    FromPort: fromPortMatch ? fromPortMatch[1] : null,
+                    ToPort: toPortMatch ? toPortMatch[1] : null
+                  };
+                  const ipRangesMatch = /<ipRanges>(.*?)<\/ipRanges>/s.exec(permXml);
+                  if (ipRangesMatch) {
+                    const ipRangesXml = ipRangesMatch[1];
+                    const ipRangeItems = extractNestedItems(ipRangesXml);
+                    if (ipRangeItems.length > 0) {
+                      permission.IpRanges = [];
+                      ipRangeItems.forEach((ipXml) => {
+                        const cidrMatch = /<cidrIp>(.*?)<\/cidrIp>/.exec(ipXml);
+                        if (cidrMatch) {
+                          permission.IpRanges.push({ CidrIp: cidrMatch[1] });
+                        }
+                      });
+                    }
+                  }
+                  const groupsMatch = /<groups>(.*?)<\/groups>/s.exec(permXml);
+                  if (groupsMatch) {
+                    const groupsXml = groupsMatch[1];
+                    const groupItems = extractNestedItems(groupsXml);
+                    if (groupItems.length > 0) {
+                      permission.UserIdGroupPairs = [];
+                      groupItems.forEach((grpXml) => {
+                        const grpIdMatch = /<groupId>(.*?)<\/groupId>/.exec(grpXml);
+                        if (grpIdMatch) {
+                          permission.UserIdGroupPairs.push({ GroupId: grpIdMatch[1] });
+                        }
+                      });
+                    }
+                  }
+                  securityGroup.IpPermissions.push(permission);
+                }
+              });
+            }
+          }
+          result.SecurityGroups.push(securityGroup);
+        }
+      });
+    }
+  }
+  return result;
 }
-function normalizeCidrArray(ipAddresses) {
-  return ipAddresses.map((ip) => normalizeToCidr(ip.trim()));
+function extractNestedItems(xml) {
+  const items = [];
+  let currentIndex = 0;
+  let itemStart = xml.indexOf("<item>", currentIndex);
+  while (itemStart !== -1) {
+    let depth = 1;
+    let searchPos = itemStart + 6;
+    let itemEnd = -1;
+    while (depth > 0 && searchPos < xml.length) {
+      const nextOpen = xml.indexOf("<item>", searchPos);
+      const nextClose = xml.indexOf("</item>", searchPos);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        searchPos = nextOpen + 6;
+      } else {
+        depth--;
+        if (depth === 0) {
+          itemEnd = nextClose + 7;
+        }
+        searchPos = nextClose + 7;
+      }
+    }
+    if (itemEnd !== -1) {
+      items.push(xml.substring(itemStart, itemEnd));
+      currentIndex = itemEnd;
+      itemStart = xml.indexOf("<item>", currentIndex);
+    } else {
+      break;
+    }
+  }
+  return items;
 }
 function getDefaultVpc(region) {
   try {
@@ -143,9 +274,8 @@ function getDefaultVpc(region) {
       "Filter.1.Name": "isDefault",
       "Filter.1.Value.1": "true"
     });
-    const vpcIdMatch = /<vpcId>(vpc-[a-z0-9]+)<\/vpcId>/i.exec(response);
-    if (vpcIdMatch) {
-      return vpcIdMatch[1];
+    if (response.VpcId && response.IsDefault) {
+      return response.VpcId;
     }
     return null;
   } catch (_error) {
@@ -158,9 +288,8 @@ function findVpcByName(region, vpcName) {
       "Filter.1.Name": "tag:Name",
       "Filter.1.Value.1": vpcName
     });
-    const vpcIdMatch = /<vpcId>(vpc-[a-z0-9]+)<\/vpcId>/i.exec(response);
-    if (vpcIdMatch) {
-      return vpcIdMatch[1];
+    if (response.VpcId) {
+      return response.VpcId;
     }
     return null;
   } catch (_error) {
@@ -189,10 +318,13 @@ function resolveSecurityGroupNames(region, groupNames, vpcId) {
     }
     const response = makeEC2Request(region, "DescribeSecurityGroups", params);
     const sgIds = [];
-    const groupIdRegex = /<groupId>(sg-[a-z0-9]+)<\/groupId>/gi;
-    let match;
-    while ((match = groupIdRegex.exec(response)) !== null) {
-      sgIds.push(match[1]);
+    const sgMatches = response.SecurityGroups || [];
+    if (Array.isArray(sgMatches)) {
+      sgMatches.forEach((sg) => {
+        if (sg.GroupId) {
+          sgIds.push(sg.GroupId);
+        }
+      });
     }
     if (sgIds.length === 0 && (vpcId || getDefaultVpc(region))) {
       const noVpcParams = {};
@@ -201,9 +333,13 @@ function resolveSecurityGroupNames(region, groupNames, vpcId) {
         noVpcParams[`Filter.1.Value.${index + 1}`] = name;
       });
       const noVpcResponse = makeEC2Request(region, "DescribeSecurityGroups", noVpcParams);
-      const noVpcRegex = /<groupId>(sg-[a-z0-9]+)<\/groupId>/gi;
-      while ((match = noVpcRegex.exec(noVpcResponse)) !== null) {
-        sgIds.push(match[1]);
+      const noVpcMatches = noVpcResponse.SecurityGroups || [];
+      if (Array.isArray(noVpcMatches)) {
+        noVpcMatches.forEach((sg) => {
+          if (sg.GroupId) {
+            sgIds.push(sg.GroupId);
+          }
+        });
       }
     }
     return sgIds;
@@ -220,11 +356,10 @@ function createSecurityGroup(region, groupName, description, vpcId) {
     params.VpcId = vpcId;
   }
   const response = makeEC2Request(region, "CreateSecurityGroup", params);
-  const groupIdMatch = /<groupId>(sg-[a-z0-9]+)<\/groupId>/i.exec(response);
-  if (!groupIdMatch) {
-    throw new Error(`Failed to create security group: No GroupId in response. Raw: ${response.substring(0, 500)}`);
+  if (!response.GroupId) {
+    throw new Error("Failed to create security group: No GroupId in response");
   }
-  return groupIdMatch[1];
+  return response.GroupId;
 }
 function checkSecurityGroupExists(region, groupId) {
   try {
@@ -251,9 +386,11 @@ function findSecurityGroupByName(region, groupName, vpcId) {
       params["Filter.2.Value.1"] = targetVpcId;
     }
     const response = makeEC2Request(region, "DescribeSecurityGroups", params);
-    const groupIdMatch = /<groupId>(sg-[a-z0-9]+)<\/groupId>/i.exec(response);
-    if (groupIdMatch) {
-      return groupIdMatch[1];
+    if (response.SecurityGroups && response.SecurityGroups.length > 0) {
+      const securityGroups = Array.isArray(response.SecurityGroups) ? response.SecurityGroups : [response.SecurityGroups];
+      if (securityGroups.length > 0) {
+        return securityGroups[0].GroupId;
+      }
     }
     return null;
   } catch (_error) {
@@ -320,39 +457,6 @@ function revokeSecurityGroupIngress(region, groupId, protocol, fromPort, toPort,
     }
   }
 }
-function getCurrentSecurityGroupRules(region, groupId, port) {
-  try {
-    const response = makeEC2Request(region, "DescribeSecurityGroups", {
-      "GroupId.1": groupId
-    });
-    const actualCidrs = [];
-    const actualSgIds = [];
-    const portStr = port.toString();
-    const ipPermissionRegex = /<item>[\s\S]*?<ipProtocol>([^<]*)<\/ipProtocol>[\s\S]*?<fromPort>([^<]*)<\/fromPort>[\s\S]*?<toPort>([^<]*)<\/toPort>[\s\S]*?<\/item>/gi;
-    let permMatch;
-    while ((permMatch = ipPermissionRegex.exec(response)) !== null) {
-      const protocol = permMatch[1];
-      const fromPort = permMatch[2];
-      const toPort = permMatch[3];
-      if (protocol === "tcp" && fromPort === portStr && toPort === portStr) {
-        const permissionBlock = permMatch[0];
-        const cidrRegex = /<cidrIp>([^<]+)<\/cidrIp>/gi;
-        let cidrMatch;
-        while ((cidrMatch = cidrRegex.exec(permissionBlock)) !== null) {
-          actualCidrs.push(cidrMatch[1]);
-        }
-        const sgIdRegex = /<groupId>(sg-[a-z0-9]+)<\/groupId>/gi;
-        let sgMatch;
-        while ((sgMatch = sgIdRegex.exec(permissionBlock)) !== null) {
-          actualSgIds.push(sgMatch[1]);
-        }
-      }
-    }
-    return { cidrs: actualCidrs, sgIds: actualSgIds };
-  } catch (_error) {
-    return { cidrs: [], sgIds: [] };
-  }
-}
 function updateSecurityGroupRules(region, groupId, port, allowedCidrs, allowedSgNames, vpcId) {
   try {
     const normalizedCidrs = normalizeCidrArray(allowedCidrs);
@@ -373,6 +477,44 @@ function updateSecurityGroupRules(region, groupId, port, allowedCidrs, allowedSg
     }
   } catch (error) {
     throw new Error(`Failed to update security group rules: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+}
+function getCurrentSecurityGroupRules(region, groupId, port) {
+  try {
+    const response = makeEC2Request(region, "DescribeSecurityGroups", {
+      "GroupId.1": groupId
+    });
+    const actualCidrs = [];
+    const actualSgIds = [];
+    if (response.SecurityGroups && response.SecurityGroups.length > 0) {
+      const securityGroup = response.SecurityGroups[0];
+      if (securityGroup.IpPermissions) {
+        const permissions = Array.isArray(securityGroup.IpPermissions) ? securityGroup.IpPermissions : [securityGroup.IpPermissions];
+        permissions.forEach((permission) => {
+          if (permission.IpProtocol === "tcp" && parseInt(permission.FromPort) === port && parseInt(permission.ToPort) === port) {
+            if (permission.IpRanges) {
+              const ipRanges = Array.isArray(permission.IpRanges) ? permission.IpRanges : [permission.IpRanges];
+              ipRanges.forEach((range) => {
+                if (range.CidrIp) {
+                  actualCidrs.push(range.CidrIp);
+                }
+              });
+            }
+            if (permission.UserIdGroupPairs) {
+              const groups = Array.isArray(permission.UserIdGroupPairs) ? permission.UserIdGroupPairs : [permission.UserIdGroupPairs];
+              groups.forEach((group) => {
+                if (group.GroupId) {
+                  actualSgIds.push(group.GroupId);
+                }
+              });
+            }
+          }
+        });
+      }
+    }
+    return { cidrs: actualCidrs, sgIds: actualSgIds };
+  } catch (_error) {
+    return { cidrs: [], sgIds: [] };
   }
 }
 function deleteSecurityGroup(region, groupId) {

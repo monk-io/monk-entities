@@ -320,13 +320,20 @@ export class Schema extends AWSGlueSchemaRegistryEntity<SchemaDefinition, Schema
 
     /**
      * Get schema information from AWS
+     * @param schemaName - Schema name to query (defaults to state.schema_name for post-creation operations)
+     * @param registryName - Registry name to query (defaults to state.registry_name for post-creation operations)
      */
-    private getSchemaInfo(): any {
+    private getSchemaInfo(schemaName?: string, registryName?: string): any {
+        // Use provided names or fall back to state (for post-creation operations)
+        // Only use definition as last resort (for initial creation check)
+        const targetSchemaName = schemaName || this.state.schema_name || this.definition.schema_name;
+        const targetRegistryName = registryName || this.state.registry_name || this.definition.registry_name;
+        
         try {
             return this.makeGlueRequest("GetSchema", {
                 SchemaId: {
-                    SchemaName: this.definition.schema_name,
-                    RegistryName: this.definition.registry_name
+                    SchemaName: targetSchemaName,
+                    RegistryName: targetRegistryName
                 }
             });
         } catch (error) {
