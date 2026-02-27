@@ -327,30 +327,25 @@ function getCurrentSecurityGroupRules(region, groupId, port) {
     });
     const actualCidrs = [];
     const actualSgIds = [];
-    if (response.SecurityGroups && response.SecurityGroups.length > 0) {
-      const securityGroup = response.SecurityGroups[0];
-      if (securityGroup.IpPermissions) {
-        const permissions = Array.isArray(securityGroup.IpPermissions) ? securityGroup.IpPermissions : [securityGroup.IpPermissions];
-        permissions.forEach((permission) => {
-          if (permission.IpProtocol === "tcp" && parseInt(permission.FromPort) === port && parseInt(permission.ToPort) === port) {
-            if (permission.IpRanges) {
-              const ipRanges = Array.isArray(permission.IpRanges) ? permission.IpRanges : [permission.IpRanges];
-              ipRanges.forEach((range) => {
-                if (range.CidrIp) {
-                  actualCidrs.push(range.CidrIp);
-                }
-              });
-            }
-            if (permission.UserIdGroupPairs) {
-              const groups = Array.isArray(permission.UserIdGroupPairs) ? permission.UserIdGroupPairs : [permission.UserIdGroupPairs];
-              groups.forEach((group) => {
-                if (group.GroupId) {
-                  actualSgIds.push(group.GroupId);
-                }
-              });
-            }
-          }
-        });
+    const portStr = port.toString();
+    const ipPermissionRegex = /<item>[\s\S]*?<ipProtocol>([^<]*)<\/ipProtocol>[\s\S]*?<fromPort>([^<]*)<\/fromPort>[\s\S]*?<toPort>([^<]*)<\/toPort>[\s\S]*?<\/item>/gi;
+    let permMatch;
+    while ((permMatch = ipPermissionRegex.exec(response)) !== null) {
+      const protocol = permMatch[1];
+      const fromPort = permMatch[2];
+      const toPort = permMatch[3];
+      if (protocol === "tcp" && fromPort === portStr && toPort === portStr) {
+        const permissionBlock = permMatch[0];
+        const cidrRegex = /<cidrIp>([^<]+)<\/cidrIp>/gi;
+        let cidrMatch;
+        while ((cidrMatch = cidrRegex.exec(permissionBlock)) !== null) {
+          actualCidrs.push(cidrMatch[1]);
+        }
+        const sgIdRegex = /<groupId>(sg-[a-z0-9]+)<\/groupId>/gi;
+        let sgMatch;
+        while ((sgMatch = sgIdRegex.exec(permissionBlock)) !== null) {
+          actualSgIds.push(sgMatch[1]);
+        }
       }
     }
     return { cidrs: actualCidrs, sgIds: actualSgIds };

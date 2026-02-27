@@ -21,7 +21,7 @@ registry:
       Works with:
       - `aws-glue-schema-registry/schema` - Create schemas within this registry
       - `aws-iam/role` - Grant registry access to Lambda, Glue jobs, or streaming applications
-    version-hash: 4ae106d1a990
+    version-hash: 9d3e3eac83bb
   schema:
     region:
       type: string

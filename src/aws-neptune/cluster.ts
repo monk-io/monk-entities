@@ -296,7 +296,8 @@ export class Cluster extends AWSNeptuneEntity<ClusterDefinition, ClusterState> {
             existing: false,
             created_security_group_id: this.state.created_security_group_id,
             created_security_group_existing: this.state.created_security_group_existing,
-            vpc_id: this.definition.vpc_id
+            // Preserve vpc_id from state (may have been resolved from vpc_name in getOrCreateSecurityGroups)
+            vpc_id: this.state.vpc_id || this.definition.vpc_id
         };
     }
 

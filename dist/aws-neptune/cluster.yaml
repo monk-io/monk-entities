@@ -28,7 +28,7 @@ cluster:
       - `aws-neptune/cluster-parameter-group` - Cluster parameter configuration
       - `aws-neptune/access-list` - Manage security group rules for client access
       - `aws-iam/role` - Grant cluster access to Lambda or other services
-    version-hash: e36ddcfc0641
+    version-hash: 75312a2900cc
   schema:
     region:
       type: string

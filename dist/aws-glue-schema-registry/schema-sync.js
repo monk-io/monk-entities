@@ -57,8 +57,8 @@ const cli = require("cli");
 const common = require("aws-glue-schema-registry/common");
 const validateSchemaName = common.validateSchemaName;
 const validateRegistryName = common.validateRegistryName;
-var _getDefinition_dec, _getDiff_dec, _checkCompatibility_dec, _getVersion_dec, _listVersions_dec, _registerVersion_dec, _getInfo_dec, _a, _init;
-var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_dec = [action("get-info")], _registerVersion_dec = [action("register-version")], _listVersions_dec = [action("list-versions")], _getVersion_dec = [action("get-version")], _checkCompatibility_dec = [action("check-compatibility")], _getDiff_dec = [action("get-diff")], _getDefinition_dec = [action("get-definition")], _a) {
+var _getDefinition_dec, _getDiff_dec, _checkValidity_dec, _getVersion_dec, _listVersions_dec, _registerVersion_dec, _getInfo_dec, _a, _init;
+var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_dec = [action("get-info")], _registerVersion_dec = [action("register-version")], _listVersions_dec = [action("list-versions")], _getVersion_dec = [action("get-version")], _checkValidity_dec = [action("check-validity")], _getDiff_dec = [action("get-diff")], _getDefinition_dec = [action("get-definition")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -180,14 +180,21 @@ var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_
       throw new Error("Schema not created yet");
     }
     this.validateDefinition();
-    if (this.definition.compatibility && this.definition.compatibility !== this.state.compatibility) {
+    const compatibilityChanged = this.definition.compatibility && this.definition.compatibility !== this.state.compatibility;
+    const currentInfo = this.getSchemaInfo();
+    const descriptionChanged = this.definition.schema_description !== void 0 && this.definition.schema_description !== (currentInfo?.Description || "");
+    if (compatibilityChanged || descriptionChanged) {
       const params = {
         SchemaId: {
           SchemaName: this.state.schema_name,
           RegistryName: this.state.registry_name
-        },
-        Compatibility: this.definition.compatibility
+        }
       };
+      if (this.definition.compatibility) {
+        params.Compatibility = this.definition.compatibility;
+      } else if (this.state.compatibility) {
+        params.Compatibility = this.state.compatibility;
+      }
       if (this.definition.schema_description !== void 0) {
         params.Description = this.definition.schema_description;
       }
@@ -416,7 +423,7 @@ var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_
     cli.output(response.SchemaDefinition);
     cli.output("==================================================");
   }
-  checkCompatibility(args) {
+  checkValidity(args) {
     if (!this.state.schema_name || !this.state.registry_name) {
       throw new Error("Schema not created yet");
     }
@@ -424,20 +431,22 @@ var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_
     if (!schemaDefinition) {
       throw new Error("schema_definition is required");
     }
-    cli.output(`Checking compatibility for schema '${this.state.schema_name}'...`);
+    cli.output(`Checking schema validity for '${this.state.schema_name}'...`);
+    cli.output(`Data format: ${this.state.data_format}`);
+    cli.output("");
     const response = this.makeGlueRequest("CheckSchemaVersionValidity", {
-      SchemaId: {
-        SchemaName: this.state.schema_name,
-        RegistryName: this.state.registry_name
-      },
       DataFormat: this.state.data_format,
       SchemaDefinition: schemaDefinition
     });
     cli.output("");
     if (response.Valid) {
-      cli.output("\u2705 Schema definition is VALID and compatible!");
+      cli.output("\u2705 Schema definition is syntactically VALID!");
+      cli.output("");
+      cli.output("\u26A0\uFE0F  NOTE: This only validates syntax, not compatibility.");
+      cli.output("   To check compatibility with previous versions, use 'register-version'.");
+      cli.output(`   Current compatibility mode: ${this.state.compatibility || "NONE"}`);
     } else {
-      cli.output("\u274C Schema definition is NOT compatible.");
+      cli.output("\u274C Schema definition is INVALID (syntax error).");
       if (response.Error) {
         cli.output(`   Error: ${response.Error}`);
       }
@@ -496,7 +505,7 @@ __decorateElement(_init, 1, "getInfo", _getInfo_dec, _Schema);
 __decorateElement(_init, 1, "registerVersion", _registerVersion_dec, _Schema);
 __decorateElement(_init, 1, "listVersions", _listVersions_dec, _Schema);
 __decorateElement(_init, 1, "getVersion", _getVersion_dec, _Schema);
-__decorateElement(_init, 1, "checkCompatibility", _checkCompatibility_dec, _Schema);
+__decorateElement(_init, 1, "checkValidity", _checkValidity_dec, _Schema);
 __decorateElement(_init, 1, "getDiff", _getDiff_dec, _Schema);
 __decorateElement(_init, 1, "getDefinition", _getDefinition_dec, _Schema);
 __decoratorMetadata(_init, _Schema);
