@@ -1,0 +1,54 @@
+REPO aws-neptune
+VERSION_HASH e36ddcfc0641
+namespace: aws-neptune
+base:
+  metadata:
+    name: AWS Neptune
+    description: Manage Amazon Neptune graph database clusters and instances
+    website: https://docs.aws.amazon.com/neptune/latest/userguide/
+    publisher: monk.io
+    icon: https://raw.githubusercontent.com/monk-io/monk-entities/main/icons/aws-neptune.png
+    tags: aws, neptune, graph, database, gremlin, sparql, rdf
+    version: 1.0.0
+cluster:
+  defines: runnable
+  metadata:
+    name: AWS Neptune Cluster
+    description: Create and manage Amazon Neptune graph database clusters
+  services:
+    data:
+      protocol: custom
+instance:
+  defines: runnable
+  metadata:
+    name: AWS Neptune Instance
+    description: Create and manage Neptune database instances within a cluster
+  services:
+    data:
+      protocol: custom
+cluster-parameter-group:
+  defines: runnable
+  metadata:
+    name: AWS Neptune Cluster Parameter Group
+    description: Create and manage Neptune cluster parameter groups
+  services:
+    data:
+      protocol: custom
+subnet-group:
+  defines: runnable
+  metadata:
+    name: AWS Neptune Subnet Group
+    description: Create and manage Neptune DB subnet groups for VPC configuration
+  services:
+    data:
+      protocol: custom
+neptune-access-list:
+  defines: runnable
+  metadata:
+    name: AWS Neptune Access List
+    description: Manage security group ingress rules for Neptune database access
+  services:
+    data:
+      protocol: custom
+LOAD cluster.yaml neptune-base.yaml subnet-group.yaml neptune-access-list.yaml cluster-parameter-group.yaml common.yaml instance.yaml
+RESOURCES common.js neptune-base.js neptune-access-list-sync.js cluster-parameter-group-sync.js cluster-sync.js subnet-group-sync.js instance-sync.js

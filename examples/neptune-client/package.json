@@ -1,0 +1,35 @@
+{
+  "name": "neptune-client",
+  "version": "1.0.0",
+  "description": "TypeScript Neptune client demonstrating graph database operations with AWS Neptune",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "clean": "rm -rf dist",
+    "test": "npm run build && npm start"
+  },
+  "keywords": [
+    "aws",
+    "neptune",
+    "graph",
+    "database",
+    "gremlin",
+    "monk",
+    "typescript"
+  ],
+  "author": "Monk Neptune Client",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

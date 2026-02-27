@@ -1,0 +1,110 @@
+namespace: aws-glue-schema-registry
+schema-version:
+  defines: entity
+  metadata:
+    name: SchemaVersion
+    description: |-
+      AWS Glue Schema Version entity.
+      Registers and manages individual schema versions within AWS Glue Schema Registry.
+      Each version represents an evolution of the schema with compatibility validation.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.schema_version_id` - UUID for SerDe operations and version lookup
+      - `state.version_number` - Sequential version number for reference
+      - `state.status` - Current version status (AVAILABLE, PENDING, FAILURE)
+      - `state.schema_arn` - Parent schema ARN
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-glue-schema-registry/schema` - Parent schema for this version
+      - `aws-kinesis/stream` - Use version ID for data serialization
+      - `aws-lambda/function` - Deserialize data using version ID
+    version-hash: 4ae106d1a990
+  schema:
+    region:
+      type: string
+      description: AWS region for the Schema Registry
+    registry_name:
+      type: string
+      description: Name of the registry containing the schema
+    schema_name:
+      type: string
+      description: Name of the schema to add a version to
+    schema_definition:
+      type: string
+      description: 'Schema definition for this version (AVRO JSON, JSON Schema, or Protobuf)'
+    metadata:
+      type: object
+      additionalProperties:
+        type: string
+        description: |-
+          Optional metadata key-value pairs to attach to this version
+          Keys and values must be strings, max 256 chars each
+      description: |-
+        Optional metadata key-value pairs to attach to this version
+        Keys and values must be strings, max 256 chars each
+    required:
+      - region
+      - registry_name
+      - schema_name
+      - schema_definition
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    schema_version_id:
+      type: string
+      description: UUID of this schema version
+    version_number:
+      type: number
+      description: Sequential version number
+    status:
+      type: string
+      enum:
+        - AVAILABLE
+        - PENDING
+        - FAILURE
+        - DELETING
+      description: 'Current status of the version (AVAILABLE, PENDING, FAILURE, DELETING)'
+    schema_arn:
+      type: string
+      description: Parent schema ARN
+    schema_name:
+      type: string
+      description: Schema name
+    registry_name:
+      type: string
+      description: Registry name
+    data_format:
+      type: string
+      enum:
+        - AVRO
+        - JSON
+        - PROTOBUF
+      description: Data format of the schema
+    created_time:
+      type: string
+      description: Version creation timestamp
+  lifecycle:
+    sync: <<< schema-version-sync.js
+    get-info: ''
+    get-definition: ''
+    put-metadata: ''
+    query-metadata: ''
+    remove-metadata: ''
+    check-validity: ''
+  checks:
+    readiness:
+      period: 3
+      initialDelay: 1
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - aws-glue-schema-registry/glue-schema-registry-base
+    - cli
+    - aws-glue-schema-registry/common

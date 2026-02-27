@@ -1,0 +1,134 @@
+namespace: azure-eventhubs
+event-hub:
+  defines: entity
+  metadata:
+    name: EventHub
+    description: |-
+      Azure Event Hub entity.
+      Creates and manages event hubs within an Event Hubs namespace.
+      Supports partitioning, message retention, and capture to storage.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.eventhub_name` - Event Hub name
+      - `state.namespace_name` - Parent namespace name
+      - `state.partition_ids` - List of partition IDs
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-eventhubs/eventhubs-namespace` - Parent namespace
+      - `azure-eventhubs/consumer-group` - Create consumer groups for this event hub
+    version-hash: ad31b513b19e
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      description: Event Hubs namespace name
+    eventhub_name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: Event Hub name (1-256 chars)
+    partition_count:
+      type: number
+      description: 'Number of partitions (1-32 for Standard, up to 1024 for Premium)'
+      default: 2
+    message_retention_in_days:
+      type: number
+      description: 'Message retention in days (1-7 for Standard, 1-90 for Premium)'
+      default: 1
+    capture:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Enable capture
+        encoding:
+          type: string
+          enum:
+            - Avro
+            - AvroDeflate
+          description: Capture encoding format
+        interval_in_seconds:
+          type: number
+          description: Time window in seconds (60-900)
+        size_limit_in_bytes:
+          type: number
+          description: Size limit in bytes (10485760-524288000)
+        skip_empty_archives:
+          type: boolean
+          description: Skip empty archives
+        destination_storage_account_resource_id:
+          type: string
+          description: Destination storage account resource ID
+        destination_blob_container:
+          type: string
+          description: Destination blob container name
+        destination_archive_name_format:
+          type: string
+          description: Archive name format
+      required:
+        - enabled
+      additionalProperties: false
+      description: Capture configuration for archiving events
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - eventhub_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    eventhub_name:
+      type: string
+      description: The event hub name
+    namespace_name:
+      type: string
+      description: The namespace name
+    status:
+      type: string
+      description: Current status
+    partition_count:
+      type: number
+      description: Number of partitions
+    partition_ids:
+      type: array
+      items:
+        type: string
+      description: Partition IDs
+    created_at:
+      type: string
+      description: Creation timestamp
+    updated_at:
+      type: string
+      description: Last update timestamp
+  lifecycle:
+    sync: <<< event-hub-sync.js
+    get-info: ''
+    list-consumer-groups: ''
+    get-partition-info: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-eventhubs/azure-eventhubs-base
+    - cli
+    - monkec/base

@@ -1,0 +1,85 @@
+namespace: aws-neptune
+subnet-group:
+  defines: entity
+  metadata:
+    name: SubnetGroup
+    description: |-
+      AWS Neptune Subnet Group entity.
+      Creates and manages Neptune DB subnet groups for VPC configuration.
+      Subnet groups define which subnets Neptune clusters can use.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.db_subnet_group_arn` - Subnet group ARN
+      - `state.db_subnet_group_name` - Subnet group name for cluster configuration
+      - `state.vpc_id` - VPC ID containing the subnets
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-neptune/cluster` - Apply this subnet group to clusters
+      - `aws-ec2/subnet` - Subnets to include in the group
+      - `aws-ec2/vpc` - VPC containing the subnets
+    version-hash: e36ddcfc0641
+  schema:
+    region:
+      type: string
+      description: AWS region for the Neptune resource
+    db_subnet_group_name:
+      type: string
+      description: Name for the subnet group (1-255 chars)
+    db_subnet_group_description:
+      type: string
+      description: Human-readable description of the subnet group
+    subnet_ids:
+      type: array
+      items:
+        type: string
+      description: List of subnet IDs to include in the group
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the subnet group
+      description: Resource tags for the subnet group
+    required:
+      - region
+      - db_subnet_group_name
+      - subnet_ids
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    db_subnet_group_arn:
+      type: string
+      description: Full ARN of the subnet group
+    db_subnet_group_name:
+      type: string
+      description: Subnet group name
+    vpc_id:
+      type: string
+      description: VPC ID containing the subnets
+    subnet_group_status:
+      type: string
+      description: Subnet group status
+    subnet_ids:
+      type: array
+      items:
+        type: string
+      description: List of subnet IDs in the group
+  lifecycle:
+    sync: <<< subnet-group-sync.js
+    get-info: ''
+    list-subnet-groups: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - aws-neptune/neptune-base
+    - cli

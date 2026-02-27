@@ -1,0 +1,38 @@
+namespace: aws-glue-schema-registry
+
+base:
+  metadata:
+    name: AWS Glue Schema Registry
+    description: Manage AWS Glue Schema Registry resources for data schema management and evolution
+    website: https://docs.aws.amazon.com/glue/latest/dg/schema-registry.html
+    publisher: monk.io
+    icon: https://raw.githubusercontent.com/monk-io/monk-entities/main/icons/aws-glue.png
+    tags: aws, glue, schema, registry, avro, json, data, streaming
+    version: 1.0.0
+
+registry:
+  defines: runnable
+  metadata:
+    name: AWS Glue Schema Registry
+    description: Create and manage AWS Glue Schema Registries for organizing schemas
+  services:
+    data:
+      protocol: custom
+
+schema:
+  defines: runnable
+  metadata:
+    name: AWS Glue Schema
+    description: Create and manage schemas within AWS Glue Schema Registry
+  services:
+    data:
+      protocol: custom
+
+schema-version:
+  defines: runnable
+  metadata:
+    name: AWS Glue Schema Version
+    description: Register and manage schema versions within AWS Glue Schema Registry
+  services:
+    data:
+      protocol: custom

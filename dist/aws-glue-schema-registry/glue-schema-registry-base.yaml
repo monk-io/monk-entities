@@ -1,0 +1,7 @@
+namespace: aws-glue-schema-registry
+
+glue-schema-registry-base:
+  defines: module
+  metadata:
+    version-hash: 4ae106d1a990
+  source: <<< glue-schema-registry-base.js

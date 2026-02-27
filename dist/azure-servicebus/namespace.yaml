@@ -1,0 +1,150 @@
+namespace:
+  defines: entity
+  metadata:
+    name: Namespace
+    description: |-
+      Azure Service Bus Namespace entity.
+      Creates and manages Azure Service Bus namespaces for enterprise messaging.
+      Supports Basic, Standard, and Premium tiers with various features.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: secret names from `primary_connection_string_secret_ref`, `secondary_connection_string_secret_ref` properties - Connection strings (if specified)
+
+      ## State Fields for Composition
+      - `state.namespace_name` - Namespace name
+      - `state.service_bus_endpoint` - Service Bus endpoint URL
+
+      ## Composing with Other Entities
+      Works with:
+      - `azure-servicebus/queue` - Create queues within the namespace
+      - `azure-servicebus/topic` - Create topics within the namespace
+    version-hash: a96c68f6e752
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      minLength: 6
+      maxLength: 50
+      pattern: '^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$'
+      description: 'Service Bus namespace name (6-50 chars, alphanumeric and hyphens)'
+    location:
+      type: string
+      description: Azure region for the namespace
+    sku:
+      type: object
+      properties:
+        name:
+          type: string
+          enum:
+            - Basic
+            - Standard
+            - Premium
+          description: |-
+            Service Bus namespace SKU name
+            - Basic: Basic tier with limited features
+            - Standard: Standard tier with topics and subscriptions
+            - Premium: Premium tier with dedicated resources
+        capacity:
+          type: number
+          description: 'Messaging units for Premium tier (1, 2, 4, 8, or 16)'
+      required:
+        - name
+      additionalProperties: false
+      description: Service Bus namespace SKU configuration
+    zone_redundant:
+      type: boolean
+      description: Enable zone redundancy for Premium tier
+    minimum_tls_version:
+      type: string
+      enum:
+        - '1.0'
+        - '1.1'
+        - '1.2'
+      description: Minimum TLS version for secure connections
+      default: '1.2'
+    disable_local_auth:
+      type: boolean
+      description: Disable local (SAS key) authentication
+    public_network_access:
+      type: string
+      enum:
+        - Enabled
+        - Disabled
+      description: Enable public network access
+      default: Enabled
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Tags for the resource
+      description: Tags for the resource
+    primary_connection_string_secret_ref:
+      type: string
+      description: |-
+        Secret reference for primary connection string
+        If provided, the primary connection string will be saved to this secret
+    secondary_connection_string_secret_ref:
+      type: string
+      description: |-
+        Secret reference for secondary connection string
+        If provided, the secondary connection string will be saved to this secret
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - location
+      - sku
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    namespace_name:
+      type: string
+      description: Namespace name (primary identifier)
+    service_bus_endpoint:
+      type: string
+      description: Service Bus endpoint URL
+    location:
+      type: string
+      description: Namespace location
+    sku_tier:
+      type: string
+      description: Namespace SKU tier
+    created_at:
+      type: string
+      description: Namespace creation time
+    updated_at:
+      type: string
+      description: Namespace last updated time
+    secrets_populated:
+      type: boolean
+      description: Whether secrets have been populated
+  lifecycle:
+    sync: <<< namespace-sync.js
+    get-info: ''
+    list-queues: ''
+    list-topics: ''
+    regenerate-key: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-servicebus/azure-servicebus-base
+    - cli
+    - secret
+    - monkec/base
