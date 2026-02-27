@@ -1,0 +1,5 @@
+REPO monkec
+VERSION_HASH c197212f1620
+VERSION 0.1.0
+LOAD endpoints.yaml
+RESOURCES endpoints-sync.js

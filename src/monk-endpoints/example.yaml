@@ -1,0 +1,331 @@
+namespace: endpoints-example
+
+# Netlify source URL (state.url)
+netlify-site:
+  defines: netlify/site
+  name: monkec-endpoints-demo-site
+  secret_ref: netlify-api-token
+  permitted-secrets:
+    netlify-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Vercel source URL (state.url after get-production-urls action)
+vercel-project:
+  defines: vercel/project
+  name: monkec-endpoints-demo-project
+  secret_ref: default-vercel-token
+  permitted-secrets:
+    default-vercel-token: true
+  services:
+    data:
+      protocol: custom
+
+# Vercel deploy runnable with inline static content (no blobs required)
+vercel-static-deploy:
+  defines: runnable
+  inherits: vercel/deploy
+  permitted-secrets:
+    default-vercel-token: true
+  containers:
+    deploy:
+      paths: []
+  files:
+    index-html:
+      container: deploy
+      path: /home/node/app/index.html
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Monk Endpoints Example</title>
+          </head>
+          <body>
+            <h1>Hello from Vercel via Monk</h1>
+            <p>This page was deployed from inline files in the template.</p>
+          </body>
+        </html>
+  connections:
+    project:
+      runnable: endpoints-example/vercel-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/vercel-project
+      timeout: 180
+  variables:
+    project: <- connection-target("project") entity-state get-member("name")
+    deploy-dir: /home/node/app
+    environment: production
+    pre-deploy: |
+      mkdir -p "$DEPLOY_DIR"
+    source_path: inline-not-used
+
+vercel-url-ready:
+  defines: utils/wait-for-action
+  target: endpoints-example/vercel-project
+  action: get-production-urls
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/vercel-project
+        - endpoints-example/vercel-static-deploy
+      timeout: 180
+
+# Placeholder ingress sources. Replace with your actual ingress runnables/services.
+# Frontend serves "/" and backend serves "/api" with prefix rewrite removed.
+frontend-ingress:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  files:
+    frontend-index:
+      container: app
+      path: /usr/share/nginx/html/index.html
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html>
+          <head><meta charset="utf-8"><title>Frontend Ingress</title></head>
+          <body>
+            <h1>Frontend ingress is responding</h1>
+            <p>Route: /</p>
+          </body>
+        </html>
+  services:
+    http:
+      container: app
+      port: 80
+      protocol: tcp
+      ingress-routes:
+        web:
+          path: /
+
+backend-ingress:
+  defines: runnable
+  containers:
+    app:
+      image: nginx:latest
+  files:
+    backend-index:
+      container: app
+      path: /usr/share/nginx/html/index.html
+      mode: 0644
+      contents: |
+        backend ingress root is responding
+    backend-health:
+      container: app
+      path: /usr/share/nginx/html/health
+      mode: 0644
+      contents: |
+        ok
+  services:
+    http:
+      container: app
+      port: 80
+      protocol: tcp
+      ingress-routes:
+        api:
+          path-prefix: /api
+          path-rewrite:
+            regex: "^/api/?(.*)"
+            to: "/$1"
+
+# Runnable with published port source.
+api-runnable:
+  defines: runnable
+  containers:
+    api:
+      image: nginx:latest
+  services:
+    api:
+      container: api
+      port: 80
+      host-port: 8080 # host port is required for public IP and port
+      protocol: tcp
+      publish: true # publish is required to open the port on the node firewall
+
+# Netlify deploy runnable with inline static content (no blobs required)
+netlify-static-deploy:
+  defines: runnable
+  inherits: netlify/deploy
+  permitted-secrets:
+    netlify-api-token: true
+  containers:
+    deploy:
+      paths: []
+  files:
+    netlify-index:
+      container: deploy
+      path: /home/node/app/index.html
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Monk Endpoints Netlify Example</title>
+          </head>
+          <body>
+            <h1>Hello from Netlify via Monk</h1>
+            <p>This page was deployed from inline files in the template.</p>
+          </body>
+        </html>
+  connections:
+    site:
+      runnable: endpoints-example/netlify-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/netlify-site
+      timeout: 180
+  variables:
+    site-id: <- connection-target("site") entity-state get-member("id")
+    deploy-dir: /home/node/app
+    token: <- secret("netlify-api-token")
+    pre-deploy: |
+      mkdir -p "$DEPLOY_DIR"
+
+# Cloudflare tunnel source URL (hostname from tunnel-app state).
+tunnel:
+  defines: cloudflare/cloudflare-tunnel
+  account_id: <- secret("cloudflare-account-id")
+  name: endpoints-demo-tunnel
+  token_secret_ref: cloudflare-tunnel-token
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+    cloudflare-tunnel-token: true
+  services:
+    data:
+      protocol: custom
+
+tunnel-app:
+  defines: cloudflare/cloudflare-tunnel-application
+  account_id: <- secret("cloudflare-account-id")
+  tunnel_id: <- connection-target("tunnel") entity-state get-member("id")
+  zone_name: thisbetterbe.online
+  hostname: tun.thisbetterbe.online
+  service: <- "http://" connection-ip("frontend") ":" connection-port("frontend") concat-all
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    tunnel:
+      runnable: endpoints-example/tunnel
+      service: data
+    frontend:
+      runnable: endpoints-example/frontend-ingress
+      service: http
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/tunnel
+      timeout: 120
+
+cloudflared:
+  defines: runnable
+  inherits: cloudflare/cloudflared
+  permitted-secrets:
+    cloudflare-tunnel-token: true
+  variables:
+    token_secret_ref:
+      type: string
+      value: cloudflare-tunnel-token
+  connections:
+    app:
+      runnable: endpoints-example/frontend-ingress
+      service: http
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/tunnel
+        - endpoints-example/frontend-ingress
+      timeout: 120
+
+endpoints:
+  metadata:
+    description: This is an example of Endpoints entity with different endpoint types. Normally you would only need one type of endpoint, but this example shows all of them to demonstrate the different methods of getting the endpoint URL.
+  defines: monkec/endpoints
+  entrypoint: frontend-netlify
+  depends:
+    wait-for:
+      runnables:
+        - endpoints-example/netlify-site
+        - endpoints-example/netlify-static-deploy
+        - endpoints-example/vercel-url-ready
+        - endpoints-example/frontend-ingress
+        - endpoints-example/backend-ingress
+        - endpoints-example/tunnel-app
+        - endpoints-example/cloudflared
+        - endpoints-example/api-runnable
+      timeout: 240
+  connections:
+    netlify-site:
+      runnable: endpoints-example/netlify-site
+      service: data
+    vercel-project:
+      runnable: endpoints-example/vercel-project
+      service: data
+    frontend-ingress:
+      runnable: endpoints-example/frontend-ingress
+      service: http
+    backend-ingress:
+      runnable: endpoints-example/backend-ingress
+      service: http
+    tunnel-app:
+      runnable: endpoints-example/tunnel-app
+      service: data
+    api-runnable:
+      runnable: endpoints-example/api-runnable
+      service: api
+  endpoints:
+    frontend-netlify:
+      url: <- connection-target("netlify-site") entity-state get-member("url")
+      description: Netlify site URL
+    frontend-vercel:
+      url: <- connection-target("vercel-project") entity-state get-member("url")
+      description: Vercel production URL
+    ingress-frontend:
+      url: <- "https://" connection-domain-name("frontend-ingress") concat-all
+      description: Frontend ingress domain URL
+    ingress-backend:
+      url: <- "https://" connection-domain-name("backend-ingress") "/api" concat-all
+      description: Backend ingress URL with /api route and prefix rewrite
+    ingress-backend-health:
+      url: <- "https://" connection-domain-name("backend-ingress") "/api/health" concat-all
+      description: Backend ingress URL with /api prefix rewritten to /health
+    cloudflare-tunnel:
+      url: <- "https://" connection-target("tunnel-app") entity-state get-member("hostname") concat-all
+      description: Cloudflare tunnel application URL
+    runnable-by-node-public-ip-and-port:
+      url: <- "http://" connection-public-ip("api-runnable") ":" connection-public-port("api-runnable") concat-all
+      description: Runnable URL from node public IP and public port
+    runnable-by-node-domain-and-port:
+      url: <- "http://" connection-domain-name("api-runnable") ":" connection-public-port("api-runnable") concat-all
+      description: Runnable URL via onmonk domain and public port
+
+stack:
+  defines: group
+  members:
+    - endpoints-example/netlify-site
+    - endpoints-example/netlify-static-deploy
+    - endpoints-example/vercel-project
+    - endpoints-example/vercel-static-deploy
+    - endpoints-example/vercel-url-ready
+    - endpoints-example/frontend-ingress
+    - endpoints-example/backend-ingress
+    - endpoints-example/api-runnable
+    - endpoints-example/tunnel
+    - endpoints-example/tunnel-app
+    - endpoints-example/cloudflared
+    - endpoints-example/endpoints
