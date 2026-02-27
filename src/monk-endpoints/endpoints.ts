@@ -87,7 +87,7 @@ export interface EndpointsState {
  * - `cloudflare/cloudflare-tunnel-application` - Consume `state.hostname`
  */
 export class Endpoints extends MonkEntity<EndpointsDefinition, EndpointsState> {
-    static readonly readiness = { period: 5, initialDelay: 1, attempts: 60 } as const;
+    static readonly readiness = { period: 5, initialDelay: 1, attempts: 60 };
 
     override create(): void {
         this.syncState();

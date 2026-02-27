@@ -23,7 +23,7 @@ endpoints:
       - `vercel/project` - Consume `state.url`
       - `cloudflare/cloudflare-tunnel-application` - Consume `state.hostname`
     version: 0.1.0
-    version-hash: c197212f1620
+    version-hash: 5d51f4aa3a56
   schema:
     entrypoint:
       type: string
@@ -81,8 +81,8 @@ endpoints:
   checks:
     readiness:
       period: 5
-      initialDelay: 2
-      attempts: 10
+      initialDelay: 1
+      attempts: 60
     liveness:
       period: 300
   requires:
