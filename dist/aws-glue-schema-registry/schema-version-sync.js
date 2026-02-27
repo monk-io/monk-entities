@@ -145,7 +145,7 @@ var _SchemaVersion = class _SchemaVersion extends (_a = AWSGlueSchemaRegistryEnt
       const newMetadata = this.definition.metadata;
       for (const key of Object.keys(currentMetadata)) {
         if (!(key in newMetadata)) {
-          this.removeMetadataKey(key);
+          this.removeMetadataKey(key, currentMetadata);
         }
       }
       if (Object.keys(newMetadata).length > 0) {
@@ -236,9 +236,14 @@ var _SchemaVersion = class _SchemaVersion extends (_a = AWSGlueSchemaRegistryEnt
   }
   /**
    * Remove a metadata key from this version
+   * Note: AWS API requires the actual stored value to match for deletion
    */
-  removeMetadataKey(key) {
+  removeMetadataKey(key, currentMetadata) {
     if (!this.state.schema_version_id) {
+      return;
+    }
+    const currentValue = currentMetadata[key];
+    if (currentValue === void 0) {
       return;
     }
     try {
@@ -246,8 +251,8 @@ var _SchemaVersion = class _SchemaVersion extends (_a = AWSGlueSchemaRegistryEnt
         SchemaVersionId: this.state.schema_version_id,
         MetadataKeyValue: {
           MetadataKey: key,
-          MetadataValue: ""
-          // Value is required but ignored for removal
+          MetadataValue: currentValue
+          // Must match the actual stored value
         }
       });
     } catch (error) {

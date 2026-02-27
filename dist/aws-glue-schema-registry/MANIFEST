@@ -1,5 +1,5 @@
 REPO aws-glue-schema-registry
-VERSION_HASH 9d3e3eac83bb
+VERSION_HASH e69f7d46d1f6
 namespace: aws-glue-schema-registry
 base:
   metadata:

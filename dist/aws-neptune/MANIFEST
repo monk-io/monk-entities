@@ -1,5 +1,5 @@
 REPO aws-neptune
-VERSION_HASH 75312a2900cc
+VERSION_HASH ff653fe1a1db
 namespace: aws-neptune
 base:
   metadata:

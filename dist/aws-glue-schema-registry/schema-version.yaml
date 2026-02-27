@@ -23,7 +23,7 @@ schema-version:
       - `aws-glue-schema-registry/schema` - Parent schema for this version
       - `aws-kinesis/stream` - Use version ID for data serialization
       - `aws-lambda/function` - Deserialize data using version ID
-    version-hash: 9d3e3eac83bb
+    version-hash: e69f7d46d1f6
   schema:
     region:
       type: string
