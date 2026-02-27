@@ -254,15 +254,30 @@ export class Schema extends AWSGlueSchemaRegistryEntity<SchemaDefinition, Schema
 
         this.validateDefinition();
 
-        // Update schema compatibility if changed
-        if (this.definition.compatibility && this.definition.compatibility !== this.state.compatibility) {
+        // Check if compatibility or description needs updating
+        const compatibilityChanged = this.definition.compatibility && 
+            this.definition.compatibility !== this.state.compatibility;
+        
+        // Get current schema info to check description
+        const currentInfo = this.getSchemaInfo();
+        const descriptionChanged = this.definition.schema_description !== undefined && 
+            this.definition.schema_description !== (currentInfo?.Description || '');
+
+        // Update schema if compatibility or description changed
+        if (compatibilityChanged || descriptionChanged) {
             const params: Record<string, any> = {
                 SchemaId: {
                     SchemaName: this.state.schema_name,
                     RegistryName: this.state.registry_name
-                },
-                Compatibility: this.definition.compatibility
+                }
             };
+
+            // Include compatibility (required by API, use current if not changing)
+            if (this.definition.compatibility) {
+                params.Compatibility = this.definition.compatibility;
+            } else if (this.state.compatibility) {
+                params.Compatibility = this.state.compatibility;
+            }
 
             if (this.definition.schema_description !== undefined) {
                 params.Description = this.definition.schema_description;
@@ -557,10 +572,16 @@ export class Schema extends AWSGlueSchemaRegistryEntity<SchemaDefinition, Schema
     }
 
     /**
-     * Check if a schema definition is compatible with this schema
+     * Check if a schema definition is syntactically valid.
+     * 
+     * NOTE: This action only validates that the schema definition is well-formed
+     * according to the data format (AVRO, JSON, PROTOBUF). It does NOT check
+     * compatibility with previous schema versions. To verify compatibility,
+     * use the register-version action which will fail if the schema is incompatible
+     * with the registry's compatibility mode.
      */
-    @action("check-compatibility")
-    checkCompatibility(args?: { schema_definition?: string }): void {
+    @action("check-validity")
+    checkValidity(args?: { schema_definition?: string }): void {
         if (!this.state.schema_name || !this.state.registry_name) {
             throw new Error("Schema not created yet");
         }
@@ -570,22 +591,24 @@ export class Schema extends AWSGlueSchemaRegistryEntity<SchemaDefinition, Schema
             throw new Error("schema_definition is required");
         }
 
-        cli.output(`Checking compatibility for schema '${this.state.schema_name}'...`);
+        cli.output(`Checking schema validity for '${this.state.schema_name}'...`);
+        cli.output(`Data format: ${this.state.data_format}`);
+        cli.output("");
 
         const response = this.makeGlueRequest("CheckSchemaVersionValidity", {
-            SchemaId: {
-                SchemaName: this.state.schema_name,
-                RegistryName: this.state.registry_name
-            },
             DataFormat: this.state.data_format,
             SchemaDefinition: schemaDefinition
         });
 
         cli.output("");
         if (response.Valid) {
-            cli.output("✅ Schema definition is VALID and compatible!");
+            cli.output("✅ Schema definition is syntactically VALID!");
+            cli.output("");
+            cli.output("⚠️  NOTE: This only validates syntax, not compatibility.");
+            cli.output("   To check compatibility with previous versions, use 'register-version'.");
+            cli.output(`   Current compatibility mode: ${this.state.compatibility || 'NONE'}`);
         } else {
-            cli.output("❌ Schema definition is NOT compatible.");
+            cli.output("❌ Schema definition is INVALID (syntax error).");
             if (response.Error) {
                 cli.output(`   Error: ${response.Error}`);
             }
