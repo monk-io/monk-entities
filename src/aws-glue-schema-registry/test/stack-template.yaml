@@ -1,0 +1,94 @@
+namespace: aws-glue-schema-registry-test
+
+# Test stack for AWS Glue Schema Registry entities
+# This template creates a registry, schema, and schema version for testing
+
+stack:
+  defines: process-group
+  runnable-list:
+    - aws-glue-schema-registry-test/test-registry
+    - aws-glue-schema-registry-test/test-schema
+    - aws-glue-schema-registry-test/test-schema-version
+
+# Test Registry
+test-registry:
+  defines: runnable
+  inherits: aws-glue-schema-registry/registry
+  permitted-secrets:
+    - aws-access-key-id
+    - aws-secret-access-key
+  region: us-east-1
+  registry_name: monk-test-registry
+  description: Test registry for Monk integration tests
+  tags:
+    test: "true"
+    managed-by: monk-test
+
+# Test Schema with AVRO format
+test-schema:
+  defines: runnable
+  inherits: aws-glue-schema-registry/schema
+  permitted-secrets:
+    - aws-access-key-id
+    - aws-secret-access-key
+  depends:
+    wait-for:
+      runnables:
+        - aws-glue-schema-registry-test/test-registry
+  connections:
+    registry:
+      runnable: aws-glue-schema-registry-test/test-registry
+      service: data
+  region: us-east-1
+  registry_name: <- connection-target("registry") entity-state get-member("registry_name")
+  schema_name: test-events
+  data_format: AVRO
+  compatibility: BACKWARD
+  description: Test schema for integration tests
+  schema_definition: |
+    {
+      "type": "record",
+      "name": "TestEvent",
+      "namespace": "com.monk.test",
+      "fields": [
+        {"name": "id", "type": "string"},
+        {"name": "message", "type": "string"},
+        {"name": "timestamp", "type": "long"}
+      ]
+    }
+  tags:
+    test: "true"
+
+# Test Schema Version - adds a new field
+test-schema-version:
+  defines: runnable
+  inherits: aws-glue-schema-registry/schema-version
+  permitted-secrets:
+    - aws-access-key-id
+    - aws-secret-access-key
+  depends:
+    wait-for:
+      runnables:
+        - aws-glue-schema-registry-test/test-schema
+  connections:
+    schema:
+      runnable: aws-glue-schema-registry-test/test-schema
+      service: data
+  region: us-east-1
+  registry_name: <- connection-target("schema") entity-state get-member("registry_name")
+  schema_name: <- connection-target("schema") entity-state get-member("schema_name")
+  schema_definition: |
+    {
+      "type": "record",
+      "name": "TestEvent",
+      "namespace": "com.monk.test",
+      "fields": [
+        {"name": "id", "type": "string"},
+        {"name": "message", "type": "string"},
+        {"name": "timestamp", "type": "long"},
+        {"name": "source", "type": ["null", "string"], "default": null}
+      ]
+    }
+  metadata:
+    test-key: test-value
+    version-info: Added optional source field

@@ -1,0 +1,134 @@
+namespace: azure-servicebus
+subscription:
+  defines: entity
+  metadata:
+    name: Subscription
+    description: |-
+      Azure Service Bus Subscription entity.
+      Creates and manages subscriptions within a Service Bus topic for receiving messages.
+      Subscriptions can filter messages using SQL-like rules.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.subscription_name` - Subscription name
+      - `state.topic_name` - Parent topic name
+      - `state.namespace_name` - Parent namespace name
+      - `state.message_count` - Current message count
+
+      ## Composing with Other Entities
+      Depends on:
+      - `azure-servicebus/namespace` - Parent namespace must exist
+      - `azure-servicebus/topic` - Parent topic must exist
+    version-hash: d1a44b5c91f9
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      description: Service Bus namespace name
+    topic_name:
+      type: string
+      description: Topic name
+    subscription_name:
+      type: string
+      minLength: 1
+      maxLength: 50
+      description: 'Subscription name (1-50 chars, alphanumeric, hyphens, underscores)'
+    default_message_time_to_live:
+      type: string
+      description: 'Default message time to live (ISO 8601 duration, e.g., PT1H, P14D)'
+    lock_duration:
+      type: string
+      description: 'Lock duration for peek-lock (ISO 8601 duration, max PT5M)'
+      default: PT1M
+    dead_lettering_on_message_expiration:
+      type: boolean
+      description: Enable dead lettering on message expiration
+    dead_lettering_on_filter_evaluation_exceptions:
+      type: boolean
+      description: Enable dead lettering on filter evaluation exceptions
+    max_delivery_count:
+      type: number
+      description: Maximum delivery count before dead-lettering
+      default: 10
+    requires_session:
+      type: boolean
+      description: Enable session support for ordered message processing
+    auto_delete_on_idle:
+      type: string
+      description: 'Auto-delete idle duration (ISO 8601 duration, min P5M)'
+    enable_batched_operations:
+      type: boolean
+      description: Enable batched operations
+      default: true
+    forward_to:
+      type: string
+      description: Forward messages to another queue/topic
+    forward_dead_lettered_messages_to:
+      type: string
+      description: Forward dead-lettered messages to another queue/topic
+    default_rule_filter:
+      type: string
+      description: SQL filter rule for the subscription (default rule)
+    default_rule_action:
+      type: string
+      description: SQL action for the default rule
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - topic_name
+      - subscription_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    subscription_name:
+      type: string
+      description: Subscription name (primary identifier)
+    topic_name:
+      type: string
+      description: Topic name
+    namespace_name:
+      type: string
+      description: Namespace name
+    status:
+      type: string
+      description: Subscription status
+    message_count:
+      type: number
+      description: Current message count
+    created_at:
+      type: string
+      description: Subscription creation time
+    updated_at:
+      type: string
+      description: Subscription last updated time
+  lifecycle:
+    sync: <<< subscription-sync.js
+    get-info: ''
+    list-rules: ''
+    get-runtime-info: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-servicebus/azure-servicebus-base
+    - cli
+    - monkec/base

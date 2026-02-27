@@ -1,0 +1,81 @@
+namespace: aws-glue-schema-registry
+registry:
+  defines: entity
+  metadata:
+    name: Registry
+    description: |-
+      AWS Glue Schema Registry entity.
+      Creates and manages AWS Glue Schema Registries for organizing and versioning data schemas.
+      Registries serve as containers for schemas used in data streaming and ETL pipelines.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.registry_arn` - Registry ARN for IAM policies and cross-service references
+      - `state.registry_name` - Registry name for schema creation
+      - `state.status` - Current registry status (AVAILABLE, DELETING)
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-glue-schema-registry/schema` - Create schemas within this registry
+      - `aws-iam/role` - Grant registry access to Lambda, Glue jobs, or streaming applications
+    version-hash: 4ae106d1a990
+  schema:
+    region:
+      type: string
+      description: AWS region for the Schema Registry
+    registry_name:
+      type: string
+      description: 'Unique name for the schema registry (1-255 chars, alphanumeric with hyphens/underscores)'
+    registry_description:
+      type: string
+      description: Human-readable description of the registry
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the registry
+      description: Resource tags for the registry
+    required:
+      - region
+      - registry_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    registry_arn:
+      type: string
+      description: Full ARN of the registry
+    registry_name:
+      type: string
+      description: Registry name
+    status:
+      type: string
+      enum:
+        - AVAILABLE
+        - DELETING
+      description: 'Current status of the registry (AVAILABLE, DELETING)'
+    created_time:
+      type: string
+      description: Registry creation timestamp
+    updated_time:
+      type: string
+      description: Registry last updated timestamp
+  lifecycle:
+    sync: <<< registry-sync.js
+    get-info: ''
+    list-schemas: ''
+    list-registries: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - aws-glue-schema-registry/glue-schema-registry-base
+    - cli
+    - aws-glue-schema-registry/common

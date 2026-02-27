@@ -1,0 +1,5 @@
+REPO azure-eventhubs
+VERSION_HASH ad31b513b19e
+namespace: azure-eventhubs
+LOAD event-hubs-namespace.yaml azure-eventhubs-base.yaml event-hub.yaml consumer-group.yaml
+RESOURCES azure-eventhubs-base.js event-hub-sync.js consumer-group-sync.js event-hubs-namespace-sync.js

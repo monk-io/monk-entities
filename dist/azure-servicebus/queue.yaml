@@ -1,0 +1,136 @@
+namespace: azure-servicebus
+queue:
+  defines: entity
+  metadata:
+    name: Queue
+    description: |-
+      Azure Service Bus Queue entity.
+      Creates and manages queues within a Service Bus namespace for point-to-point messaging.
+      Supports features like sessions, dead-lettering, and message forwarding.
+
+      ## Secrets
+      - Reads: none (authenticated via Azure provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.queue_name` - Queue name
+      - `state.namespace_name` - Parent namespace name
+      - `state.message_count` - Current message count
+
+      ## Composing with Other Entities
+      Depends on:
+      - `azure-servicebus/namespace` - Parent namespace must exist
+    version-hash: d1a44b5c91f9
+  schema:
+    subscription_id:
+      type: string
+      description: Azure subscription ID
+    resource_group_name:
+      type: string
+      description: Azure resource group name
+    create_when_missing:
+      type: boolean
+      description: Create resource even if it doesn't exist (for testing)
+      default: true
+    namespace_name:
+      type: string
+      description: Service Bus namespace name
+    queue_name:
+      type: string
+      minLength: 1
+      maxLength: 260
+      description: 'Queue name (1-260 chars, alphanumeric, hyphens, underscores, periods)'
+    max_size_in_megabytes:
+      type: number
+      description: 'Maximum queue size in megabytes (1024, 2048, 3072, 4096, 5120, 10240, 20480, 40960, 81920)'
+      default: 1024
+    default_message_time_to_live:
+      type: string
+      description: 'Default message time to live (ISO 8601 duration, e.g., PT1H, P14D)'
+      default: P14D
+    lock_duration:
+      type: string
+      description: 'Lock duration for peek-lock (ISO 8601 duration, max PT5M)'
+      default: PT1M
+    requires_duplicate_detection:
+      type: boolean
+      description: Enable duplicate detection
+    duplicate_detection_history_time_window:
+      type: string
+      description: Duplicate detection history time window (ISO 8601 duration)
+    dead_lettering_on_message_expiration:
+      type: boolean
+      description: Enable dead lettering on message expiration
+    max_delivery_count:
+      type: number
+      description: Maximum delivery count before dead-lettering
+      default: 10
+    requires_session:
+      type: boolean
+      description: Enable session support for ordered message processing
+    enable_partitioning:
+      type: boolean
+      description: Enable partitioning for high throughput
+    enable_express:
+      type: boolean
+      description: 'Enable express entities (in-memory, not persisted)'
+    auto_delete_on_idle:
+      type: string
+      description: 'Auto-delete idle duration (ISO 8601 duration, min P5M)'
+    enable_batched_operations:
+      type: boolean
+      description: Enable batched operations
+      default: true
+    forward_to:
+      type: string
+      description: Forward messages to another queue/topic
+    forward_dead_lettered_messages_to:
+      type: string
+      description: Forward dead-lettered messages to another queue/topic
+    required:
+      - subscription_id
+      - resource_group_name
+      - namespace_name
+      - queue_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    provisioning_state:
+      type: string
+      description: The provisioning state of the resource
+    queue_name:
+      type: string
+      description: Queue name (primary identifier)
+    namespace_name:
+      type: string
+      description: Namespace name
+    status:
+      type: string
+      description: Queue status
+    message_count:
+      type: number
+      description: Current message count
+    size_in_bytes:
+      type: number
+      description: Queue size in bytes
+    created_at:
+      type: string
+      description: Queue creation time
+    updated_at:
+      type: string
+      description: Queue last updated time
+  lifecycle:
+    sync: <<< queue-sync.js
+    get-info: ''
+    purge-messages: ''
+    get-runtime-info: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 20
+  requires:
+    - azure-servicebus/azure-servicebus-base
+    - cli
+    - monkec/base

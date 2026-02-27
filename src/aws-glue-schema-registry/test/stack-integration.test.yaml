@@ -1,0 +1,189 @@
+# Integration tests for AWS Glue Schema Registry entities
+# Run with: sudo INPUT_DIR=./src/aws-glue-schema-registry/ ./monkec.sh test
+
+namespace: aws-glue-schema-registry-test
+
+tests:
+  # ==================== Registry Tests ====================
+  
+  - name: Registry should be created and available
+    target: aws-glue-schema-registry-test/test-registry
+    assertions:
+      - type: state
+        path: registry_name
+        operator: equals
+        value: monk-test-registry
+      - type: state
+        path: status
+        operator: equals
+        value: AVAILABLE
+      - type: state
+        path: registry_arn
+        operator: contains
+        value: "arn:aws:glue:"
+      - type: state
+        path: existing
+        operator: equals
+        value: false
+
+  - name: Registry get-info action should work
+    target: aws-glue-schema-registry-test/test-registry
+    action: get-info
+    assertions:
+      - type: action_success
+
+  - name: Registry list-schemas action should work
+    target: aws-glue-schema-registry-test/test-registry
+    action: list-schemas
+    assertions:
+      - type: action_success
+
+  - name: Registry list-registries action should work
+    target: aws-glue-schema-registry-test/test-registry
+    action: list-registries
+    assertions:
+      - type: action_success
+
+  # ==================== Schema Tests ====================
+
+  - name: Schema should be created and available
+    target: aws-glue-schema-registry-test/test-schema
+    assertions:
+      - type: state
+        path: schema_name
+        operator: equals
+        value: test-events
+      - type: state
+        path: registry_name
+        operator: equals
+        value: monk-test-registry
+      - type: state
+        path: status
+        operator: equals
+        value: AVAILABLE
+      - type: state
+        path: data_format
+        operator: equals
+        value: AVRO
+      - type: state
+        path: compatibility
+        operator: equals
+        value: BACKWARD
+      - type: state
+        path: schema_arn
+        operator: contains
+        value: "arn:aws:glue:"
+      - type: state
+        path: latest_schema_version
+        operator: gte
+        value: 1
+
+  - name: Schema get-info action should work
+    target: aws-glue-schema-registry-test/test-schema
+    action: get-info
+    assertions:
+      - type: action_success
+
+  - name: Schema list-versions action should work
+    target: aws-glue-schema-registry-test/test-schema
+    action: list-versions
+    assertions:
+      - type: action_success
+
+  - name: Schema get-version action should work
+    target: aws-glue-schema-registry-test/test-schema
+    action: get-version
+    assertions:
+      - type: action_success
+
+  - name: Schema get-definition action should work
+    target: aws-glue-schema-registry-test/test-schema
+    action: get-definition
+    assertions:
+      - type: action_success
+
+  - name: Schema check-compatibility action should validate compatible schema
+    target: aws-glue-schema-registry-test/test-schema
+    action: check-compatibility
+    args:
+      schema_definition: |
+        {
+          "type": "record",
+          "name": "TestEvent",
+          "namespace": "com.monk.test",
+          "fields": [
+            {"name": "id", "type": "string"},
+            {"name": "message", "type": "string"},
+            {"name": "timestamp", "type": "long"},
+            {"name": "extra", "type": ["null", "string"], "default": null}
+          ]
+        }
+    assertions:
+      - type: action_success
+
+  # ==================== Schema Version Tests ====================
+
+  - name: Schema version should be created and available
+    target: aws-glue-schema-registry-test/test-schema-version
+    assertions:
+      - type: state
+        path: schema_version_id
+        operator: not_empty
+      - type: state
+        path: version_number
+        operator: gte
+        value: 2
+      - type: state
+        path: status
+        operator: equals
+        value: AVAILABLE
+      - type: state
+        path: schema_name
+        operator: equals
+        value: test-events
+      - type: state
+        path: registry_name
+        operator: equals
+        value: monk-test-registry
+
+  - name: Schema version get-info action should work
+    target: aws-glue-schema-registry-test/test-schema-version
+    action: get-info
+    assertions:
+      - type: action_success
+
+  - name: Schema version get-definition action should work
+    target: aws-glue-schema-registry-test/test-schema-version
+    action: get-definition
+    assertions:
+      - type: action_success
+
+  - name: Schema version query-metadata action should work
+    target: aws-glue-schema-registry-test/test-schema-version
+    action: query-metadata
+    assertions:
+      - type: action_success
+
+  - name: Schema version check-validity action should work
+    target: aws-glue-schema-registry-test/test-schema-version
+    action: check-validity
+    assertions:
+      - type: action_success
+
+  # ==================== Cross-Entity Tests ====================
+
+  - name: Schema should reference correct registry
+    target: aws-glue-schema-registry-test/test-schema
+    assertions:
+      - type: state
+        path: registry_name
+        operator: equals
+        value: monk-test-registry
+
+  - name: Schema version should have metadata from definition
+    target: aws-glue-schema-registry-test/test-schema-version
+    action: query-metadata
+    args:
+      key: test-key
+    assertions:
+      - type: action_success

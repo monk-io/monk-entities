@@ -1,0 +1,78 @@
+namespace: aws-neptune
+cluster-parameter-group:
+  defines: entity
+  metadata:
+    name: ClusterParameterGroup
+    description: |-
+      AWS Neptune Cluster Parameter Group entity.
+      Creates and manages Neptune cluster parameter groups for configuring cluster-level settings.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.db_cluster_parameter_group_arn` - Parameter group ARN
+      - `state.db_cluster_parameter_group_name` - Parameter group name for cluster configuration
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-neptune/cluster` - Apply this parameter group to clusters
+    version-hash: e36ddcfc0641
+  schema:
+    region:
+      type: string
+      description: AWS region for the Neptune resource
+    db_cluster_parameter_group_name:
+      type: string
+      description: Name for the cluster parameter group (1-255 chars)
+    db_parameter_group_family:
+      type: string
+      description: 'DB parameter group family (e.g., neptune1, neptune1.2)'
+    parameter_group_description:
+      type: string
+      description: Human-readable description of the parameter group
+    parameters:
+      type: object
+      additionalProperties:
+        type: string
+        description: Parameters to set in the group
+      description: Parameters to set in the group
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the parameter group
+      description: Resource tags for the parameter group
+    required:
+      - region
+      - db_cluster_parameter_group_name
+      - db_parameter_group_family
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    db_cluster_parameter_group_arn:
+      type: string
+      description: Full ARN of the parameter group
+    db_cluster_parameter_group_name:
+      type: string
+      description: Parameter group name
+    db_parameter_group_family:
+      type: string
+      description: Parameter group family
+  lifecycle:
+    sync: <<< cluster-parameter-group-sync.js
+    get-info: ''
+    list-parameters: ''
+    reset-parameters: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - aws-neptune/neptune-base
+    - cli

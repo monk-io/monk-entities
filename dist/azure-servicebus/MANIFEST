@@ -1,0 +1,10 @@
+REPO azure-servicebus
+VERSION_HASH d1a44b5c91f9
+namespace: azure-servicebus
+entities:
+  - namespace
+  - queue
+  - topic
+  - subscription
+LOAD azure-servicebus-base.yaml namespace.yaml subscription.yaml topic.yaml queue.yaml service-bus-namespace.yaml
+RESOURCES namespace-sync.js queue-sync.js subscription-sync.js topic-sync.js service-bus-namespace-sync.js azure-servicebus-base.js

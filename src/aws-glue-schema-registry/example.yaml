@@ -1,0 +1,55 @@
+namespace: aws-glue-schema-registry-example
+
+# Schema Registry - container for schemas
+my-registry:
+  defines: aws-glue-schema-registry/registry
+  region: us-east-1
+  registry_name: example-data-registry
+  registry_description: Example schema registry for data pipeline schemas
+  tags:
+    environment: development
+    managed-by: monk
+
+# AVRO Schema for user events
+user-events-schema:
+  defines: aws-glue-schema-registry/schema
+  depends:
+    wait-for:
+      runnables:
+        - aws-glue-schema-registry-example/my-registry
+  connections:
+    registry:
+      runnable: aws-glue-schema-registry-example/my-registry
+      service: data
+  region: us-east-1
+  registry_name: <- connection-target("registry") entity-state get-member("registry_name")
+  schema_name: user-events
+  data_format: AVRO
+  compatibility: BACKWARD
+  schema_description: Schema for user event tracking data
+  schema_definition: '{"type":"record","name":"UserEvent","namespace":"com.example.events","fields":[{"name":"event_id","type":"string"},{"name":"user_id","type":"string"},{"name":"timestamp","type":"long"}]}'
+  tags:
+    domain: analytics
+    data-type: events
+
+# JSON Schema for orders
+order-schema:
+  defines: aws-glue-schema-registry/schema
+  depends:
+    wait-for:
+      runnables:
+        - aws-glue-schema-registry-example/my-registry
+  connections:
+    registry:
+      runnable: aws-glue-schema-registry-example/my-registry
+      service: data
+  region: us-east-1
+  registry_name: <- connection-target("registry") entity-state get-member("registry_name")
+  schema_name: orders
+  data_format: JSON
+  compatibility: FULL
+  schema_description: Schema for e-commerce order data
+  schema_definition: '{"$schema":"http://json-schema.org/draft-07/schema#","title":"Order","type":"object","properties":{"order_id":{"type":"string"},"customer_id":{"type":"string"},"status":{"type":"string"},"total_amount":{"type":"number"}},"required":["order_id","customer_id","status","total_amount"]}'
+  tags:
+    domain: commerce
+    data-type: transactions
