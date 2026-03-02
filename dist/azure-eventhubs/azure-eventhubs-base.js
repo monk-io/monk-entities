@@ -232,22 +232,6 @@ var _AzureEventHubsEntity = class _AzureEventHubsEntity extends import_base.Monk
       return null;
     }
   }
-  /**
-   * Check if response indicates success
-   */
-  isSuccessResponse(response) {
-    return !response.error && response.statusCode !== void 0 && response.statusCode >= 200 && response.statusCode < 300;
-  }
-  /**
-   * Format bytes to human-readable format
-   */
-  formatBytes(bytes) {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  }
 };
 // Event Hubs namespaces typically provision in 1-3 minutes
 // Total timeout: 10s initial + (20 attempts × 15s) = ~5 minutes

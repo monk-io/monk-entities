@@ -296,14 +296,4 @@ export abstract class AzureStorageEntity<
             return null;
         }
     }
-
-    /**
-     * Check if response indicates success
-     */
-    protected isSuccessResponse(response: AzureResponse): boolean {
-        return !response.error && 
-               response.statusCode !== undefined && 
-               response.statusCode >= 200 && 
-               response.statusCode < 300;
-    }
 }

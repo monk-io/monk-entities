@@ -315,16 +315,6 @@ export abstract class AzureServiceBusEntity<
     }
 
     /**
-     * Check if response indicates success
-     */
-    protected isSuccessResponse(response: AzureResponse): boolean {
-        return !response.error && 
-               response.statusCode !== undefined && 
-               response.statusCode >= 200 && 
-               response.statusCode < 300;
-    }
-
-    /**
      * Convert ISO 8601 duration string to human-readable format
      */
     protected formatDuration(isoDuration: string): string {

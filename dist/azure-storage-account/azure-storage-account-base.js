@@ -214,12 +214,6 @@ var _AzureStorageEntity = class _AzureStorageEntity extends import_base.MonkEnti
       return null;
     }
   }
-  /**
-   * Check if response indicates success
-   */
-  isSuccessResponse(response) {
-    return !response.error && response.statusCode !== void 0 && response.statusCode >= 200 && response.statusCode < 300;
-  }
 };
 // Azure Storage Account typically provisions quickly (1-2 minutes)
 // Total timeout: 5s initial + (30 attempts × 10s) = ~5 minutes

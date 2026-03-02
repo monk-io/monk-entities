@@ -320,24 +320,4 @@ export abstract class AzureEventHubsEntity<
         }
     }
 
-    /**
-     * Check if response indicates success
-     */
-    protected isSuccessResponse(response: AzureResponse): boolean {
-        return !response.error && 
-               response.statusCode !== undefined && 
-               response.statusCode >= 200 && 
-               response.statusCode < 300;
-    }
-
-    /**
-     * Format bytes to human-readable format
-     */
-    protected formatBytes(bytes: number): string {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
 }

@@ -22,7 +22,7 @@ topic:
       - `azure-servicebus/namespace` - Parent namespace must exist
       Works with:
       - `azure-servicebus/subscription` - Create subscriptions to receive messages
-    version-hash: 6a861cbbad11
+    version-hash: b3d1c1813873
   schema:
     subscription_id:
       type: string
