@@ -585,13 +585,16 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
     }
 
     override checkReadiness(): boolean {
-        if (!this.state.account_name) {
-            return false;
+        // If create_when_missing is false and resource doesn't exist, consider it ready
+        // Check this first before checking state.account_name since state may only have { existing: false }
+        if (this.definition.create_when_missing === false && this.state.existing === false) {
+            cli.output(`✅ Storage account ${this.definition.account_name} not created (create_when_missing is false)`);
+            return true;
         }
 
-        // If create_when_missing is false and resource doesn't exist, consider it ready
-        if (this.definition.create_when_missing === false && !this.state.existing) {
-            return true;
+        if (!this.state.account_name) {
+            cli.output(`⏳ Storage account not yet created`);
+            return false;
         }
 
         try {

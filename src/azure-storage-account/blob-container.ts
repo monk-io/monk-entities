@@ -288,13 +288,16 @@ export class BlobContainer extends AzureStorageEntity<BlobContainerDefinition, B
     }
 
     override checkReadiness(): boolean {
-        if (!this.state.container_name) {
-            return false;
+        // If create_when_missing is false and resource doesn't exist, consider it ready
+        // Check this first before checking state.container_name since state may only have { existing: false }
+        if (this.definition.create_when_missing === false && this.state.existing === false) {
+            cli.output(`✅ Blob container ${this.definition.container_name} not created (create_when_missing is false)`);
+            return true;
         }
 
-        // If create_when_missing is false and resource doesn't exist, consider it ready
-        if (this.definition.create_when_missing === false && !this.state.existing) {
-            return true;
+        if (!this.state.container_name) {
+            cli.output(`⏳ Blob container not yet created`);
+            return false;
         }
 
         try {
@@ -421,16 +424,28 @@ export class BlobContainer extends AzureStorageEntity<BlobContainerDefinition, B
             );
         }
 
-        const tags = enabled === "true" ? ["legal-hold"] : [];
-
         try {
-            const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/setLegalHold?api-version=${this.apiVersion}`;
-            const body = { tags };
-            
-            const response = this.makeAzureRequest("POST", path, body);
+            // Azure requires different endpoints for setting vs clearing legal hold
+            // setLegalHold only adds tags, clearLegalHold removes them
+            if (enabled === "true") {
+                const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/setLegalHold?api-version=${this.apiVersion}`;
+                const body = { tags: ["legal-hold"] };
+                
+                const response = this.makeAzureRequest("POST", path, body);
 
-            if (response.error) {
-                throw new Error(`API error: ${response.error}, body: ${response.body}`);
+                if (response.error) {
+                    throw new Error(`API error: ${response.error}, body: ${response.body}`);
+                }
+            } else {
+                // Use clearLegalHold endpoint to remove legal hold tags
+                const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/clearLegalHold?api-version=${this.apiVersion}`;
+                const body = { tags: ["legal-hold"] };
+                
+                const response = this.makeAzureRequest("POST", path, body);
+
+                if (response.error) {
+                    throw new Error(`API error: ${response.error}, body: ${response.body}`);
+                }
             }
 
             cli.output(`\n✅ Legal hold ${enabled === "true" ? "enabled" : "disabled"} on container ${this.definition.container_name}`);

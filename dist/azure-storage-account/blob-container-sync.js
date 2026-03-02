@@ -179,11 +179,13 @@ var _BlobContainer = class _BlobContainer extends (_a = AzureStorageEntity, _get
     this.deleteResource(this.definition.container_name);
   }
   checkReadiness() {
-    if (!this.state.container_name) {
-      return false;
-    }
-    if (this.definition.create_when_missing === false && !this.state.existing) {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      cli.output(`\u2705 Blob container ${this.definition.container_name} not created (create_when_missing is false)`);
       return true;
+    }
+    if (!this.state.container_name) {
+      cli.output(`\u23F3 Blob container not yet created`);
+      return false;
     }
     try {
       const container = this.checkResourceExists(this.definition.container_name);
@@ -272,13 +274,21 @@ Usage: monk do namespace/blob-container set-legal-hold enabled="true"
 Valid values: true, false`
       );
     }
-    const tags = enabled === "true" ? ["legal-hold"] : [];
     try {
-      const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/setLegalHold?api-version=${this.apiVersion}`;
-      const body = { tags };
-      const response = this.makeAzureRequest("POST", path, body);
-      if (response.error) {
-        throw new Error(`API error: ${response.error}, body: ${response.body}`);
+      if (enabled === "true") {
+        const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/setLegalHold?api-version=${this.apiVersion}`;
+        const body = { tags: ["legal-hold"] };
+        const response = this.makeAzureRequest("POST", path, body);
+        if (response.error) {
+          throw new Error(`API error: ${response.error}, body: ${response.body}`);
+        }
+      } else {
+        const path = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.storage_account_name}/blobServices/default/containers/${this.definition.container_name}/clearLegalHold?api-version=${this.apiVersion}`;
+        const body = { tags: ["legal-hold"] };
+        const response = this.makeAzureRequest("POST", path, body);
+        if (response.error) {
+          throw new Error(`API error: ${response.error}, body: ${response.body}`);
+        }
       }
       cli.output(`
 \u2705 Legal hold ${enabled === "true" ? "enabled" : "disabled"} on container ${this.definition.container_name}`);

@@ -73,17 +73,22 @@ var _ServiceBusNamespace = class _ServiceBusNamespace extends (_a = AzureService
     if (existsResult.resource) {
       const existingNamespace = existsResult.resource;
       const properties2 = existingNamespace.properties;
+      const provisioningState = typeof properties2?.provisioningState === "string" ? properties2.provisioningState : void 0;
       this.state = {
         namespace_name: this.definition.namespace_name,
         service_bus_endpoint: typeof properties2?.serviceBusEndpoint === "string" ? properties2.serviceBusEndpoint : void 0,
         location: typeof existingNamespace.location === "string" ? existingNamespace.location : void 0,
         sku_tier: typeof existingNamespace.sku?.tier === "string" ? existingNamespace.sku.tier : void 0,
-        provisioning_state: typeof properties2?.provisioningState === "string" ? properties2.provisioningState : void 0,
+        provisioning_state: provisioningState,
         created_at: typeof properties2?.createdAt === "string" ? properties2.createdAt : void 0,
         updated_at: typeof properties2?.updatedAt === "string" ? properties2.updatedAt : void 0,
         existing: true
       };
       cli.output(`\u2705 Service Bus namespace ${this.definition.namespace_name} already exists`);
+      if (provisioningState === "Succeeded") {
+        cli.output(`\u{1F511} Existing namespace is ready, attempting to populate secrets...`);
+        this.populateSecrets();
+      }
       return;
     }
     if (this.definition.create_when_missing === false) {
