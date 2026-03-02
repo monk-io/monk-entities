@@ -830,7 +830,6 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                 cli.output(`\n🔑 Updating secrets with new keys...`);
                 this.state.secrets_populated = false;
                 this.populateAccountSecrets();
-                this.state.secrets_populated = true;
             }
 
             cli.output(`\n==================================================`);
