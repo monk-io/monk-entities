@@ -20,7 +20,7 @@ service-bus-namespace:
       Works with:
       - `azure-servicebus/queue` - Create queues within the namespace
       - `azure-servicebus/topic` - Create topics within the namespace
-    version-hash: d1a44b5c91f9
+    version-hash: bb2e7c0cd5b9
   schema:
     subscription_id:
       type: string

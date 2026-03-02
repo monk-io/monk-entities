@@ -266,7 +266,7 @@ var _Topic = class _Topic extends (_a = AzureServiceBusEntity, _getInfo_dec = [a
     cli.output(`   Requires Duplicate Detection: ${properties?.requiresDuplicateDetection || false}`);
     cli.output(`   Enable Partitioning: ${properties?.enablePartitioning || false}`);
     cli.output(`   Enable Express: ${properties?.enableExpress || false}`);
-    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations || true}`);
+    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations ?? true}`);
     cli.output(`   Support Ordering: ${properties?.supportOrdering || false}`);
     cli.output(`
 \u{1F4C5} Timestamps:`);

@@ -178,10 +178,23 @@ export abstract class AzurePostgreSQLEntity<
         }
 
         cli.output(`📡 Response status: ${response.statusCode}`);
-        cli.output(`📡 Response body: ${response.body}`);
+        
+        // Redact sensitive fields from response body before logging
+        if (response.body) {
+            try {
+                const parsedBody = JSON.parse(response.body);
+                const redactedBody = this.redactSensitiveFields(parsedBody);
+                cli.output(`📡 Response body: ${JSON.stringify(redactedBody)}`);
+            } catch {
+                // If not JSON, log as-is (non-JSON responses typically don't contain secrets)
+                cli.output(`📡 Response body: ${response.body}`);
+            }
+        } else {
+            cli.output(`📡 Response body: `);
+        }
         
         if (response.error) {
-            cli.output(`❌ Error response: ${response.error}, body: ${response.body}`);
+            cli.output(`❌ Error response: ${response.error}`);
         }
 
         return response;

@@ -291,7 +291,7 @@ var _Queue = class _Queue extends (_a = AzureServiceBusEntity, _getInfo_dec = [a
     cli.output(`   Dead Lettering on Expiration: ${properties?.deadLetteringOnMessageExpiration || false}`);
     cli.output(`   Enable Partitioning: ${properties?.enablePartitioning || false}`);
     cli.output(`   Enable Express: ${properties?.enableExpress || false}`);
-    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations || true}`);
+    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations ?? true}`);
     if (properties?.forwardTo) {
       cli.output(`
 \u27A1\uFE0F  Forwarding:`);

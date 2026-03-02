@@ -118,9 +118,19 @@ var _AzurePostgreSQLEntity = class _AzurePostgreSQLEntity extends import_base.Mo
         throw new Error(`Unsupported HTTP method: ${method}`);
     }
     import_cli.default.output(`\u{1F4E1} Response status: ${response.statusCode}`);
-    import_cli.default.output(`\u{1F4E1} Response body: ${response.body}`);
+    if (response.body) {
+      try {
+        const parsedBody = JSON.parse(response.body);
+        const redactedBody = this.redactSensitiveFields(parsedBody);
+        import_cli.default.output(`\u{1F4E1} Response body: ${JSON.stringify(redactedBody)}`);
+      } catch {
+        import_cli.default.output(`\u{1F4E1} Response body: ${response.body}`);
+      }
+    } else {
+      import_cli.default.output(`\u{1F4E1} Response body: `);
+    }
     if (response.error) {
-      import_cli.default.output(`\u274C Error response: ${response.error}, body: ${response.body}`);
+      import_cli.default.output(`\u274C Error response: ${response.error}`);
     }
     return response;
   }
