@@ -3,5 +3,5 @@ namespace: azure-eventhubs
 azure-eventhubs-base:
   defines: module
   metadata:
-    version-hash: ad31b513b19e
+    version-hash: dc4925717ee6
   source: <<< azure-eventhubs-base.js

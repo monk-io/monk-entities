@@ -325,7 +325,7 @@ var _Subscription = class _Subscription extends (_a = AzureServiceBusEntity, _ge
     cli.output(`   Requires Session: ${properties?.requiresSession || false}`);
     cli.output(`   Dead Lettering on Expiration: ${properties?.deadLetteringOnMessageExpiration || false}`);
     cli.output(`   Dead Lettering on Filter Exceptions: ${properties?.deadLetteringOnFilterEvaluationExceptions || false}`);
-    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations || true}`);
+    cli.output(`   Enable Batched Operations: ${properties?.enableBatchedOperations ?? true}`);
     if (properties?.forwardTo) {
       cli.output(`
 \u27A1\uFE0F  Forwarding:`);

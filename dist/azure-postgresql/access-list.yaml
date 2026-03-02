@@ -74,7 +74,7 @@ access-list:
       | Other cloud/region | `network.public_network_access: Enabled` | YES |
 
       ---
-    version-hash: a61f1eedff68
+    version-hash: 9064afb19a2f
   schema:
     subscription_id:
       type: string
