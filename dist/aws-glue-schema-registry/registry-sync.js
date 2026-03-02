@@ -131,11 +131,9 @@ var _Registry = class _Registry extends (_a = AWSGlueSchemaRegistryEntity, _getI
     this.validateDefinition();
     if (this.definition.registry_description !== void 0) {
       const params = {
-        RegistryId: { RegistryName: this.state.registry_name }
+        RegistryId: { RegistryName: this.state.registry_name },
+        Description: this.definition.registry_description
       };
-      if (this.definition.registry_description) {
-        params.Description = this.definition.registry_description;
-      }
       this.makeGlueRequest("UpdateRegistry", params);
     }
     if (this.definition.tags) {
