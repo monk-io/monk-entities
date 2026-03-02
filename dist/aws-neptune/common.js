@@ -368,7 +368,7 @@ function checkSecurityGroupExists(region, groupId) {
     });
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes("InvalidGroupId.NotFound")) {
+    if (error instanceof Error && error.message.includes("InvalidGroup.NotFound")) {
       return false;
     }
     throw error;
