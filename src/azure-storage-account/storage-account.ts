@@ -334,7 +334,6 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
             if (provisioningState === "Succeeded") {
                 cli.output(`🔑 Existing account is ready, attempting to populate secrets...`);
                 this.populateAccountSecrets();
-                this.state.secrets_populated = true;
             }
             return;
         }
@@ -627,7 +626,6 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                 if (!this.state.secrets_populated) {
                     cli.output(`🔑 Account is ready, attempting to populate secrets...`);
                     this.populateAccountSecrets();
-                    this.state.secrets_populated = true;
                 }
             } else {
                 cli.output(`⏳ Storage account ${this.definition.account_name} not ready yet (status: ${provisioningState || 'unknown'})`);
@@ -652,6 +650,7 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
         if (!this.definition.primary_key_secret_ref && 
             !this.definition.secondary_key_secret_ref &&
             !this.definition.connection_string_secret_ref) {
+            this.state.secrets_populated = true;
             return; // No secrets to populate
         }
 
@@ -679,6 +678,7 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                         cli.output(`🔑 Saved primary key to secret: ${this.definition.primary_key_secret_ref}`);
                     } catch (error) {
                         cli.output(`⚠️  Failed to save primary key to secret: ${this.definition.primary_key_secret_ref}`);
+                        return;
                     }
                 }
 
@@ -689,6 +689,7 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                         cli.output(`🔑 Saved secondary key to secret: ${this.definition.secondary_key_secret_ref}`);
                     } catch (error) {
                         cli.output(`⚠️  Failed to save secondary key to secret: ${this.definition.secondary_key_secret_ref}`);
+                        return;
                     }
                 }
 
@@ -700,8 +701,12 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                         cli.output(`🔑 Saved connection string to secret: ${this.definition.connection_string_secret_ref}`);
                     } catch (error) {
                         cli.output(`⚠️  Failed to save connection string to secret: ${this.definition.connection_string_secret_ref}`);
+                        return;
                     }
                 }
+
+                // Only mark as populated after all secrets are successfully saved
+                this.state.secrets_populated = true;
             } else {
                 cli.output(`⚠️  No keys data received from Azure API`);
             }
