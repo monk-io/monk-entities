@@ -181,10 +181,11 @@ export class EventHubsNamespace extends AzureEventHubsEntity<EventHubsNamespaceD
             // Namespace exists
             const props = existingResult.resource.properties as Record<string, unknown>;
             const sku = existingResult.resource.sku as Record<string, unknown>;
+            const provisioningState = props.provisioningState as string;
             
             this.state.existing = true;
             this.state.namespace_name = namespaceName;
-            this.state.provisioning_state = props.provisioningState as string;
+            this.state.provisioning_state = provisioningState;
             this.state.service_bus_endpoint = props.serviceBusEndpoint as string;
             this.state.location = existingResult.resource.location as string;
             this.state.sku_tier = sku?.tier as string;
@@ -193,8 +194,11 @@ export class EventHubsNamespace extends AzureEventHubsEntity<EventHubsNamespaceD
             
             cli.output(`✅ Found existing Event Hubs namespace: ${namespaceName}`);
             
-            // Populate secrets if configured
-            this.populateSecrets();
+            // If existing namespace is ready, populate secrets immediately
+            if (provisioningState === "Succeeded") {
+                cli.output(`🔑 Existing namespace is ready, attempting to populate secrets...`);
+                this.populateSecrets();
+            }
             return;
         }
         
@@ -287,6 +291,7 @@ export class EventHubsNamespace extends AzureEventHubsEntity<EventHubsNamespaceD
     private populateSecrets(): void {
         if (!this.definition.primary_connection_string_secret_ref && 
             !this.definition.secondary_connection_string_secret_ref) {
+            this.state.secrets_populated = true;
             return;
         }
 
