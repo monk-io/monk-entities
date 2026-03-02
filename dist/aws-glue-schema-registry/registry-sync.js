@@ -136,8 +136,7 @@ var _Registry = class _Registry extends (_a = AWSGlueSchemaRegistryEntity, _getI
       if (this.definition.registry_description) {
         params.Description = this.definition.registry_description;
       }
-      const response = this.makeGlueRequest("UpdateRegistry", params);
-      this.state.updated_time = response.UpdatedTime;
+      this.makeGlueRequest("UpdateRegistry", params);
     }
     if (this.definition.tags) {
       this.updateTags();

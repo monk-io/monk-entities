@@ -370,7 +370,7 @@ var _Cluster = class _Cluster extends (_a = AWSNeptuneEntity, _getInfo_dec = [ac
     if (!this.state.db_cluster_identifier) {
       throw new Error("Cluster not created yet");
     }
-    if (!args.snapshot_identifier) {
+    if (!args?.snapshot_identifier) {
       throw new Error("snapshot_identifier is required");
     }
     this.makeNeptuneRequest("CreateDBClusterSnapshot", {

@@ -553,12 +553,12 @@ export class Cluster extends AWSNeptuneEntity<ClusterDefinition, ClusterState> {
      * Create a manual snapshot of the cluster
      */
     @action("create-snapshot")
-    createSnapshot(args: { snapshot_identifier: string }): void {
+    createSnapshot(args?: { snapshot_identifier: string }): void {
         if (!this.state.db_cluster_identifier) {
             throw new Error("Cluster not created yet");
         }
 
-        if (!args.snapshot_identifier) {
+        if (!args?.snapshot_identifier) {
             throw new Error("snapshot_identifier is required");
         }
 

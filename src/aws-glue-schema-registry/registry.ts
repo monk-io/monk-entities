@@ -165,8 +165,9 @@ export class Registry extends AWSGlueSchemaRegistryEntity<RegistryDefinition, Re
                 params.Description = this.definition.registry_description;
             }
 
-            const response = this.makeGlueRequest("UpdateRegistry", params);
-            this.state.updated_time = response.UpdatedTime;
+            this.makeGlueRequest("UpdateRegistry", params);
+            // Note: UpdateRegistry response only contains RegistryArn, RegistryName, Description
+            // It does NOT return UpdatedTime, so we preserve existing state.updated_time
         }
 
         // Update tags if specified

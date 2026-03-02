@@ -20,25 +20,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // input/aws-glue-schema-registry/common.ts
 var common_exports = {};
 __export(common_exports, {
-  buildRegistryId: () => buildRegistryId,
-  buildSchemaId: () => buildSchemaId,
-  convertTagsToArray: () => convertTagsToArray,
-  convertTagsToObject: () => convertTagsToObject,
   validateRegistryName: () => validateRegistryName,
   validateSchemaName: () => validateSchemaName
 });
 module.exports = __toCommonJS(common_exports);
-function convertTagsToArray(tags) {
-  return Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
-}
-function convertTagsToObject(tags) {
-  if (!tags) return {};
-  const result = {};
-  for (const tag of tags) {
-    result[tag.Key] = tag.Value;
-  }
-  return result;
-}
 function validateRegistryName(name) {
   if (!name || name.length < 1 || name.length > 255) {
     return false;
@@ -51,30 +36,8 @@ function validateSchemaName(name) {
   }
   return /^[a-zA-Z0-9._-]+$/.test(name);
 }
-function buildRegistryId(registryName, registryArn) {
-  if (registryArn) {
-    return { RegistryArn: registryArn };
-  }
-  if (registryName) {
-    return { RegistryName: registryName };
-  }
-  throw new Error("Either registryName or registryArn must be provided");
-}
-function buildSchemaId(schemaName, registryName, schemaArn) {
-  if (schemaArn) {
-    return { SchemaArn: schemaArn };
-  }
-  if (schemaName && registryName) {
-    return { SchemaName: schemaName, RegistryName: registryName };
-  }
-  throw new Error("Either schemaArn or both schemaName and registryName must be provided");
-}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  buildRegistryId,
-  buildSchemaId,
-  convertTagsToArray,
-  convertTagsToObject,
   validateRegistryName,
   validateSchemaName
 });
