@@ -1,0 +1,217 @@
+# =============================================================================
+# AWS Neptune Example - Complete Setup with Dynamic Access Control
+# =============================================================================
+#
+# This example demonstrates a Neptune deployment with:
+#   - Neptune cluster with auto-created security group
+#   - Neptune instance (writer)
+#   - Client application (placeholder - replace with your app)
+#   - Access list with dynamic security group resolution
+#
+# IMPORTANT: Neptune is VPC-only! No public access is possible.
+# Client applications MUST run in the same VPC as Neptune.
+#
+# Deployment order (handled automatically by depends):
+#   1. neptune-cluster (creates cluster + security group)
+#   2. neptune-instance (creates database instance)
+#   3. my-client (your application deployed to AWS)
+#   4. neptune-access-list (configures security group rules)
+#
+# =============================================================================
+
+namespace: aws-neptune-example
+
+# =============================================================================
+# NEPTUNE CLUSTER
+# =============================================================================
+# Creates the Neptune graph database cluster.
+#
+# Key features:
+#   - auto_create_security_group: Creates a security group with NO inbound rules
+#   - Security group ID is exposed in state for use by access-list
+#   - Uses default VPC if vpc_id/vpc_name not specified
+#
+# State outputs (use in other entities via connection-target):
+#   - endpoint: Writer endpoint (e.g., cluster.xxx.neptune.amazonaws.com)
+#   - reader_endpoint: Reader endpoint for read replicas
+#   - port: Connection port (default 8182)
+#   - created_security_group_id: ID of auto-created security group
+#   - db_cluster_identifier: Cluster name for instance association
+#
+# =============================================================================
+
+my-cluster:
+  defines: aws-neptune/cluster
+  region: us-east-1
+  db_cluster_identifier: neptune-example-cluster-2
+  engine_version: "1.2.1.0"
+  
+  # Security: Auto-create security group
+  # The security group starts with NO inbound rules for security.
+  # Use neptune-access-list to add rules after client is deployed.
+  auto_create_security_group: true
+  
+  # Storage and backup
+  storage_encrypted: true
+  backup_retention_period: 1
+  
+  # Deletion settings (for demo - use deletion_protection: true in production)
+  deletion_protection: false
+  skip_final_snapshot: true
+  
+  tags:
+    environment: development
+    managed-by: monk
+
+# =============================================================================
+# NEPTUNE INSTANCE
+# =============================================================================
+# Creates a database instance within the cluster.
+#
+# Key features:
+#   - Must wait for cluster to be available (depends.wait-for)
+#   - Gets cluster identifier from cluster state via connection-target
+#   - db.t3.medium is the smallest instance class for Neptune
+#
+# State outputs:
+#   - endpoint_address: Instance-specific endpoint
+#   - endpoint_port: Connection port
+#   - status: Current instance status
+#
+# =============================================================================
+
+my-instance:
+  defines: aws-neptune/instance
+  
+  # CRITICAL: Must wait for cluster to be available
+  # Neptune clusters take 10-15 minutes to create
+  depends:
+    wait-for:
+      runnables:
+        - aws-neptune-example/my-cluster
+      timeout: 900  # 15 minutes
+  
+  # Connection to retrieve cluster identifier from state
+  connections:
+    cluster:
+      runnable: aws-neptune-example/my-cluster
+      service: data
+  
+  region: us-east-1
+  db_instance_identifier: neptune-example-instance-2
+  
+  # Get cluster ID from cluster's STATE (runtime value, not definition)
+  # This ensures the instance is associated with the correct cluster
+  db_cluster_identifier: <- connection-target("cluster") entity-state get-member("db_cluster_identifier")
+  
+  # Instance size - db.t3.medium is smallest for Neptune
+  # For production, use db.r5.large or larger
+  db_instance_class: db.t3.medium
+  
+  tags:
+    environment: development
+    managed-by: monk
+
+# =============================================================================
+# CLIENT APPLICATION (Placeholder)
+# =============================================================================
+# Your application that connects to Neptune.
+# Replace this with your actual application configuration.
+#
+# IMPORTANT: Must be deployed to AWS (EC2/ECS/EKS) in same VPC as Neptune!
+#
+# Variables show how to get Neptune connection info from cluster state:
+#   - endpoint: Writer endpoint for Gremlin/SPARQL queries
+#   - port: Connection port (default 8182)
+#   - reader_endpoint: Reader endpoint for read-only queries
+#
+# =============================================================================
+
+my-client:
+  defines: runnable
+  
+  # Connection to retrieve cluster information
+  connections:
+    cluster:
+      runnable: aws-neptune-example/my-cluster
+      service: data
+  
+  # Wait for both cluster AND instance to be ready
+  depends:
+    wait-for:
+      runnables:
+        - aws-neptune-example/my-cluster
+        - aws-neptune-example/my-instance
+      timeout: 900
+  
+  # Variables automatically populated from cluster state
+  variables:
+    neptune_endpoint:
+      env: NEPTUNE_HOST
+      value: <- connection-target("cluster") entity-state get-member("endpoint")
+      type: string
+    neptune_port:
+      env: NEPTUNE_PORT
+      value: <- connection-target("cluster") entity-state get-member("port")
+      type: string
+    neptune_reader_endpoint:
+      env: NEPTUNE_READER_HOST
+      value: <- connection-target("cluster") entity-state get-member("reader_endpoint")
+      type: string
+
+  containers:
+    app:
+      # Replace with your application image
+      image: your-registry/your-neptune-app:latest
+      environment:
+        - NEPTUNE_USE_SSL=true
+
+# =============================================================================
+# NEPTUNE ACCESS LIST
+# =============================================================================
+# Manages security group ingress rules for Neptune access.
+#
+# This entity is REQUIRED for any client to connect to Neptune!
+# The auto-created security group starts with NO inbound rules.
+#
+# Dynamic access pattern (allowed_security_group_names):
+#   - Gets client's security group via runnable-peers()
+#   - MUST depend on both cluster AND client
+#   - runnable-peers() returns security group names of nodes running the client
+#
+# Why depends on BOTH cluster AND client?
+#   - security_group_id comes from cluster state (needs cluster deployed)
+#   - runnable-peers() returns client's node SGs (needs client deployed)
+#   - If deployed before client: returns empty list → no access → connection fails
+#
+# =============================================================================
+
+my-access-list:
+  defines: aws-neptune/neptune-access-list
+  
+  # Get region from cluster DEFINITION (static value)
+  region: <- connection-target("cluster") entity get-member("region")
+  
+  # Get security group ID from cluster STATE (runtime value)
+  security_group_id: <- connection-target("cluster") entity-state get-member("created_security_group_id")
+  
+  # Get port from cluster STATE
+  port: <- connection-target("cluster") entity-state get-member("port")
+  
+  # Dynamic access: Allow traffic from client's node security groups
+  # runnable-peers() returns the SG names of nodes running the specified runnable
+  allowed_security_group_names: <- runnable-peers("aws-neptune-example/my-client")
+  
+  # Connection to cluster for retrieving values
+  connections:
+    cluster:
+      runnable: aws-neptune-example/my-cluster
+      service: data
+  
+  # CRITICAL: Must wait for BOTH cluster AND client!
+  depends:
+    wait-for:
+      runnables:
+        - aws-neptune-example/my-cluster
+        - aws-neptune-example/my-client
+      timeout: 900

@@ -1,0 +1,90 @@
+namespace: monkec
+endpoints:
+  defines: entity
+  metadata:
+    name: Endpoints
+    description: |-
+      MonkEC Endpoints entity.
+      Collects and normalizes endpoint URLs from connected entities and exposes a single entrypoint.
+      Keeps endpoint definitions simple by using one `url` property per endpoint key.
+
+      ## Secrets
+      - Reads: none
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.entrypoint_url` - Default URL to open/use
+      - `state.endpoints` - All resolved endpoint URLs
+      - `state.ready` - Readiness flag for entrypoint URL population
+
+      ## Composing with Other Entities
+      Works with:
+      - `netlify/site` - Consume `state.url`
+      - `vercel/project` - Consume `state.url`
+      - `cloudflare/cloudflare-tunnel-application` - Consume `state.hostname`
+    version: 0.1.0
+    version-hash: 5d51f4aa3a56
+  schema:
+    entrypoint:
+      type: string
+      description: Endpoint key used as the default entrypoint.
+    endpoints:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          url:
+            type: string
+            description: Fully qualified URL or host value resolved through template expressions.
+          description:
+            type: string
+            description: Brief text explaining endpoint purpose.
+        required:
+          - url
+        additionalProperties: false
+        description: Named endpoint map; each item defines a single `url`.
+      description: Named endpoint map; each item defines a single `url`.
+    required:
+      - entrypoint
+      - endpoints
+  state-schema:
+    entrypoint:
+      type: string
+      description: Endpoint key selected as default entrypoint.
+    entrypoint_url:
+      type: string
+      description: Resolved URL for the selected entrypoint.
+    ready:
+      type: boolean
+      description: True when entrypoint URL is present and passes HTTP(S) URL validation.
+    endpoints:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          url:
+            type: string
+          description:
+            type: string
+          ready:
+            type: boolean
+        required:
+          - name
+          - ready
+        additionalProperties: false
+      description: Flattened endpoint list for composition and debugging.
+  lifecycle:
+    sync: <<< endpoints-sync.js
+    refresh: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - cli
+    - monkec/base
