@@ -74,16 +74,20 @@ var _EventHubsNamespace = class _EventHubsNamespace extends (_a = AzureEventHubs
     if (existingResult.resource) {
       const props2 = existingResult.resource.properties;
       const sku2 = existingResult.resource.sku;
+      const provisioningState = props2.provisioningState;
       this.state.existing = true;
       this.state.namespace_name = namespaceName;
-      this.state.provisioning_state = props2.provisioningState;
+      this.state.provisioning_state = provisioningState;
       this.state.service_bus_endpoint = props2.serviceBusEndpoint;
       this.state.location = existingResult.resource.location;
       this.state.sku_tier = sku2?.tier;
       this.state.created_at = props2.createdAt;
       this.state.updated_at = props2.updatedAt;
       cli.output(`\u2705 Found existing Event Hubs namespace: ${namespaceName}`);
-      this.populateSecrets();
+      if (provisioningState === "Succeeded") {
+        cli.output(`\u{1F511} Existing namespace is ready, attempting to populate secrets...`);
+        this.populateSecrets();
+      }
       return;
     }
     if (this.definition.create_when_missing === false) {
@@ -152,6 +156,7 @@ var _EventHubsNamespace = class _EventHubsNamespace extends (_a = AzureEventHubs
   }
   populateSecrets() {
     if (!this.definition.primary_connection_string_secret_ref && !this.definition.secondary_connection_string_secret_ref) {
+      this.state.secrets_populated = true;
       return;
     }
     try {
