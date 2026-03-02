@@ -23,7 +23,7 @@ storage-account:
       Works with:
       - `azure-storage-account/blob-container` - Create blob containers within the storage account
     version: 1.0.0
-    version-hash: 741756ae9033
+    version-hash: 53605a9d0efe
   schema:
     subscription_id:
       type: string
