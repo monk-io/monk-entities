@@ -269,11 +269,13 @@ var _StorageAccount = class _StorageAccount extends (_a = AzureStorageEntity, _g
     this.deleteResource(this.definition.account_name);
   }
   checkReadiness() {
-    if (!this.state.account_name) {
-      return false;
-    }
-    if (this.definition.create_when_missing === false && !this.state.existing) {
+    if (this.definition.create_when_missing === false && this.state.existing === false) {
+      cli.output(`\u2705 Storage account ${this.definition.account_name} not created (create_when_missing is false)`);
       return true;
+    }
+    if (!this.state.account_name) {
+      cli.output(`\u23F3 Storage account not yet created`);
+      return false;
     }
     try {
       const account = this.checkResourceExists(this.definition.account_name);

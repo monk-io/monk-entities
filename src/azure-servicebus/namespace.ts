@@ -164,6 +164,7 @@ export class ServiceBusNamespace extends AzureServiceBusEntity<NamespaceDefiniti
         if (existsResult.resource) {
             const existingNamespace = existsResult.resource;
             const properties = existingNamespace.properties as Record<string, unknown> | undefined;
+            const provisioningState = typeof properties?.provisioningState === 'string' ? properties.provisioningState : undefined;
             
             this.state = {
                 namespace_name: this.definition.namespace_name,
@@ -171,12 +172,18 @@ export class ServiceBusNamespace extends AzureServiceBusEntity<NamespaceDefiniti
                 location: typeof existingNamespace.location === 'string' ? existingNamespace.location : undefined,
                 sku_tier: typeof (existingNamespace.sku as Record<string, unknown>)?.tier === 'string' 
                     ? (existingNamespace.sku as Record<string, unknown>).tier as string : undefined,
-                provisioning_state: typeof properties?.provisioningState === 'string' ? properties.provisioningState : undefined,
+                provisioning_state: provisioningState,
                 created_at: typeof properties?.createdAt === 'string' ? properties.createdAt : undefined,
                 updated_at: typeof properties?.updatedAt === 'string' ? properties.updatedAt : undefined,
                 existing: true
             };
             cli.output(`✅ Service Bus namespace ${this.definition.namespace_name} already exists`);
+            
+            // If existing namespace is ready, populate secrets immediately
+            if (provisioningState === "Succeeded") {
+                cli.output(`🔑 Existing namespace is ready, attempting to populate secrets...`);
+                this.populateSecrets();
+            }
             return;
         }
 
