@@ -450,7 +450,6 @@ Valid values: key1, key2`
 \u{1F511} Updating secrets with new keys...`);
         this.state.secrets_populated = false;
         this.populateAccountSecrets();
-        this.state.secrets_populated = true;
       }
       cli.output(`
 ==================================================`);

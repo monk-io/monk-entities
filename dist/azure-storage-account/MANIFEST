@@ -1,5 +1,5 @@
 REPO azure-storage-account
-VERSION_HASH cec55bfd9b13
+VERSION_HASH eb230cf1f3ee
 DESCRIPTION Azure Storage Account entities for MonkEC
 AUTHOR monk
 VERSION 1.0.0
