@@ -144,12 +144,18 @@ var _SchemaVersion = class _SchemaVersion extends (_a = AWSGlueSchemaRegistryEnt
       const currentMetadata = this.queryAllMetadata();
       const newMetadata = this.definition.metadata;
       for (const key of Object.keys(currentMetadata)) {
-        if (!(key in newMetadata)) {
+        if (!(key in newMetadata) || currentMetadata[key] !== newMetadata[key]) {
           this.removeMetadataKey(key, currentMetadata);
         }
       }
-      if (Object.keys(newMetadata).length > 0) {
-        this.addMetadata(newMetadata);
+      const keysToAdd = {};
+      for (const [key, value] of Object.entries(newMetadata)) {
+        if (!(key in currentMetadata) || currentMetadata[key] !== value) {
+          keysToAdd[key] = value;
+        }
+      }
+      if (Object.keys(keysToAdd).length > 0) {
+        this.addMetadata(keysToAdd);
       }
     }
   }

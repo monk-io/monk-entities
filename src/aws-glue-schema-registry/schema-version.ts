@@ -196,16 +196,24 @@ export class SchemaVersion extends AWSGlueSchemaRegistryEntity<SchemaVersionDefi
             const currentMetadata = this.queryAllMetadata();
             const newMetadata = this.definition.metadata;
 
-            // Remove metadata keys that are no longer present
+            // Remove metadata keys that are no longer present or have changed values
+            // AWS PutSchemaVersionMetadata is not an upsert - it throws if key exists
+            // So we must remove keys with changed values before re-adding them
             for (const key of Object.keys(currentMetadata)) {
-                if (!(key in newMetadata)) {
+                if (!(key in newMetadata) || currentMetadata[key] !== newMetadata[key]) {
                     this.removeMetadataKey(key, currentMetadata);
                 }
             }
 
-            // Add/update metadata
-            if (Object.keys(newMetadata).length > 0) {
-                this.addMetadata(newMetadata);
+            // Add metadata for new keys and keys with changed values
+            const keysToAdd: Record<string, string> = {};
+            for (const [key, value] of Object.entries(newMetadata)) {
+                if (!(key in currentMetadata) || currentMetadata[key] !== value) {
+                    keysToAdd[key] = value;
+                }
+            }
+            if (Object.keys(keysToAdd).length > 0) {
+                this.addMetadata(keysToAdd);
             }
         }
     }
