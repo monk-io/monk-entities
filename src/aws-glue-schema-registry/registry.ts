@@ -158,12 +158,9 @@ export class Registry extends AWSGlueSchemaRegistryEntity<RegistryDefinition, Re
         // Update registry description if changed
         if (this.definition.registry_description !== undefined) {
             const params: Record<string, any> = {
-                RegistryId: { RegistryName: this.state.registry_name }
+                RegistryId: { RegistryName: this.state.registry_name },
+                Description: this.definition.registry_description
             };
-
-            if (this.definition.registry_description) {
-                params.Description = this.definition.registry_description;
-            }
 
             this.makeGlueRequest("UpdateRegistry", params);
             // Note: UpdateRegistry response only contains RegistryArn, RegistryName, Description

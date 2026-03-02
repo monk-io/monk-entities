@@ -25,7 +25,7 @@ schema:
       - `aws-glue-schema-registry/schema-version` - Register additional versions
       - `aws-lambda/function` - Validate data in Lambda functions
       - `aws-kinesis/stream` - Schema validation for streaming data
-    version-hash: 4def4aeeed9a
+    version-hash: 53aeddc11ba3
   schema:
     region:
       type: string
