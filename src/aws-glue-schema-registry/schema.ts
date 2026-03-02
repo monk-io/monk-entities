@@ -283,8 +283,13 @@ export class Schema extends AWSGlueSchemaRegistryEntity<SchemaDefinition, Schema
                 params.Description = this.definition.schema_description;
             }
 
-            const response = this.makeGlueRequest("UpdateSchema", params);
-            this.state.compatibility = response.Compatibility as Compatibility;
+            this.makeGlueRequest("UpdateSchema", params);
+            // Note: UpdateSchema response only contains SchemaArn, SchemaName, RegistryName
+            // It does NOT return Compatibility, so we preserve the value we sent
+            if (this.definition.compatibility) {
+                this.state.compatibility = this.definition.compatibility;
+            }
+            // If no compatibility was specified in definition, state.compatibility remains unchanged
         }
 
         // Update tags if specified

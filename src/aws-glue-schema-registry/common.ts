@@ -86,25 +86,6 @@ export interface Tag {
 }
 
 /**
- * Convert Record<string, string> tags to AWS Tag array format
- */
-export function convertTagsToArray(tags: Record<string, string>): Tag[] {
-    return Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
-}
-
-/**
- * Convert AWS Tag array to Record<string, string> format
- */
-export function convertTagsToObject(tags?: Tag[]): Record<string, string> {
-    if (!tags) return {};
-    const result: Record<string, string> = {};
-    for (const tag of tags) {
-        result[tag.Key] = tag.Value;
-    }
-    return result;
-}
-
-/**
  * Validate registry name format
  * Must be 1-255 characters, alphanumeric with hyphens and underscores
  */
@@ -124,30 +105,4 @@ export function validateSchemaName(name: string): boolean {
         return false;
     }
     return /^[a-zA-Z0-9._-]+$/.test(name);
-}
-
-/**
- * Build a RegistryId object from name or ARN
- */
-export function buildRegistryId(registryName?: string, registryArn?: string): RegistryId {
-    if (registryArn) {
-        return { RegistryArn: registryArn };
-    }
-    if (registryName) {
-        return { RegistryName: registryName };
-    }
-    throw new Error('Either registryName or registryArn must be provided');
-}
-
-/**
- * Build a SchemaId object from name/registry or ARN
- */
-export function buildSchemaId(schemaName?: string, registryName?: string, schemaArn?: string): SchemaId {
-    if (schemaArn) {
-        return { SchemaArn: schemaArn };
-    }
-    if (schemaName && registryName) {
-        return { SchemaName: schemaName, RegistryName: registryName };
-    }
-    throw new Error('Either schemaArn or both schemaName and registryName must be provided');
 }

@@ -24,7 +24,7 @@ instance:
       - `aws-neptune/cluster` - Parent cluster for this instance
       - `aws-neptune/parameter-group` - Instance parameter configuration
       - `aws-iam/role` - Grant instance access to other services
-    version-hash: ff653fe1a1db
+    version-hash: 3bbfad54e5e9
   schema:
     region:
       type: string

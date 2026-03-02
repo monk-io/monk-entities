@@ -3,5 +3,5 @@ namespace: aws-glue-schema-registry
 common:
   defines: module
   metadata:
-    version-hash: e69f7d46d1f6
+    version-hash: 4def4aeeed9a
   source: <<< common.js

@@ -198,8 +198,10 @@ var _Schema = class _Schema extends (_a = AWSGlueSchemaRegistryEntity, _getInfo_
       if (this.definition.schema_description !== void 0) {
         params.Description = this.definition.schema_description;
       }
-      const response = this.makeGlueRequest("UpdateSchema", params);
-      this.state.compatibility = response.Compatibility;
+      this.makeGlueRequest("UpdateSchema", params);
+      if (this.definition.compatibility) {
+        this.state.compatibility = this.definition.compatibility;
+      }
     }
     if (this.definition.tags) {
       this.updateTags();
