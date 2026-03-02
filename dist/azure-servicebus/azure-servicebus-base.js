@@ -233,12 +233,6 @@ var _AzureServiceBusEntity = class _AzureServiceBusEntity extends import_base.Mo
     }
   }
   /**
-   * Check if response indicates success
-   */
-  isSuccessResponse(response) {
-    return !response.error && response.statusCode !== void 0 && response.statusCode >= 200 && response.statusCode < 300;
-  }
-  /**
    * Convert ISO 8601 duration string to human-readable format
    */
   formatDuration(isoDuration) {

@@ -21,7 +21,7 @@ event-hub:
       Works with:
       - `azure-eventhubs/eventhubs-namespace` - Parent namespace
       - `azure-eventhubs/consumer-group` - Create consumer groups for this event hub
-    version-hash: acf47209cbe5
+    version-hash: 682d0839a1d0
   schema:
     subscription_id:
       type: string

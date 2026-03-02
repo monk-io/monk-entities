@@ -3,5 +3,5 @@ namespace: azure-servicebus
 azure-servicebus-base:
   defines: module
   metadata:
-    version-hash: 6a861cbbad11
+    version-hash: b3d1c1813873
   source: <<< azure-servicebus-base.js

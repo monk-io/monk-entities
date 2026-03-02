@@ -1,5 +1,5 @@
 REPO azure-servicebus
-VERSION_HASH 6a861cbbad11
+VERSION_HASH b3d1c1813873
 namespace: azure-servicebus
 entities:
   - namespace
