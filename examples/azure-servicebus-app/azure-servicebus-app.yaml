@@ -1,0 +1,223 @@
+# Azure Service Bus Messaging Application
+# Demonstrates pub/sub and point-to-point messaging patterns with Service Bus
+#
+# Architecture:
+#   Namespace → Topic (order-events) → Subscriptions (filtered by event type)
+#                                    → Dead-letter queue for failed messages
+#   Namespace → Queue (commands) → Worker processes commands
+#   Publisher app sends events to topic and commands to queue
+#
+# Patterns demonstrated:
+#   1. Pub/Sub with filtered subscriptions (topic + subscriptions)
+#   2. Point-to-point messaging (queue + worker)
+#   3. Dead-letter handling
+#   4. Connection string secret management
+#   5. Monk connections for dynamic configuration
+
+namespace: azure-servicebus-app
+
+# =============================================================================
+# Service Bus Namespace (Standard tier for topics + subscriptions)
+# =============================================================================
+servicebus-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  permitted-secrets:
+    servicebus-connection-string: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  location: "East US"
+  sku:
+    name: "Standard"
+  minimum_tls_version: "1.2"
+  primary_connection_string_secret_ref: "servicebus-connection-string"
+  tags:
+    Application: "servicebus-app"
+    Environment: "demo"
+    ManagedBy: "monk"
+
+# =============================================================================
+# Command Queue (point-to-point pattern)
+# =============================================================================
+commands-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  queue_name: "commands"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P7D"
+  lock_duration: "PT1M"
+  max_delivery_count: 5
+  dead_lettering_on_message_expiration: true
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/servicebus-namespace
+
+# =============================================================================
+# Dead-Letter Queue (collects failed messages for inspection)
+# =============================================================================
+dead-letter-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  queue_name: "dead-letters"
+  max_size_in_megabytes: 5120
+  default_message_time_to_live: "P30D"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/servicebus-namespace
+
+# =============================================================================
+# Order Events Topic (pub/sub pattern)
+# =============================================================================
+order-events-topic:
+  defines: azure-servicebus/topic
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  topic_name: "order-events"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P7D"
+  enable_batched_operations: true
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/servicebus-namespace
+
+# =============================================================================
+# Subscription: Order Processor (filters for order lifecycle events)
+# =============================================================================
+order-processor-sub:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  topic_name: "order-events"
+  subscription_name: "order-processor"
+  max_delivery_count: 5
+  default_message_time_to_live: "P7D"
+  dead_lettering_on_message_expiration: true
+  dead_lettering_on_filter_evaluation_exceptions: true
+  forward_dead_lettered_messages_to: "dead-letters"
+  default_rule_filter: "eventType = 'OrderCreated' OR eventType = 'OrderUpdated' OR eventType = 'OrderCancelled'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/order-events-topic
+          - azure-servicebus-app/dead-letter-queue
+
+# =============================================================================
+# Subscription: Payment Handler (filters for payment events)
+# =============================================================================
+payment-handler-sub:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  topic_name: "order-events"
+  subscription_name: "payment-handler"
+  max_delivery_count: 3
+  default_message_time_to_live: "P3D"
+  dead_lettering_on_message_expiration: true
+  forward_dead_lettered_messages_to: "dead-letters"
+  default_rule_filter: "eventType = 'PaymentReceived' OR eventType = 'PaymentFailed' OR eventType = 'RefundProcessed'"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/order-events-topic
+          - azure-servicebus-app/dead-letter-queue
+
+# =============================================================================
+# Subscription: Audit Logger (receives ALL events, no filter)
+# =============================================================================
+audit-logger-sub:
+  defines: azure-servicebus/subscription
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-servicebus-app"
+  topic_name: "order-events"
+  subscription_name: "audit-logger"
+  max_delivery_count: 10
+  default_message_time_to_live: "P14D"
+  auto_delete_on_idle: "P7D"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-servicebus-app/order-events-topic
+
+# =============================================================================
+# Publisher Application
+# Sends order events to the topic and commands to the queue
+# =============================================================================
+publisher:
+  defines: runnable
+  permitted-secrets:
+    servicebus-connection-string: true
+  depends:
+    wait-for:
+      runnables:
+        - azure-servicebus-app/servicebus-namespace
+        - azure-servicebus-app/commands-queue
+        - azure-servicebus-app/order-events-topic
+        - azure-servicebus-app/order-processor-sub
+        - azure-servicebus-app/payment-handler-sub
+        - azure-servicebus-app/audit-logger-sub
+      timeout: 300
+  variables:
+    servicebus_connection_string:
+      env: SERVICEBUS_CONNECTION_STRING
+      value: <- secret("servicebus-connection-string")
+      type: string
+    topic_name:
+      env: TOPIC_NAME
+      value: "order-events"
+      type: string
+    queue_name:
+      env: QUEUE_NAME
+      value: "commands"
+      type: string
+    operation_interval_ms:
+      env: OPERATION_INTERVAL_MS
+      value: "5000"
+      type: string
+    max_operations:
+      env: MAX_OPERATIONS
+      value: "20"
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/azure-servicebus-app:latest
+
+# =============================================================================
+# Stacks
+# =============================================================================
+
+# Infrastructure only (namespace + queues + topics + subscriptions)
+infra-stack:
+  defines: group
+  members:
+    - azure-servicebus-app/servicebus-namespace
+    - azure-servicebus-app/commands-queue
+    - azure-servicebus-app/dead-letter-queue
+    - azure-servicebus-app/order-events-topic
+    - azure-servicebus-app/order-processor-sub
+    - azure-servicebus-app/payment-handler-sub
+    - azure-servicebus-app/audit-logger-sub
+
+# Complete stack (infrastructure + publisher app)
+complete-stack:
+  defines: group
+  members:
+    - azure-servicebus-app/servicebus-namespace
+    - azure-servicebus-app/commands-queue
+    - azure-servicebus-app/dead-letter-queue
+    - azure-servicebus-app/order-events-topic
+    - azure-servicebus-app/order-processor-sub
+    - azure-servicebus-app/payment-handler-sub
+    - azure-servicebus-app/audit-logger-sub
+    - azure-servicebus-app/publisher

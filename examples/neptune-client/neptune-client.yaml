@@ -1,281 +1,132 @@
-# =============================================================================
-# Neptune Client Demo - Complete Integration Example
-# =============================================================================
-#
-# This example demonstrates a complete Neptune deployment with a client
-# application, showcasing the proper access control pattern.
-#
-# ARCHITECTURE:
-#   ┌─────────────────────────────────────────────────────────────────────┐
-#   │                        AWS VPC (us-east-1)                          │
-#   │                                                                     │
-#   │  ┌─────────────────┐     ┌─────────────────┐                       │
-#   │  │ Neptune Cluster │     │ Neptune Instance│                       │
-#   │  │ (neptune-cluster)│◄───│ (neptune-instance)                      │
-#   │  └────────┬────────┘     └─────────────────┘                       │
-#   │           │                                                         │
-#   │  ┌────────▼────────┐                                               │
-#   │  │ Security Group  │◄── Managed by neptune-access-list             │
-#   │  │ (neptune-demo-sg)│    - Adds inbound rules for client           │
-#   │  └────────┬────────┘                                               │
-#   │           │ Port 8182                                              │
-#   │  ┌────────▼────────┐                                               │
-#   │  │ Client Container│◄── Must run in same VPC!                      │
-#   │  │ (neptune-client) │    Deploy with: monk run -t <aws-tag>        │
-#   │  └─────────────────┘                                               │
-#   └─────────────────────────────────────────────────────────────────────┘
-#
-# CRITICAL: Neptune is VPC-only! No public access is possible.
-#
-# DEPLOYMENT ORDER:
-#   1. neptune-cluster (creates cluster + security group)
-#   2. neptune-instance (creates database instance)
-#   3. neptune-client (deploy to AWS node in same VPC)
-#   4. neptune-access-list (configures security group rules)
-#
-# =============================================================================
+namespace: neptune-client
 
-namespace: neptune-client-demo
-
-# Process group for deploying entire stack at once
-neptune-demo-app:
-  defines: group
-  members:
-    - neptune-cluster
-    - neptune-instance
-    - neptune-client
-    - neptune-access-list
-
-# =============================================================================
-# NEPTUNE CLUSTER
-# =============================================================================
-# Creates the Neptune graph database cluster with auto-managed security group.
-#
-# The security group starts with NO inbound rules for security.
-# The neptune-access-list entity adds rules after client is deployed.
-#
-# STATE OUTPUTS (available via entity-state):
-#   - endpoint: Writer endpoint for Gremlin/SPARQL queries
-#   - reader_endpoint: Reader endpoint for read replicas
-#   - port: Connection port (default 8182)
-#   - created_security_group_id: ID of auto-created security group
-#   - db_cluster_identifier: Cluster name for instance association
-#   - vpc_id: VPC where cluster is deployed
-#
-# USAGE IN OTHER ENTITIES:
-#   endpoint: <- connection-target("cluster") entity-state get-member("endpoint")
-#   port: <- connection-target("cluster") entity-state get-member("port")
-#
-# =============================================================================
+# AWS production stack (us-east-1) for the neptune-client Node.js/TypeScript worker.
+# - Provisions an AWS Neptune cluster + instance
+# - Opens inbound access to Neptune (8182/tcp) only from the worker's AWS node security groups
+# - Runs the worker container image `neptune-client:latest` (no HTTP exposure)
 
 neptune-cluster:
   defines: aws-neptune/cluster
   region: us-east-1
-  db_cluster_identifier: neptune-demo-cluster
-  engine_version: "1.2.1.0"
-  
-  # SECURITY GROUP: Auto-create with no inbound rules
-  # This is the recommended pattern for Neptune access control.
-  # The neptune-access-list entity will add rules after client deployment.
+  db_cluster_identifier: neptune-client-prod
+  port: 8182
   auto_create_security_group: true
-  security_group_name: neptune-demo-sg
-  
-  # OPTIONAL: Specify VPC by name instead of ID
-  # If not specified, uses default VPC
-  # vpc_name: my-custom-vpc
-  
-  # STORAGE AND BACKUP
+  security_group_name: neptune-client-prod-sg
   storage_encrypted: true
   backup_retention_period: 1
-  
-  # DELETION SETTINGS
-  # For demo - use deletion_protection: true in production!
-  deletion_protection: false
+  deletion_protection: true
+  # With deletion protection enabled, deletion should be blocked; we also skip the final snapshot
+  # to avoid needing a unique snapshot identifier on delete attempts.
   skip_final_snapshot: true
-  
   tags:
-    environment: demo
+    environment: prod
     application: neptune-client
     managed-by: monk
-
-# =============================================================================
-# NEPTUNE INSTANCE
-# =============================================================================
-# Creates a database instance within the cluster.
-#
-# IMPORTANT: Must wait for cluster to be available before creating.
-# Neptune clusters take 10-15 minutes to create.
-#
-# STATE OUTPUTS:
-#   - endpoint_address: Instance-specific endpoint
-#   - endpoint_port: Connection port
-#   - status: Current instance status (creating, available, etc.)
-#
-# =============================================================================
+  services:
+    data:
+      protocol: custom
 
 neptune-instance:
   defines: aws-neptune/instance
-  
-  # DEPENDENCY: Wait for cluster to be available
-  # timeout: 900 = 15 minutes (Neptune clusters take time)
+  region: us-east-1
+  db_instance_identifier: neptune-client-prod-1
+  db_instance_class: db.t3.medium
+  db_cluster_identifier: <- connection-target("cluster") entity-state get-member("db_cluster_identifier")
+  tags:
+    environment: prod
+    application: neptune-client
+    managed-by: monk
+  connections:
+    cluster:
+      target: neptune-client/neptune-cluster
+      service: data
   depends:
     wait-for:
       runnables:
-        - neptune-client-demo/neptune-cluster
+        - neptune-client/neptune-cluster
       timeout: 900
-  
-  # CONNECTION: Required to retrieve cluster identifier from state
-  connections:
-    cluster:
-      runnable: neptune-client-demo/neptune-cluster
-      service: data
-  
-  region: us-east-1
-  db_instance_identifier: neptune-demo-instance
-  
-  # GET CLUSTER ID FROM STATE (not definition!)
-  # This ensures the instance is associated with the correct cluster
-  # even if the cluster identifier changes.
-  db_cluster_identifier: <- connection-target("cluster") entity-state get-member("db_cluster_identifier")
-  
-  # INSTANCE SIZE
-  # db.t3.medium is the smallest instance class for Neptune
-  # For production, use db.r5.large or larger
-  db_instance_class: db.t3.medium
-  
-  tags:
-    environment: demo
-    application: neptune-client
-    managed-by: monk
-
-# =============================================================================
-# NEPTUNE CLIENT APPLICATION
-# =============================================================================
-# Containerized application that connects to Neptune.
-#
-# CRITICAL: Must be deployed to AWS (EC2/ECS/EKS) in same VPC as Neptune!
-#
-# DEPLOYMENT:
-#   monk run -t <aws-tag> neptune-client-demo/neptune-client
-#
-# The -t flag specifies which AWS tag (node group) to deploy to.
-# The node must be in the same VPC as the Neptune cluster.
-#
-# ENVIRONMENT VARIABLES (automatically populated from cluster state):
-#   - NEPTUNE_HOST: Writer endpoint
-#   - NEPTUNE_PORT: Connection port (8182)
-#   - NEPTUNE_READER_HOST: Reader endpoint (for read-only queries)
-#
-# =============================================================================
+  services:
+    data:
+      protocol: custom
 
 neptune-client:
   defines: runnable
-  
-  # CONNECTION: Required to retrieve cluster information
+  containers:
+    main:
+      image: neptune-client:latest
+      # Uses the image default CMD (e.g., npm start). Override here if needed:
+      # command: ["npm", "start"]
   connections:
-    cluster:
-      runnable: neptune-client-demo/neptune-cluster
+    neptune:
+      target: neptune-client/neptune-cluster
       service: data
-  
-  # DEPENDENCY: Wait for both cluster AND instance to be ready
+    neptune-instance:
+      target: neptune-client/neptune-instance
+      service: data
   depends:
     wait-for:
       runnables:
-        - neptune-client-demo/neptune-cluster
-        - neptune-client-demo/neptune-instance
-      timeout: 900
-  
-  # VARIABLES: Automatically populated from cluster state
+        - neptune-client/neptune-instance
+      timeout: 1200
   variables:
-    # WRITER ENDPOINT: Use for all write operations
-    # Format: cluster-name.cluster-xxx.region.neptune.amazonaws.com
-    neptune_endpoint:
+    neptune-host:
+      type: string
+      value: <- connection-target("neptune") entity-state get-member("endpoint")
       env: NEPTUNE_HOST
-      value: <- connection-target("cluster") entity-state get-member("endpoint")
-      type: string
-    
-    # PORT: Default is 8182 for Neptune
-    neptune_port:
+    neptune-port:
+      type: int
+      value: 8182
       env: NEPTUNE_PORT
-      value: <- connection-target("cluster") entity-state get-member("port")
-      type: string
-    
-    # READER ENDPOINT: Use for read-only operations (better performance)
-    # Format: cluster-name.cluster-ro-xxx.region.neptune.amazonaws.com
-    neptune_reader_endpoint:
-      env: NEPTUNE_READER_HOST
-      value: <- connection-target("cluster") entity-state get-member("reader_endpoint")
-      type: string
+    neptune-use-ssl:
+      type: bool
+      value: true
+      env: NEPTUNE_USE_SSL
+    neptune-timeout:
+      type: int
+      value: 30000
+      env: NEPTUNE_TIMEOUT
+    operation-interval-ms:
+      type: int
+      value: 10000
+      env: OPERATION_INTERVAL_MS
 
-  containers:
-    client:
-      # Docker image with Neptune client application
-      image: monkimages.azurecr.io/neptune-client:v1
-      environment:
-        - NEPTUNE_USE_SSL=true
-        - NEPTUNE_TIMEOUT=30000
-        - OPERATION_INTERVAL_MS=15000
-
-# =============================================================================
-# NEPTUNE ACCESS LIST
-# =============================================================================
-# Manages security group ingress rules to allow client access.
-#
-# THIS ENTITY IS REQUIRED for the client to connect to Neptune!
-# The auto-created security group starts with NO inbound rules.
-#
-# ACCESS CONTROL PATTERN:
-#   1. Cluster creates security group with no inbound rules
-#   2. Client deploys to AWS node (gets assigned a security group)
-#   3. Access-list adds inbound rule: allow client's SG → Neptune port
-#
-# CRITICAL: Must depend on BOTH cluster AND client!
-#   - security_group_id: Comes from cluster state (needs cluster deployed)
-#   - allowed_security_group_names: Comes from client's node (needs client deployed)
-#
-# If deployed before client:
-#   - runnable-peers() returns empty list []
-#   - No rules added → Connection fails!
-#
-# MONK EXPRESSIONS EXPLAINED:
-#   entity get-member("field")       → Gets value from DEFINITION (static)
-#   entity-state get-member("field") → Gets value from STATE (runtime)
-#   runnable-peers("ns/name")        → Gets security group names of nodes running the runnable
-#
-# =============================================================================
+neptune-client-prod:
+  defines: runnable
+  inherits: neptune-client/neptune-client
+  scale:
+    value: 1
 
 neptune-access-list:
   defines: aws-neptune/neptune-access-list
-  
-  # REGION: From cluster definition (static value)
-  # Use entity get-member (not entity-state) for definition values
-  region: <- connection-target("cluster") entity get-member("region")
-  
-  # SECURITY GROUP ID: From cluster state (runtime value)
-  # This is the auto-created security group that protects Neptune
-  security_group_id: <- connection-target("cluster") entity-state get-member("created_security_group_id")
-  
-  # PORT: From cluster state (runtime value)
-  # Default is 8182 for Neptune
-  port: <- connection-target("cluster") entity-state get-member("port")
-  
-  # DYNAMIC ACCESS: Allow traffic from client's node security group
-  # runnable-peers() returns the security group names of nodes running the client
-  # Example return value: ["test-neptun"] (the AWS node name)
-  allowed_security_group_names: <- runnable-peers("neptune-client-demo/neptune-client")
-  
-  # CONNECTION: Required to retrieve cluster values
+  region: us-east-1
+  port: 8182
+  vpc_id: <- connection-target("db") entity-state get-member("vpc_id")
+  security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
+  # Allow inbound Neptune traffic from the AWS node security groups running this runnable.
+  # NOTE: This field is a YAML array of strings. Since the runnable is scaled to 1 in prod,
+  # we take a single peer security group name from runnable-peers().
+  allowed_security_group_names:
+    - <- runnable-peers("neptune-client/neptune-client-prod") last
   connections:
-    cluster:
-      runnable: neptune-client-demo/neptune-cluster
+    db:
+      target: neptune-client/neptune-cluster
       service: data
-  
-  # CRITICAL DEPENDENCY: Must wait for BOTH cluster AND client!
-  # - Cluster: Provides security_group_id
-  # - Client: Provides security group names via runnable-peers()
+    instance:
+      target: neptune-client/neptune-instance
+      service: data
   depends:
     wait-for:
       runnables:
-        - neptune-client-demo/neptune-cluster
-        - neptune-client-demo/neptune-client
-      timeout: 900
+        # MUST wait for both cluster and client so runnable-peers() returns non-empty.
+        - neptune-client/neptune-cluster
+        - neptune-client/neptune-instance
+        - neptune-client/neptune-client-prod
+      timeout: 1200
+
+prod:
+  defines: group
+  members:
+    - neptune-client/neptune-cluster
+    - neptune-client/neptune-instance
+    - neptune-client/neptune-client-prod
+    - neptune-client/neptune-access-list

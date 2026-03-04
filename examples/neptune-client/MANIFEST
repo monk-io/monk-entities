@@ -1,0 +1,5 @@
+REPO neptune-client
+LOAD neptune-client.yaml
+ENV prod
+ENTRY prod:neptune-client/prod
+IMAGE neptune-client:latest neptune-client/neptune-client,neptune-client/neptune-client-prod . Dockerfile
