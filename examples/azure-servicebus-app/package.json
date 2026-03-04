@@ -1,0 +1,36 @@
+{
+  "name": "azure-servicebus-app",
+  "version": "1.0.0",
+  "description": "Azure Service Bus client demonstrating pub/sub and point-to-point messaging patterns with MonkEC",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "dev": "ts-node src/client.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "azure",
+    "service-bus",
+    "messaging",
+    "pubsub",
+    "queue",
+    "topic",
+    "monk",
+    "typescript"
+  ],
+  "author": "Monk Azure Service Bus App",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@azure/service-bus": "^7.9.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,198 @@
+# Azure Event Hubs Streaming Application
+# Demonstrates event streaming patterns with Event Hubs
+#
+# Architecture:
+#   Namespace (Standard, Kafka-enabled, auto-inflate)
+#     → Event Hub: telemetry (8 partitions, 3-day retention)
+#         → Consumer Group: realtime-dashboard
+#         → Consumer Group: batch-analytics
+#     → Event Hub: alerts (4 partitions, 7-day retention)
+#         → Consumer Group: alert-processor
+#
+#   Producer app sends telemetry + alert events
+#   Consumer app reads from consumer groups
+#
+# Patterns demonstrated:
+#   1. High-throughput event ingestion (partitioned event hubs)
+#   2. Multiple consumer groups for independent processing
+#   3. Auto-inflate for elastic scaling
+#   4. Kafka-compatible namespace
+#   5. Connection string secret management
+#   6. Monk connections for dynamic configuration
+
+namespace: azure-eventhubs-app
+
+# =============================================================================
+# Event Hubs Namespace (Standard, Kafka-enabled, auto-inflate)
+# =============================================================================
+eventhubs-namespace:
+  defines: azure-eventhubs/event-hubs-namespace
+  permitted-secrets:
+    eventhubs-connection-string: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  location: "East US"
+  sku:
+    name: "Standard"
+    capacity: 2
+  is_auto_inflate_enabled: true
+  maximum_throughput_units: 10
+  kafka_enabled: true
+  minimum_tls_version: "1.2"
+  primary_connection_string_secret_ref: "eventhubs-connection-string"
+  tags:
+    Application: "eventhubs-app"
+    Environment: "demo"
+    ManagedBy: "monk"
+
+# =============================================================================
+# Telemetry Event Hub (high-throughput sensor/device data)
+# =============================================================================
+telemetry-hub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  eventhub_name: "telemetry"
+  partition_count: 8
+  message_retention_in_days: 3
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-app/eventhubs-namespace
+
+# =============================================================================
+# Alerts Event Hub (lower-volume critical alerts)
+# =============================================================================
+alerts-hub:
+  defines: azure-eventhubs/event-hub
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  eventhub_name: "alerts"
+  partition_count: 4
+  message_retention_in_days: 7
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-app/eventhubs-namespace
+
+# =============================================================================
+# Consumer Groups for Telemetry Hub
+# =============================================================================
+realtime-dashboard-cg:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  eventhub_name: "telemetry"
+  consumer_group_name: "realtime-dashboard"
+  user_metadata: "Real-time dashboard for live telemetry visualization"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-app/telemetry-hub
+
+batch-analytics-cg:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  eventhub_name: "telemetry"
+  consumer_group_name: "batch-analytics"
+  user_metadata: "Batch analytics pipeline for aggregated telemetry processing"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-app/telemetry-hub
+
+# =============================================================================
+# Consumer Group for Alerts Hub
+# =============================================================================
+alert-processor-cg:
+  defines: azure-eventhubs/consumer-group
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "monk-eventhubs-app"
+  eventhub_name: "alerts"
+  consumer_group_name: "alert-processor"
+  user_metadata: "Alert processor for critical event handling and notifications"
+  depends:
+    - wait-for:
+        runnables:
+          - azure-eventhubs-app/alerts-hub
+
+# =============================================================================
+# Producer / Consumer Application
+# Sends telemetry + alerts, reads events from consumer groups
+# =============================================================================
+streaming-app:
+  defines: runnable
+  permitted-secrets:
+    eventhubs-connection-string: true
+  depends:
+    wait-for:
+      runnables:
+        - azure-eventhubs-app/eventhubs-namespace
+        - azure-eventhubs-app/telemetry-hub
+        - azure-eventhubs-app/alerts-hub
+        - azure-eventhubs-app/realtime-dashboard-cg
+        - azure-eventhubs-app/batch-analytics-cg
+        - azure-eventhubs-app/alert-processor-cg
+      timeout: 300
+  variables:
+    eventhubs_connection_string:
+      env: EVENTHUBS_CONNECTION_STRING
+      value: <- secret("eventhubs-connection-string")
+      type: string
+    telemetry_hub_name:
+      env: TELEMETRY_HUB_NAME
+      value: "telemetry"
+      type: string
+    alerts_hub_name:
+      env: ALERTS_HUB_NAME
+      value: "alerts"
+      type: string
+    consumer_group:
+      env: CONSUMER_GROUP
+      value: "realtime-dashboard"
+      type: string
+    operation_interval_ms:
+      env: OPERATION_INTERVAL_MS
+      value: "3000"
+      type: string
+    max_operations:
+      env: MAX_OPERATIONS
+      value: "30"
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/azure-eventhubs-app:latest
+
+# =============================================================================
+# Stacks
+# =============================================================================
+
+# Infrastructure only
+infra-stack:
+  defines: group
+  members:
+    - azure-eventhubs-app/eventhubs-namespace
+    - azure-eventhubs-app/telemetry-hub
+    - azure-eventhubs-app/alerts-hub
+    - azure-eventhubs-app/realtime-dashboard-cg
+    - azure-eventhubs-app/batch-analytics-cg
+    - azure-eventhubs-app/alert-processor-cg
+
+# Complete stack (infrastructure + streaming app)
+complete-stack:
+  defines: group
+  members:
+    - azure-eventhubs-app/eventhubs-namespace
+    - azure-eventhubs-app/telemetry-hub
+    - azure-eventhubs-app/alerts-hub
+    - azure-eventhubs-app/realtime-dashboard-cg
+    - azure-eventhubs-app/batch-analytics-cg
+    - azure-eventhubs-app/alert-processor-cg
+    - azure-eventhubs-app/streaming-app
