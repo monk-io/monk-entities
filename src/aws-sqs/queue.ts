@@ -1,6 +1,7 @@
 import { AWSSQSEntity, AWSSQSDefinition, AWSSQSState } from "./sqs-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
+import aws from "cloud/aws";
 import {
     QueueAttributes,
     SQSMessage,
@@ -367,6 +368,289 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
             return statistics;
         } catch (error) {
             throw new Error(`Failed to get queue statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    // ==================== COST ESTIMATION ====================
+
+    /**
+     * Get CloudWatch metrics for SQS queue (last 30 days)
+     */
+    private getSQSCloudWatchMetrics(): {
+        numberOfMessagesSent: number;
+        numberOfMessagesReceived: number;
+        numberOfMessagesDeleted: number;
+    } | null {
+        if (!this.state.queue_name) return null;
+
+        try {
+            const endTime = new Date().toISOString();
+            const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            const period = 2592000;
+
+            const getMetric = (metricName: string): number => {
+                // Build query string manually (URLSearchParams not available in MonkEC)
+                const queryParams = [
+                    'Action=GetMetricStatistics',
+                    'Version=2010-08-01',
+                    'Namespace=AWS%2FSQS',
+                    `MetricName=${encodeURIComponent(metricName)}`,
+                    `StartTime=${encodeURIComponent(startTime)}`,
+                    `EndTime=${encodeURIComponent(endTime)}`,
+                    `Period=${period.toString()}`,
+                    'Statistics.member.1=Sum',
+                    'Dimensions.member.1.Name=QueueName',
+                    `Dimensions.member.1.Value=${encodeURIComponent(this.state.queue_name!)}`
+                ];
+
+                const url = `https://monitoring.${this.definition.region}.amazonaws.com/?${queryParams.join('&')}`;
+                const response = aws.get(url, {
+                    service: 'monitoring',
+                    region: this.definition.region
+                });
+
+                if (response.statusCode === 200) {
+                    const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
+                    return sumMatch ? parseFloat(sumMatch[1]) : 0;
+                }
+                return 0;
+            };
+
+            return {
+                numberOfMessagesSent: getMetric('NumberOfMessagesSent'),
+                numberOfMessagesReceived: getMetric('NumberOfMessagesReceived'),
+                numberOfMessagesDeleted: getMetric('NumberOfMessagesDeleted')
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse pricing response from AWS Price List API
+     */
+    private parsePricingResponse(responseBody: string): number {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return 0;
+            }
+
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                        if (pricePerUnit > 0) {
+                            return pricePerUnit;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
+        }
+        return 0;
+    }
+
+    /**
+     * Map AWS region codes to location names for Pricing API
+     */
+    private getRegionToLocationMap(): Record<string, string> {
+        return {
+            'us-east-1': 'US East (N. Virginia)',
+            'us-east-2': 'US East (Ohio)',
+            'us-west-1': 'US West (N. California)',
+            'us-west-2': 'US West (Oregon)',
+            'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-southeast-1': 'Asia Pacific (Singapore)',
+            'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-northeast-1': 'Asia Pacific (Tokyo)',
+            'ap-northeast-2': 'Asia Pacific (Seoul)',
+            'ca-central-1': 'Canada (Central)',
+            'eu-central-1': 'EU (Frankfurt)',
+            'eu-west-1': 'EU (Ireland)',
+            'eu-west-2': 'EU (London)',
+            'eu-west-3': 'EU (Paris)',
+            'eu-north-1': 'EU (Stockholm)',
+            'me-south-1': 'Middle East (Bahrain)',
+            'sa-east-1': 'South America (Sao Paulo)'
+        };
+    }
+
+    /**
+     * Fetch SQS pricing from AWS Price List API
+     */
+    private fetchSQSPricing(): {
+        standardPerMillion: number;
+        fifoPerMillion: number;
+        source: string;
+    } {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+        const location = this.getRegionToLocationMap()[this.definition.region] || 'US East (N. Virginia)';
+
+        // Fetch standard queue pricing
+        const standardFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AWSQueueService' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'queueType', Value: 'Standard' }
+        ];
+
+        const standardResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AWSQueueService',
+                Filters: standardFilters,
+                MaxResults: 10
+            })
+        });
+
+        // Fetch FIFO queue pricing
+        const fifoFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AWSQueueService' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'queueType', Value: 'FIFO' }
+        ];
+
+        const fifoResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AWSQueueService',
+                Filters: fifoFilters,
+                MaxResults: 10
+            })
+        });
+
+        // SQS pricing is per request; convert to per million
+        if (standardResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${standardResponse.statusCode} for SQS standard queue pricing`);
+        }
+        const standardPerRequest = this.parsePricingResponse(standardResponse.body);
+        if (standardPerRequest <= 0) {
+            throw new Error('Could not parse SQS standard queue pricing from AWS Price List API response');
+        }
+
+        if (fifoResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${fifoResponse.statusCode} for SQS FIFO queue pricing`);
+        }
+        const fifoPerRequest = this.parsePricingResponse(fifoResponse.body);
+        if (fifoPerRequest <= 0) {
+            throw new Error('Could not parse SQS FIFO queue pricing from AWS Price List API response');
+        }
+
+        return {
+            standardPerMillion: standardPerRequest * 1000000,
+            fifoPerMillion: fifoPerRequest * 1000000,
+            source: 'AWS Price List API'
+        };
+    }
+
+    /**
+     * Get detailed cost estimate for the SQS queue
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(): void {
+        if (!this.state.queue_url) {
+            throw new Error("Queue not created yet");
+        }
+
+        const isFifo = this.definition.fifo_queue === true;
+        const pricing = this.fetchSQSPricing();
+        const pricePerMillion = isFifo ? pricing.fifoPerMillion : pricing.standardPerMillion;
+
+        cli.output(`\n💰 Cost Estimate for SQS Queue: ${this.state.queue_name}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📊 Queue Configuration:`);
+        cli.output(`   Queue Name: ${this.state.queue_name}`);
+        cli.output(`   Queue Type: ${isFifo ? 'FIFO' : 'Standard'}`);
+        cli.output(`   Region: ${this.definition.region}`);
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   ${isFifo ? 'FIFO' : 'Standard'} Requests: $${pricePerMillion.toFixed(2)} per million`);
+        cli.output(`   First 1 million requests/month: Free (free tier)`);
+
+        const metrics = this.getSQSCloudWatchMetrics();
+        let totalMonthlyCost = 0;
+
+        if (metrics) {
+            const totalRequests = metrics.numberOfMessagesSent + metrics.numberOfMessagesReceived + metrics.numberOfMessagesDeleted;
+            totalMonthlyCost = (totalRequests / 1000000) * pricePerMillion;
+
+            cli.output(`\n📈 Usage (Last 30 Days from CloudWatch):`);
+            cli.output(`   Messages Sent: ${metrics.numberOfMessagesSent.toLocaleString()}`);
+            cli.output(`   Messages Received: ${metrics.numberOfMessagesReceived.toLocaleString()}`);
+            cli.output(`   Messages Deleted: ${metrics.numberOfMessagesDeleted.toLocaleString()}`);
+            cli.output(`   Total API Requests: ${totalRequests.toLocaleString()}`);
+
+            cli.output(`\n💵 Cost Breakdown:`);
+            cli.output(`   Request Costs: $${totalMonthlyCost.toFixed(4)}`);
+        } else {
+            cli.output(`\n⚠️ CloudWatch metrics unavailable - usage costs not included`);
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - SQS is purely usage-based (no fixed monthly cost)`);
+        cli.output(`   - Each 64KB chunk of a message counts as one request`);
+        cli.output(`   - Free tier: 1 million requests/month (not deducted above)`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        if (!this.state.queue_url) {
+            const result = {
+                type: "aws-sqs-queue",
+                costs: { month: { amount: "0", currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const isFifo = this.definition.fifo_queue === true;
+            const pricing = this.fetchSQSPricing();
+            const pricePerMillion = isFifo ? pricing.fifoPerMillion : pricing.standardPerMillion;
+            let totalMonthlyCost = 0;
+
+            const metrics = this.getSQSCloudWatchMetrics();
+            if (metrics) {
+                const totalRequests = metrics.numberOfMessagesSent + metrics.numberOfMessagesReceived + metrics.numberOfMessagesDeleted;
+                totalMonthlyCost = (totalRequests / 1000000) * pricePerMillion;
+            }
+
+            const result = {
+                type: "aws-sqs-queue",
+                costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "aws-sqs-queue",
+                costs: { month: { amount: "0", currency: "USD", error: (error as Error).message } }
+            };
+            cli.output(JSON.stringify(result));
         }
     }
 } 

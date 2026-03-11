@@ -1165,6 +1165,292 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
    * @param args Required arguments:
    *   - table: Table name to show time travel info for
    */
+  // =========================================================================
+  // Cost Estimation
+  // =========================================================================
+
+  /**
+   * Extract price from a GCP Billing SKU
+   */
+  private extractPriceFromSku(sku: any): number {
+    try {
+      const pricingInfo = sku.pricingInfo;
+      if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+        return 0;
+      }
+      const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+      if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+        return 0;
+      }
+      for (const rate of tieredRates) {
+        const unitPrice = rate.unitPrice;
+        if (unitPrice) {
+          const units = parseInt(unitPrice.units || '0', 10);
+          const nanos = parseInt(unitPrice.nanos || '0', 10);
+          const price = units + (nanos / 1e9);
+          if (price > 0) {
+            return price;
+          }
+        }
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Get BigQuery pricing from GCP Cloud Billing Catalog API
+   */
+  private fetchBigQueryPricing(): {
+    activeStoragePerGbMonth: number;
+    longTermStoragePerGbMonth: number;
+    queryPerTbScanned: number;
+    streamingInsertPerGb: number;
+    source: string;
+  } {
+    try {
+      const billingApiUrl = 'https://cloudbilling.googleapis.com/v1';
+      // BigQuery service ID
+      const serviceId = '24E6-581D-38E5';
+      const skusUrl = `${billingApiUrl}/services/${serviceId}/skus?currencyCode=USD`;
+      const response = this.get(skusUrl);
+
+      if (response.skus && Array.isArray(response.skus)) {
+        let activeStorageRate = 0;
+        let longTermStorageRate = 0;
+        let queryRate = 0;
+        let streamingInsertRate = 0;
+
+        const location = (this.definition.location || 'US').toLowerCase();
+
+        for (const sku of response.skus) {
+          const desc = (sku.description || '').toLowerCase();
+          const serviceRegions = sku.serviceRegions || [];
+
+          // Check region match
+          const regionMatch = serviceRegions.some((r: string) => {
+            const rl = r.toLowerCase();
+            return rl === location || rl === 'global';
+          });
+          if (!regionMatch) continue;
+
+          const price = this.extractPriceFromSku(sku);
+          if (price <= 0) continue;
+
+          if (desc.includes('active') && desc.includes('storage')) {
+            activeStorageRate = price;
+          } else if (desc.includes('long') && desc.includes('term') && desc.includes('storage')) {
+            longTermStorageRate = price;
+          } else if (desc.includes('analysis') && desc.includes('on demand')) {
+            queryRate = price;
+          } else if (desc.includes('streaming') && desc.includes('insert')) {
+            streamingInsertRate = price;
+          }
+        }
+
+        if (activeStorageRate > 0 || queryRate > 0) {
+          if (activeStorageRate <= 0 || queryRate <= 0) {
+            const missing: string[] = [];
+            if (activeStorageRate <= 0) missing.push('active storage');
+            if (queryRate <= 0) missing.push('query');
+            throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(', ')}`);
+          }
+          if (longTermStorageRate <= 0) {
+            throw new Error('Long-term storage rate not found in GCP Cloud Billing API. Cannot derive from active storage rate.');
+          }
+          return {
+            activeStoragePerGbMonth: activeStorageRate,
+            longTermStoragePerGbMonth: longTermStorageRate,
+            queryPerTbScanned: queryRate * 1024, // API returns per-GB, convert to per-TB
+            streamingInsertPerGb: streamingInsertRate > 0 ? streamingInsertRate : 0,
+            source: 'GCP Cloud Billing Catalog API'
+          };
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch BigQuery pricing from GCP API: ${(error as Error).message}`);
+    }
+
+    throw new Error('Could not retrieve BigQuery pricing from GCP Cloud Billing Catalog API');
+  }
+
+  /**
+   * Get dataset storage metrics from BigQuery API
+   */
+  private getDatasetStorageMetrics(): {
+    totalSizeBytes: number;
+    tableCount: number;
+  } {
+    try {
+      const dataset = this.getDataset();
+      if (!dataset) {
+        return { totalSizeBytes: 0, tableCount: 0 };
+      }
+
+      // List tables to get storage info
+      const tableList = this.listTables();
+      let totalSizeBytes = 0;
+      let tableCount = 0;
+
+      if (tableList.tables && Array.isArray(tableList.tables)) {
+        tableCount = tableList.tables.length;
+        for (const table of tableList.tables) {
+          // Get detailed table info for size
+          try {
+            const tableRef = table.tableReference;
+            const tableUrl = `${this.apiUrl}/datasets/${tableRef.datasetId}/tables/${tableRef.tableId}`;
+            const tableDetail = this.get(tableUrl);
+            if (tableDetail.numBytes) {
+              totalSizeBytes += parseInt(tableDetail.numBytes, 10);
+            }
+          } catch {
+            // Skip tables we can't read
+          }
+        }
+      }
+
+      return { totalSizeBytes, tableCount };
+    } catch {
+      return { totalSizeBytes: 0, tableCount: 0 };
+    }
+  }
+
+  /**
+   * Get detailed cost estimate for the BigQuery dataset
+   */
+  @action("get-cost-estimate")
+  getCostEstimate(_args?: Args): void {
+    const datasetId = this.definition.dataset;
+
+    cli.output(`\n💰 Cost Estimate for BigQuery Dataset: ${datasetId}`);
+    cli.output(`${'='.repeat(60)}`);
+
+    const location = this.definition.location || 'US';
+    const billingModel = this.definition.storage_billing_model || 'LOGICAL';
+
+    cli.output(`\n📊 Dataset Configuration:`);
+    cli.output(`   Dataset: ${datasetId}`);
+    cli.output(`   Project: ${this.projectId}`);
+    cli.output(`   Location: ${location}`);
+    cli.output(`   Storage Billing Model: ${billingModel}`);
+
+    const pricing = this.fetchBigQueryPricing();
+
+    cli.output(`\n💵 Pricing (${pricing.source}):`);
+    cli.output(`   Active Storage: $${pricing.activeStoragePerGbMonth.toFixed(4)}/GB/month`);
+    cli.output(`   Long-term Storage: $${pricing.longTermStoragePerGbMonth.toFixed(4)}/GB/month`);
+    cli.output(`   On-demand Queries: $${pricing.queryPerTbScanned.toFixed(2)}/TB scanned`);
+    cli.output(`   Streaming Inserts: $${pricing.streamingInsertPerGb.toFixed(4)}/GB`);
+
+    // Get storage metrics
+    const storageMetrics = this.getDatasetStorageMetrics();
+    const storageSizeGb = storageMetrics.totalSizeBytes / (1024 * 1024 * 1024);
+
+    cli.output(`\n📈 Storage Usage:`);
+    cli.output(`   Tables: ${storageMetrics.tableCount}`);
+    cli.output(`   Total Size: ${storageSizeGb.toFixed(4)} GB (${storageMetrics.totalSizeBytes.toLocaleString()} bytes)`);
+
+    // Calculate storage cost (assume all active for simplicity)
+    const storageCostMonthly = storageSizeGb * pricing.activeStoragePerGbMonth;
+
+    cli.output(`\n💵 Cost Breakdown (Monthly):`);
+    cli.output(`   Storage Cost: $${storageCostMonthly.toFixed(4)}`);
+    cli.output(`   Query Cost: Usage-based (not estimated - depends on query volume)`);
+
+    // First 10 GB of storage is free
+    const freeStorageGb = 10;
+    const billableStorageGb = Math.max(0, storageSizeGb - freeStorageGb);
+    const adjustedStorageCost = billableStorageGb * pricing.activeStoragePerGbMonth;
+
+    cli.output(`\n   Free Tier: First ${freeStorageGb} GB storage free`);
+    cli.output(`   Billable Storage: ${billableStorageGb.toFixed(4)} GB`);
+    cli.output(`   Adjusted Storage Cost: $${adjustedStorageCost.toFixed(4)}`);
+
+    const totalMonthlyCost = adjustedStorageCost;
+
+    // JSON Summary
+    const summary = {
+      entity_type: "gcp-big-query",
+      dataset: datasetId,
+      project: this.projectId,
+      location: location,
+      configuration: {
+        storage_billing_model: billingModel,
+        table_count: storageMetrics.tableCount,
+        total_size_bytes: storageMetrics.totalSizeBytes,
+        total_size_gb: parseFloat(storageSizeGb.toFixed(4))
+      },
+      pricing_rates: {
+        source: pricing.source,
+        currency: 'USD',
+        active_storage_per_gb_month: pricing.activeStoragePerGbMonth,
+        long_term_storage_per_gb_month: pricing.longTermStoragePerGbMonth,
+        query_per_tb_scanned: pricing.queryPerTbScanned,
+        streaming_insert_per_gb: pricing.streamingInsertPerGb
+      },
+      cost_breakdown: {
+        storage_monthly: parseFloat(adjustedStorageCost.toFixed(4)),
+        query_monthly: 0, // Usage-based, not estimated
+        total_monthly: parseFloat(totalMonthlyCost.toFixed(2))
+      },
+      disclaimer: "Storage costs based on current dataset size. Query costs are usage-based and not included. First 10 GB storage and 1 TB queries/month are free."
+    };
+
+    cli.output(`\n${'='.repeat(60)}`);
+    cli.output(`💰 ESTIMATED MONTHLY COST (storage only): $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${'='.repeat(60)}`);
+
+    cli.output(`\n📝 Notes:`);
+    cli.output(`   - BigQuery pricing is primarily usage-based (queries)`);
+    cli.output(`   - Free tier: 10 GB storage, 1 TB queries/month`);
+    cli.output(`   - Query costs depend on data scanned, not shown here`);
+    cli.output(`   - PHYSICAL billing model may reduce storage costs (compressed)`);
+
+    cli.output(`\n📋 JSON Summary:`);
+    cli.output(JSON.stringify(summary, null, 2));
+    cli.output(`\n${'='.repeat(60)}`);
+  }
+
+  /**
+   * Returns cost information in standardized format for Monk's billing system.
+   */
+  @action("costs")
+  costs(): void {
+    try {
+      const pricing = this.fetchBigQueryPricing();
+      const storageMetrics = this.getDatasetStorageMetrics();
+      const storageSizeGb = storageMetrics.totalSizeBytes / (1024 * 1024 * 1024);
+
+      // First 10 GB free
+      const billableStorageGb = Math.max(0, storageSizeGb - 10);
+      const totalMonthlyCost = billableStorageGb * pricing.activeStoragePerGbMonth;
+
+      const result = {
+        type: "gcp-big-query",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "gcp-big-query",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: (error as Error).message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
+
   @action("time-travel-info")
   timeTravelInfo(args?: Args): void {
     cli.output(`==================================================`);

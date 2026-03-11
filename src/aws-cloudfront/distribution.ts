@@ -736,4 +736,324 @@ ${pathsXml}
         this.state.in_progress_invalidation_batches = undefined;
         this.state.existing = false;
     }
+
+    // ==================== COST ESTIMATION ====================
+
+    /**
+     * Get CloudWatch metrics for CloudFront distribution (last 30 days)
+     */
+    private getCloudFrontMetrics(): {
+        totalRequests: number;
+        bytesDownloaded: number;
+        bytesUploaded: number;
+    } | null {
+        if (!this.state.distribution_id) return null;
+
+        try {
+            const endTime = new Date().toISOString();
+            const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            const period = 2592000; // 30 days
+
+            const getMetric = (metricName: string, stat: string = 'Sum'): number => {
+                // Build query string manually (URLSearchParams not available in MonkEC)
+                const queryParams = [
+                    'Action=GetMetricStatistics',
+                    'Version=2010-08-01',
+                    'Namespace=AWS%2FCloudFront',
+                    `MetricName=${encodeURIComponent(metricName)}`,
+                    `StartTime=${encodeURIComponent(startTime)}`,
+                    `EndTime=${encodeURIComponent(endTime)}`,
+                    `Period=${period.toString()}`,
+                    `Statistics.member.1=${stat}`,
+                    'Dimensions.member.1.Name=DistributionId',
+                    `Dimensions.member.1.Value=${encodeURIComponent(this.state.distribution_id!)}`,
+                    'Dimensions.member.2.Name=Region',
+                    'Dimensions.member.2.Value=Global'
+                ];
+
+                const url = `https://monitoring.us-east-1.amazonaws.com/?${queryParams.join('&')}`;
+                const response = aws.get(url, {
+                    service: 'monitoring',
+                    region: 'us-east-1'
+                });
+
+                if (response.statusCode === 200) {
+                    const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
+                    return sumMatch ? parseFloat(sumMatch[1]) : 0;
+                }
+                return 0;
+            };
+
+            return {
+                totalRequests: getMetric('Requests'),
+                bytesDownloaded: getMetric('BytesDownloaded'),
+                bytesUploaded: getMetric('BytesUploaded')
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse pricing response from AWS Price List API
+     */
+    private parsePricingResponse(responseBody: string): number {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return 0;
+            }
+
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                        if (pricePerUnit > 0) {
+                            return pricePerUnit;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
+        }
+        return 0;
+    }
+
+    /**
+     * Fetch CloudFront pricing from AWS Price List API
+     */
+    private fetchCloudFrontPricing(): {
+        requestsPer10k: number;
+        dataTransferPerGB: number;
+        source: string;
+    } {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+
+        // Fetch data transfer pricing (US/Europe)
+        const transferFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonCloudFront' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: 'United States' },
+            { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'Data Transfer' }
+        ];
+
+        const transferResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonCloudFront',
+                Filters: transferFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (transferResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${transferResponse.statusCode} for CloudFront data transfer pricing`);
+        }
+
+        const dataTransferPerGB = this.parsePricingResponse(transferResponse.body);
+        if (dataTransferPerGB <= 0) {
+            throw new Error('Could not parse CloudFront data transfer pricing from AWS Price List API response');
+        }
+
+        // Fetch request pricing
+        const requestFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonCloudFront' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: 'United States' },
+            { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'Request' }
+        ];
+
+        const requestResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonCloudFront',
+                Filters: requestFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (requestResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for CloudFront request pricing`);
+        }
+
+        // Request pricing is per request; convert to per 10k
+        const requestPerUnit = this.parsePricingResponse(requestResponse.body);
+        if (requestPerUnit <= 0) {
+            throw new Error('Could not parse CloudFront request pricing from AWS Price List API response');
+        }
+        const requestsPer10k = requestPerUnit * 10000;
+
+        return {
+            requestsPer10k,
+            dataTransferPerGB,
+            source: 'AWS Price List API'
+        };
+    }
+
+    /**
+     * Fetch dedicated IP SSL pricing from AWS Price List API.
+     */
+    private fetchDedicatedIPSSLCost(): number {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+
+        const filters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonCloudFront' },
+            { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'SSL Certificate Custom' }
+        ];
+
+        const response = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonCloudFront',
+                Filters: filters,
+                MaxResults: 10
+            })
+        });
+
+        if (response.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${response.statusCode} for CloudFront SSL pricing`);
+        }
+
+        const rate = this.parsePricingResponse(response.body);
+        if (rate <= 0) {
+            throw new Error('Could not parse CloudFront dedicated IP SSL pricing from AWS Price List API response');
+        }
+
+        return rate;
+    }
+
+    /**
+     * Get detailed cost estimate for the CloudFront distribution
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(): void {
+        if (!this.state.distribution_id) {
+            throw new Error("Distribution not created yet");
+        }
+
+        cli.output(`\n💰 Cost Estimate for CloudFront Distribution: ${this.state.distribution_id}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📊 Distribution Configuration:`);
+        cli.output(`   Distribution ID: ${this.state.distribution_id}`);
+        cli.output(`   Domain: ${this.state.domain_name || 'N/A'}`);
+        cli.output(`   Status: ${this.state.distribution_status || 'N/A'}`);
+        cli.output(`   Price Class: ${this.definition.price_class || 'PriceClass_All'}`);
+
+        // Get pricing from AWS Price List API
+        const pricing = this.fetchCloudFrontPricing();
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   HTTPS Requests: $${pricing.requestsPer10k.toFixed(4)} per 10,000`);
+        cli.output(`   Data Transfer Out: $${pricing.dataTransferPerGB.toFixed(4)}/GB (first 10TB)`);
+
+        const metrics = this.getCloudFrontMetrics();
+
+        let totalMonthlyCost = 0;
+
+        if (metrics) {
+            const requestCost = (metrics.totalRequests / 10000) * pricing.requestsPer10k;
+            const dataTransferGB = metrics.bytesDownloaded / (1024 * 1024 * 1024);
+            const dataTransferCost = dataTransferGB * pricing.dataTransferPerGB;
+
+            totalMonthlyCost = requestCost + dataTransferCost;
+
+            cli.output(`\n📈 Usage (Last 30 Days from CloudWatch):`);
+            cli.output(`   Total Requests: ${metrics.totalRequests.toLocaleString()}`);
+            cli.output(`   Data Transfer Out: ${dataTransferGB.toFixed(2)} GB`);
+            cli.output(`   Data Transfer In: ${(metrics.bytesUploaded / (1024 * 1024 * 1024)).toFixed(2)} GB`);
+
+            cli.output(`\n💵 Cost Breakdown:`);
+            cli.output(`   Request Costs: $${requestCost.toFixed(4)}`);
+            cli.output(`   Data Transfer Out: $${dataTransferCost.toFixed(4)}`);
+            cli.output(`   Data Transfer In: Free (always free to origin)`);
+        } else {
+            cli.output(`\n⚠️ CloudWatch metrics unavailable - usage costs not included`);
+        }
+
+        // SSL certificate cost
+        if (this.definition.viewer_certificate?.acm_certificate_arn) {
+            cli.output(`\n🔒 SSL Certificate: Free (ACM certificate)`);
+        } else if (this.definition.viewer_certificate?.ssl_support_method === 'vip') {
+            const sslCost = this.fetchDedicatedIPSSLCost();
+            totalMonthlyCost += sslCost;
+            cli.output(`\n🔒 Dedicated IP SSL: $${sslCost.toFixed(2)}/month (from AWS Price List API)`);
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Pricing from ${pricing.source}`);
+        cli.output(`   - Actual costs vary by geographic region of requests`);
+        cli.output(`   - First 1TB/month free tier (not deducted above)`);
+        cli.output(`   - Does not include: Lambda@Edge, Field-Level Encryption, Real-Time Logs`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        if (!this.state.distribution_id) {
+            const result = {
+                type: "aws-cloudfront-distribution",
+                costs: { month: { amount: "0", currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const pricing = this.fetchCloudFrontPricing();
+            let totalMonthlyCost = 0;
+            const metrics = this.getCloudFrontMetrics();
+
+            if (metrics) {
+                const requestCost = (metrics.totalRequests / 10000) * pricing.requestsPer10k;
+                const dataTransferGB = metrics.bytesDownloaded / (1024 * 1024 * 1024);
+                const dataTransferCost = dataTransferGB * pricing.dataTransferPerGB;
+                totalMonthlyCost = requestCost + dataTransferCost;
+            }
+
+            // Dedicated IP SSL
+            if (this.definition.viewer_certificate?.ssl_support_method === 'vip') {
+                totalMonthlyCost += this.fetchDedicatedIPSSLCost();
+            }
+
+            const result = {
+                type: "aws-cloudfront-distribution",
+                costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "aws-cloudfront-distribution",
+                costs: { month: { amount: "0", currency: "USD", error: (error as Error).message } }
+            };
+            cli.output(JSON.stringify(result));
+        }
+    }
 }
