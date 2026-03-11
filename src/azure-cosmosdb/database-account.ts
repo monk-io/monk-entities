@@ -841,6 +841,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         regionCount: number;
         multiRegionWrites: boolean;
         storageSizeGb: number;
+        storageMetricAvailable: boolean;
     } {
         const account = this.checkResourceExists(this.definition.account_name);
         if (!account) {
@@ -859,10 +860,11 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
 
         // Try to get throughput settings from the account
         let totalRUs = 0;
+        const basePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${this.definition.account_name}`;
 
-        // Try to get account-level throughput
+        // 1. Try account-level throughput first
         try {
-            const throughputPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${this.definition.account_name}/throughputSettings/default?api-version=${this.apiVersion}`;
+            const throughputPath = `${basePath}/throughputSettings/default?api-version=${this.apiVersion}`;
             const throughputResponse = this.makeAzureRequest("GET", throughputPath);
             if (!throughputResponse.error && throughputResponse.body) {
                 const throughputData = JSON.parse(throughputResponse.body);
@@ -874,23 +876,33 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                 }
             }
         } catch {
-            // Throughput may be set at database/container level
+            // Throughput may be set at database/container level — will enumerate below
+        }
+
+        // 2. If no account-level throughput, enumerate databases and containers
+        //    to sum per-database and per-container provisioned RU/s.
+        //    This covers the common case where throughput is set at the database or container level.
+        if (totalRUs <= 0) {
+            totalRUs = this.enumerateDatabaseAndContainerThroughput(basePath);
         }
 
         if (totalRUs <= 0) {
             throw new Error(
                 'Could not determine Cosmos DB throughput (RU/s). ' +
-                'Throughput may be set at database or container level, which is not yet supported for cost estimation.'
+                'No throughput found at account, database, or container level.'
             );
         }
 
         // Try to get storage usage from Azure Monitor metrics
+        // When DataUsage returns 0, this may indicate a new account with no data yet,
+        // or that Azure Monitor metrics are not yet populated. We track this separately
+        // so callers can distinguish "0 GB actual usage" from "metric unavailable".
         let storageSizeGb = 0;
+        let storageMetricAvailable = false;
         try {
-            const resourceId = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${this.definition.account_name}`;
             const now = new Date();
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const metricsPath = `${resourceId}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=DataUsage&timespan=${thirtyDaysAgo.toISOString()}/${now.toISOString()}&aggregation=Average`;
+            const metricsPath = `${basePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=DataUsage&timespan=${thirtyDaysAgo.toISOString()}/${now.toISOString()}&aggregation=Average`;
             const metricsResponse = this.makeAzureRequest("GET", metricsPath);
             if (!metricsResponse.error && metricsResponse.body) {
                 const metricsData = JSON.parse(metricsResponse.body);
@@ -900,6 +912,7 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
                     for (const ts of timeseries) {
                         const dataPoints = ts.data || [];
                         for (const point of dataPoints) {
+                            storageMetricAvailable = true;
                             const avg = point.average || 0;
                             if (avg > 0) {
                                 storageSizeGb = avg / (1024 * 1024 * 1024);
@@ -912,7 +925,106 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
             // Storage metrics may not be available
         }
 
-        return { totalRUs, regionCount, multiRegionWrites, storageSizeGb };
+        return { totalRUs, regionCount, multiRegionWrites, storageSizeGb, storageMetricAvailable };
+    }
+
+    /**
+     * Enumerate databases and containers to sum per-database and per-container provisioned RU/s.
+     * Called when no account-level throughput is configured (the common case for per-database
+     * or per-container throughput provisioning).
+     * 
+     * Uses the Azure Management API:
+     * - GET .../sqlDatabases to list databases
+     * - GET .../sqlDatabases/{db}/throughputSettings/default for database-level throughput
+     * - GET .../sqlDatabases/{db}/containers to list containers
+     * - GET .../sqlDatabases/{db}/containers/{c}/throughputSettings/default for container-level throughput
+     * 
+     * Also checks MongoDB databases/collections if the account kind is MongoDB.
+     */
+    private enumerateDatabaseAndContainerThroughput(basePath: string): number {
+        let totalRUs = 0;
+        const accountKind = (this.definition.account_kind || 'GlobalDocumentDB').toLowerCase();
+
+        // Determine the API path prefix based on account kind
+        const dbType = accountKind === 'mongodb' ? 'mongodbDatabases' : 'sqlDatabases';
+        const containerType = accountKind === 'mongodb' ? 'collections' : 'containers';
+
+        try {
+            // List databases
+            const dbListPath = `${basePath}/${dbType}?api-version=${this.apiVersion}`;
+            const dbListResponse = this.makeAzureRequest("GET", dbListPath);
+            if (dbListResponse.error || !dbListResponse.body) return totalRUs;
+
+            const dbListData = JSON.parse(dbListResponse.body);
+            const databases = dbListData?.value || [];
+
+            for (const db of databases) {
+                const dbName = db.name as string;
+                if (!dbName) continue;
+                const dbPath = `${basePath}/${dbType}/${dbName}`;
+
+                // Try database-level throughput
+                let dbHasThroughput = false;
+                try {
+                    const dbThroughputPath = `${dbPath}/throughputSettings/default?api-version=${this.apiVersion}`;
+                    const dbThroughputResponse = this.makeAzureRequest("GET", dbThroughputPath);
+                    if (!dbThroughputResponse.error && dbThroughputResponse.body) {
+                        const dbThroughputData = JSON.parse(dbThroughputResponse.body);
+                        const dbThroughputProps = dbThroughputData?.properties?.resource;
+                        if (dbThroughputProps?.throughput) {
+                            totalRUs += dbThroughputProps.throughput;
+                            dbHasThroughput = true;
+                        } else if (dbThroughputProps?.autoscaleSettings?.maxThroughput) {
+                            totalRUs += dbThroughputProps.autoscaleSettings.maxThroughput;
+                            dbHasThroughput = true;
+                        }
+                    }
+                } catch {
+                    // Database-level throughput not set
+                }
+
+                // If database has shared throughput, skip container enumeration
+                // (all containers share the database throughput)
+                if (dbHasThroughput) continue;
+
+                // List containers and check per-container throughput
+                try {
+                    const containerListPath = `${dbPath}/${containerType}?api-version=${this.apiVersion}`;
+                    const containerListResponse = this.makeAzureRequest("GET", containerListPath);
+                    if (containerListResponse.error || !containerListResponse.body) continue;
+
+                    const containerListData = JSON.parse(containerListResponse.body);
+                    const containers = containerListData?.value || [];
+
+                    for (const container of containers) {
+                        const containerName = container.name as string;
+                        if (!containerName) continue;
+
+                        try {
+                            const containerThroughputPath = `${dbPath}/${containerType}/${containerName}/throughputSettings/default?api-version=${this.apiVersion}`;
+                            const containerThroughputResponse = this.makeAzureRequest("GET", containerThroughputPath);
+                            if (!containerThroughputResponse.error && containerThroughputResponse.body) {
+                                const containerThroughputData = JSON.parse(containerThroughputResponse.body);
+                                const containerThroughputProps = containerThroughputData?.properties?.resource;
+                                if (containerThroughputProps?.throughput) {
+                                    totalRUs += containerThroughputProps.throughput;
+                                } else if (containerThroughputProps?.autoscaleSettings?.maxThroughput) {
+                                    totalRUs += containerThroughputProps.autoscaleSettings.maxThroughput;
+                                }
+                            }
+                        } catch {
+                            // Container-level throughput not set
+                        }
+                    }
+                } catch {
+                    // Failed to list containers
+                }
+            }
+        } catch {
+            // Failed to list databases
+        }
+
+        return totalRUs;
     }
 
     /**
@@ -973,8 +1085,10 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
         const storageCost = metrics.storageSizeGb * pricing.storagePerGbMonth * regionMultiplier;
         if (metrics.storageSizeGb > 0) {
             cli.output(`   Storage (${metrics.storageSizeGb.toFixed(2)} GB x ${regionMultiplier} regions): $${storageCost.toFixed(2)}`);
+        } else if (metrics.storageMetricAvailable) {
+            cli.output(`   Storage: $0.00 (Azure Monitor DataUsage metric returned 0 — account may be empty or newly created)`);
         } else {
-            cli.output(`   Storage: $0.00 (no usage data available from Azure Monitor)`);
+            cli.output(`   Storage: $0.00 (Azure Monitor DataUsage metric unavailable — storage cost not included)`);
         }
 
         const totalMonthlyCost = totalRuCost + storageCost;

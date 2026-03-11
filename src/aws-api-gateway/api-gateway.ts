@@ -556,7 +556,11 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
                 totalRequests = sumMatch ? parseFloat(sumMatch[1]) : 0;
             }
 
-            // For WebSocket APIs, also fetch ConnectCount to estimate connection minutes
+            // For WebSocket APIs, estimate connection minutes from ConnectCount × IntegrationLatency.
+            // **Known platform limitation**: AWS CloudWatch does not expose a direct "connection duration"
+            // or "connection minutes" metric for API Gateway WebSocket APIs. IntegrationLatency measures
+            // backend response time, not total connection lifetime, so this is an approximation.
+            // There is currently no better alternative available through CloudWatch.
             const isWebSocket = String(this.state.protocol_type || this.definition.protocol_type).toUpperCase() === 'WEBSOCKET';
             let connectionMinutes: number | undefined;
 

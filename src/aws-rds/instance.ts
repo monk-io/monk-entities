@@ -1248,6 +1248,13 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             }
             
             // Calculate backup storage cost (if retention > 0)
+            // Backup storage quantity uses CloudWatch's TotalBackupStorageBilled metric when available.
+            // When the metric is unavailable (e.g. new instances or CloudWatch not enabled), backup cost
+            // is reported as $0 because there is no reliable way to estimate actual backup size:
+            //   - AWS does not expose per-snapshot sizes in DescribeDBSnapshots for automated backups
+            //   - Heuristics like storageSizeGb × retentionDays / 7 are inaccurate because actual backup
+            //     size depends on data change rate, compression, and incremental backup behaviour
+            // The backup rate itself is always fetched from the AWS Price List API.
             let backupCostMonthly = 0;
             let backupRate = 0;
             let estimatedBackupGB = 0;
@@ -1259,8 +1266,6 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 if (metrics && metrics.totalBackupStorageBilled > 0) {
                     estimatedBackupGB = metrics.totalBackupStorageBilled / (1024 * 1024 * 1024);
                 }
-                // If CloudWatch metric is not available, we cannot accurately estimate backup size
-                // Leave as 0 rather than guessing
                 backupCostMonthly = estimatedBackupGB * backupRate;
             }
             
@@ -1432,11 +1437,11 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             }
             
             // Calculate backup storage cost using actual CloudWatch metric
+            // See getCostEstimate() for detailed rationale on why we don't estimate when metric is unavailable
             let backupCostMonthly = 0;
             const backupRetention = dbInstance.BackupRetentionPeriod || this.definition.backup_retention_period || 0;
             if (backupRetention > 0) {
                 const backupRate = this.fetchBackupStorageRate();
-                // Use actual TotalBackupStorageBilled from CloudWatch if available
                 let estimatedBackupGB = 0;
                 if (metrics && metrics.totalBackupStorageBilled > 0) {
                     estimatedBackupGB = metrics.totalBackupStorageBilled / (1024 * 1024 * 1024);

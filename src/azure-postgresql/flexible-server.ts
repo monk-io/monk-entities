@@ -1673,8 +1673,12 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
         const storageCost = storageSizeGb * pricing.storagePerGbMonth;
 
         // Calculate backup costs
-        // First backup storage equal to provisioned storage is free
-        // Estimate additional backup storage based on retention
+        // First backup storage equal to provisioned storage is free.
+        // Azure does not expose actual backup storage consumed for PostgreSQL Flexible Server
+        // via any Management API or Azure Monitor metric. The estimate below uses:
+        //   estimatedBackupGb = (storageSizeGb × backupRetentionDays / 7) - storageSizeGb
+        // which assumes ~1 full backup per 7 days of retention above the free tier.
+        // Actual backup size may differ based on data change rate and WAL volume.
         const estimatedBackupGb = Math.max(0, (storageSizeGb * backupRetentionDays / 7) - storageSizeGb);
         let backupCost = estimatedBackupGb * pricing.backupPerGbMonth;
         if (geoRedundantBackup === 'Enabled') {
@@ -1846,9 +1850,10 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
         // Calculate storage cost
         const storageCost = storageSizeGb * pricing.storagePerGbMonth;
 
-        // Calculate backup cost using actual retention days from server configuration
-        // First backup storage equal to provisioned storage is free
-        // Estimate additional backup storage based on retention
+        // Calculate backup cost using actual retention days from server configuration.
+        // First backup storage equal to provisioned storage is free.
+        // Azure does not expose actual backup storage consumed for PostgreSQL Flexible Server
+        // via any Management API or Azure Monitor metric — see getCostEstimate() for rationale.
         const estimatedBackupGb = Math.max(0, (storageSizeGb * backupRetentionDays / 7) - storageSizeGb);
         let backupCost = estimatedBackupGb * pricing.backupPerGbMonth;
         if (geoRedundantBackup === 'Enabled') {
@@ -1923,7 +1928,10 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
     }
 
     /**
-     * Get Azure PostgreSQL pricing from Azure Retail Prices API
+     * Get Azure PostgreSQL pricing from Azure Retail Prices API.
+     * Returns null only if no matching SKU was found in the API response.
+     * Throws if the API call itself fails (network error, HTTP error, etc.)
+     * so callers can surface the root cause.
      */
     private getPostgreSQLPricing(location: string, tier: string, skuName?: string): {
         computePerVCoreHour: number;
@@ -1932,13 +1940,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
         source: string;
         isBurstable: boolean;
     } | null {
-        try {
-            const apiPricing = this.fetchPostgreSQLRetailPrices(location, tier, skuName);
-            if (apiPricing) {
-                return { ...apiPricing, source: 'Azure Retail Prices API' };
-            }
-        } catch (error) {
-            cli.output(`Warning: Failed to fetch pricing from Azure API: ${(error as Error).message}`);
+        const apiPricing = this.fetchPostgreSQLRetailPrices(location, tier, skuName);
+        if (apiPricing) {
+            return { ...apiPricing, source: 'Azure Retail Prices API' };
         }
 
         return null;
@@ -2058,8 +2062,10 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
 
             return null;
         } catch (error) {
-            cli.output(`Error fetching Azure retail prices: ${(error as Error).message}`);
-            return null;
+            // Re-throw so callers can distinguish "no matching SKU" (returns null) from
+            // "API failure / network error" (thrown exception). Swallowing here would lose
+            // the root cause and produce a generic "Could not fetch pricing" message.
+            throw error;
         }
     }
 
