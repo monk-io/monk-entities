@@ -374,6 +374,129 @@ export class Registry extends DOProviderEntity<
         }
     }
 
+    // =========================================================================
+    // Cost Estimation
+    // =========================================================================
+
+    /**
+     * DigitalOcean Container Registry has fixed, tier-based pricing.
+     * This is a known limitation: while DigitalOcean exposes subscription
+     * tier info via `GET /v2/registry/subscription`, the pricing is fixed
+     * per tier and sourced from the official pricing page
+     * (https://www.digitalocean.com/pricing/container-registry).
+     *
+     * DigitalOcean allows only one registry per account.
+     *
+     * - Starter: Free (500 MB storage, 1 repo) - only via web
+     * - Basic: $5/month (5 GB storage, unlimited repos)
+     * - Professional: $20/month (unlimited storage, unlimited repos)
+     */
+    private getRegistryPricing(tier: string): {
+        monthlyPrice: number;
+        includedStorageGb: number;
+        source: string;
+    } {
+        const tierLower = tier.toLowerCase();
+        switch (tierLower) {
+            case 'starter':
+                return { monthlyPrice: 0, includedStorageGb: 0.5, source: 'DigitalOcean Container Registry (Starter)' };
+            case 'basic':
+                return { monthlyPrice: 5, includedStorageGb: 5, source: 'DigitalOcean Container Registry (Basic)' };
+            case 'professional':
+                return { monthlyPrice: 20, includedStorageGb: -1, source: 'DigitalOcean Container Registry (Professional)' }; // -1 = unlimited
+            default:
+                return { monthlyPrice: 5, includedStorageGb: 5, source: 'DigitalOcean Container Registry (Basic - default)' };
+        }
+    }
+
+    /**
+     * Get detailed cost estimate for the Container Registry
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        const registryName = this.definition.name;
+
+        cli.output(`\n💰 Cost Estimate for DO Container Registry: ${registryName}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const tier = this.definition.subscription_tier;
+        const region = this.definition.region;
+
+        cli.output(`\n📊 Registry Configuration:`);
+        cli.output(`   Name: ${registryName}`);
+        cli.output(`   Region: ${region}`);
+        cli.output(`   Subscription Tier: ${tier}`);
+
+        const pricing = this.getRegistryPricing(tier);
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   Monthly Price: $${pricing.monthlyPrice.toFixed(2)}`);
+        cli.output(`   Included Storage: ${pricing.includedStorageGb === -1 ? 'Unlimited' : `${pricing.includedStorageGb} GB`}`);
+
+        // Try to get current storage usage
+        try {
+            const existingRegistry = this.findExistingRegistry();
+            if (existingRegistry) {
+                const usageBytes = existingRegistry.storage_usage_bytes || 0;
+                const usageGb = usageBytes / (1024 * 1024 * 1024);
+                cli.output(`\n📈 Current Usage:`);
+                cli.output(`   Storage: ${usageGb.toFixed(4)} GB (${usageBytes.toLocaleString()} bytes)`);
+                if (existingRegistry.storage_quota_bytes) {
+                    const quotaGb = existingRegistry.storage_quota_bytes / (1024 * 1024 * 1024);
+                    cli.output(`   Quota: ${quotaGb.toFixed(2)} GB`);
+                }
+            }
+        } catch {
+            // Registry may not exist yet
+        }
+
+        const totalMonthlyCost = pricing.monthlyPrice;
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - DigitalOcean allows only one registry per account`);
+        cli.output(`   - Basic: 5 GB storage, unlimited repositories`);
+        cli.output(`   - Professional: Unlimited storage, unlimited repositories`);
+        cli.output(`   - Pricing is fixed per tier, no usage-based charges`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        try {
+            const tier = this.definition.subscription_tier;
+            const pricing = this.getRegistryPricing(tier);
+
+            const result = {
+                type: "digitalocean-container-registry",
+                costs: {
+                    month: {
+                        amount: pricing.monthlyPrice.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "digitalocean-container-registry",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
+    }
+
     /**
      * Run garbage collection on the registry
      */

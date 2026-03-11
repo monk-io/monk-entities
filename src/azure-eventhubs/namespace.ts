@@ -1,6 +1,7 @@
 import { AzureEventHubsEntity, AzureEventHubsDefinition, AzureEventHubsState } from "./azure-eventhubs-base.ts";
 import cli from "cli";
 import secret from "secret";
+import http from "http";
 import { action, Args } from "monkec/base";
 
 /**
@@ -467,6 +468,241 @@ export class EventHubsNamespace extends AzureEventHubsEntity<EventHubsNamespaceD
         }
 
         cli.output("==================================================");
+    }
+
+    // ========================================
+    // Cost Estimation
+    // ========================================
+
+    /**
+     * Make an external HTTP request (for Azure Retail Prices API)
+     */
+    private makeExternalRequest(url: string): Record<string, unknown> | null {
+        try {
+            const response = http.get(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (response.body) {
+                return JSON.parse(response.body);
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch Event Hubs pricing from Azure Retail Prices API
+     */
+    private fetchEventHubsPricing(location: string, skuName: string): {
+        throughputUnitPerHour: number;
+        ingressPerMillion: number;
+        source: string;
+    } {
+        try {
+            const baseUrl = 'https://prices.azure.com/api/retail/prices';
+            const armRegionName = location.toLowerCase().replace(/\s+/g, '');
+
+            const filter = `serviceName eq 'Event Hubs' and armRegionName eq '${armRegionName}'`;
+            const encodedFilter = encodeURIComponent(filter);
+            const url = `${baseUrl}?$filter=${encodedFilter}`;
+
+            const response = this.makeExternalRequest(url);
+
+            if (response && response.Items && Array.isArray(response.Items)) {
+                let tuRate = 0;
+                let ingressRate = 0;
+
+                const tierLower = skuName.toLowerCase();
+
+                for (const item of response.Items as Array<{
+                    meterName?: string;
+                    productName?: string;
+                    skuName?: string;
+                    unitPrice?: number;
+                }>) {
+                    const meterName = (item.meterName || '').toLowerCase();
+                    const productName = (item.productName || '').toLowerCase();
+                    const itemSku = (item.skuName || '').toLowerCase();
+                    const price = item.unitPrice || 0;
+
+                    if (price <= 0) continue;
+
+                    // Match the correct tier
+                    if (!productName.includes(tierLower) && !itemSku.includes(tierLower)) continue;
+
+                    if (meterName.includes('throughput unit') || meterName.includes('processing unit')) {
+                        if (tuRate === 0) tuRate = price;
+                    } else if (meterName.includes('ingress') && meterName.includes('event')) {
+                        if (ingressRate === 0) ingressRate = price;
+                    }
+                }
+
+                if (tuRate > 0) {
+                    return {
+                        throughputUnitPerHour: tuRate,
+                        ingressPerMillion: ingressRate > 0 ? ingressRate : 0,
+                        source: 'Azure Retail Prices API'
+                    };
+                }
+            }
+        } catch (error) {
+            throw new Error(`Failed to fetch Event Hubs pricing from Azure API: ${(error as Error).message}`);
+        }
+
+        throw new Error(`Could not retrieve Event Hubs ${skuName} pricing from Azure Retail Prices API`);
+    }
+
+    /**
+     * Get detailed cost estimate for the Event Hubs namespace
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        const namespaceName = this.definition.namespace_name;
+
+        cli.output(`\n💰 Cost Estimate for Event Hubs Namespace: ${namespaceName}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const skuName = this.definition.sku.name;
+        const capacity = this.definition.sku.capacity || 1;
+        const location = this.definition.location;
+
+        cli.output(`\n📊 Namespace Configuration:`);
+        cli.output(`   Name: ${namespaceName}`);
+        cli.output(`   Location: ${location}`);
+        cli.output(`   SKU: ${skuName}`);
+        cli.output(`   Capacity: ${capacity} ${skuName === 'Premium' ? 'Processing Unit(s)' : 'Throughput Unit(s)'}`);
+        cli.output(`   Auto-Inflate: ${this.definition.is_auto_inflate_enabled || false}`);
+        if (this.definition.is_auto_inflate_enabled && this.definition.maximum_throughput_units) {
+            cli.output(`   Max Throughput Units: ${this.definition.maximum_throughput_units}`);
+        }
+        cli.output(`   Kafka Enabled: ${this.definition.kafka_enabled || false}`);
+
+        const pricing = this.fetchEventHubsPricing(location, skuName);
+        const hoursPerMonth = 730;
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   Per ${skuName === 'Premium' ? 'PU' : 'TU'}/hour: $${pricing.throughputUnitPerHour.toFixed(4)}`);
+        if (pricing.ingressPerMillion > 0) {
+            cli.output(`   Ingress Events: $${pricing.ingressPerMillion.toFixed(4)} per million`);
+        }
+
+        const tuMonthlyCost = capacity * pricing.throughputUnitPerHour * hoursPerMonth;
+
+        // Get actual ingress event metrics from Azure Monitor
+        const metrics = this.getEventHubsMetrics();
+        let ingressCost = 0;
+        if (metrics.incomingMessages > 0 && pricing.ingressPerMillion > 0 && skuName !== 'Premium') {
+            ingressCost = (metrics.incomingMessages / 1000000) * pricing.ingressPerMillion;
+        }
+
+        cli.output(`\n💵 Cost Breakdown (Monthly):`);
+        cli.output(`   ${skuName === 'Premium' ? 'Processing Units' : 'Throughput Units'} (${capacity} x $${pricing.throughputUnitPerHour.toFixed(4)}/hr x ${hoursPerMonth}hrs): $${tuMonthlyCost.toFixed(2)}`);
+        if (skuName === 'Premium') {
+            cli.output(`   Ingress Events: Included in PU cost`);
+        } else if (metrics.incomingMessages > 0) {
+            cli.output(`   Ingress Events (${metrics.incomingMessages.toLocaleString()} from Azure Monitor): $${ingressCost.toFixed(4)}`);
+        } else {
+            cli.output(`   Ingress Events: Azure Monitor metrics unavailable`);
+        }
+
+        const totalMonthlyCost = tuMonthlyCost + ingressCost;
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Cost is primarily based on provisioned throughput/processing units`);
+        cli.output(`   - Ingress events are charged per million events (Basic/Standard)`);
+        cli.output(`   - Premium tier includes ingress events in the PU cost`);
+        cli.output(`   - Auto-inflate may increase costs if TUs scale up`);
+        cli.output(`   - Capture feature (if enabled) has additional storage costs`);
+    }
+
+    /**
+     * Get Azure Monitor metrics for Event Hubs namespace (last 30 days).
+     * Returns total incoming messages count.
+     */
+    private getEventHubsMetrics(): { incomingMessages: number } {
+        try {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
+            const resourcePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.EventHub/namespaces/${this.definition.namespace_name}`;
+
+            const metricsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=IncomingMessages&timespan=${timespan}&interval=P1D&aggregation=Total`;
+            const response = this.makeAzureRequest("GET", metricsPath);
+
+            if (response.error || !response.body) {
+                return { incomingMessages: 0 };
+            }
+
+            const data = JSON.parse(response.body);
+            const metrics = data.value || [];
+            let incomingMessages = 0;
+
+            for (const metric of metrics) {
+                const timeseries = metric.timeseries || [];
+                for (const ts of timeseries) {
+                    const dataPoints = ts.data || [];
+                    for (const point of dataPoints) {
+                        incomingMessages += point.total || 0;
+                    }
+                }
+            }
+
+            return { incomingMessages };
+        } catch {
+            return { incomingMessages: 0 };
+        }
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        try {
+            const skuName = this.definition.sku.name;
+            const capacity = this.definition.sku.capacity || 1;
+            const location = this.definition.location;
+            const hoursPerMonth = 730;
+
+            const pricing = this.fetchEventHubsPricing(location, skuName);
+            let totalMonthlyCost = capacity * pricing.throughputUnitPerHour * hoursPerMonth;
+
+            // Add ingress event cost from Azure Monitor metrics (not for Premium tier)
+            if (skuName !== 'Premium' && pricing.ingressPerMillion > 0) {
+                const metrics = this.getEventHubsMetrics();
+                if (metrics.incomingMessages > 0) {
+                    totalMonthlyCost += (metrics.incomingMessages / 1000000) * pricing.ingressPerMillion;
+                }
+            }
+
+            const result = {
+                type: "azure-eventhubs-namespace",
+                costs: {
+                    month: {
+                        amount: totalMonthlyCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "azure-eventhubs-namespace",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
     }
 
     /**

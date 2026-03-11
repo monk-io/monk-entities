@@ -859,4 +859,216 @@ export class Database extends DOProviderEntity<
         this.state.connection_database = database.connection.database;
         this.state.connection_ssl = database.connection.ssl;
     }
+
+    // ==================== COST ESTIMATION ACTIONS ====================
+
+    /**
+     * DigitalOcean Database pricing by size slug (monthly USD)
+     * Prices are fixed per size and engine type
+     * Source: https://www.digitalocean.com/pricing/managed-databases
+     */
+    private getDatabasePricing(): {
+        basePrice: number;
+        pricePerNode: number;
+        storageIncludedGb: number;
+        source: string;
+    } | null {
+        const size = this.state.size || this.definition.size;
+        const engine = this.state.engine || this.definition.engine;
+
+        try {
+            // Fetch pricing from DigitalOcean database options API
+            const response = this.makeRequest("GET", `/databases/options`);
+            const options = response.options;
+
+            if (!options || !options.layouts) {
+                cli.output(`⚠️ Could not parse database options response`);
+                return null;
+            }
+
+            // Find the layout for our engine
+            const engineLayout = options.layouts.find((layout: any) => layout.slug === engine);
+            if (!engineLayout || !engineLayout.sizes) {
+                cli.output(`⚠️ No layout found for engine: ${engine}`);
+                return null;
+            }
+
+            // Find the size in the engine layout
+            const sizeInfo = engineLayout.sizes.find((s: any) => s.slug === size);
+            if (!sizeInfo) {
+                cli.output(`⚠️ Unknown database size: ${size} for engine: ${engine}`);
+                return null;
+            }
+
+            const pricePerNode = parseFloat(sizeInfo.price_monthly || '0');
+            if (pricePerNode <= 0) {
+                cli.output(`⚠️ Could not determine price for size: ${size}`);
+                return null;
+            }
+
+            return {
+                basePrice: pricePerNode,
+                pricePerNode: pricePerNode,
+                storageIncludedGb: sizeInfo.disk || 0,
+                source: 'DigitalOcean Database Options API'
+            };
+        } catch (error) {
+            cli.output(`⚠️ Failed to fetch pricing from DigitalOcean API: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Get detailed cost estimate for the database cluster
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(): void {
+        cli.output(`\n💰 Cost Estimate for DigitalOcean Database: ${this.state.name || this.definition.name}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        // Get current database info
+        let dbInfo: any = null;
+        if (this.state.id) {
+            try {
+                const response = this.makeRequest("GET", `/databases/${this.state.id}`);
+                dbInfo = response.database;
+            } catch (error) {
+                cli.output(`⚠️ Could not fetch current database info: ${(error as Error).message}`);
+            }
+        }
+
+        const size = dbInfo?.size || this.state.size || this.definition.size;
+        const engine = dbInfo?.engine || this.state.engine || this.definition.engine;
+        const numNodes = dbInfo?.num_nodes || this.state.num_nodes || this.definition.num_nodes;
+        const region = dbInfo?.region || this.state.region || this.definition.region;
+        const version = dbInfo?.version || this.state.version || this.definition.version;
+
+        cli.output(`\n📊 Cluster Configuration:`);
+        cli.output(`   Name: ${this.state.name || this.definition.name}`);
+        cli.output(`   Engine: ${engine} ${version ? `v${version}` : ''}`);
+        cli.output(`   Size: ${size}`);
+        cli.output(`   Nodes: ${numNodes}`);
+        cli.output(`   Region: ${region}`);
+        cli.output(`   Status: ${this.state.status || 'unknown'}`);
+
+        // Get pricing
+        const pricing = this.getDatabasePricing();
+        if (!pricing) {
+            cli.output(`\n❌ Error: Could not determine pricing for size: ${size}`);
+            return;
+        }
+
+        cli.output(`\n💵 Pricing Information:`);
+        cli.output(`   Source: ${pricing.source}`);
+        cli.output(`   Base Price per Node: $${pricing.basePrice.toFixed(2)}/month`);
+        cli.output(`   Storage Included: ${pricing.storageIncludedGb} GB per node`);
+
+        // Calculate costs
+        const computeCost = pricing.pricePerNode * numNodes;
+        
+        // DigitalOcean includes storage in the base price
+        // Additional storage is $0.10/GB/month if needed
+        const totalStorageIncluded = pricing.storageIncludedGb * numNodes;
+
+        cli.output(`\n📈 Cost Breakdown:`);
+        cli.output(`   Compute (${numNodes} node${numNodes > 1 ? 's' : ''} × $${pricing.pricePerNode.toFixed(2)}): $${computeCost.toFixed(2)}/month`);
+        cli.output(`   Storage Included: ${totalStorageIncluded} GB`);
+        cli.output(`   Additional Storage: $0.10/GB/month (if needed)`);
+
+        // High availability note
+        if (numNodes > 1) {
+            cli.output(`\n🔄 High Availability:`);
+            cli.output(`   Standby Nodes: ${numNodes - 1}`);
+            cli.output(`   Automatic Failover: Enabled`);
+        }
+
+        // Backup costs (included in DigitalOcean)
+        cli.output(`\n💾 Backups:`);
+        cli.output(`   Daily Backups: Included`);
+        cli.output(`   Retention: 7 days`);
+        cli.output(`   Point-in-Time Recovery: ${engine === 'pg' || engine === 'mysql' ? 'Supported' : 'Not supported'}`);
+
+        const totalCost = computeCost;
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Prices are estimates based on DigitalOcean's published pricing`);
+        cli.output(`   - Actual costs may vary based on data transfer and additional storage`);
+        cli.output(`   - Network transfer: First 1TB outbound free, then $0.01/GB`);
+    }
+
+    /**
+     * Returns cost information in the format expected by Monk billing system.
+     * This lifecycle method is called automatically by the core to collect entity costs.
+     * 
+     * Returns JSON in format:
+     * {
+     *   "type": "digitalocean-database",
+     *   "costs": {
+     *     "month": {
+     *       "amount": "X.XX",
+     *       "currency": "USD"
+     *     }
+     *   }
+     * }
+     */
+    @action("costs")
+    costs(): void {
+        // Get current database info
+        let dbInfo: any = null;
+        if (this.state.id) {
+            try {
+                const response = this.makeRequest("GET", `/databases/${this.state.id}`);
+                dbInfo = response.database;
+            } catch (error) {
+                cli.output(JSON.stringify({
+                    type: "digitalocean-database",
+                    costs: {
+                        month: {
+                            amount: "0",
+                            currency: "USD",
+                            error: `Could not retrieve database info: ${(error as Error).message}`
+                        }
+                    }
+                }));
+                return;
+            }
+        }
+
+        const numNodes = dbInfo?.num_nodes || this.state.num_nodes || this.definition.num_nodes;
+
+        // Get pricing
+        const pricing = this.getDatabasePricing();
+        if (!pricing) {
+            cli.output(JSON.stringify({
+                type: "digitalocean-database",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: "Could not determine pricing for database size"
+                    }
+                }
+            }));
+            return;
+        }
+
+        // Calculate total monthly cost
+        const totalCost = pricing.pricePerNode * numNodes;
+
+        const result = {
+            type: "digitalocean-database",
+            costs: {
+                month: {
+                    amount: totalCost.toFixed(2),
+                    currency: "USD"
+                }
+            }
+        };
+
+        cli.output(JSON.stringify(result));
+    }
 }

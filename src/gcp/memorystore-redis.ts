@@ -510,6 +510,269 @@ export class MemorystoreRedis extends GcpEntity<MemorystoreRedisDefinition, Memo
     }
 
     // =========================================================================
+    // Cost Estimation
+    // =========================================================================
+
+    /**
+     * Extract price from a GCP Billing SKU
+     */
+    private extractPriceFromSku(sku: any): number {
+        try {
+            const pricingInfo = sku.pricingInfo;
+            if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+                return 0;
+            }
+            const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+            if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+                return 0;
+            }
+            for (const rate of tieredRates) {
+                const unitPrice = rate.unitPrice;
+                if (unitPrice) {
+                    const units = parseInt(unitPrice.units || '0', 10);
+                    const nanos = parseInt(unitPrice.nanos || '0', 10);
+                    const price = units + (nanos / 1e9);
+                    if (price > 0) {
+                        return price;
+                    }
+                }
+            }
+            return 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Get Memorystore for Redis pricing from GCP Cloud Billing Catalog API
+     */
+    private fetchMemorystoreRedisPricing(): {
+        perGbPerHour: number;
+        networkEgressPerGb: number;
+        source: string;
+    } {
+        try {
+            const billingApiUrl = 'https://cloudbilling.googleapis.com/v1';
+            // Memorystore for Redis service ID
+            const serviceId = '3905-3524-EC04';
+            const skusUrl = `${billingApiUrl}/services/${serviceId}/skus?currencyCode=USD`;
+            const response = this.get(skusUrl);
+
+            if (response.skus && Array.isArray(response.skus)) {
+                const tier = (this.definition.tier || 'BASIC').toUpperCase();
+                const region = this.region;
+
+                let perGbPerHour = 0;
+                let networkEgressPerGb = 0;
+
+                for (const sku of response.skus) {
+                    const desc = (sku.description || '').toLowerCase();
+                    const serviceRegions = sku.serviceRegions || [];
+
+                    // Check region match
+                    const regionMatch = serviceRegions.some((r: string) => r.toLowerCase() === region.toLowerCase());
+                    if (!regionMatch) continue;
+
+                    const price = this.extractPriceFromSku(sku);
+                    if (price <= 0) continue;
+
+                    // Match tier: Basic or Standard (HA)
+                    if (perGbPerHour === 0) {
+                        if (tier === 'BASIC' && desc.includes('basic') && desc.includes('redis') && desc.includes('capacity')) {
+                            perGbPerHour = price;
+                        }
+                        if (tier === 'STANDARD_HA' && desc.includes('standard') && desc.includes('redis') && desc.includes('capacity')) {
+                            perGbPerHour = price;
+                        }
+                    }
+
+                    // Match network egress
+                    if (networkEgressPerGb === 0 && desc.includes('network') && (desc.includes('egress') || desc.includes('internet'))) {
+                        networkEgressPerGb = price;
+                    }
+                }
+
+                if (perGbPerHour > 0) {
+                    return { perGbPerHour, networkEgressPerGb, source: 'GCP Cloud Billing Catalog API' };
+                }
+            }
+        } catch (error) {
+            throw new Error(`Failed to fetch Memorystore Redis pricing from GCP API: ${(error as Error).message}`);
+        }
+
+        throw new Error('Could not retrieve Memorystore Redis pricing from GCP Cloud Billing Catalog API');
+    }
+
+    /**
+     * Get Cloud Monitoring metrics for Memorystore Redis (last 30 days).
+     * Returns network egress bytes.
+     */
+    private getMemorystoreMetrics(): {
+        networkEgressBytes: number;
+    } {
+        try {
+            const monitoringApiUrl = 'https://monitoring.googleapis.com/v3';
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const endTime = now.toISOString();
+            const startTime = thirtyDaysAgo.toISOString();
+
+            // Fetch network egress bytes
+            const filter = encodeURIComponent(
+                `metric.type="redis.googleapis.com/stats/network_traffic" AND resource.labels.instance_id="${this.definition.name}" AND metric.labels.direction="output"`
+            );
+            const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?` +
+                `filter=${filter}&` +
+                `interval.startTime=${startTime}&` +
+                `interval.endTime=${endTime}&` +
+                `aggregation.alignmentPeriod=2592000s&` +
+                `aggregation.perSeriesAligner=ALIGN_SUM`;
+
+            const response = this.get(url);
+            let totalBytes = 0;
+            if (response.timeSeries && response.timeSeries.length > 0) {
+                for (const series of response.timeSeries) {
+                    for (const point of (series.points || [])) {
+                        totalBytes += parseFloat(point.value?.int64Value || point.value?.doubleValue || '0');
+                    }
+                }
+            }
+
+            return { networkEgressBytes: totalBytes };
+        } catch {
+            return { networkEgressBytes: 0 };
+        }
+    }
+
+    /**
+     * Get detailed cost estimate for the Memorystore Redis instance
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        const instanceName = this.definition.name;
+
+        cli.output(`\n💰 Cost Estimate for Memorystore Redis: ${instanceName}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const tier = this.definition.tier || 'BASIC';
+        const memorySizeGb = this.definition.memory_size_gb;
+        const replicaCount = this.definition.replica_count || 0;
+        const readReplicasMode = this.definition.read_replicas_mode || 'READ_REPLICAS_DISABLED';
+
+        cli.output(`\n📊 Instance Configuration:`);
+        cli.output(`   Name: ${instanceName}`);
+        cli.output(`   Project: ${this.projectId}`);
+        cli.output(`   Region: ${this.region}`);
+        cli.output(`   Tier: ${tier}`);
+        cli.output(`   Memory: ${memorySizeGb} GB`);
+        cli.output(`   Redis Version: ${this.definition.redis_version || 'default'}`);
+        if (readReplicasMode !== 'READ_REPLICAS_DISABLED') {
+            cli.output(`   Read Replicas: ${replicaCount}`);
+        }
+
+        const pricing = this.fetchMemorystoreRedisPricing();
+        const hoursPerMonth = 730;
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   Per GB/hour: $${pricing.perGbPerHour.toFixed(4)}`);
+        cli.output(`   Per GB/month: $${(pricing.perGbPerHour * hoursPerMonth).toFixed(2)}`);
+
+        // Primary instance cost
+        const primaryMonthlyCost = memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+
+        cli.output(`\n💵 Cost Breakdown (Monthly):`);
+        cli.output(`   Primary Instance (${memorySizeGb} GB): $${primaryMonthlyCost.toFixed(2)}`);
+
+        let totalMonthlyCost = primaryMonthlyCost;
+
+        // HA replica cost (Standard tier includes 1 replica)
+        if (tier === 'STANDARD_HA') {
+            cli.output(`   HA Replica (included in Standard tier pricing): $0.00`);
+        }
+
+        // Read replicas cost
+        if (readReplicasMode !== 'READ_REPLICAS_DISABLED' && replicaCount > 0) {
+            const replicaCost = replicaCount * memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+            totalMonthlyCost += replicaCost;
+            cli.output(`   Read Replicas (${replicaCount} x ${memorySizeGb} GB): $${replicaCost.toFixed(2)}`);
+        }
+
+        // Network egress cost from Cloud Monitoring
+        const metrics = this.getMemorystoreMetrics();
+        if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+            const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+            const egressCost = egressGb * pricing.networkEgressPerGb;
+            totalMonthlyCost += egressCost;
+            cli.output(`   Network Egress: ${egressGb.toFixed(2)} GB × $${pricing.networkEgressPerGb.toFixed(4)}/GB = $${egressCost.toFixed(2)}`);
+        } else if (pricing.networkEgressPerGb > 0) {
+            cli.output(`   Network Egress: No egress measured (rate: $${pricing.networkEgressPerGb.toFixed(4)}/GB)`);
+        } else {
+            cli.output(`   Network Egress: Egress rate not available from API`);
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Pricing is per GB of provisioned capacity per hour`);
+        cli.output(`   - Standard HA tier includes automatic failover replica`);
+        cli.output(`   - Network egress based on Cloud Monitoring metrics (last 30 days)`);
+        cli.output(`   - No free tier for Memorystore`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        try {
+            const pricing = this.fetchMemorystoreRedisPricing();
+            const memorySizeGb = this.definition.memory_size_gb;
+            const hoursPerMonth = 730;
+
+            let totalMonthlyCost = memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+
+            // Add read replica costs
+            const replicaCount = this.definition.replica_count || 0;
+            const readReplicasMode = this.definition.read_replicas_mode || 'READ_REPLICAS_DISABLED';
+            if (readReplicasMode !== 'READ_REPLICAS_DISABLED' && replicaCount > 0) {
+                totalMonthlyCost += replicaCount * memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+            }
+
+            // Add network egress cost from Cloud Monitoring
+            const metrics = this.getMemorystoreMetrics();
+            if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+                const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+                totalMonthlyCost += egressGb * pricing.networkEgressPerGb;
+            }
+
+            const result = {
+                type: "gcp-memorystore-redis",
+                costs: {
+                    month: {
+                        amount: totalMonthlyCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "gcp-memorystore-redis",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
+    }
+
+    // =========================================================================
     // Backup & Restore Interface (Export/Import)
     // =========================================================================
 

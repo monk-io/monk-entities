@@ -1,6 +1,7 @@
 import { AzureCosmosDBEntity, AzureCosmosDBDefinition, AzureCosmosDBState } from "./azure-cosmosdb-base.ts";
 import cli from "cli";
 import secret from "secret";
+import http from "http";
 import { action, Args } from "monkec/base";
 
 /**
@@ -721,6 +722,325 @@ export class DatabaseAccount extends AzureCosmosDBEntity<DatabaseAccountDefiniti
             } catch (error) {
                 cli.output(`⚠️  Failed to fetch access keys from Azure: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
+        }
+    }
+
+    // ========================================
+    // Cost Estimation
+    // ========================================
+
+    /**
+     * Make an external HTTP request (for Azure Retail Prices API)
+     */
+    private makeExternalRequest(url: string): Record<string, unknown> | null {
+        try {
+            const response = http.get(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (response.body) {
+                return JSON.parse(response.body);
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch Cosmos DB pricing from Azure Retail Prices API
+     */
+    private fetchCosmosDBPricing(location: string): {
+        ruPerHourPer100: number;
+        storagePerGbMonth: number;
+        multiRegionWriteMultiplier: number;
+        source: string;
+    } {
+        try {
+            const baseUrl = 'https://prices.azure.com/api/retail/prices';
+            const armRegionName = location.toLowerCase().replace(/\s+/g, '');
+
+            const filter = `serviceName eq 'Azure Cosmos DB' and armRegionName eq '${armRegionName}'`;
+            const encodedFilter = encodeURIComponent(filter);
+            const url = `${baseUrl}?$filter=${encodedFilter}`;
+
+            const response = this.makeExternalRequest(url);
+
+            if (response && response.Items && Array.isArray(response.Items)) {
+                let ruRate = 0;
+                let storageRate = 0;
+
+                for (const item of response.Items as Array<{
+                    meterName?: string;
+                    productName?: string;
+                    unitPrice?: number;
+                    unitOfMeasure?: string;
+                }>) {
+                    const meterName = (item.meterName || '').toLowerCase();
+                    const productName = (item.productName || '').toLowerCase();
+                    const price = item.unitPrice || 0;
+
+                    if (price <= 0) continue;
+
+                    // RU pricing: "100 RU/s" or "100 Request Units"
+                    if (meterName.includes('100 ru') && !productName.includes('serverless') && !meterName.includes('multi-region')) {
+                        if (ruRate === 0) ruRate = price;
+                    }
+                    // Storage pricing
+                    else if (meterName.includes('data stored') && !meterName.includes('analytical') && !meterName.includes('backup')) {
+                        if (storageRate === 0) storageRate = price;
+                    }
+                }
+
+                // Also look for multi-region write pricing to derive the multiplier
+                let multiRegionRuRate = 0;
+                for (const item of response.Items as Array<{
+                    meterName?: string;
+                    productName?: string;
+                    unitPrice?: number;
+                    unitOfMeasure?: string;
+                }>) {
+                    const meterName = (item.meterName || '').toLowerCase();
+                    const price = item.unitPrice || 0;
+                    if (price <= 0) continue;
+                    if (meterName.includes('100 ru') && meterName.includes('multi-region') && !meterName.includes('serverless')) {
+                        if (multiRegionRuRate === 0) multiRegionRuRate = price;
+                    }
+                }
+
+                if (ruRate > 0 || storageRate > 0) {
+                    if (ruRate <= 0 || storageRate <= 0) {
+                        const missing: string[] = [];
+                        if (ruRate <= 0) missing.push('RU');
+                        if (storageRate <= 0) missing.push('storage');
+                        throw new Error(`Incomplete Cosmos DB pricing from Azure API: missing rates for ${missing.join(', ')}`);
+                    }
+                    // Derive multi-region write multiplier from API data if available
+                    const multiRegionWriteMultiplier = (multiRegionRuRate > 0 && ruRate > 0)
+                        ? multiRegionRuRate / ruRate
+                        : 1; // If we can't determine the multiplier, don't apply one
+                    return {
+                        ruPerHourPer100: ruRate,
+                        storagePerGbMonth: storageRate,
+                        multiRegionWriteMultiplier,
+                        source: 'Azure Retail Prices API'
+                    };
+                }
+            }
+        } catch (error) {
+            throw new Error(`Failed to fetch Cosmos DB pricing from Azure API: ${(error as Error).message}`);
+        }
+
+        throw new Error('Could not retrieve Cosmos DB pricing from Azure Retail Prices API');
+    }
+
+    /**
+     * Get account throughput and storage metrics
+     */
+    private getAccountMetrics(): {
+        totalRUs: number;
+        regionCount: number;
+        multiRegionWrites: boolean;
+        storageSizeGb: number;
+    } {
+        const account = this.checkResourceExists(this.definition.account_name);
+        if (!account) {
+            throw new Error(`Cosmos DB account '${this.definition.account_name}' not found. Cannot estimate costs without account data.`);
+        }
+
+        const properties = account.properties as Record<string, unknown> | undefined;
+        const writeLocations = properties?.writeLocations as unknown[] | undefined;
+        const readLocations = properties?.readLocations as unknown[] | undefined;
+        const multiRegionWrites = properties?.enableMultipleWriteLocations === true;
+
+        const regionCount = Math.max(
+            (writeLocations?.length || 0) + (readLocations?.length || 0),
+            1
+        );
+
+        // Try to get throughput settings from the account
+        let totalRUs = 0;
+
+        // Try to get account-level throughput
+        try {
+            const throughputPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${this.definition.account_name}/throughputSettings/default?api-version=${this.apiVersion}`;
+            const throughputResponse = this.makeAzureRequest("GET", throughputPath);
+            if (!throughputResponse.error && throughputResponse.body) {
+                const throughputData = JSON.parse(throughputResponse.body);
+                const throughputProps = throughputData?.properties?.resource;
+                if (throughputProps?.throughput) {
+                    totalRUs = throughputProps.throughput;
+                } else if (throughputProps?.autoscaleSettings?.maxThroughput) {
+                    totalRUs = throughputProps.autoscaleSettings.maxThroughput;
+                }
+            }
+        } catch {
+            // Throughput may be set at database/container level
+        }
+
+        if (totalRUs <= 0) {
+            throw new Error(
+                'Could not determine Cosmos DB throughput (RU/s). ' +
+                'Throughput may be set at database or container level, which is not yet supported for cost estimation.'
+            );
+        }
+
+        // Try to get storage usage from Azure Monitor metrics
+        let storageSizeGb = 0;
+        try {
+            const resourceId = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${this.definition.account_name}`;
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const metricsPath = `${resourceId}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=DataUsage&timespan=${thirtyDaysAgo.toISOString()}/${now.toISOString()}&aggregation=Average`;
+            const metricsResponse = this.makeAzureRequest("GET", metricsPath);
+            if (!metricsResponse.error && metricsResponse.body) {
+                const metricsData = JSON.parse(metricsResponse.body);
+                const metrics = metricsData?.value || [];
+                for (const metric of metrics) {
+                    const timeseries = metric.timeseries || [];
+                    for (const ts of timeseries) {
+                        const dataPoints = ts.data || [];
+                        for (const point of dataPoints) {
+                            const avg = point.average || 0;
+                            if (avg > 0) {
+                                storageSizeGb = avg / (1024 * 1024 * 1024);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Storage metrics may not be available
+        }
+
+        return { totalRUs, regionCount, multiRegionWrites, storageSizeGb };
+    }
+
+    /**
+     * Get detailed cost estimate for the Cosmos DB account
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        const accountName = this.definition.account_name;
+
+        cli.output(`\n💰 Cost Estimate for Cosmos DB Account: ${accountName}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const locationsArray = this.extractArrayFromIndexedFields(this.definition, 'locations') as LocationConfig[];
+        const location = this.definition.location || locationsArray[0]?.location_name || 'East US';
+        const multiRegionWrites = this.definition.enable_multiple_write_locations || false;
+
+        cli.output(`\n📊 Account Configuration:`);
+        cli.output(`   Account Name: ${accountName}`);
+        cli.output(`   Primary Location: ${location}`);
+        cli.output(`   Account Kind: ${this.definition.account_kind || 'GlobalDocumentDB'}`);
+        cli.output(`   Multi-Region Writes: ${multiRegionWrites}`);
+        cli.output(`   Regions: ${locationsArray.length || 1}`);
+        if (this.definition.consistency_policy) {
+            cli.output(`   Consistency: ${this.definition.consistency_policy.default_consistency_level}`);
+        }
+
+        const pricing = this.fetchCosmosDBPricing(location);
+        const metrics = this.getAccountMetrics();
+        const hoursPerMonth = 730;
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   Per 100 RU/s/hour: $${pricing.ruPerHourPer100.toFixed(4)}`);
+        cli.output(`   Storage: $${pricing.storagePerGbMonth.toFixed(2)}/GB/month`);
+
+        cli.output(`\n📈 Account Metrics:`);
+        cli.output(`   Provisioned RU/s: ${metrics.totalRUs}`);
+        cli.output(`   Regions: ${metrics.regionCount}`);
+        cli.output(`   Multi-Region Writes: ${metrics.multiRegionWrites}`);
+
+        // Calculate RU cost
+        const ruUnits = metrics.totalRUs / 100;
+        let ruMonthlyCost = ruUnits * pricing.ruPerHourPer100 * hoursPerMonth;
+
+        // Multi-region write multiplier
+        if (metrics.multiRegionWrites && metrics.regionCount > 1) {
+            ruMonthlyCost *= pricing.multiRegionWriteMultiplier;
+            cli.output(`   Multi-region write multiplier: ${pricing.multiRegionWriteMultiplier}x`);
+        }
+
+        // Multi-region replication cost (each additional region adds the same RU cost)
+        const regionMultiplier = Math.max(metrics.regionCount, 1);
+        const totalRuCost = ruMonthlyCost * regionMultiplier;
+
+        cli.output(`\n💵 Cost Breakdown (Monthly):`);
+        cli.output(`   Throughput (${metrics.totalRUs} RU/s x ${regionMultiplier} regions): $${totalRuCost.toFixed(2)}`);
+
+        // Storage cost from actual usage metrics
+        const storageCost = metrics.storageSizeGb * pricing.storagePerGbMonth * regionMultiplier;
+        if (metrics.storageSizeGb > 0) {
+            cli.output(`   Storage (${metrics.storageSizeGb.toFixed(2)} GB x ${regionMultiplier} regions): $${storageCost.toFixed(2)}`);
+        } else {
+            cli.output(`   Storage: $0.00 (no usage data available from Azure Monitor)`);
+        }
+
+        const totalMonthlyCost = totalRuCost + storageCost;
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Throughput cost is the primary cost driver for Cosmos DB`);
+        cli.output(`   - Storage cost ($${pricing.storagePerGbMonth.toFixed(2)}/GB/month from API) based on actual data volume`);
+        cli.output(`   - Consider autoscale to optimize costs for variable workloads`);
+        cli.output(`   - Free tier: 1000 RU/s and 25 GB storage (first account per subscription)`);
+        cli.output(`   - Backup costs vary by policy type (Continuous vs Periodic)`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        try {
+            const locationsArray = this.extractArrayFromIndexedFields(this.definition, 'locations') as LocationConfig[];
+            const location = this.definition.location || locationsArray[0]?.location_name || 'East US';
+
+            const pricing = this.fetchCosmosDBPricing(location);
+            const metrics = this.getAccountMetrics();
+            const hoursPerMonth = 730;
+
+            const ruUnits = metrics.totalRUs / 100;
+            let ruMonthlyCost = ruUnits * pricing.ruPerHourPer100 * hoursPerMonth;
+
+            if (metrics.multiRegionWrites && metrics.regionCount > 1) {
+                ruMonthlyCost *= pricing.multiRegionWriteMultiplier;
+            }
+
+            const regionMultiplier = Math.max(metrics.regionCount, 1);
+            const ruTotalCost = ruMonthlyCost * regionMultiplier;
+
+            // Include storage cost in total
+            const storageCost = metrics.storageSizeGb * pricing.storagePerGbMonth * regionMultiplier;
+
+            const totalMonthlyCost = ruTotalCost + storageCost;
+
+            const result = {
+                type: "azure-cosmosdb-account",
+                costs: {
+                    month: {
+                        amount: totalMonthlyCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "azure-cosmosdb-account",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
         }
     }
 

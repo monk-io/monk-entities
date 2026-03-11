@@ -1,6 +1,7 @@
 import { AzureServiceBusEntity, AzureServiceBusDefinition, AzureServiceBusState } from "./azure-servicebus-base.ts";
 import cli from "cli";
 import secret from "secret";
+import http from "http";
 import { action, Args } from "monkec/base";
 
 /**
@@ -583,6 +584,271 @@ export class ServiceBusNamespace extends AzureServiceBusEntity<NamespaceDefiniti
         }
 
         cli.output("==================================================");
+    }
+
+    // ========================================
+    // Cost Estimation
+    // ========================================
+
+    /**
+     * Make an external HTTP request (for Azure Retail Prices API)
+     */
+    private makeExternalRequest(url: string): Record<string, unknown> | null {
+        try {
+            const response = http.get(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (response.body) {
+                return JSON.parse(response.body);
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch Service Bus pricing from Azure Retail Prices API
+     */
+    private fetchServiceBusPricing(location: string, skuName: string): {
+        basePerHour: number;
+        operationsPerMillion: number;
+        source: string;
+    } {
+        try {
+            const baseUrl = 'https://prices.azure.com/api/retail/prices';
+            const armRegionName = location.toLowerCase().replace(/\s+/g, '');
+
+            const filter = `serviceName eq 'Service Bus' and armRegionName eq '${armRegionName}'`;
+            const encodedFilter = encodeURIComponent(filter);
+            const url = `${baseUrl}?$filter=${encodedFilter}`;
+
+            const response = this.makeExternalRequest(url);
+
+            if (response && response.Items && Array.isArray(response.Items)) {
+                let baseRate = 0;
+                let opsRate = 0;
+
+                const tierLower = skuName.toLowerCase();
+
+                for (const item of response.Items as Array<{
+                    meterName?: string;
+                    productName?: string;
+                    skuName?: string;
+                    unitPrice?: number;
+                }>) {
+                    const meterName = (item.meterName || '').toLowerCase();
+                    const productName = (item.productName || '').toLowerCase();
+                    const itemSku = (item.skuName || '').toLowerCase();
+                    const price = item.unitPrice || 0;
+
+                    if (price <= 0) continue;
+
+                    // Match the correct tier
+                    if (!productName.includes(tierLower) && !itemSku.includes(tierLower)) continue;
+
+                    if (meterName.includes('messaging unit') || meterName.includes('base unit')) {
+                        if (baseRate === 0) baseRate = price;
+                    } else if (meterName.includes('operations') || meterName.includes('messaging operation')) {
+                        if (opsRate === 0) opsRate = price;
+                    }
+                }
+
+                if (baseRate > 0 || opsRate > 0) {
+                    return {
+                        basePerHour: baseRate,
+                        operationsPerMillion: opsRate > 0 ? opsRate : 0,
+                        source: 'Azure Retail Prices API'
+                    };
+                }
+            }
+        } catch (error) {
+            throw new Error(`Failed to fetch Service Bus pricing from Azure API: ${(error as Error).message}`);
+        }
+
+        throw new Error(`Could not retrieve Service Bus ${skuName} pricing from Azure Retail Prices API`);
+    }
+
+    /**
+     * Get detailed cost estimate for the Service Bus namespace
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        const namespaceName = this.definition.namespace_name;
+
+        cli.output(`\n💰 Cost Estimate for Service Bus Namespace: ${namespaceName}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const skuName = this.definition.sku.name;
+        const capacity = this.definition.sku.capacity || 1;
+        const location = this.definition.location;
+
+        cli.output(`\n📊 Namespace Configuration:`);
+        cli.output(`   Name: ${namespaceName}`);
+        cli.output(`   Location: ${location}`);
+        cli.output(`   SKU: ${skuName}`);
+        if (skuName === 'Premium') {
+            cli.output(`   Messaging Units: ${capacity}`);
+        }
+
+        const pricing = this.fetchServiceBusPricing(location, skuName);
+        const hoursPerMonth = 730;
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        if (pricing.basePerHour > 0) {
+            cli.output(`   Base: $${pricing.basePerHour.toFixed(4)}/hour${skuName === 'Premium' ? ' per messaging unit' : ''}`);
+        }
+        if (pricing.operationsPerMillion > 0) {
+            cli.output(`   Operations: $${pricing.operationsPerMillion.toFixed(4)} per million`);
+        }
+
+        let totalMonthlyCost = 0;
+
+        // Get actual operation metrics from Azure Monitor
+        const metrics = this.getServiceBusMetrics();
+
+        if (skuName === 'Premium') {
+            // Premium: per messaging unit per hour
+            totalMonthlyCost = capacity * pricing.basePerHour * hoursPerMonth;
+            cli.output(`\n💵 Cost Breakdown (Monthly):`);
+            cli.output(`   Messaging Units (${capacity} x $${pricing.basePerHour.toFixed(4)}/hr x ${hoursPerMonth}hrs): $${totalMonthlyCost.toFixed(2)}`);
+            cli.output(`   Operations: Included in Premium tier`);
+        } else if (skuName === 'Standard') {
+            // Standard: base charge + per million operations
+            if (pricing.basePerHour <= 0) {
+                throw new Error('Standard tier base hourly rate not found in Azure Retail Prices API');
+            }
+            const baseCost = pricing.basePerHour * hoursPerMonth;
+            const operationsCost = metrics.totalOperations > 0
+                ? (metrics.totalOperations / 1000000) * pricing.operationsPerMillion
+                : 0;
+            totalMonthlyCost = baseCost + operationsCost;
+            cli.output(`\n💵 Cost Breakdown (Monthly):`);
+            cli.output(`   Base Charge: $${baseCost.toFixed(2)}`);
+            if (metrics.totalOperations > 0) {
+                cli.output(`   Operations (${metrics.totalOperations.toLocaleString()} from Azure Monitor): $${operationsCost.toFixed(4)}`);
+            } else {
+                cli.output(`   Operations: $${pricing.operationsPerMillion.toFixed(4)} per million (Azure Monitor metrics unavailable)`);
+            }
+        } else {
+            // Basic: per million operations only
+            const operationsCost = metrics.totalOperations > 0
+                ? (metrics.totalOperations / 1000000) * pricing.operationsPerMillion
+                : 0;
+            totalMonthlyCost = operationsCost;
+            cli.output(`\n💵 Cost Breakdown (Monthly):`);
+            if (metrics.totalOperations > 0) {
+                cli.output(`   Operations (${metrics.totalOperations.toLocaleString()} from Azure Monitor): $${operationsCost.toFixed(4)}`);
+            } else {
+                cli.output(`   Operations: $${pricing.operationsPerMillion.toFixed(4)} per million (Azure Monitor metrics unavailable)`);
+            }
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Basic/Standard tiers: operations-based pricing`);
+        cli.output(`   - Premium tier: fixed per messaging unit, operations included`);
+        cli.output(`   - Brokered connections may incur additional charges`);
+        cli.output(`   - Hybrid connections have separate pricing`);
+    }
+
+    /**
+     * Get Azure Monitor metrics for Service Bus namespace (last 30 days).
+     * Returns total incoming + outgoing messages as an approximation of billable operations.
+     */
+    private getServiceBusMetrics(): { totalOperations: number } {
+        try {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
+            const resourcePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.ServiceBus/namespaces/${this.definition.namespace_name}`;
+
+            const metricsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=IncomingMessages,OutgoingMessages&timespan=${timespan}&interval=P1D&aggregation=Total`;
+            const response = this.makeAzureRequest("GET", metricsPath);
+
+            if (response.error || !response.body) {
+                return { totalOperations: 0 };
+            }
+
+            const data = JSON.parse(response.body);
+            const metrics = data.value || [];
+            let totalOperations = 0;
+
+            for (const metric of metrics) {
+                const timeseries = metric.timeseries || [];
+                for (const ts of timeseries) {
+                    const dataPoints = ts.data || [];
+                    for (const point of dataPoints) {
+                        totalOperations += point.total || 0;
+                    }
+                }
+            }
+
+            return { totalOperations };
+        } catch {
+            return { totalOperations: 0 };
+        }
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        try {
+            const skuName = this.definition.sku.name;
+            const capacity = this.definition.sku.capacity || 1;
+            const location = this.definition.location;
+            const hoursPerMonth = 730;
+
+            const pricing = this.fetchServiceBusPricing(location, skuName);
+            const metrics = this.getServiceBusMetrics();
+            let totalMonthlyCost = 0;
+
+            if (skuName === 'Premium') {
+                totalMonthlyCost = capacity * pricing.basePerHour * hoursPerMonth;
+            } else if (skuName === 'Standard') {
+                if (pricing.basePerHour <= 0) {
+                    throw new Error('Standard tier base hourly rate not found in Azure Retail Prices API');
+                }
+                totalMonthlyCost = pricing.basePerHour * hoursPerMonth;
+                // Add operations cost from Azure Monitor metrics
+                if (metrics.totalOperations > 0 && pricing.operationsPerMillion > 0) {
+                    totalMonthlyCost += (metrics.totalOperations / 1000000) * pricing.operationsPerMillion;
+                }
+            } else {
+                // Basic tier: operations-based only
+                if (metrics.totalOperations > 0 && pricing.operationsPerMillion > 0) {
+                    totalMonthlyCost = (metrics.totalOperations / 1000000) * pricing.operationsPerMillion;
+                }
+            }
+
+            const result = {
+                type: "azure-servicebus-namespace",
+                costs: {
+                    month: {
+                        amount: totalMonthlyCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "azure-servicebus-namespace",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
     }
 
     /**

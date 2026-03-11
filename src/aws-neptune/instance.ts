@@ -5,6 +5,7 @@ import {
     action
 } from "./neptune-base.ts";
 import cli from "cli";
+import aws from "cloud/aws";
 import {
     InstanceStatus,
     InstanceClass,
@@ -477,5 +478,367 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         }
 
         cli.output("==================================================");
+    }
+
+    // ==================== Cost Estimation ====================
+
+    /**
+     * Map AWS region codes to location names for Pricing API
+     */
+    private getRegionToLocationMap(): Record<string, string> {
+        return {
+            'us-east-1': 'US East (N. Virginia)',
+            'us-east-2': 'US East (Ohio)',
+            'us-west-1': 'US West (N. California)',
+            'us-west-2': 'US West (Oregon)',
+            'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-southeast-1': 'Asia Pacific (Singapore)',
+            'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-northeast-1': 'Asia Pacific (Tokyo)',
+            'ap-northeast-2': 'Asia Pacific (Seoul)',
+            'ca-central-1': 'Canada (Central)',
+            'eu-central-1': 'EU (Frankfurt)',
+            'eu-west-1': 'EU (Ireland)',
+            'eu-west-2': 'EU (London)',
+            'eu-west-3': 'EU (Paris)',
+            'eu-north-1': 'EU (Stockholm)',
+            'me-south-1': 'Middle East (Bahrain)',
+            'sa-east-1': 'South America (Sao Paulo)'
+        };
+    }
+
+    /**
+     * Parse pricing response from AWS Price List API
+     */
+    private parsePricingResponse(responseBody: string): number {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return 0;
+            }
+
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                        if (pricePerUnit > 0) {
+                            return pricePerUnit;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
+        }
+        return 0;
+    }
+
+    /**
+     * Fetch Neptune instance pricing from AWS Price List API
+     */
+    private fetchNeptunePricing(instanceClass: string): {
+        instanceHourly: number;
+        storagePerGBMonth: number;
+        ioPerMillion: number;
+        source: string;
+    } | null {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+
+        // Fetch instance pricing
+        const instanceFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonNeptune' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'instanceType', Value: instanceClass }
+        ];
+
+        const instanceResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonNeptune',
+                Filters: instanceFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (instanceResponse.statusCode !== 200) {
+            cli.output(`AWS Pricing API returned status ${instanceResponse.statusCode} for Neptune instance pricing`);
+            return null;
+        }
+
+        const instanceHourly = this.parsePricingResponse(instanceResponse.body);
+        if (instanceHourly === 0) {
+            cli.output(`No pricing found for Neptune instance class ${instanceClass} in ${location}`);
+            return null;
+        }
+
+        // Fetch storage pricing
+        const storageFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonNeptune' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'Database Storage' }
+        ];
+
+        const storageResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonNeptune',
+                Filters: storageFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (storageResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${storageResponse.statusCode} for Neptune storage pricing`);
+        }
+        const storagePerGBMonth = this.parsePricingResponse(storageResponse.body);
+        if (storagePerGBMonth <= 0) {
+            throw new Error('Could not parse Neptune storage pricing from AWS Price List API response');
+        }
+
+        // Fetch I/O pricing
+        const ioFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonNeptune' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'System Operation' }
+        ];
+
+        const ioResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonNeptune',
+                Filters: ioFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (ioResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${ioResponse.statusCode} for Neptune I/O pricing`);
+        }
+        const ioPerRequest = this.parsePricingResponse(ioResponse.body);
+        if (ioPerRequest <= 0) {
+            throw new Error('Could not parse Neptune I/O pricing from AWS Price List API response');
+        }
+        const ioPerMillion = ioPerRequest * 1000000;
+
+        return {
+            instanceHourly,
+            storagePerGBMonth,
+            ioPerMillion,
+            source: 'AWS Price List API'
+        };
+    }
+
+    /**
+     * Get CloudWatch metrics for Neptune instance (last 30 days)
+     */
+    private getCloudWatchNeptuneMetrics(): {
+        gremlinRequestsPerSecond: number;
+        sparqlRequestsPerSecond: number;
+        volumeBytesUsed: number;
+    } | null {
+        try {
+            const endTime = new Date();
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate() - 30);
+
+            const startTimeISO = startTime.toISOString();
+            const endTimeISO = endTime.toISOString();
+            const url = `https://monitoring.${this.region}.amazonaws.com/`;
+
+            const getMetric = (metricName: string, stat: string = 'Average'): number => {
+                try {
+                    const queryParams = [
+                        'Action=GetMetricStatistics',
+                        'Version=2010-08-01',
+                        'Namespace=AWS%2FNeptune',
+                        `MetricName=${encodeURIComponent(metricName)}`,
+                        `StartTime=${encodeURIComponent(startTimeISO)}`,
+                        `EndTime=${encodeURIComponent(endTimeISO)}`,
+                        'Period=2592000',
+                        `Statistics.member.1=${stat}`,
+                        'Dimensions.member.1.Name=DBInstanceIdentifier',
+                        `Dimensions.member.1.Value=${encodeURIComponent(this.state.db_instance_identifier!)}`
+                    ];
+
+                    const response = aws.get(`${url}?${queryParams.join('&')}`, {
+                        service: 'monitoring',
+                        region: this.region
+                    });
+
+                    if (response.statusCode !== 200) return 0;
+
+                    const match = stat === 'Sum'
+                        ? response.body.match(/<Sum>([\d.]+)<\/Sum>/)
+                        : response.body.match(/<Average>([\d.]+)<\/Average>/);
+                    return match ? parseFloat(match[1]) : 0;
+                } catch (_e) {
+                    return 0;
+                }
+            };
+
+            return {
+                gremlinRequestsPerSecond: getMetric('GremlinRequestsPerSec'),
+                sparqlRequestsPerSecond: getMetric('SparqlRequestsPerSec'),
+                volumeBytesUsed: getMetric('VolumeBytesUsed', 'Average')
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    @action("get-cost-estimate")
+    getCostEstimate(): void {
+        if (!this.state.db_instance_identifier) {
+            throw new Error("Neptune instance not created yet");
+        }
+
+        const instanceClass = this.state.db_instance_class || this.definition.db_instance_class;
+        if (!instanceClass) {
+            throw new Error("Instance class not available for cost estimation");
+        }
+
+        cli.output(`\n💰 Cost Estimate for Neptune Instance: ${this.state.db_instance_identifier}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📊 Instance Configuration:`);
+        cli.output(`   Instance: ${this.state.db_instance_identifier}`);
+        cli.output(`   Cluster: ${this.state.db_cluster_identifier || 'N/A'}`);
+        cli.output(`   Instance Class: ${instanceClass}`);
+        cli.output(`   Engine Version: ${this.state.engine_version || 'N/A'}`);
+        cli.output(`   Region: ${this.region}`);
+        cli.output(`   Is Writer: ${this.state.is_cluster_writer || false}`);
+
+        // Get pricing from AWS Price List API
+        const pricing = this.fetchNeptunePricing(instanceClass);
+        if (!pricing) {
+            throw new Error("Failed to fetch pricing from AWS Price List API. Ensure you have pricing:GetProducts permission.");
+        }
+
+        const hoursPerMonth = 730;
+
+        // Compute cost
+        const instanceCostMonthly = pricing.instanceHourly * hoursPerMonth;
+
+        cli.output(`\n💻 Compute Costs:`);
+        cli.output(`   Instance Class: ${instanceClass}`);
+        cli.output(`   Hourly Rate: $${pricing.instanceHourly.toFixed(4)}`);
+        cli.output(`   Monthly Cost: $${instanceCostMonthly.toFixed(2)}`);
+
+        // Storage cost (from CloudWatch if available)
+        let storageCostMonthly = 0;
+        const metrics = this.getCloudWatchNeptuneMetrics();
+
+        if (metrics && metrics.volumeBytesUsed > 0) {
+            const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
+            storageCostMonthly = storageGB * pricing.storagePerGBMonth;
+
+            cli.output(`\n💾 Storage Costs:`);
+            cli.output(`   Volume Used: ${storageGB.toFixed(2)} GB`);
+            cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
+            cli.output(`   Monthly Cost: $${storageCostMonthly.toFixed(2)}`);
+        } else {
+            cli.output(`\n💾 Storage Costs:`);
+            cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
+            cli.output(`   ⚠️ CloudWatch metrics unavailable - storage cost not included`);
+        }
+
+        // I/O cost info
+        cli.output(`\n📈 I/O Costs:`);
+        cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O requests`);
+        if (metrics) {
+            cli.output(`   Gremlin Requests/sec (avg): ${metrics.gremlinRequestsPerSecond.toFixed(2)}`);
+            cli.output(`   SPARQL Requests/sec (avg): ${metrics.sparqlRequestsPerSecond.toFixed(2)}`);
+        } else {
+            cli.output(`   ⚠️ CloudWatch metrics unavailable - I/O cost not included`);
+        }
+
+        // Backup cost info
+        cli.output(`\n🔒 Backup Storage:`);
+        cli.output(`   Rate: $0.023/GB-month (beyond free retention)`);
+
+        const totalMonthlyCost = instanceCostMonthly + storageCostMonthly;
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - Pricing from ${pricing.source}`);
+        cli.output(`   - Compute cost is for this instance only (cluster may have multiple instances)`);
+        cli.output(`   - Storage is shared across the cluster`);
+        cli.output(`   - Does not include: I/O requests, backup beyond retention, data transfer`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        const instanceClass = this.state.db_instance_class || this.definition.db_instance_class;
+
+        if (!instanceClass || !this.state.db_instance_identifier) {
+            const result = {
+                type: "aws-neptune-instance",
+                costs: { month: { amount: "0", currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const pricing = this.fetchNeptunePricing(instanceClass);
+            if (!pricing) {
+                const result = {
+                    type: "aws-neptune-instance",
+                    costs: { month: { amount: "0", currency: "USD" } }
+                };
+                cli.output(JSON.stringify(result));
+                return;
+            }
+
+            const hoursPerMonth = 730;
+            let totalMonthlyCost = pricing.instanceHourly * hoursPerMonth;
+
+            // Add storage cost from CloudWatch if available
+            const metrics = this.getCloudWatchNeptuneMetrics();
+            if (metrics && metrics.volumeBytesUsed > 0) {
+                const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
+                totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
+            }
+
+            const result = {
+                type: "aws-neptune-instance",
+                costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "aws-neptune-instance",
+                costs: { month: { amount: "0", currency: "USD", error: (error as Error).message } }
+            };
+            cli.output(JSON.stringify(result));
+        }
     }
 }

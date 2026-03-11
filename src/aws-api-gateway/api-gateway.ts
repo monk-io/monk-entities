@@ -1,6 +1,7 @@
 import { AWSAPIGatewayEntity, AWSAPIGatewayDefinition, AWSAPIGatewayState } from "./api-gateway-base.ts";
 import { action } from "monkec/base";
 import cli from "cli";
+import aws from "cloud/aws";
 
 /**
  * Definition interface for AWS API Gateway entity.
@@ -363,6 +364,375 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
         const keys = items.map(i => (i.RouteKey || i.routeKey));
         cli.output(`[aws-api-gateway] routes (${this.state.api_id}): ${items.length}`);
         cli.output(JSON.stringify(keys, null, 2));
+    }
+
+    // ==================== COST ESTIMATION ====================
+
+    /**
+     * Parse pricing response from AWS Price List API
+     */
+    private parsePricingResponse(responseBody: string): number {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return 0;
+            }
+
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                        if (pricePerUnit > 0) {
+                            return pricePerUnit;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
+        }
+        return 0;
+    }
+
+    /**
+     * Map AWS region codes to location names for Pricing API
+     */
+    private getRegionToLocationMap(): Record<string, string> {
+        return {
+            'us-east-1': 'US East (N. Virginia)',
+            'us-east-2': 'US East (Ohio)',
+            'us-west-1': 'US West (N. California)',
+            'us-west-2': 'US West (Oregon)',
+            'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-southeast-1': 'Asia Pacific (Singapore)',
+            'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-northeast-1': 'Asia Pacific (Tokyo)',
+            'ap-northeast-2': 'Asia Pacific (Seoul)',
+            'ca-central-1': 'Canada (Central)',
+            'eu-central-1': 'EU (Frankfurt)',
+            'eu-west-1': 'EU (Ireland)',
+            'eu-west-2': 'EU (London)',
+            'eu-west-3': 'EU (Paris)',
+            'eu-north-1': 'EU (Stockholm)',
+            'me-south-1': 'Middle East (Bahrain)',
+            'sa-east-1': 'South America (Sao Paulo)'
+        };
+    }
+
+    /**
+     * Fetch API Gateway pricing from AWS Price List API
+     */
+    private fetchAPIGatewayPricing(): {
+        requestPerMillion: number;
+        connectionMinutePerMillion: number;
+        source: string;
+    } {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+
+        const filters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonApiGateway' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location }
+        ];
+
+        const response = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AmazonApiGateway',
+                Filters: filters,
+                MaxResults: 100
+            })
+        });
+
+        if (response.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${response.statusCode} for API Gateway pricing`);
+        }
+
+        let requestPerMillion = 0;
+        let connectionMinutePerMillion = 0;
+
+        try {
+            const data = JSON.parse(response.body);
+            if (data.PriceList && data.PriceList.length > 0) {
+                for (const priceItem of data.PriceList) {
+                    const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                    const attributes = product.product?.attributes || {};
+                    const usageType = (attributes.usagetype || '').toLowerCase();
+                    const group = (attributes.group || '').toLowerCase();
+                    const terms = product.terms?.OnDemand;
+                    if (!terms) continue;
+
+                    let pricePerUnit = 0;
+                    for (const termKey of Object.keys(terms)) {
+                        const priceDimensions = terms[termKey].priceDimensions;
+                        for (const dimKey of Object.keys(priceDimensions)) {
+                            const p = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                            if (p > 0) {
+                                pricePerUnit = p;
+                                break;
+                            }
+                        }
+                        if (pricePerUnit > 0) break;
+                    }
+
+                    if (pricePerUnit <= 0) continue;
+
+                    // Match WebSocket connection minutes
+                    if (usageType.includes('connectionminute') || group.includes('websocket-connection')) {
+                        connectionMinutePerMillion = pricePerUnit * 1000000;
+                    }
+                    // Match API requests (HTTP or WebSocket messages)
+                    else if (requestPerMillion === 0 && (usageType.includes('apirequest') || usageType.includes('message') || group.includes('api-request'))) {
+                        requestPerMillion = pricePerUnit * 1000000;
+                    }
+                }
+            }
+        } catch {
+            // Fall through to error check below
+        }
+
+        if (requestPerMillion <= 0) {
+            // Fallback to the simpler parser
+            const perRequest = this.parsePricingResponse(response.body);
+            if (perRequest <= 0) {
+                throw new Error('Could not parse API Gateway pricing from AWS Price List API response');
+            }
+            requestPerMillion = perRequest * 1000000;
+        }
+
+        return {
+            requestPerMillion,
+            connectionMinutePerMillion,
+            source: 'AWS Price List API'
+        };
+    }
+
+    /**
+     * Get CloudWatch metrics for API Gateway (last 30 days)
+     */
+    private getAPIGatewayCloudWatchMetrics(): {
+        totalRequests: number;
+        connectionMinutes?: number;
+    } | null {
+        if (!this.state.api_id) return null;
+
+        try {
+            const endTime = new Date().toISOString();
+            const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+            const queryParams = [
+                'Action=GetMetricStatistics',
+                'Version=2010-08-01',
+                'Namespace=AWS%2FApiGateway',
+                'MetricName=Count',
+                `StartTime=${encodeURIComponent(startTime)}`,
+                `EndTime=${encodeURIComponent(endTime)}`,
+                'Period=2592000',
+                'Statistics.member.1=Sum',
+                'Dimensions.member.1.Name=ApiId',
+                `Dimensions.member.1.Value=${encodeURIComponent(this.state.api_id)}`
+            ];
+
+            const cwUrl = `https://monitoring.${this.region}.amazonaws.com/?${queryParams.join('&')}`;
+            const response = aws.get(cwUrl, {
+                service: 'monitoring',
+                region: this.region
+            });
+
+            let totalRequests = 0;
+            if (response.statusCode === 200) {
+                const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
+                totalRequests = sumMatch ? parseFloat(sumMatch[1]) : 0;
+            }
+
+            // For WebSocket APIs, also fetch ConnectCount to estimate connection minutes
+            const isWebSocket = String(this.state.protocol_type || this.definition.protocol_type).toUpperCase() === 'WEBSOCKET';
+            let connectionMinutes: number | undefined;
+
+            if (isWebSocket) {
+                try {
+                    // Fetch ConnectCount metric
+                    const connectParams = [
+                        'Action=GetMetricStatistics',
+                        'Version=2010-08-01',
+                        'Namespace=AWS%2FApiGateway',
+                        'MetricName=ConnectCount',
+                        `StartTime=${encodeURIComponent(startTime)}`,
+                        `EndTime=${encodeURIComponent(endTime)}`,
+                        'Period=2592000',
+                        'Statistics.member.1=Sum',
+                        'Dimensions.member.1.Name=ApiId',
+                        `Dimensions.member.1.Value=${encodeURIComponent(this.state.api_id)}`
+                    ];
+
+                    const connectUrl = `https://monitoring.${this.region}.amazonaws.com/?${connectParams.join('&')}`;
+                    const connectResponse = aws.get(connectUrl, {
+                        service: 'monitoring',
+                        region: this.region
+                    });
+
+                    if (connectResponse.statusCode === 200) {
+                        const connectMatch = connectResponse.body.match(/<Sum>([\d.]+)<\/Sum>/);
+                        const connectCount = connectMatch ? parseFloat(connectMatch[1]) : 0;
+
+                        // Also fetch IntegrationLatency to estimate average connection duration
+                        const latencyParams = [
+                            'Action=GetMetricStatistics',
+                            'Version=2010-08-01',
+                            'Namespace=AWS%2FApiGateway',
+                            'MetricName=IntegrationLatency',
+                            `StartTime=${encodeURIComponent(startTime)}`,
+                            `EndTime=${encodeURIComponent(endTime)}`,
+                            'Period=2592000',
+                            'Statistics.member.1=Average',
+                            'Dimensions.member.1.Name=ApiId',
+                            `Dimensions.member.1.Value=${encodeURIComponent(this.state.api_id)}`
+                        ];
+
+                        const latencyUrl = `https://monitoring.${this.region}.amazonaws.com/?${latencyParams.join('&')}`;
+                        const latencyResponse = aws.get(latencyUrl, {
+                            service: 'monitoring',
+                            region: this.region
+                        });
+
+                        if (latencyResponse.statusCode === 200) {
+                            const avgMatch = latencyResponse.body.match(/<Average>([\d.]+)<\/Average>/);
+                            const avgLatencyMs = avgMatch ? parseFloat(avgMatch[1]) : 0;
+                            // Convert: connectCount * avgLatencyMs / 60000 = connection minutes
+                            if (connectCount > 0 && avgLatencyMs > 0) {
+                                connectionMinutes = (connectCount * avgLatencyMs) / 60000;
+                            }
+                        }
+                    }
+                } catch {
+                    // Connection minutes not available
+                }
+            }
+
+            return { totalRequests, connectionMinutes };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Get detailed cost estimate for the API Gateway
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(): void {
+        if (!this.state.api_id) {
+            throw new Error("API Gateway not created yet");
+        }
+
+        const pricing = this.fetchAPIGatewayPricing();
+        const isHttp = String(this.state.protocol_type || this.definition.protocol_type).toUpperCase() !== 'WEBSOCKET';
+
+        cli.output(`\n💰 Cost Estimate for API Gateway: ${this.state.name}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📊 API Configuration:`);
+        cli.output(`   API Name: ${this.state.name}`);
+        cli.output(`   API ID: ${this.state.api_id}`);
+        cli.output(`   Protocol: ${isHttp ? 'HTTP' : 'WebSocket'}`);
+        cli.output(`   Endpoint: ${this.state.api_endpoint || 'N/A'}`);
+        cli.output(`   Region: ${this.region}`);
+
+        cli.output(`\n💵 Pricing (${pricing.source}):`);
+        cli.output(`   Requests: $${pricing.requestPerMillion.toFixed(2)} per million`);
+        if (!isHttp) {
+            if (pricing.connectionMinutePerMillion > 0) {
+                cli.output(`   Connection Minutes: $${pricing.connectionMinutePerMillion.toFixed(2)} per million`);
+            } else {
+                cli.output(`   Connection Minutes: Rate not available from API`);
+            }
+        }
+        cli.output(`   First 1 million requests/month: Free (free tier, first 12 months)`);
+
+        const metrics = this.getAPIGatewayCloudWatchMetrics();
+        let totalMonthlyCost = 0;
+
+        if (metrics) {
+            const requestCost = (metrics.totalRequests / 1000000) * pricing.requestPerMillion;
+            totalMonthlyCost += requestCost;
+
+            cli.output(`\n📈 Usage (Last 30 Days from CloudWatch):`);
+            cli.output(`   Total Requests: ${metrics.totalRequests.toLocaleString()}`);
+
+            cli.output(`\n💵 Cost Breakdown:`);
+            cli.output(`   Request Costs: $${requestCost.toFixed(4)}`);
+
+            // WebSocket connection-minute cost
+            if (!isHttp && pricing.connectionMinutePerMillion > 0 && metrics.connectionMinutes !== undefined && metrics.connectionMinutes > 0) {
+                const connectionCost = (metrics.connectionMinutes / 1000000) * pricing.connectionMinutePerMillion;
+                totalMonthlyCost += connectionCost;
+                cli.output(`   Connection Minutes: ${metrics.connectionMinutes.toLocaleString()} × $${pricing.connectionMinutePerMillion.toFixed(2)}/M = $${connectionCost.toFixed(4)}`);
+            } else if (!isHttp) {
+                cli.output(`   Connection Minutes: Not measured from CloudWatch`);
+            }
+        } else {
+            cli.output(`\n⚠️ CloudWatch metrics unavailable - usage costs not included`);
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - API Gateway is purely usage-based (no fixed monthly cost)`);
+        cli.output(`   - Does not include: Data transfer, caching, custom domain names`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     */
+    @action("costs")
+    costs(): void {
+        if (!this.state.api_id) {
+            const result = {
+                type: "aws-api-gateway",
+                costs: { month: { amount: "0", currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const pricing = this.fetchAPIGatewayPricing();
+            let totalMonthlyCost = 0;
+
+            const metrics = this.getAPIGatewayCloudWatchMetrics();
+            if (metrics) {
+                totalMonthlyCost += (metrics.totalRequests / 1000000) * pricing.requestPerMillion;
+
+                // WebSocket connection-minute cost
+                if (metrics.connectionMinutes !== undefined && metrics.connectionMinutes > 0 && pricing.connectionMinutePerMillion > 0) {
+                    totalMonthlyCost += (metrics.connectionMinutes / 1000000) * pricing.connectionMinutePerMillion;
+                }
+            }
+
+            const result = {
+                type: "aws-api-gateway",
+                costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+            };
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
+                type: "aws-api-gateway",
+                costs: { month: { amount: "0", currency: "USD", error: (error as Error).message } }
+            };
+            cli.output(JSON.stringify(result));
+        }
     }
 }
 

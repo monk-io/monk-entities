@@ -1011,4 +1011,691 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
                 return '🔄';
         }
     }
+
+    // =========================================================================
+    // Cost Estimation
+    // =========================================================================
+
+    /**
+     * Get estimated monthly cost for this Cloud SQL instance
+     * 
+     * Calculates costs based on:
+     * - Instance tier (vCPU + memory)
+     * - Storage type and size
+     * - High availability (REGIONAL vs ZONAL)
+     * - Network egress (from Cloud Monitoring)
+     * - Backup storage
+     * 
+     * Usage:
+     * - monk do namespace/instance get-cost-estimate
+     * 
+     * Required IAM permissions:
+     * - cloudbilling.skus.list (for pricing)
+     * - monitoring.timeSeries.list (for metrics)
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`💰 Cost Estimate for Cloud SQL Instance`);
+        cli.output(`Instance: ${this.definition.name}`);
+        cli.output(`Project: ${this.projectId}`);
+        cli.output(`==================================================`);
+
+        // Get instance details
+        const instance = this.getInstance();
+        if (!instance) {
+            throw new Error(`Instance ${this.definition.name} not found`);
+        }
+
+        const settings = instance.settings || {};
+        const tier = settings.tier || this.definition.tier || 'db-f1-micro';
+        const region = instance.region || this.definition.region || 'us-central1';
+        const databaseVersion = instance.databaseVersion || this.definition.database_version || 'POSTGRES_14';
+        const storageType = settings.dataDiskType || this.definition.storage_type || 'PD_SSD';
+        const storageSizeGb = parseInt(settings.dataDiskSizeGb || this.definition.storage_size_gb || '10', 10);
+        const availabilityType = settings.availabilityType || this.definition.availability_type || 'ZONAL';
+        const edition = settings.edition || this.definition.edition || 'ENTERPRISE';
+
+        // Determine database engine
+        const engine = this.getDatabaseEngine(databaseVersion);
+
+        cli.output(`\n📊 Instance Configuration:`);
+        cli.output(`   Tier: ${tier}`);
+        cli.output(`   Region: ${region}`);
+        cli.output(`   Database: ${databaseVersion} (${engine})`);
+        cli.output(`   Edition: ${edition}`);
+        cli.output(`   Storage: ${storageSizeGb} GB (${storageType})`);
+        cli.output(`   Availability: ${availabilityType}`);
+
+        // Get pricing from Cloud Billing Catalog API
+        const pricing = this.getCloudSQLPricing(tier, region, engine, storageType, edition);
+
+        // Get CloudWatch-equivalent metrics from Cloud Monitoring
+        const metrics = this.getCloudMonitoringMetrics(instance);
+
+        // Calculate costs
+        const hoursPerMonth = 730;
+        const isHA = availabilityType === 'REGIONAL';
+        const haMultiplier = isHA ? 2 : 1;
+
+        // Instance cost (vCPU + memory)
+        const instanceCostMonthly = pricing.instanceHourly * hoursPerMonth * haMultiplier;
+
+        // Storage cost
+        const storageCostMonthly = storageSizeGb * pricing.storagePerGbMonth * haMultiplier;
+
+        // Network egress cost (using API tiered rates)
+        const networkEgressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        const networkCostMonthly = this.calculateNetworkEgressCost(networkEgressGb, pricing.networkEgressPerGb, pricing.networkEgressTiers);
+
+        // Backup storage cost based on actual backup configuration
+        // Cloud SQL includes 7 free backups up to instance storage size.
+        // Additional backup storage beyond that is charged.
+        const backupConfig = settings.backupConfiguration || {};
+        const backupEnabled = backupConfig.enabled || false;
+        const retainedBackups = backupConfig.backupRetentionSettings?.retainedBackups || 7;
+        // Estimate: each backup is roughly equal to the storage size.
+        // First 7 backups are free (up to instance storage size). Additional backups are charged.
+        const chargeableBackups = Math.max(0, retainedBackups - 7);
+        const estimatedBackupGb = backupEnabled ? chargeableBackups * storageSizeGb : 0;
+        const backupCostMonthly = estimatedBackupGb * pricing.backupPerGbMonth;
+
+        // Total cost
+        const totalCostMonthly = instanceCostMonthly + storageCostMonthly + networkCostMonthly + backupCostMonthly;
+
+        cli.output(`\n💵 Cost Breakdown (Monthly):`);
+        cli.output(`   Instance (${tier}): $${instanceCostMonthly.toFixed(2)}`);
+        cli.output(`      └─ $${pricing.instanceHourly.toFixed(4)}/hr × ${hoursPerMonth} hrs${isHA ? ' × 2 (HA)' : ''}`);
+        cli.output(`   Storage (${storageType}): $${storageCostMonthly.toFixed(2)}`);
+        cli.output(`      └─ ${storageSizeGb} GB × $${pricing.storagePerGbMonth.toFixed(3)}/GB${isHA ? ' × 2 (HA)' : ''}`);
+        cli.output(`   Network Egress: $${networkCostMonthly.toFixed(2)}`);
+        cli.output(`      └─ ${networkEgressGb.toFixed(2)} GB egress`);
+        if (backupEnabled) {
+            cli.output(`   Backup Storage: $${backupCostMonthly.toFixed(2)}`);
+            cli.output(`      └─ ~${estimatedBackupGb.toFixed(1)} GB × $${pricing.backupPerGbMonth.toFixed(3)}/GB`);
+        }
+        cli.output(`   ─────────────────────────────`);
+        cli.output(`   TOTAL: $${totalCostMonthly.toFixed(2)}/month`);
+
+        cli.output(`\n📈 Cloud Monitoring Metrics (last 30 days):`);
+        cli.output(`   CPU Utilization (avg): ${metrics.cpuUtilization.toFixed(2)}%`);
+        cli.output(`   Memory Utilization (avg): ${metrics.memoryUtilization.toFixed(2)}%`);
+        cli.output(`   Disk Read IOPS (avg): ${metrics.diskReadOps.toFixed(0)}`);
+        cli.output(`   Disk Write IOPS (avg): ${metrics.diskWriteOps.toFixed(0)}`);
+        cli.output(`   Network Egress: ${(metrics.networkEgressBytes / (1024 * 1024)).toFixed(2)} MB`);
+        cli.output(`   Network Ingress: ${(metrics.networkIngressBytes / (1024 * 1024)).toFixed(2)} MB`);
+        cli.output(`   Database Connections (avg): ${metrics.connections.toFixed(0)}`);
+
+        // Output JSON summary
+        const summary = {
+            instance: {
+                name: this.definition.name,
+                project: this.projectId,
+                tier: tier,
+                region: region,
+                database_version: databaseVersion,
+                engine: engine,
+                edition: edition,
+                storage_type: storageType,
+                storage_size_gb: storageSizeGb,
+                availability_type: availabilityType,
+                is_ha: isHA
+            },
+            pricing_rates: {
+                source: pricing.source,
+                currency: 'USD',
+                instance_hourly: pricing.instanceHourly,
+                storage_per_gb_month: pricing.storagePerGbMonth,
+                network_egress_per_gb: pricing.networkEgressPerGb,
+                backup_per_gb_month: pricing.backupPerGbMonth
+            },
+            cost_breakdown: {
+                instance_monthly: parseFloat(instanceCostMonthly.toFixed(2)),
+                storage_monthly: parseFloat(storageCostMonthly.toFixed(2)),
+                network_monthly: parseFloat(networkCostMonthly.toFixed(2)),
+                backup_monthly: parseFloat(backupCostMonthly.toFixed(2)),
+                total_monthly: parseFloat(totalCostMonthly.toFixed(2))
+            },
+            metrics: {
+                period_days: 30,
+                cpu_utilization_percent: parseFloat(metrics.cpuUtilization.toFixed(2)),
+                memory_utilization_percent: parseFloat(metrics.memoryUtilization.toFixed(2)),
+                disk_read_ops: parseFloat(metrics.diskReadOps.toFixed(0)),
+                disk_write_ops: parseFloat(metrics.diskWriteOps.toFixed(0)),
+                network_egress_bytes: metrics.networkEgressBytes,
+                network_ingress_bytes: metrics.networkIngressBytes,
+                connections_avg: parseFloat(metrics.connections.toFixed(0))
+            },
+            disclaimer: "Pricing from GCP Cloud Billing Catalog API. Metrics from Cloud Monitoring. Actual costs may vary based on committed use discounts, sustained use discounts, and additional features."
+        };
+
+        cli.output(`\n📋 JSON Summary:`);
+        cli.output(JSON.stringify(summary, null, 2));
+        cli.output(`\n==================================================`);
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     * 
+     * Output format:
+     * {
+     *   "type": "gcp-cloud-sql-instance",
+     *   "costs": {
+     *     "month": {
+     *       "amount": "85.50",
+     *       "currency": "USD"
+     *     }
+     *   }
+     * }
+     */
+    @action("costs")
+    costs(): void {
+        // Get instance details
+        const instance = this.getInstance();
+        if (!instance) {
+            // Return zero cost if instance doesn't exist
+            const result = {
+                type: "gcp-cloud-sql-instance",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const settings = instance.settings || {};
+            const tier = settings.tier || this.definition.tier || 'db-f1-micro';
+            const region = instance.region || this.definition.region || 'us-central1';
+            const databaseVersion = instance.databaseVersion || this.definition.database_version || 'POSTGRES_14';
+            const storageType = settings.dataDiskType || this.definition.storage_type || 'PD_SSD';
+            const storageSizeGb = parseInt(settings.dataDiskSizeGb || this.definition.storage_size_gb || '10', 10);
+            const availabilityType = settings.availabilityType || this.definition.availability_type || 'ZONAL';
+            const edition = settings.edition || this.definition.edition || 'ENTERPRISE';
+
+            // Determine database engine
+            const engine = this.getDatabaseEngine(databaseVersion);
+
+            // Get pricing from Cloud Billing Catalog API
+            const pricing = this.getCloudSQLPricing(tier, region, engine, storageType, edition);
+
+            // Get metrics from Cloud Monitoring
+            const metrics = this.getCloudMonitoringMetrics(instance);
+
+            // Calculate costs
+            const hoursPerMonth = 730;
+            const isHA = availabilityType === 'REGIONAL';
+            const haMultiplier = isHA ? 2 : 1;
+
+            // Instance cost (vCPU + memory)
+            const instanceCostMonthly = pricing.instanceHourly * hoursPerMonth * haMultiplier;
+
+            // Storage cost
+            const storageCostMonthly = storageSizeGb * pricing.storagePerGbMonth * haMultiplier;
+
+            // Network egress cost (using API tiered rates)
+            const networkEgressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+            const networkCostMonthly = this.calculateNetworkEgressCost(networkEgressGb, pricing.networkEgressPerGb, pricing.networkEgressTiers);
+
+            // Backup storage cost based on actual backup configuration
+            const backupConfig = settings.backupConfiguration || {};
+            const backupEnabled = backupConfig.enabled || false;
+            const retainedBackups = backupConfig.backupRetentionSettings?.retainedBackups || 7;
+            const chargeableBackups = Math.max(0, retainedBackups - 7);
+            const estimatedBackupGb = backupEnabled ? chargeableBackups * storageSizeGb : 0;
+            const backupCostMonthly = estimatedBackupGb * pricing.backupPerGbMonth;
+
+            // Total cost
+            const totalCostMonthly = instanceCostMonthly + storageCostMonthly + networkCostMonthly + backupCostMonthly;
+
+            const result = {
+                type: "gcp-cloud-sql-instance",
+                costs: {
+                    month: {
+                        amount: totalCostMonthly.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+
+        } catch (error) {
+            // Return zero cost on error
+            const result = {
+                type: "gcp-cloud-sql-instance",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
+    }
+
+    /**
+     * Get database engine from version string
+     */
+    private getDatabaseEngine(databaseVersion: string): string {
+        if (databaseVersion.startsWith('POSTGRES')) {
+            return 'PostgreSQL';
+        } else if (databaseVersion.startsWith('MYSQL')) {
+            return 'MySQL';
+        } else if (databaseVersion.startsWith('SQLSERVER')) {
+            return 'SQL Server';
+        }
+        return 'Unknown';
+    }
+
+    /**
+     * Get Cloud SQL pricing from GCP Cloud Billing Catalog API
+     */
+    private getCloudSQLPricing(
+        tier: string,
+        region: string,
+        engine: string,
+        storageType: string,
+        edition: string
+    ): {
+        instanceHourly: number;
+        storagePerGbMonth: number;
+        networkEgressPerGb: number;
+        networkEgressTiers: { limitGb: number; ratePerGb: number }[];
+        backupPerGbMonth: number;
+        source: string;
+    } {
+        try {
+            const apiPricing = this.fetchCloudSQLPricingFromAPI(tier, region, engine, storageType, edition);
+            if (apiPricing) {
+                return { ...apiPricing, source: 'GCP Cloud Billing Catalog API' };
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to fetch pricing from GCP API: ${(error as Error).message}`);
+        }
+
+        // If API fails, throw error (no hardcoded fallback)
+        throw new Error(
+            'Failed to fetch pricing from GCP Cloud Billing Catalog API. ' +
+            'Ensure the Cloud Billing API is enabled and you have cloudbilling.skus.list permission.'
+        );
+    }
+
+    /**
+     * Fetch Cloud SQL pricing from GCP Cloud Billing Catalog API
+     */
+    private fetchCloudSQLPricingFromAPI(
+        tier: string,
+        region: string,
+        engine: string,
+        storageType: string,
+        _edition: string
+    ): {
+        instanceHourly: number;
+        storagePerGbMonth: number;
+        networkEgressPerGb: number;
+        networkEgressTiers: { limitGb: number; ratePerGb: number }[];
+        backupPerGbMonth: number;
+    } | null {
+        const billingApiUrl = 'https://cloudbilling.googleapis.com/v1';
+        
+        // Cloud SQL service ID
+        const cloudSqlServiceId = '9662-B51E-5089'; // Cloud SQL service ID
+        
+        // Parse tier to get vCPU and memory
+        const tierSpec = this.parseTier(tier);
+        
+        try {
+            // Fetch SKUs for Cloud SQL
+            const skusUrl = `${billingApiUrl}/services/${cloudSqlServiceId}/skus?currencyCode=USD`;
+            const response = this.get(skusUrl);
+            
+            if (!response.skus || !Array.isArray(response.skus)) {
+                return null;
+            }
+
+            const skus = response.skus;
+            
+            // Find instance pricing (vCPU + RAM)
+            let vcpuHourly = 0;
+            let ramHourly = 0;
+            let storageMonthly = 0;
+            let networkEgress = 0;
+            let networkEgressTiers: { limitGb: number; ratePerGb: number }[] = [];
+            let backupMonthly = 0;
+
+            for (const sku of skus) {
+                const desc = (sku.description || '').toLowerCase();
+                const category = sku.category?.resourceFamily || '';
+                
+                // Check if SKU matches our region
+                const serviceRegions = sku.serviceRegions || [];
+                if (!serviceRegions.includes(region) && !serviceRegions.includes('global')) {
+                    continue;
+                }
+
+                // vCPU pricing
+                if (desc.includes('vcpu') && desc.includes(engine.toLowerCase()) && category === 'Compute') {
+                    const price = this.extractPriceFromSku(sku);
+                    if (price > 0) {
+                        vcpuHourly = price;
+                    }
+                }
+
+                // RAM pricing
+                if (desc.includes('ram') && desc.includes(engine.toLowerCase()) && category === 'Compute') {
+                    const price = this.extractPriceFromSku(sku);
+                    if (price > 0) {
+                        ramHourly = price;
+                    }
+                }
+
+                // Storage pricing
+                if (desc.includes('storage') && desc.includes(engine.toLowerCase())) {
+                    if ((storageType === 'PD_SSD' && desc.includes('ssd')) ||
+                        (storageType === 'PD_HDD' && desc.includes('hdd'))) {
+                        const price = this.extractPriceFromSku(sku);
+                        if (price > 0) {
+                            storageMonthly = price;
+                        }
+                    }
+                }
+
+                // Backup pricing
+                if (desc.includes('backup') && desc.includes(engine.toLowerCase())) {
+                    const price = this.extractPriceFromSku(sku);
+                    if (price > 0) {
+                        backupMonthly = price;
+                    }
+                }
+
+                // Network egress - extract full tiered rates
+                if (desc.includes('network') && desc.includes('egress')) {
+                    const price = this.extractPriceFromSku(sku);
+                    if (price > 0) {
+                        networkEgress = price;
+                        networkEgressTiers = this.extractTieredRatesFromSku(sku);
+                    }
+                }
+            }
+
+            // Calculate instance hourly cost based on tier
+            // If we couldn't get exact pricing from the API, return null
+            if (vcpuHourly === 0 || ramHourly === 0 || storageMonthly === 0) {
+                return null;
+            }
+
+            // Calculate total instance cost: (vCPU × count) + (RAM GB × count)
+            const instanceHourly = (vcpuHourly * tierSpec.vcpu) + (ramHourly * tierSpec.memoryGb);
+
+            return {
+                instanceHourly: instanceHourly,
+                storagePerGbMonth: storageMonthly,
+                networkEgressPerGb: networkEgress,
+                networkEgressTiers,
+                backupPerGbMonth: backupMonthly
+            };
+        } catch (error) {
+            cli.output(`Error fetching pricing: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Parse tier string to get vCPU and memory specifications
+     */
+    private parseTier(tier: string): { vcpu: number; memoryGb: number } {
+        // Shared-core tiers
+        if (tier === 'db-f1-micro') {
+            return { vcpu: 0.6, memoryGb: 0.614 }; // Shared vCPU
+        }
+        if (tier === 'db-g1-small') {
+            return { vcpu: 0.5, memoryGb: 1.7 }; // Shared vCPU
+        }
+
+        // Custom tiers: db-custom-{vCPU}-{memoryMB}
+        const customMatch = tier.match(/^db-custom-(\d+)-(\d+)$/);
+        if (customMatch) {
+            return {
+                vcpu: parseInt(customMatch[1], 10),
+                memoryGb: parseInt(customMatch[2], 10) / 1024
+            };
+        }
+
+        // High-memory tiers: db-n1-highmem-{vCPU}
+        const highmemMatch = tier.match(/^db-n1-highmem-(\d+)$/);
+        if (highmemMatch) {
+            const vcpu = parseInt(highmemMatch[1], 10);
+            return { vcpu: vcpu, memoryGb: vcpu * 6.5 }; // ~6.5GB per vCPU
+        }
+
+        // Standard tiers: db-n1-standard-{vCPU}
+        const standardMatch = tier.match(/^db-n1-standard-(\d+)$/);
+        if (standardMatch) {
+            const vcpu = parseInt(standardMatch[1], 10);
+            return { vcpu: vcpu, memoryGb: vcpu * 3.75 }; // ~3.75GB per vCPU
+        }
+
+        // Enterprise Plus tiers: db-perf-optimized-N-{vCPU}
+        const perfMatch = tier.match(/^db-perf-optimized-N-(\d+)$/);
+        if (perfMatch) {
+            const vcpu = parseInt(perfMatch[1], 10);
+            return { vcpu: vcpu, memoryGb: vcpu * 8 }; // ~8GB per vCPU for perf-optimized
+        }
+
+        // Default fallback
+        return { vcpu: 1, memoryGb: 3.75 };
+    }
+
+    /**
+     * Extract price from SKU pricing info
+     */
+    private extractPriceFromSku(sku: any): number {
+        try {
+            const pricingInfo = sku.pricingInfo;
+            if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+                return 0;
+            }
+
+            const pricing = pricingInfo[0];
+            const tieredRates = pricing.pricingExpression?.tieredRates;
+            if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+                return 0;
+            }
+
+            // Get the first non-zero rate
+            for (const rate of tieredRates) {
+                const unitPrice = rate.unitPrice;
+                if (unitPrice) {
+                    const units = parseInt(unitPrice.units || '0', 10);
+                    const nanos = parseInt(unitPrice.nanos || '0', 10);
+                    const price = units + (nanos / 1e9);
+                    if (price > 0) {
+                        return price;
+                    }
+                }
+            }
+            return 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Extract full tiered rates from a SKU's pricing info.
+     * Returns an array of { limitGb, ratePerGb } sorted by tier start usage.
+     */
+    private extractTieredRatesFromSku(sku: any): { limitGb: number; ratePerGb: number }[] {
+        try {
+            const pricingInfo = sku.pricingInfo;
+            if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+                return [];
+            }
+
+            const pricing = pricingInfo[0];
+            const tieredRates = pricing.pricingExpression?.tieredRates;
+            if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+                return [];
+            }
+
+            const tiers: { startUsageAmount: number; ratePerGb: number }[] = [];
+            for (const rate of tieredRates) {
+                const unitPrice = rate.unitPrice;
+                const startUsageAmount = rate.startUsageAmount || 0;
+                let price = 0;
+                if (unitPrice) {
+                    const units = parseInt(unitPrice.units || '0', 10);
+                    const nanos = parseInt(unitPrice.nanos || '0', 10);
+                    price = units + (nanos / 1e9);
+                }
+                tiers.push({ startUsageAmount, ratePerGb: price });
+            }
+
+            tiers.sort((a, b) => a.startUsageAmount - b.startUsageAmount);
+
+            const result: { limitGb: number; ratePerGb: number }[] = [];
+            for (let i = 0; i < tiers.length; i++) {
+                const nextStart = i + 1 < tiers.length ? tiers[i + 1].startUsageAmount : Infinity;
+                result.push({
+                    limitGb: nextStart,
+                    ratePerGb: tiers[i].ratePerGb
+                });
+            }
+
+            return result;
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Calculate network egress cost with tiered pricing from the API.
+     * Uses actual tiered rates from the GCP Cloud Billing API when available,
+     * otherwise falls back to the single rate (flat pricing).
+     */
+    private calculateNetworkEgressCost(
+        egressGb: number,
+        ratePerGb: number,
+        egressTiers?: { limitGb: number; ratePerGb: number }[]
+    ): number {
+        if (egressGb <= 0) return 0;
+
+        // If we have actual tiered rates from the API, use them
+        if (egressTiers && egressTiers.length > 1) {
+            let cost = 0;
+            let remaining = egressGb;
+
+            for (const tier of egressTiers) {
+                if (remaining <= 0) break;
+
+                const tierCapacity = tier.limitGb === Infinity ? remaining : tier.limitGb;
+                const usageInTier = Math.min(remaining, tierCapacity);
+
+                cost += usageInTier * tier.ratePerGb;
+                remaining -= usageInTier;
+            }
+
+            return cost;
+        }
+
+        // Fallback: use flat rate (no tiered discount approximation)
+        return egressGb * ratePerGb;
+    }
+
+    /**
+     * Get metrics from Cloud Monitoring API
+     */
+    private getCloudMonitoringMetrics(_instance: any): {
+        cpuUtilization: number;
+        memoryUtilization: number;
+        diskReadOps: number;
+        diskWriteOps: number;
+        networkEgressBytes: number;
+        networkIngressBytes: number;
+        connections: number;
+    } {
+        const defaultMetrics = {
+            cpuUtilization: 0,
+            memoryUtilization: 0,
+            diskReadOps: 0,
+            diskWriteOps: 0,
+            networkEgressBytes: 0,
+            networkIngressBytes: 0,
+            connections: 0
+        };
+
+        try {
+            const monitoringApiUrl = 'https://monitoring.googleapis.com/v3';
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            
+            const endTime = now.toISOString();
+            const startTime = thirtyDaysAgo.toISOString();
+
+            // Cloud SQL metric types
+            const metricTypes = [
+                'cloudsql.googleapis.com/database/cpu/utilization',
+                'cloudsql.googleapis.com/database/memory/utilization',
+                'cloudsql.googleapis.com/database/disk/read_ops_count',
+                'cloudsql.googleapis.com/database/disk/write_ops_count',
+                'cloudsql.googleapis.com/database/network/sent_bytes_count',
+                'cloudsql.googleapis.com/database/network/received_bytes_count',
+                'cloudsql.googleapis.com/database/network/connections'
+            ];
+
+            const results: Record<string, number> = {};
+
+            for (const metricType of metricTypes) {
+                try {
+                    const filter = `metric.type="${metricType}" AND resource.labels.database_id="${this.projectId}:${this.definition.name}"`;
+                    const encodedFilter = encodeURIComponent(filter);
+                    
+                    const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?` +
+                        `filter=${encodedFilter}&` +
+                        `interval.startTime=${startTime}&` +
+                        `interval.endTime=${endTime}&` +
+                        `aggregation.alignmentPeriod=86400s&` +
+                        `aggregation.perSeriesAligner=ALIGN_MEAN`;
+
+                    const response = this.get(url);
+                    
+                    if (response.timeSeries && response.timeSeries.length > 0) {
+                        const points = response.timeSeries[0].points || [];
+                        if (points.length > 0) {
+                            // Calculate average across all points
+                            let sum = 0;
+                            for (const point of points) {
+                                const value = point.value?.doubleValue || 
+                                             point.value?.int64Value || 
+                                             point.value?.distributionValue?.mean || 0;
+                                sum += parseFloat(value.toString());
+                            }
+                            results[metricType] = sum / points.length;
+                        }
+                    }
+                } catch (metricError) {
+                    // Continue with other metrics if one fails
+                    cli.output(`Warning: Could not fetch metric ${metricType}`);
+                }
+            }
+
+            return {
+                cpuUtilization: (results['cloudsql.googleapis.com/database/cpu/utilization'] || 0) * 100,
+                memoryUtilization: (results['cloudsql.googleapis.com/database/memory/utilization'] || 0) * 100,
+                diskReadOps: results['cloudsql.googleapis.com/database/disk/read_ops_count'] || 0,
+                diskWriteOps: results['cloudsql.googleapis.com/database/disk/write_ops_count'] || 0,
+                networkEgressBytes: (results['cloudsql.googleapis.com/database/network/sent_bytes_count'] || 0) * 30 * 24 * 3600, // Convert rate to total
+                networkIngressBytes: (results['cloudsql.googleapis.com/database/network/received_bytes_count'] || 0) * 30 * 24 * 3600,
+                connections: results['cloudsql.googleapis.com/database/network/connections'] || 0
+            };
+        } catch (error) {
+            cli.output(`Warning: Could not fetch Cloud Monitoring metrics: ${(error as Error).message}`);
+            return defaultMetrics;
+        }
+    }
 }

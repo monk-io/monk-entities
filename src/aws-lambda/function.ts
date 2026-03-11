@@ -5,6 +5,7 @@
 import { AWSLambdaEntity, AWSLambdaDefinition, AWSLambdaState } from "./lambda-base.ts";
 import { action, Args } from "monkec/base";
 import cli from "cli";
+import aws from "cloud/aws";
 
 // AWS Lambda API interfaces (internal to this file)
 interface LambdaFunctionConfig {
@@ -735,5 +736,551 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         } catch (error) {
             throw new Error(`Failed to update function code: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+    }
+
+    /**
+     * Get estimated monthly cost for the Lambda function based on CloudWatch metrics and AWS Pricing API.
+     * 
+     * Lambda pricing components:
+     * - Request charges: $0.20 per 1 million requests
+     * - Duration charges: Based on GB-seconds of compute time
+     * - Provisioned Concurrency: If configured, charged per GB-hour
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        if (!this.state.function_name) {
+            throw new Error("Function does not exist, cannot get cost estimate");
+        }
+
+        try {
+            const functionName = this.definition.function_name;
+            const memoryMB = this.definition.memory_size || 128;
+            const memoryGB = memoryMB / 1024;
+            const architecture = this.definition.architectures?.[0] || 'x86_64';
+
+            // Get pricing from AWS Price List API
+            const pricing = this.getLambdaPricingRates(architecture);
+
+            // Get CloudWatch metrics for the last 30 days
+            const metrics = this.getCloudWatchLambdaMetrics(functionName);
+
+            // Calculate costs
+            const invocations = metrics?.invocations || 0;
+            const totalDurationMs = metrics?.totalDurationMs || 0;
+            const avgDurationMs = invocations > 0 ? totalDurationMs / invocations : 0;
+            
+            // Duration is billed in 1ms increments, minimum 1ms
+            const gbSeconds = (totalDurationMs / 1000) * memoryGB;
+            
+            // Request costs: $0.20 per 1M requests (first 1M free tier not considered here)
+            const requestCost = (invocations / 1_000_000) * pricing.requestRate;
+            
+            // Duration costs: price per GB-second
+            const durationCost = gbSeconds * pricing.durationRate;
+            
+            // Total compute cost
+            const totalComputeCost = requestCost + durationCost;
+
+            // Check for provisioned concurrency
+            const provisionedConcurrency = this.getProvisionedConcurrency(functionName);
+            let provisionedCost = 0;
+            if (provisionedConcurrency > 0) {
+                // Provisioned concurrency is charged per GB-hour
+                const hoursInMonth = 730;
+                const provisionedGBHours = provisionedConcurrency * memoryGB * hoursInMonth;
+                provisionedCost = provisionedGBHours * pricing.provisionedConcurrencyRate;
+            }
+
+            const totalMonthlyCost = totalComputeCost + provisionedCost;
+
+            const costEstimate = {
+                function_name: functionName,
+                region: this.region,
+                summary: {
+                    memory_mb: memoryMB,
+                    architecture: architecture,
+                    timeout_seconds: this.definition.timeout || 3,
+                    estimated_monthly_cost_usd: Math.round(totalMonthlyCost * 100) / 100
+                },
+                request_costs: {
+                    source: "CloudWatch (last 30 days)",
+                    invocations: invocations,
+                    rate_per_million: pricing.requestRate,
+                    monthly_cost_usd: Math.round(requestCost * 100) / 100
+                },
+                duration_costs: {
+                    source: "CloudWatch (last 30 days)",
+                    total_duration_ms: Math.round(totalDurationMs),
+                    avg_duration_ms: Math.round(avgDurationMs * 100) / 100,
+                    gb_seconds: Math.round(gbSeconds * 100) / 100,
+                    rate_per_gb_second: pricing.durationRate,
+                    monthly_cost_usd: Math.round(durationCost * 100) / 100
+                },
+                provisioned_concurrency_costs: {
+                    provisioned_concurrency: provisionedConcurrency,
+                    rate_per_gb_hour: pricing.provisionedConcurrencyRate,
+                    monthly_cost_usd: Math.round(provisionedCost * 100) / 100,
+                    note: provisionedConcurrency > 0 
+                        ? `${provisionedConcurrency} units provisioned` 
+                        : "No provisioned concurrency configured"
+                },
+                cloudwatch_metrics: {
+                    source: "CloudWatch (last 30 days)",
+                    invocations: invocations,
+                    errors: metrics?.errors || 0,
+                    throttles: metrics?.throttles || 0,
+                    concurrent_executions_max: metrics?.concurrentExecutionsMax || 0,
+                    avg_duration_ms: Math.round(avgDurationMs * 100) / 100
+                },
+                pricing_rates: {
+                    source: "AWS Price List API",
+                    region: this.region,
+                    architecture: architecture,
+                    currency: "USD",
+                    request_rate_per_million: pricing.requestRate,
+                    duration_rate_per_gb_second: pricing.durationRate,
+                    provisioned_concurrency_rate_per_gb_hour: pricing.provisionedConcurrencyRate
+                },
+                disclaimer: "Pricing from AWS Price List API. Metrics from CloudWatch. Free tier not included. Actual costs may vary."
+            };
+
+            cli.output(`Lambda Cost Estimate:\n${JSON.stringify(costEstimate, null, 2)}`);
+
+        } catch (error) {
+            throw new Error(`Failed to get cost estimate: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Returns cost information in standardized format for Monk's billing system.
+     * 
+     * Output format:
+     * {
+     *   "type": "aws-lambda-function",
+     *   "costs": {
+     *     "month": {
+     *       "amount": "5.50",
+     *       "currency": "USD"
+     *     }
+     *   }
+     * }
+     */
+    @action("costs")
+    costs(): void {
+        if (!this.state.function_name) {
+            // Return zero cost if function doesn't exist
+            const result = {
+                type: "aws-lambda-function",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        try {
+            const functionName = this.definition.function_name;
+            const memoryMB = this.definition.memory_size || 128;
+            const memoryGB = memoryMB / 1024;
+            const architecture = this.definition.architectures?.[0] || 'x86_64';
+
+            // Get pricing from AWS Price List API
+            const pricing = this.getLambdaPricingRates(architecture);
+
+            // Get CloudWatch metrics for the last 30 days
+            const metrics = this.getCloudWatchLambdaMetrics(functionName);
+
+            // Calculate costs
+            const invocations = metrics?.invocations || 0;
+            const totalDurationMs = metrics?.totalDurationMs || 0;
+            
+            // Duration is billed in 1ms increments
+            const gbSeconds = (totalDurationMs / 1000) * memoryGB;
+            
+            // Request costs
+            const requestCost = (invocations / 1_000_000) * pricing.requestRate;
+            
+            // Duration costs
+            const durationCost = gbSeconds * pricing.durationRate;
+            
+            // Total compute cost
+            const totalComputeCost = requestCost + durationCost;
+
+            // Check for provisioned concurrency
+            const provisionedConcurrency = this.getProvisionedConcurrency(functionName);
+            let provisionedCost = 0;
+            if (provisionedConcurrency > 0) {
+                const hoursInMonth = 730;
+                const provisionedGBHours = provisionedConcurrency * memoryGB * hoursInMonth;
+                provisionedCost = provisionedGBHours * pricing.provisionedConcurrencyRate;
+            }
+
+            const totalMonthlyCost = totalComputeCost + provisionedCost;
+
+            const result = {
+                type: "aws-lambda-function",
+                costs: {
+                    month: {
+                        amount: totalMonthlyCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+
+        } catch (error) {
+            // Return zero cost on error
+            const result = {
+                type: "aws-lambda-function",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: (error as Error).message
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+        }
+    }
+
+    /**
+     * Get Lambda pricing rates from AWS Price List API
+     */
+    private getLambdaPricingRates(architecture: string): {
+        requestRate: number;
+        durationRate: number;
+        provisionedConcurrencyRate: number;
+        source: string;
+    } {
+        const pricingRegion = 'us-east-1';
+        const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+
+        // Determine architecture filter value
+        const archFilter = architecture === 'arm64' ? 'ARM' : 'x86';
+
+        // Get request pricing
+        const requestFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AWSLambda' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'group', Value: 'AWS-Lambda-Requests' }
+        ];
+
+        const requestResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AWSLambda',
+                Filters: requestFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (requestResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for request pricing`);
+        }
+
+        const requestRate = this.parseLambdaPricing(requestResponse.body);
+        if (requestRate === 0) {
+            throw new Error(`No request pricing found for Lambda in ${location}`);
+        }
+
+        // Get duration pricing (GB-Second)
+        const durationFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AWSLambda' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'group', Value: `AWS-Lambda-Duration${architecture === 'arm64' ? '-ARM' : ''}` }
+        ];
+
+        const durationResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AWSLambda',
+                Filters: durationFilters,
+                MaxResults: 10
+            })
+        });
+
+        if (durationResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API returned status ${durationResponse.statusCode} for duration pricing`);
+        }
+
+        const durationRate = this.parseLambdaPricing(durationResponse.body);
+        if (durationRate === 0) {
+            throw new Error(`No duration pricing found for Lambda (${archFilter}) in ${location}`);
+        }
+
+        // Get provisioned concurrency pricing
+        const provisionedFilters = [
+            { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AWSLambda' },
+            { Type: 'TERM_MATCH', Field: 'location', Value: location },
+            { Type: 'TERM_MATCH', Field: 'group', Value: `AWS-Lambda-Provisioned-Concurrency${architecture === 'arm64' ? '-ARM' : ''}` }
+        ];
+
+        const provisionedResponse = aws.post(url, {
+            service: 'pricing',
+            region: pricingRegion,
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSPriceListService.GetProducts'
+            },
+            body: JSON.stringify({
+                ServiceCode: 'AWSLambda',
+                Filters: provisionedFilters,
+                MaxResults: 10
+            })
+        });
+
+        let provisionedConcurrencyRate = 0;
+        if (provisionedResponse.statusCode === 200) {
+            provisionedConcurrencyRate = this.parseLambdaPricing(provisionedResponse.body);
+        }
+
+        return {
+            requestRate,
+            durationRate,
+            provisionedConcurrencyRate,
+            source: "AWS Price List API"
+        };
+    }
+
+    /**
+     * Parse Lambda pricing from API response
+     */
+    private parseLambdaPricing(responseBody: string): number {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return 0;
+            }
+
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms;
+                if (!terms || !terms.OnDemand) continue;
+
+                for (const termKey of Object.keys(terms.OnDemand)) {
+                    const term = terms.OnDemand[termKey];
+                    const priceDimensions = term.priceDimensions;
+                    if (!priceDimensions) continue;
+
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const dimension = priceDimensions[dimKey];
+                        const pricePerUnit = dimension.pricePerUnit;
+                        if (pricePerUnit && pricePerUnit.USD) {
+                            const price = parseFloat(pricePerUnit.USD);
+                            if (price > 0) {
+                                return price;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to parse Lambda pricing: ${(error as Error).message}`);
+        }
+        return 0;
+    }
+
+    /**
+     * Get CloudWatch metrics for Lambda function
+     */
+    private getCloudWatchLambdaMetrics(functionName: string): {
+        invocations: number;
+        totalDurationMs: number;
+        errors: number;
+        throttles: number;
+        concurrentExecutionsMax: number;
+    } | null {
+        try {
+            const endTime = new Date();
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate() - 30);
+
+            const startTimeISO = startTime.toISOString();
+            const endTimeISO = endTime.toISOString();
+
+            const url = `https://monitoring.${this.region}.amazonaws.com/`;
+
+            // Get invocations (Sum)
+            const invocations = this.getCloudWatchLambdaMetric(
+                url, functionName, 'Invocations', startTimeISO, endTimeISO, 'Sum'
+            ) || 0;
+
+            // Get duration (Sum of all durations in ms)
+            const totalDurationMs = this.getCloudWatchLambdaMetric(
+                url, functionName, 'Duration', startTimeISO, endTimeISO, 'Sum'
+            ) || 0;
+
+            // Get errors (Sum)
+            const errors = this.getCloudWatchLambdaMetric(
+                url, functionName, 'Errors', startTimeISO, endTimeISO, 'Sum'
+            ) || 0;
+
+            // Get throttles (Sum)
+            const throttles = this.getCloudWatchLambdaMetric(
+                url, functionName, 'Throttles', startTimeISO, endTimeISO, 'Sum'
+            ) || 0;
+
+            // Get concurrent executions (Maximum)
+            const concurrentExecutionsMax = this.getCloudWatchLambdaMetric(
+                url, functionName, 'ConcurrentExecutions', startTimeISO, endTimeISO, 'Maximum'
+            ) || 0;
+
+            return {
+                invocations,
+                totalDurationMs,
+                errors,
+                throttles,
+                concurrentExecutionsMax
+            };
+        } catch (error) {
+            cli.output(`Warning: Failed to get CloudWatch metrics: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Get a single CloudWatch metric for Lambda
+     */
+    private getCloudWatchLambdaMetric(
+        url: string,
+        functionName: string,
+        metricName: string,
+        startTime: string,
+        endTime: string,
+        statistic: string
+    ): number | null {
+        try {
+            // Build query string manually (URLSearchParams not available)
+            const params: string[] = [
+                'Action=GetMetricStatistics',
+                'Version=2010-08-01',
+                'Namespace=AWS/Lambda',
+                `MetricName=${encodeURIComponent(metricName)}`,
+                `StartTime=${encodeURIComponent(startTime)}`,
+                `EndTime=${encodeURIComponent(endTime)}`,
+                'Period=2592000', // 30 days in seconds
+                `Statistics.member.1=${statistic}`,
+                `Dimensions.member.1.Name=FunctionName`,
+                `Dimensions.member.1.Value=${encodeURIComponent(functionName)}`
+            ];
+
+            const queryString = params.join('&');
+            const fullUrl = `${url}?${queryString}`;
+
+            const response = aws.get(fullUrl, {
+                service: 'monitoring',
+                region: this.region,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (response.statusCode !== 200) {
+                return null;
+            }
+
+            // Parse XML response to extract the statistic value
+            const body = response.body;
+            const statLower = statistic.toLowerCase();
+            
+            // Look for the statistic in the response
+            const patterns = [
+                new RegExp(`<${statistic}>([\\d.]+)</${statistic}>`),
+                new RegExp(`<${statLower}>([\\d.]+)</${statLower}>`),
+                /<Sum>([\d.]+)<\/Sum>/,
+                /<Average>([\d.]+)<\/Average>/,
+                /<Maximum>([\d.]+)<\/Maximum>/
+            ];
+
+            for (const pattern of patterns) {
+                const match = body.match(pattern);
+                if (match) {
+                    return parseFloat(match[1]);
+                }
+            }
+
+            return 0;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    /**
+     * Get provisioned concurrency configuration for the function
+     */
+    private getProvisionedConcurrency(functionName: string): number {
+        try {
+            const response = this.makeAWSRequest(
+                "GET",
+                `/2019-09-30/functions/${encodeURIComponent(functionName)}/provisioned-concurrency?List=ALL`
+            );
+
+            if (response && typeof response === 'object') {
+                const configs = (response as any).ProvisionedConcurrencyConfigs;
+                if (configs && Array.isArray(configs)) {
+                    // Sum up all provisioned concurrency across versions/aliases
+                    let total = 0;
+                    for (const config of configs) {
+                        total += config.RequestedProvisionedConcurrentExecutions || 0;
+                    }
+                    return total;
+                }
+            }
+            return 0;
+        } catch (_error) {
+            return 0;
+        }
+    }
+
+    /**
+     * Map AWS region codes to location names for Pricing API
+     */
+    private getRegionToLocationMap(): Record<string, string> {
+        return {
+            'us-east-1': 'US East (N. Virginia)',
+            'us-east-2': 'US East (Ohio)',
+            'us-west-1': 'US West (N. California)',
+            'us-west-2': 'US West (Oregon)',
+            'af-south-1': 'Africa (Cape Town)',
+            'ap-east-1': 'Asia Pacific (Hong Kong)',
+            'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-south-2': 'Asia Pacific (Hyderabad)',
+            'ap-southeast-1': 'Asia Pacific (Singapore)',
+            'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-southeast-3': 'Asia Pacific (Jakarta)',
+            'ap-southeast-4': 'Asia Pacific (Melbourne)',
+            'ap-northeast-1': 'Asia Pacific (Tokyo)',
+            'ap-northeast-2': 'Asia Pacific (Seoul)',
+            'ap-northeast-3': 'Asia Pacific (Osaka)',
+            'ca-central-1': 'Canada (Central)',
+            'eu-central-1': 'EU (Frankfurt)',
+            'eu-central-2': 'EU (Zurich)',
+            'eu-west-1': 'EU (Ireland)',
+            'eu-west-2': 'EU (London)',
+            'eu-west-3': 'EU (Paris)',
+            'eu-south-1': 'EU (Milan)',
+            'eu-south-2': 'EU (Spain)',
+            'eu-north-1': 'EU (Stockholm)',
+            'il-central-1': 'Israel (Tel Aviv)',
+            'me-south-1': 'Middle East (Bahrain)',
+            'me-central-1': 'Middle East (UAE)',
+            'sa-east-1': 'South America (Sao Paulo)'
+        };
     }
 } 

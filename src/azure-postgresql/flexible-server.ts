@@ -1,6 +1,7 @@
 import { AzurePostgreSQLEntity, AzurePostgreSQLDefinition, AzurePostgreSQLState } from "./azure-postgresql-base.ts";
 import cli from "cli";
 import secret from "secret";
+import http from "http";
 import { action, Args } from "monkec/base";
 
 /**
@@ -1557,5 +1558,683 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
         cli.output(`   psql "host=${this.state.fqdn} port=5432 dbname=${database} user=${adminLogin} sslmode=require"`);
 
         cli.output(`\n==================================================`);
+    }
+
+    // =========================================================================
+    // Cost Estimation
+    // =========================================================================
+
+    /**
+     * Get estimated monthly cost for this Azure PostgreSQL Flexible Server
+     * 
+     * Calculates costs based on:
+     * - Compute (vCores and memory based on SKU tier)
+     * - Storage (provisioned storage GB)
+     * - Backup storage (beyond included amount)
+     * - High availability (doubles compute cost if enabled)
+     * - Network egress
+     * 
+     * Uses Azure Retail Prices API (free, no authentication required)
+     * 
+     * Usage:
+     *   monk do namespace/server get-cost-estimate
+     * 
+     * Required permissions:
+     * - Microsoft.DBforPostgreSQL/flexibleServers/read
+     * - Microsoft.Insights/metrics/read (for Azure Monitor metrics)
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        cli.output(`==================================================`);
+        cli.output(`💰 Cost Estimate for Azure PostgreSQL Flexible Server`);
+        cli.output(`Server: ${this.definition.server_name}`);
+        cli.output(`==================================================`);
+
+        // Get server details
+        const server = this.checkResourceExists(this.definition.server_name);
+        if (!server) {
+            throw new Error(`Server ${this.definition.server_name} not found`);
+        }
+
+        const properties = server.properties as Record<string, unknown> | undefined;
+        const sku = server.sku as Record<string, unknown> | undefined;
+        const skuName = (sku?.name as string) || this.definition.sku?.name || 'Standard_B1ms';
+        const skuTier = (sku?.tier as string) || this.definition.sku?.tier || 'Burstable';
+        const location = (server.location as string) || this.definition.location;
+        const version = (properties?.version as string) || this.definition.version || '16';
+
+        // Get storage configuration
+        const storageConfig = properties?.storage as Record<string, unknown> | undefined;
+        const storageSizeGb = (storageConfig?.storageSizeGB as number) || this.definition.storage?.storage_size_gb || 32;
+
+        // Get HA configuration
+        const haConfig = properties?.highAvailability as Record<string, unknown> | undefined;
+        const haMode = (haConfig?.mode as string) || this.definition.high_availability?.mode || 'Disabled';
+        const isHaEnabled = haMode !== 'Disabled';
+
+        // Get backup configuration
+        const backupConfig = properties?.backup as Record<string, unknown> | undefined;
+        const backupRetentionDays = (backupConfig?.backupRetentionDays as number) || this.definition.backup?.backup_retention_days || 7;
+        const geoRedundantBackup = (backupConfig?.geoRedundantBackup as string) || this.definition.backup?.geo_redundant_backup || 'Disabled';
+
+        cli.output(`\n📊 Server Configuration:`);
+        cli.output(`   Location: ${location}`);
+        cli.output(`   PostgreSQL Version: ${version}`);
+        cli.output(`   SKU: ${skuName} (${skuTier})`);
+        cli.output(`   Storage: ${storageSizeGb} GB`);
+        cli.output(`   High Availability: ${haMode}`);
+        cli.output(`   Backup Retention: ${backupRetentionDays} days`);
+        cli.output(`   Geo-Redundant Backup: ${geoRedundantBackup}`);
+
+        // Parse SKU to get vCores and memory
+        const skuSpecs = this.parseSkuSpecs(skuName, skuTier);
+        cli.output(`   vCores: ${skuSpecs.vCores}`);
+        cli.output(`   Memory: ${skuSpecs.memoryGb} GB`);
+
+        // Get pricing from Azure Retail Prices API (pass SKU name for Burstable tier)
+        const pricing = this.getPostgreSQLPricing(location, skuTier, skuName);
+
+        if (!pricing) {
+            cli.output(`\n❌ Error: Could not fetch pricing from Azure Retail Prices API`);
+            cli.output(`   Location: ${location}`);
+            cli.output(`   Tier: ${skuTier}`);
+            cli.output(`   SKU: ${skuName}`);
+            cli.output(`\nPlease check that the Azure Retail Prices API is accessible.`);
+            return;
+        }
+
+        // Get Azure Monitor metrics
+        const metrics = this.getPostgreSQLMetrics();
+
+        // Calculate compute costs
+        // Burstable tier is priced per-instance, not per-vCore
+        const hoursPerMonth = 730;
+        let computeCost: number;
+        let computeDescription: string;
+        
+        if (pricing.isBurstable) {
+            // Burstable: price is per instance
+            computeCost = pricing.computePerVCoreHour * hoursPerMonth;
+            computeDescription = `${skuName} @ $${pricing.computePerVCoreHour.toFixed(4)}/hr × ${hoursPerMonth} hrs`;
+        } else {
+            // General Purpose / Memory Optimized: price is per vCore
+            computeCost = skuSpecs.vCores * pricing.computePerVCoreHour * hoursPerMonth;
+            computeDescription = `${skuSpecs.vCores} vCores × $${pricing.computePerVCoreHour.toFixed(4)}/hr × ${hoursPerMonth} hrs`;
+        }
+        
+        // HA doubles compute cost
+        const haMultiplier = isHaEnabled ? 2 : 1;
+        computeCost *= haMultiplier;
+        if (haMultiplier > 1) {
+            computeDescription += ` × ${haMultiplier}x (HA)`;
+        }
+
+        // Calculate storage costs
+        const storageCost = storageSizeGb * pricing.storagePerGbMonth;
+
+        // Calculate backup costs
+        // First backup storage equal to provisioned storage is free
+        // Estimate additional backup storage based on retention
+        const estimatedBackupGb = Math.max(0, (storageSizeGb * backupRetentionDays / 7) - storageSizeGb);
+        let backupCost = estimatedBackupGb * pricing.backupPerGbMonth;
+        if (geoRedundantBackup === 'Enabled') {
+            backupCost *= 2; // Geo-redundant backup doubles the cost
+        }
+
+        // Calculate network egress costs
+        const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        const networkCost = this.calculateEgressCost(egressGb);
+
+        // Total cost
+        const totalCost = computeCost + storageCost + backupCost + networkCost;
+
+        cli.output(`\n💵 Cost Breakdown (Monthly):`);
+        cli.output(`   Compute: $${computeCost.toFixed(2)}`);
+        cli.output(`      └─ ${computeDescription} = $${computeCost.toFixed(2)}`);
+        cli.output(`   Storage: $${storageCost.toFixed(2)}`);
+        cli.output(`      └─ ${storageSizeGb} GB × $${pricing.storagePerGbMonth.toFixed(4)}/GB = $${storageCost.toFixed(2)}`);
+        cli.output(`   Backup: $${backupCost.toFixed(2)}`);
+        cli.output(`      └─ ~${estimatedBackupGb.toFixed(0)} GB additional × $${pricing.backupPerGbMonth.toFixed(4)}/GB${geoRedundantBackup === 'Enabled' ? ' × 2 (geo-redundant)' : ''}`);
+        cli.output(`   Network Egress: $${networkCost.toFixed(2)}`);
+        cli.output(`      └─ ${egressGb.toFixed(2)} GB egress`);
+        cli.output(`   ─────────────────────────────`);
+        cli.output(`   TOTAL: $${totalCost.toFixed(2)}/month`);
+
+        cli.output(`\n📈 Azure Monitor Metrics (last 30 days):`);
+        cli.output(`   CPU Utilization: ${metrics.cpuPercent.toFixed(1)}%`);
+        cli.output(`   Memory Utilization: ${metrics.memoryPercent.toFixed(1)}%`);
+        cli.output(`   Storage Used: ${this.formatBytes(metrics.storageUsedBytes)}`);
+        cli.output(`   Active Connections: ${metrics.activeConnections}`);
+        cli.output(`   Network Egress: ${this.formatBytes(metrics.networkEgressBytes)}`);
+        cli.output(`   Network Ingress: ${this.formatBytes(metrics.networkIngressBytes)}`);
+
+        // Output JSON summary
+        const summary = {
+            server: {
+                name: this.definition.server_name,
+                subscription_id: this.definition.subscription_id,
+                resource_group: this.definition.resource_group_name,
+                location: location,
+                version: version,
+                sku: skuName,
+                tier: skuTier,
+                vcores: skuSpecs.vCores,
+                memory_gb: skuSpecs.memoryGb,
+                storage_gb: storageSizeGb,
+                high_availability: haMode,
+                backup_retention_days: backupRetentionDays,
+                geo_redundant_backup: geoRedundantBackup
+            },
+            pricing_rates: {
+                source: pricing.source,
+                currency: 'USD',
+                compute_per_vcore_hour: pricing.computePerVCoreHour,
+                storage_per_gb_month: pricing.storagePerGbMonth,
+                backup_per_gb_month: pricing.backupPerGbMonth
+            },
+            cost_breakdown: {
+                compute_monthly: parseFloat(computeCost.toFixed(2)),
+                storage_monthly: parseFloat(storageCost.toFixed(2)),
+                backup_monthly: parseFloat(backupCost.toFixed(2)),
+                network_monthly: parseFloat(networkCost.toFixed(2)),
+                total_monthly: parseFloat(totalCost.toFixed(2))
+            },
+            metrics: {
+                period_days: 30,
+                cpu_percent: parseFloat(metrics.cpuPercent.toFixed(1)),
+                memory_percent: parseFloat(metrics.memoryPercent.toFixed(1)),
+                storage_used_bytes: metrics.storageUsedBytes,
+                active_connections: metrics.activeConnections,
+                network_egress_bytes: metrics.networkEgressBytes,
+                network_ingress_bytes: metrics.networkIngressBytes
+            },
+            disclaimer: "Pricing from Azure Retail Prices API. Metrics from Azure Monitor. Actual costs may vary based on reserved capacity and additional features."
+        };
+
+        cli.output(`\n📋 JSON Summary:`);
+        cli.output(JSON.stringify(summary, null, 2));
+        cli.output(`\n==================================================`);
+    }
+
+    /**
+     * Returns cost information in the format expected by Monk billing system.
+     * This lifecycle method is called automatically by the core to collect entity costs.
+     * 
+     * Returns JSON in format:
+     * {
+     *   "type": "azure-postgresql-flexible-server",
+     *   "costs": {
+     *     "month": {
+     *       "amount": "X.XX",
+     *       "currency": "USD"
+     *     }
+     *   }
+     * }
+     */
+    @action("costs")
+    costs(_args?: Args): void {
+        // Get server details from Azure
+        const serverPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}?api-version=${this.apiVersion}`;
+        const serverResponse = this.makeAzureRequest("GET", serverPath);
+
+        if (serverResponse.error || !serverResponse.body) {
+            // Return zero cost if server doesn't exist
+            const result = {
+                type: "azure-postgresql-flexible-server",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(result));
+            return;
+        }
+
+        const serverData = JSON.parse(serverResponse.body);
+        const sku = serverData.sku || {};
+        const properties = serverData.properties || {};
+        const storage = properties.storage || {};
+        const ha = properties.highAvailability || {};
+
+        const skuName = sku.name || this.definition.sku?.name || 'Standard_B1ms';
+        const tier = sku.tier || this.definition.sku?.tier || 'Burstable';
+        const location = serverData.location || this.definition.location;
+        const storageSizeGb = storage.storageSizeGB || this.definition.storage?.storage_size_gb || 32;
+        const haMode = ha.mode || 'Disabled';
+        const backupConfig = properties.backup as Record<string, unknown> | undefined;
+        const backupRetentionDays = (backupConfig?.backupRetentionDays as number) || this.definition.backup?.backup_retention_days || 7;
+        const geoRedundantBackup = (backupConfig?.geoRedundantBackup as string) || this.definition.backup?.geo_redundant_backup || 'Disabled';
+
+        // Parse SKU to get vCores and memory
+        const skuSpecs = this.parseSkuSpecs(skuName, tier);
+
+        // Get pricing from Azure Retail Prices API (pass SKU name for Burstable tier)
+        const pricing = this.getPostgreSQLPricing(location, tier, skuName);
+
+        if (!pricing) {
+            // Return error result if pricing is unavailable
+            const errorResult = {
+                type: "azure-postgresql-flexible-server",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: "Could not fetch pricing from Azure Retail Prices API"
+                    }
+                }
+            };
+            cli.output(JSON.stringify(errorResult));
+            return;
+        }
+
+        // Calculate compute cost
+        // Burstable tier is priced per-instance, not per-vCore
+        let computeCost: number;
+        if (pricing.isBurstable) {
+            computeCost = pricing.computePerVCoreHour * 730;
+        } else {
+            computeCost = skuSpecs.vCores * pricing.computePerVCoreHour * 730;
+        }
+        
+        // Double compute cost for Zone Redundant HA
+        if (haMode === 'ZoneRedundant') {
+            computeCost *= 2;
+        }
+
+        // Calculate storage cost
+        const storageCost = storageSizeGb * pricing.storagePerGbMonth;
+
+        // Calculate backup cost using actual retention days from server configuration
+        // First backup storage equal to provisioned storage is free
+        // Estimate additional backup storage based on retention
+        const estimatedBackupGb = Math.max(0, (storageSizeGb * backupRetentionDays / 7) - storageSizeGb);
+        let backupCost = estimatedBackupGb * pricing.backupPerGbMonth;
+        if (geoRedundantBackup === 'Enabled') {
+            backupCost *= 2; // Geo-redundant backup doubles the cost
+        }
+
+        // Get network metrics for data transfer cost
+        const metrics = this.getPostgreSQLMetrics();
+        const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        const networkCost = this.calculateEgressCost(egressGb);
+
+        // Total cost
+        const totalCost = computeCost + storageCost + backupCost + networkCost;
+
+        // Return in the format expected by Monk billing system
+        const result = {
+            type: "azure-postgresql-flexible-server",
+            costs: {
+                month: {
+                    amount: totalCost.toFixed(2),
+                    currency: "USD"
+                }
+            }
+        };
+
+        cli.output(JSON.stringify(result));
+    }
+
+    /**
+     * Parse SKU name to extract vCores and memory
+     */
+    private parseSkuSpecs(skuName: string, tier: string): { vCores: number; memoryGb: number } {
+        // Azure PostgreSQL Flexible Server SKU naming:
+        // Burstable: Standard_B1ms, Standard_B2s, Standard_B2ms, Standard_B4ms, etc.
+        // General Purpose: Standard_D2s_v3, Standard_D4s_v3, Standard_D8s_v3, etc.
+        // Memory Optimized: Standard_E2s_v3, Standard_E4s_v3, Standard_E8s_v3, etc.
+
+        const skuLower = skuName.toLowerCase();
+        
+        // Burstable tier
+        if (tier === 'Burstable' || skuLower.includes('_b')) {
+            if (skuLower.includes('b1ms')) return { vCores: 1, memoryGb: 2 };
+            if (skuLower.includes('b2s')) return { vCores: 2, memoryGb: 4 };
+            if (skuLower.includes('b2ms')) return { vCores: 2, memoryGb: 8 };
+            if (skuLower.includes('b4ms')) return { vCores: 4, memoryGb: 16 };
+            if (skuLower.includes('b8ms')) return { vCores: 8, memoryGb: 32 };
+            if (skuLower.includes('b12ms')) return { vCores: 12, memoryGb: 48 };
+            if (skuLower.includes('b16ms')) return { vCores: 16, memoryGb: 64 };
+            if (skuLower.includes('b20ms')) return { vCores: 20, memoryGb: 80 };
+        }
+
+        // General Purpose (D-series) - 4 GB RAM per vCore
+        if (tier === 'GeneralPurpose' || skuLower.includes('_d')) {
+            const match = skuLower.match(/d(\d+)/);
+            if (match) {
+                const vCores = parseInt(match[1], 10);
+                return { vCores, memoryGb: vCores * 4 };
+            }
+        }
+
+        // Memory Optimized (E-series) - 8 GB RAM per vCore
+        if (tier === 'MemoryOptimized' || skuLower.includes('_e')) {
+            const match = skuLower.match(/e(\d+)/);
+            if (match) {
+                const vCores = parseInt(match[1], 10);
+                return { vCores, memoryGb: vCores * 8 };
+            }
+        }
+
+        // Default fallback
+        return { vCores: 2, memoryGb: 8 };
+    }
+
+    /**
+     * Get Azure PostgreSQL pricing from Azure Retail Prices API
+     */
+    private getPostgreSQLPricing(location: string, tier: string, skuName?: string): {
+        computePerVCoreHour: number;
+        storagePerGbMonth: number;
+        backupPerGbMonth: number;
+        source: string;
+        isBurstable: boolean;
+    } | null {
+        try {
+            const apiPricing = this.fetchPostgreSQLRetailPrices(location, tier, skuName);
+            if (apiPricing) {
+                return { ...apiPricing, source: 'Azure Retail Prices API' };
+            }
+        } catch (error) {
+            cli.output(`Warning: Failed to fetch pricing from Azure API: ${(error as Error).message}`);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch PostgreSQL pricing from Azure Retail Prices API
+     * 
+     * Note: Burstable tier is priced per-instance, not per-vCore.
+     * General Purpose and Memory Optimized tiers are priced per-vCore.
+     */
+    private fetchPostgreSQLRetailPrices(location: string, tier: string, skuName?: string): {
+        computePerVCoreHour: number;
+        storagePerGbMonth: number;
+        backupPerGbMonth: number;
+        isBurstable: boolean;
+    } | null {
+        // Azure Retail Prices API is free and doesn't require authentication
+        const baseUrl = 'https://prices.azure.com/api/retail/prices';
+        
+        // Normalize location to armRegionName format (lowercase, no spaces)
+        // The API expects lowercase region names like 'eastus', not 'East US'
+        const armRegionName = location.toLowerCase().replace(/\s+/g, '');
+
+        // Build filter for PostgreSQL Flexible Server pricing
+        const filter = `serviceName eq 'Azure Database for PostgreSQL' and armRegionName eq '${armRegionName}'`;
+        const encodedFilter = encodeURIComponent(filter);
+        const url = `${baseUrl}?$filter=${encodedFilter}`;
+
+        try {
+            // Use http module for external API call
+            const response = this.makeExternalRequest(url);
+            
+            if (!response || !response.Items) {
+                return null;
+            }
+
+            const items = response.Items as Array<{
+                skuName?: string;
+                productName?: string;
+                meterName?: string;
+                unitPrice?: number;
+                unitOfMeasure?: string;
+            }>;
+
+            let computePerVCoreHour = 0;
+            let storagePerGbMonth = 0;
+            let backupPerGbMonth = 0;
+            const isBurstable = tier.toLowerCase() === 'burstable';
+
+            // Map tier to product name pattern
+            const tierPattern = tier.toLowerCase();
+
+            // For Burstable tier, extract SKU suffix (e.g., "B1ms" from "Standard_B1ms")
+            let burstableSkuSuffix = '';
+            if (isBurstable && skuName) {
+                const match = skuName.match(/_(B\d+\w*)/i);
+                if (match) {
+                    burstableSkuSuffix = match[1].toUpperCase();
+                }
+            }
+
+            for (const item of items) {
+                const productName = (item.productName || '').toLowerCase();
+                const meterName = (item.meterName || '').toLowerCase();
+                const itemSkuName = (item.skuName || '').toUpperCase();
+                const price = item.unitPrice || 0;
+
+                // Skip if not Flexible Server
+                if (!productName.includes('flexible')) {
+                    continue;
+                }
+
+                // Compute pricing - different logic for Burstable vs other tiers
+                if (isBurstable) {
+                    // Burstable tier: match exact SKU name (e.g., "B1MS")
+                    // These are priced per-instance, not per-vCore
+                    if (productName.includes('burstable') && burstableSkuSuffix && itemSkuName === burstableSkuSuffix) {
+                        // Store as "per instance" price, but we'll return it as computePerVCoreHour
+                        // and set isBurstable=true so caller knows not to multiply by vCores
+                        computePerVCoreHour = price;
+                    }
+                } else {
+                    // General Purpose and Memory Optimized: priced per vCore
+                    if (meterName.includes('vcore') && productName.includes(tierPattern)) {
+                        computePerVCoreHour = price;
+                    }
+                }
+
+                // Storage pricing
+                if (meterName.includes('storage') && meterName.includes('data stored')) {
+                    storagePerGbMonth = price;
+                }
+
+                // Backup pricing
+                if (meterName.includes('backup') && meterName.includes('storage')) {
+                    backupPerGbMonth = price;
+                }
+            }
+
+            // Only return if we found compute pricing
+            if (computePerVCoreHour > 0) {
+                // Fail if storage or backup pricing is missing - do not use hardcoded fallbacks
+                if (storagePerGbMonth <= 0 || backupPerGbMonth <= 0) {
+                    const missing: string[] = [];
+                    if (storagePerGbMonth <= 0) missing.push('storage');
+                    if (backupPerGbMonth <= 0) missing.push('backup');
+                    throw new Error(`Incomplete PostgreSQL pricing from Azure API: missing rates for ${missing.join(', ')}`);
+                }
+                return {
+                    computePerVCoreHour,
+                    storagePerGbMonth,
+                    backupPerGbMonth,
+                    isBurstable
+                };
+            }
+
+            return null;
+        } catch (error) {
+            cli.output(`Error fetching Azure retail prices: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Make an external HTTP request (for Azure Retail Prices API which doesn't need Azure auth)
+     */
+    private makeExternalRequest(url: string): Record<string, unknown> | null {
+        try {
+            const response = http.get(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (response.body) {
+                return JSON.parse(response.body);
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Get metrics from Azure Monitor for PostgreSQL
+     */
+    private getPostgreSQLMetrics(): {
+        cpuPercent: number;
+        memoryPercent: number;
+        storageUsedBytes: number;
+        activeConnections: number;
+        networkEgressBytes: number;
+        networkIngressBytes: number;
+    } {
+        const defaultMetrics = {
+            cpuPercent: 0,
+            memoryPercent: 0,
+            storageUsedBytes: 0,
+            activeConnections: 0,
+            networkEgressBytes: 0,
+            networkIngressBytes: 0
+        };
+
+        try {
+            // Get the time range for last 30 days
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
+
+            // Metrics to fetch
+            const metricNames = 'cpu_percent,memory_percent,storage_used,active_connections,network_bytes_egress,network_bytes_ingress';
+            
+            const metricsPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${this.definition.server_name}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=${metricNames}&timespan=${timespan}&interval=P1D&aggregation=Average,Total`;
+            
+            const response = this.makeAzureRequest("GET", metricsPath);
+
+            if (response.error || !response.body) {
+                return defaultMetrics;
+            }
+
+            const data = JSON.parse(response.body);
+            const metrics = data.value || [];
+
+            const results = { ...defaultMetrics };
+
+            for (const metric of metrics) {
+                const metricName = metric.name?.value;
+                const timeseries = metric.timeseries || [];
+                
+                let total = 0;
+                let count = 0;
+                let lastValue = 0;
+                
+                for (const ts of timeseries) {
+                    const dataPoints = ts.data || [];
+                    for (const point of dataPoints) {
+                        if (point.average !== undefined) {
+                            total += point.average;
+                            count++;
+                        }
+                        if (point.total !== undefined) {
+                            lastValue += point.total;
+                        }
+                    }
+                }
+
+                const average = count > 0 ? total / count : 0;
+
+                switch (metricName) {
+                    case 'cpu_percent':
+                        results.cpuPercent = average;
+                        break;
+                    case 'memory_percent':
+                        results.memoryPercent = average;
+                        break;
+                    case 'storage_used':
+                        results.storageUsedBytes = lastValue || average;
+                        break;
+                    case 'active_connections':
+                        results.activeConnections = Math.round(average);
+                        break;
+                    case 'network_bytes_egress':
+                        results.networkEgressBytes = lastValue;
+                        break;
+                    case 'network_bytes_ingress':
+                        results.networkIngressBytes = lastValue;
+                        break;
+                }
+            }
+
+            return results;
+        } catch (error) {
+            cli.output(`Warning: Could not fetch Azure Monitor metrics: ${(error as Error).message}`);
+            return defaultMetrics;
+        }
+    }
+
+    /**
+     * Fetch Azure egress pricing tiers from Azure Retail Prices API
+     */
+    private fetchEgressPricingTiers(): { limit: number; rate: number }[] {
+        const baseUrl = 'https://prices.azure.com/api/retail/prices';
+        const location = (this.definition.location || 'eastus').toLowerCase().replace(/\s+/g, '');
+        const filter = `serviceName eq 'Bandwidth' and armRegionName eq '${location}' and meterName eq 'Standard Data Transfer Out'`;
+        const encodedFilter = encodeURIComponent(filter);
+        const url = `${baseUrl}?$filter=${encodedFilter}`;
+
+        const response = this.makeExternalRequest(url);
+        if (response && response.Items && Array.isArray(response.Items)) {
+            const tiers: { limit: number; rate: number }[] = [];
+            for (const item of response.Items as Array<{ tierMinimumUnits?: number; unitPrice?: number; unitOfMeasure?: string }>) {
+                const price = item.unitPrice || 0;
+                if (price > 0) {
+                    const tierMin = item.tierMinimumUnits || 0;
+                    tiers.push({ limit: tierMin, rate: price });
+                }
+            }
+            if (tiers.length > 0) {
+                tiers.sort((a, b) => a.limit - b.limit);
+                return tiers;
+            }
+        }
+
+        throw new Error('Could not retrieve Azure egress pricing from Azure Retail Prices API');
+    }
+
+    /**
+     * Calculate egress cost with tiered pricing from Azure Retail Prices API
+     */
+    private calculateEgressCost(egressGb: number): number {
+        if (egressGb <= 5) {
+            return 0; // First 5 GB free
+        }
+
+        const tiers = this.fetchEgressPricingTiers();
+        const billableGb = egressGb - 5;
+        let cost = 0;
+        let remaining = billableGb;
+
+        for (let i = 0; i < tiers.length && remaining > 0; i++) {
+            const tierLimit = i + 1 < tiers.length ? (tiers[i + 1].limit - tiers[i].limit) : Infinity;
+            const tierGb = Math.min(remaining, tierLimit);
+            cost += tierGb * tiers[i].rate;
+            remaining -= tierGb;
+        }
+
+        return cost;
+    }
+
+    /**
+     * Format bytes to human-readable string
+     */
+    private formatBytes(bytes: number): string {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 }
