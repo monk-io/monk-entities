@@ -1488,8 +1488,8 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
             return { vcpu: vcpu, memoryGb: vcpu * 8 }; // ~8GB per vCPU for perf-optimized
         }
 
-        // Default fallback
-        return { vcpu: 1, memoryGb: 3.75 };
+        // Fail fast for unknown tier strings instead of guessing
+        throw new Error(`Unknown Cloud SQL tier: '${tier}'. Cannot determine vCPU/memory specs. Supported formats: db-f1-micro, db-g1-small, db-custom-{vCPU}-{memoryMB}, db-n1-highmem-{vCPU}, db-n1-standard-{vCPU}, db-perf-optimized-N-{vCPU}`);
     }
 
     /**

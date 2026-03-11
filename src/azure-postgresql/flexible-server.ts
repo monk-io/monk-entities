@@ -1918,8 +1918,8 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             }
         }
 
-        // Default fallback
-        return { vCores: 2, memoryGb: 8 };
+        // Fail fast for unknown SKU patterns instead of guessing
+        throw new Error(`Unknown PostgreSQL SKU: '${skuName}' (tier: ${tier}). Cannot determine vCore/memory specs. Supported patterns: Standard_B{n}ms, Standard_B{n}s, Standard_D{n}s_v{x}, Standard_E{n}s_v{x}`);
     }
 
     /**

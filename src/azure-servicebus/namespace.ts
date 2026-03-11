@@ -757,7 +757,11 @@ export class ServiceBusNamespace extends AzureServiceBusEntity<NamespaceDefiniti
 
     /**
      * Get Azure Monitor metrics for Service Bus namespace (last 30 days).
-     * Returns total incoming + outgoing messages as an approximation of billable operations.
+     * Uses the IncomingRequests metric, which counts every API call made against the
+     * namespace (send, receive, peek, abandon, complete, management, etc.).
+     * Azure bills Standard/Basic tiers per "messaging operation," defined as each
+     * API call, so IncomingRequests directly measures the billable quantity.
+     * @see https://learn.microsoft.com/en-us/azure/service-bus-messaging/monitor-service-bus-reference
      */
     private getServiceBusMetrics(): { totalOperations: number } {
         try {
@@ -766,7 +770,7 @@ export class ServiceBusNamespace extends AzureServiceBusEntity<NamespaceDefiniti
             const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
             const resourcePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.ServiceBus/namespaces/${this.definition.namespace_name}`;
 
-            const metricsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=IncomingMessages,OutgoingMessages&timespan=${timespan}&interval=P1D&aggregation=Total`;
+            const metricsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=IncomingRequests&timespan=${timespan}&interval=P1D&aggregation=Total`;
             const response = this.makeAzureRequest("GET", metricsPath);
 
             if (response.error || !response.body) {
