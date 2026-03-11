@@ -717,6 +717,17 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
         totalMonthlyCost += deletesCost;
         cli.output(`   Document Deletes: ${metrics.documentDeletes.toLocaleString()} × $${pricing.deletePer100K.toFixed(2)}/100K = $${deletesCost.toFixed(2)}/month`);
 
+        // Network egress cost
+        let egressCost = 0;
+        if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+            const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+            egressCost = egressGb * pricing.networkEgressPerGb;
+            totalMonthlyCost += egressCost;
+            cli.output(`   Network Egress: ${egressGb.toFixed(4)} GB × $${pricing.networkEgressPerGb.toFixed(2)}/GB = $${egressCost.toFixed(2)}/month`);
+        } else if (pricing.networkEgressPerGb > 0) {
+            cli.output(`   Network Egress: No egress measured (rate: $${pricing.networkEgressPerGb.toFixed(2)}/GB)`);
+        }
+
         cli.output(`\n${'='.repeat(60)}`);
         cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
         cli.output(`${'='.repeat(60)}`);
@@ -727,7 +738,6 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
         cli.output(`   - Free tier not deducted from estimates above`);
         cli.output(`   - PITR adds ~30% to storage costs when enabled`);
         cli.output(`   - Multi-region locations (nam5, eur3) cost more than regional`);
-        cli.output(`   - Network egress charges apply for cross-region access`);
 
         const summary = {
             entity_type: "gcp-firestore",
@@ -740,13 +750,15 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
                 storage_gib: storageGib,
                 document_reads: metrics.documentReads,
                 document_writes: metrics.documentWrites,
-                document_deletes: metrics.documentDeletes
+                document_deletes: metrics.documentDeletes,
+                network_egress_bytes: metrics.networkEgressBytes
             },
             cost_breakdown: {
                 storage: storageCost.toFixed(2),
                 reads: readsCost.toFixed(2),
                 writes: writesCost.toFixed(2),
-                deletes: deletesCost.toFixed(2)
+                deletes: deletesCost.toFixed(2),
+                network_egress: egressCost.toFixed(2)
             },
             pricing_rates: {
                 source: pricing.source,
@@ -766,19 +778,21 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
 
     /**
      * Get Cloud Monitoring metrics for Firestore (last 30 days).
-     * Returns document reads, writes, deletes, and storage usage.
+     * Returns document reads, writes, deletes, storage usage, and network egress.
      */
     private getFirestoreMetrics(): {
         documentReads: number;
         documentWrites: number;
         documentDeletes: number;
         storageSizeBytes: number;
+        networkEgressBytes: number;
     } {
         const defaultMetrics = {
             documentReads: 0,
             documentWrites: 0,
             documentDeletes: 0,
-            storageSizeBytes: 0
+            storageSizeBytes: 0,
+            networkEgressBytes: 0
         };
 
         try {
@@ -795,7 +809,8 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
                 { type: 'firestore.googleapis.com/document/read_count', key: 'reads' },
                 { type: 'firestore.googleapis.com/document/write_count', key: 'writes' },
                 { type: 'firestore.googleapis.com/document/delete_count', key: 'deletes' },
-                { type: 'firestore.googleapis.com/storage/size', key: 'storage' }
+                { type: 'firestore.googleapis.com/storage/size', key: 'storage' },
+                { type: 'firestore.googleapis.com/network/sent_bytes_count', key: 'egress' }
             ];
 
             for (const metric of metricTypes) {
@@ -831,7 +846,8 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
                 documentReads: results['reads'] || 0,
                 documentWrites: results['writes'] || 0,
                 documentDeletes: results['deletes'] || 0,
-                storageSizeBytes: results['storage'] || 0
+                storageSizeBytes: results['storage'] || 0,
+                networkEgressBytes: results['egress'] || 0
             };
         } catch {
             return defaultMetrics;
@@ -862,6 +878,12 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
 
             // Document deletes cost
             totalMonthlyCost += (metrics.documentDeletes / 100000) * pricing.deletePer100K;
+
+            // Network egress cost
+            if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+                const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+                totalMonthlyCost += egressGb * pricing.networkEgressPerGb;
+            }
 
             const result = {
                 type: "gcp-firestore",

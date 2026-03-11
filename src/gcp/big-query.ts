@@ -1317,6 +1317,76 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
   }
 
   /**
+   * Get BigQuery usage metrics from Cloud Monitoring (last 30 days).
+   * Returns query bytes scanned and streaming insert bytes.
+   */
+  private getBigQueryUsageMetrics(): {
+    queryBytesScanned: number;
+    streamingInsertBytes: number;
+  } {
+    const defaultMetrics = { queryBytesScanned: 0, streamingInsertBytes: 0 };
+
+    try {
+      const monitoringApiUrl = 'https://monitoring.googleapis.com/v3';
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const endTime = now.toISOString();
+      const startTime = thirtyDaysAgo.toISOString();
+      const datasetId = this.definition.dataset;
+
+      const results: Record<string, number> = {};
+
+      const metricTypes = [
+        { type: 'bigquery.googleapis.com/query/scanned_bytes', key: 'queryBytes' },
+        { type: 'bigquery.googleapis.com/storage/uploaded_bytes', key: 'streamingBytes' }
+      ];
+
+      for (const metric of metricTypes) {
+        try {
+          // Filter by project; dataset-level filtering may not be available for query metrics
+          const filter = encodeURIComponent(
+            `metric.type="${metric.type}" AND resource.labels.project_id="${this.projectId}"`
+          );
+          const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?` +
+            `filter=${filter}&` +
+            `interval.startTime=${startTime}&` +
+            `interval.endTime=${endTime}&` +
+            `aggregation.alignmentPeriod=2592000s&` +
+            `aggregation.perSeriesAligner=ALIGN_SUM`;
+
+          const response = this.get(url);
+          if (response.timeSeries && response.timeSeries.length > 0) {
+            let total = 0;
+            for (const series of response.timeSeries) {
+              // For streaming bytes, filter to our dataset if possible
+              if (metric.key === 'streamingBytes') {
+                const labels = series.resource?.labels || {};
+                if (labels.dataset_id && labels.dataset_id !== datasetId) continue;
+              }
+              for (const point of (series.points || [])) {
+                const value = parseFloat(
+                  point.value?.int64Value || point.value?.doubleValue || '0'
+                );
+                total += value;
+              }
+            }
+            results[metric.key] = total;
+          }
+        } catch {
+          // Continue with other metrics
+        }
+      }
+
+      return {
+        queryBytesScanned: results['queryBytes'] || 0,
+        streamingInsertBytes: results['streamingBytes'] || 0
+      };
+    } catch {
+      return defaultMetrics;
+    }
+  }
+
+  /**
    * Get detailed cost estimate for the BigQuery dataset
    */
   @action("get-cost-estimate")
@@ -1351,23 +1421,39 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
     cli.output(`   Tables: ${storageMetrics.tableCount}`);
     cli.output(`   Total Size: ${storageSizeGb.toFixed(4)} GB (${storageMetrics.totalSizeBytes.toLocaleString()} bytes)`);
 
-    // Calculate storage cost (assume all active for simplicity)
-    const storageCostMonthly = storageSizeGb * pricing.activeStoragePerGbMonth;
-
-    cli.output(`\n💵 Cost Breakdown (Monthly):`);
-    cli.output(`   Storage Cost: $${storageCostMonthly.toFixed(4)}`);
-    cli.output(`   Query Cost: Usage-based (not estimated - depends on query volume)`);
-
     // First 10 GB of storage is free
     const freeStorageGb = 10;
     const billableStorageGb = Math.max(0, storageSizeGb - freeStorageGb);
     const adjustedStorageCost = billableStorageGb * pricing.activeStoragePerGbMonth;
 
-    cli.output(`\n   Free Tier: First ${freeStorageGb} GB storage free`);
-    cli.output(`   Billable Storage: ${billableStorageGb.toFixed(4)} GB`);
-    cli.output(`   Adjusted Storage Cost: $${adjustedStorageCost.toFixed(4)}`);
+    // Get usage metrics from Cloud Monitoring
+    const usageMetrics = this.getBigQueryUsageMetrics();
+    const queryTbScanned = usageMetrics.queryBytesScanned / (1024 * 1024 * 1024 * 1024);
+    // First 1 TB queries/month is free
+    const billableQueryTb = Math.max(0, queryTbScanned - 1);
+    const queryCost = billableQueryTb * pricing.queryPerTbScanned;
 
-    const totalMonthlyCost = adjustedStorageCost;
+    const streamingInsertGb = usageMetrics.streamingInsertBytes / (1024 * 1024 * 1024);
+    const streamingInsertCost = pricing.streamingInsertPerGb > 0
+      ? streamingInsertGb * pricing.streamingInsertPerGb
+      : 0;
+
+    const totalMonthlyCost = adjustedStorageCost + queryCost + streamingInsertCost;
+
+    cli.output(`\n💵 Cost Breakdown (Monthly):`);
+    cli.output(`   Storage: ${storageSizeGb.toFixed(4)} GB (billable: ${billableStorageGb.toFixed(4)} GB after 10 GB free): $${adjustedStorageCost.toFixed(4)}`);
+
+    if (usageMetrics.queryBytesScanned > 0) {
+      cli.output(`   Queries: ${queryTbScanned.toFixed(4)} TB scanned (billable: ${billableQueryTb.toFixed(4)} TB after 1 TB free): $${queryCost.toFixed(4)}`);
+    } else {
+      cli.output(`   Queries: No query usage measured from Cloud Monitoring`);
+    }
+
+    if (usageMetrics.streamingInsertBytes > 0 && pricing.streamingInsertPerGb > 0) {
+      cli.output(`   Streaming Inserts: ${streamingInsertGb.toFixed(4)} GB × $${pricing.streamingInsertPerGb.toFixed(4)}/GB = $${streamingInsertCost.toFixed(4)}`);
+    } else if (pricing.streamingInsertPerGb > 0) {
+      cli.output(`   Streaming Inserts: No streaming insert usage measured`);
+    }
 
     // JSON Summary
     const summary = {
@@ -1381,6 +1467,12 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
         total_size_bytes: storageMetrics.totalSizeBytes,
         total_size_gb: parseFloat(storageSizeGb.toFixed(4))
       },
+      usage_metrics: {
+        query_bytes_scanned: usageMetrics.queryBytesScanned,
+        query_tb_scanned: parseFloat(queryTbScanned.toFixed(4)),
+        streaming_insert_bytes: usageMetrics.streamingInsertBytes,
+        streaming_insert_gb: parseFloat(streamingInsertGb.toFixed(4))
+      },
       pricing_rates: {
         source: pricing.source,
         currency: 'USD',
@@ -1391,20 +1483,20 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
       },
       cost_breakdown: {
         storage_monthly: parseFloat(adjustedStorageCost.toFixed(4)),
-        query_monthly: 0, // Usage-based, not estimated
+        query_monthly: parseFloat(queryCost.toFixed(4)),
+        streaming_insert_monthly: parseFloat(streamingInsertCost.toFixed(4)),
         total_monthly: parseFloat(totalMonthlyCost.toFixed(2))
       },
-      disclaimer: "Storage costs based on current dataset size. Query costs are usage-based and not included. First 10 GB storage and 1 TB queries/month are free."
+      disclaimer: "Costs based on Cloud Monitoring metrics. Free tier (10 GB storage, 1 TB queries/month) deducted."
     };
 
     cli.output(`\n${'='.repeat(60)}`);
-    cli.output(`💰 ESTIMATED MONTHLY COST (storage only): $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
     cli.output(`${'='.repeat(60)}`);
 
     cli.output(`\n📝 Notes:`);
-    cli.output(`   - BigQuery pricing is primarily usage-based (queries)`);
-    cli.output(`   - Free tier: 10 GB storage, 1 TB queries/month`);
-    cli.output(`   - Query costs depend on data scanned, not shown here`);
+    cli.output(`   - Query and streaming insert costs based on Cloud Monitoring metrics (last 30 days)`);
+    cli.output(`   - Free tier: 10 GB storage, 1 TB queries/month (deducted above)`);
     cli.output(`   - PHYSICAL billing model may reduce storage costs (compressed)`);
 
     cli.output(`\n📋 JSON Summary:`);
@@ -1424,7 +1516,21 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
 
       // First 10 GB free
       const billableStorageGb = Math.max(0, storageSizeGb - 10);
-      const totalMonthlyCost = billableStorageGb * pricing.activeStoragePerGbMonth;
+      let totalMonthlyCost = billableStorageGb * pricing.activeStoragePerGbMonth;
+
+      // Query and streaming insert costs from Cloud Monitoring
+      const usageMetrics = this.getBigQueryUsageMetrics();
+
+      // Query cost: first 1 TB/month free
+      const queryTbScanned = usageMetrics.queryBytesScanned / (1024 * 1024 * 1024 * 1024);
+      const billableQueryTb = Math.max(0, queryTbScanned - 1);
+      totalMonthlyCost += billableQueryTb * pricing.queryPerTbScanned;
+
+      // Streaming insert cost
+      if (usageMetrics.streamingInsertBytes > 0 && pricing.streamingInsertPerGb > 0) {
+        const streamingInsertGb = usageMetrics.streamingInsertBytes / (1024 * 1024 * 1024);
+        totalMonthlyCost += streamingInsertGb * pricing.streamingInsertPerGb;
+      }
 
       const result = {
         type: "gcp-big-query",
