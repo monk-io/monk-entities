@@ -1774,11 +1774,13 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             // Fetch write IOPS
             const writeIOPS = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'WriteIOPS', startTimeISO, endTimeISO, 'Average') || 0;
             
-            // Fetch network bytes in (Sum over period)
-            const networkBytesIn = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'NetworkReceiveThroughput', startTimeISO, endTimeISO, 'Sum') || 0;
+            const periodSeconds = 30 * 24 * 60 * 60;
+
+            // Throughput metrics are bytes/second, so convert average throughput to total bytes over the period
+            const networkBytesIn = (this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'NetworkReceiveThroughput', startTimeISO, endTimeISO, 'Average') || 0) * periodSeconds;
             
-            // Fetch network bytes out (Sum over period)
-            const networkBytesOut = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'NetworkTransmitThroughput', startTimeISO, endTimeISO, 'Sum') || 0;
+            // Throughput metrics are bytes/second, so convert average throughput to total bytes over the period
+            const networkBytesOut = (this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'NetworkTransmitThroughput', startTimeISO, endTimeISO, 'Average') || 0) * periodSeconds;
 
             // Fetch total backup storage billed (in bytes, Average over period)
             const totalBackupStorageBilled = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, 'TotalBackupStorageBilled', startTimeISO, endTimeISO, 'Average') || 0;
