@@ -380,10 +380,12 @@ export class Registry extends DOProviderEntity<
 
     /**
      * DigitalOcean Container Registry has fixed, tier-based pricing.
-     * This is a known limitation: while DigitalOcean exposes subscription
-     * tier info via `GET /v2/registry/subscription`, the pricing is fixed
-     * per tier and sourced from the official pricing page
-     * (https://www.digitalocean.com/pricing/container-registry).
+     *
+     * **No pricing API exists** for DigitalOcean Container Registry.
+     * The DigitalOcean API (`GET /v2/registry/subscription`) returns the current
+     * subscription tier but does not include pricing information. Prices are
+     * therefore hard-coded from the official pricing page:
+     * @see https://www.digitalocean.com/pricing/container-registry (last verified 2026-03-11)
      *
      * DigitalOcean allows only one registry per account.
      *

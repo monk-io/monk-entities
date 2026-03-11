@@ -1235,6 +1235,12 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
     /**
      * Get Azure Storage pricing from Azure Retail Prices API
      */
+    /**
+     * Get Azure Storage pricing from Azure Retail Prices API.
+     * Returns null only if no matching SKU was found in the API response.
+     * Throws if the API call itself fails (network error, HTTP error, etc.)
+     * so callers can surface the root cause.
+     */
     private getAzureStoragePricing(location: string, skuName: string, accessTier: string): {
         storagePerGb: number;
         writeOperationsPer10k: number;
@@ -1243,13 +1249,9 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
         dataRetrievalPerGb: number;
         source: string;
     } | null {
-        try {
-            const apiPricing = this.fetchAzureRetailPrices(location, skuName, accessTier);
-            if (apiPricing) {
-                return { ...apiPricing, source: 'Azure Retail Prices API' };
-            }
-        } catch (error) {
-            cli.output(`Warning: Failed to fetch pricing from Azure API: ${(error as Error).message}`);
+        const apiPricing = this.fetchAzureRetailPrices(location, skuName, accessTier);
+        if (apiPricing) {
+            return { ...apiPricing, source: 'Azure Retail Prices API' };
         }
 
         return null;
@@ -1360,8 +1362,9 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
 
             return null;
         } catch (error) {
-            cli.output(`Error fetching Azure retail prices: ${(error as Error).message}`);
-            return null;
+            // Re-throw so callers can distinguish "no matching SKU" (returns null) from
+            // "API failure / network error" (thrown exception).
+            throw error;
         }
     }
 
@@ -1378,8 +1381,8 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
                 return JSON.parse(response.body);
             }
             return null;
-        } catch {
-            return null;
+        } catch (error) {
+            throw new Error(`External HTTP request to ${url} failed: ${(error as Error).message}`);
         }
     }
 

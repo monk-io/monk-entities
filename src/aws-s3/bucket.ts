@@ -647,11 +647,11 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
             const dataTransferOutGB = dataTransferMetrics ? dataTransferMetrics.bytesDownloaded / (1024 * 1024 * 1024) : 0;
             const dataTransferInGB = dataTransferMetrics ? dataTransferMetrics.bytesUploaded / (1024 * 1024 * 1024) : 0;
             
-            // Calculate data transfer out cost using API-fetched rate
+            // Calculate data transfer out cost using tiered pricing from AWS Price List API
             let dataTransferOutCost = 0;
             if (dataTransferOutGB > 0) {
-                const dataTransferRate = this.fetchDataTransferOutRate();
-                dataTransferOutCost = dataTransferOutGB * dataTransferRate;
+                const dataTransferTiers = this.fetchDataTransferOutTiers();
+                dataTransferOutCost = this.calculateTieredDataTransferCost(dataTransferOutGB, dataTransferTiers);
             }
             
             const totalEstimatedCost = totalStorageCost + putRequestCost + getRequestCost + dataTransferOutCost;
@@ -690,7 +690,7 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
                     download_cost_usd: Math.round(dataTransferOutCost * 100) / 100,
                     upload_cost_usd: 0, // Data transfer IN is free
                     total_transfer_cost_usd: Math.round(dataTransferOutCost * 100) / 100,
-                    pricing_note: "Data OUT pricing fetched from AWS Price List API. Data IN: Free."
+                    pricing_note: "Data OUT tiered pricing fetched from AWS Price List API. Data IN: Free."
                 },
                 pricing_rates: {
                     source: "AWS Price List API",
@@ -1214,43 +1214,17 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
     }
 
     /**
-     * Parse a single price from AWS Price List API response.
-     */
-    private parsePricingResponse(responseBody: string): number {
-        try {
-            const data = JSON.parse(responseBody);
-            if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
-            }
-
-            for (const priceItemStr of data.PriceList) {
-                const product = typeof priceItemStr === 'string' ? JSON.parse(priceItemStr) : priceItemStr;
-                const terms = product.terms?.OnDemand;
-                if (!terms) continue;
-
-                for (const termKey of Object.keys(terms)) {
-                    const priceDimensions = terms[termKey].priceDimensions;
-                    if (!priceDimensions) continue;
-                    for (const dimKey of Object.keys(priceDimensions)) {
-                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
-                        if (pricePerUnit > 0) {
-                            return pricePerUnit;
-                        }
-                    }
-                }
-            }
-        } catch (_error) {
-            // Parsing failed
-        }
-        return 0;
-    }
-
-    /**
-     * Fetch AWS data transfer out pricing from AWS Price List API.
-     * Returns the per-GB rate for the first pricing tier (up to 10 TB).
+     * Fetch AWS data transfer out tiered pricing from AWS Price List API.
+     * Returns an array of tier objects with beginRange (GB), endRange (GB), and pricePerGB.
+     * AWS data transfer out pricing is tiered:
+     *   - First 1 GB/month: free (0.00)
+     *   - Up to 10 TB/month: tier 1 rate
+     *   - Next 40 TB/month: tier 2 rate
+     *   - Next 100 TB/month: tier 3 rate
+     *   - Over 150 TB/month: tier 4 rate
      * @throws Error if pricing cannot be fetched
      */
-    private fetchDataTransferOutRate(): number {
+    private fetchDataTransferOutTiers(): Array<{ beginRange: number; endRange: number; pricePerGb: number }> {
         const pricingRegion = 'us-east-1';
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
         const location = this.getRegionToLocationMap()[this.region];
@@ -1283,12 +1257,76 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
             throw new Error(`AWS Pricing API returned status ${response.statusCode} for data transfer pricing`);
         }
 
-        const rate = this.parsePricingResponse(response.body);
-        if (rate <= 0) {
-            throw new Error('Could not parse data transfer pricing from AWS Price List API response');
+        const tiers = this.parseDataTransferTiers(response.body);
+        if (tiers.length === 0) {
+            throw new Error('Could not parse data transfer tier pricing from AWS Price List API response');
         }
 
-        return rate;
+        return tiers;
+    }
+
+    /**
+     * Parse tiered data transfer pricing from AWS Price List API response.
+     * Extracts all price dimensions with their beginRange/endRange.
+     */
+    private parseDataTransferTiers(responseBody: string): Array<{ beginRange: number; endRange: number; pricePerGb: number }> {
+        const tiers: Array<{ beginRange: number; endRange: number; pricePerGb: number }> = [];
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) {
+                return tiers;
+            }
+
+            for (const priceItemStr of data.PriceList) {
+                const product = typeof priceItemStr === 'string' ? JSON.parse(priceItemStr) : priceItemStr;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    if (!priceDimensions) continue;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const dim = priceDimensions[dimKey];
+                        const pricePerGb = parseFloat(dim.pricePerUnit?.USD || '0');
+                        const beginRange = parseFloat(dim.beginRange || '0');
+                        // endRange may be "Inf" for the last tier
+                        const endRange = dim.endRange === 'Inf' ? Infinity : parseFloat(dim.endRange || '0');
+                        tiers.push({ beginRange, endRange, pricePerGb });
+                    }
+                }
+                // Use the first product that yields tiers
+                if (tiers.length > 0) break;
+            }
+        } catch (_error) {
+            // Parsing failed
+        }
+
+        // Sort tiers by beginRange ascending
+        tiers.sort((a, b) => a.beginRange - b.beginRange);
+        return tiers;
+    }
+
+    /**
+     * Calculate data transfer out cost using tiered pricing from the AWS Price List API.
+     * Applies each tier's rate to the corresponding volume slice.
+     */
+    private calculateTieredDataTransferCost(
+        totalGb: number,
+        tiers: Array<{ beginRange: number; endRange: number; pricePerGb: number }>
+    ): number {
+        let totalCost = 0;
+        let remainingGb = totalGb;
+
+        for (const tier of tiers) {
+            if (remainingGb <= 0) break;
+            const tierSize = tier.endRange === Infinity
+                ? remainingGb
+                : Math.min(remainingGb, tier.endRange - tier.beginRange);
+            totalCost += tierSize * tier.pricePerGb;
+            remainingGb -= tierSize;
+        }
+
+        return totalCost;
     }
 
     /**
@@ -1529,8 +1567,8 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
             let dataTransferCost = 0;
             if (dataTransferMetrics && dataTransferMetrics.bytesDownloaded > 0) {
                 const dataTransferOutGB = dataTransferMetrics.bytesDownloaded / (1024 * 1024 * 1024);
-                const dataTransferRate = this.fetchDataTransferOutRate();
-                dataTransferCost = dataTransferOutGB * dataTransferRate;
+                const dataTransferTiers = this.fetchDataTransferOutTiers();
+                dataTransferCost = this.calculateTieredDataTransferCost(dataTransferOutGB, dataTransferTiers);
             }
             
             const totalMonthlyCost = totalStorageCost + requestCost + dataTransferCost;

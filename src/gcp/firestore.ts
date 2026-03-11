@@ -857,6 +857,12 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
     /**
      * Returns cost information in standardized format for Monk's billing system.
      * Uses Cloud Monitoring metrics for actual usage-based cost estimation.
+     *
+     * Note: Firestore free tier (50K reads/day, 20K writes/day, 20K deletes/day,
+     * 1 GiB storage) is intentionally NOT deducted from the estimate. This is a
+     * deliberate design choice to avoid under-reporting costs when usage exceeds
+     * the free tier. For low-usage databases the estimate will over-report slightly.
+     * This behaviour is documented in the getCostEstimate() output.
      */
     @action("costs")
     costs(): void {

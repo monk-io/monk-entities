@@ -913,8 +913,7 @@ export class Database extends DOProviderEntity<
                 source: 'DigitalOcean Database Options API'
             };
         } catch (error) {
-            cli.output(`⚠️ Failed to fetch pricing from DigitalOcean API: ${(error as Error).message}`);
-            return null;
+            throw new Error(`Failed to fetch pricing from DigitalOcean API: ${(error as Error).message}`);
         }
     }
 
@@ -966,14 +965,20 @@ export class Database extends DOProviderEntity<
         // Calculate costs
         const computeCost = pricing.pricePerNode * numNodes;
         
-        // DigitalOcean includes storage in the base price
-        // Additional storage is $0.10/GB/month if needed
+        // DigitalOcean includes storage in the base price.
+        // Additional storage and network transfer costs are usage-based and cannot be
+        // pre-calculated — they are not included in the cost total below.
+        // Note: The rates shown are from DigitalOcean's published pricing page
+        // (https://www.digitalocean.com/pricing/managed-databases) and are not available
+        // via any DigitalOcean API. DigitalOcean database pricing is uniform across regions.
         const totalStorageIncluded = pricing.storageIncludedGb * numNodes;
 
         cli.output(`\n📈 Cost Breakdown:`);
         cli.output(`   Compute (${numNodes} node${numNodes > 1 ? 's' : ''} × $${pricing.pricePerNode.toFixed(2)}): $${computeCost.toFixed(2)}/month`);
         cli.output(`   Storage Included: ${totalStorageIncluded} GB`);
-        cli.output(`   Additional Storage: $0.10/GB/month (if needed)`);
+        // Note: $0.10/GB/month is from DigitalOcean's published pricing page, not from an API.
+        // This cost is usage-based and NOT included in the total estimate below.
+        cli.output(`   Additional Storage: $0.10/GB/month (if needed, not included in total)`);
 
         // High availability note
         if (numNodes > 1) {
@@ -995,9 +1000,11 @@ export class Database extends DOProviderEntity<
         cli.output(`${'='.repeat(60)}`);
 
         cli.output(`\n📝 Notes:`);
-        cli.output(`   - Prices are estimates based on DigitalOcean's published pricing`);
-        cli.output(`   - Actual costs may vary based on data transfer and additional storage`);
-        cli.output(`   - Network transfer: First 1TB outbound free, then $0.01/GB`);
+        cli.output(`   - Prices are estimates based on DigitalOcean's /v2/databases/options API`);
+        cli.output(`   - DigitalOcean database pricing is uniform across regions`);
+        cli.output(`   - Additional storage and network transfer are usage-based and NOT included in the total`);
+        // Note: $0.01/GB is from DigitalOcean's published pricing page, not from an API.
+        cli.output(`   - Network transfer: First 1TB outbound free, then $0.01/GB (published rate, not API-sourced)`);
     }
 
     /**
