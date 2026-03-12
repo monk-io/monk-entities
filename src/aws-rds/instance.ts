@@ -1213,7 +1213,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             const engine = dbInstance.Engine || this.definition.engine;
             const allocatedStorage = dbInstance.AllocatedStorage || this.definition.allocated_storage;
             const storageType = (dbInstance as any).StorageType || this.definition.storage_type || 'gp2';
-            const multiAZ = (dbInstance as any).MultiAZ || this.definition.multi_az || false;
+            const multiAZ = (dbInstance as any).MultiAZ ?? this.definition.multi_az ?? false;
             
             // Get pricing rates from AWS Price List API
             const pricing = this.getRDSPricingRates(instanceClass, engine, storageType);
@@ -1408,7 +1408,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             const engine = dbInstance.Engine || this.definition.engine;
             const allocatedStorage = dbInstance.AllocatedStorage || this.definition.allocated_storage;
             const storageType = (dbInstance as any).StorageType || this.definition.storage_type || 'gp2';
-            const multiAZ = (dbInstance as any).MultiAZ || this.definition.multi_az || false;
+            const multiAZ = (dbInstance as any).MultiAZ ?? this.definition.multi_az ?? false;
             
             // Get pricing rates from AWS Price List API
             const pricing = this.getRDSPricingRates(instanceClass, engine, storageType);
