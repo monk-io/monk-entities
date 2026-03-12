@@ -522,12 +522,15 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
                     if (!terms) continue;
 
                     let pricePerUnit = 0;
+                    let itemUnit = '';
                     for (const termKey of Object.keys(terms)) {
                         const priceDimensions = terms[termKey].priceDimensions;
                         for (const dimKey of Object.keys(priceDimensions)) {
-                            const p = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
+                            const dim = priceDimensions[dimKey];
+                            const p = parseFloat(dim.pricePerUnit?.USD || '0');
                             if (p > 0) {
                                 pricePerUnit = p;
+                                itemUnit = (dim.unit || '').toLowerCase();
                                 break;
                             }
                         }
@@ -537,13 +540,12 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
                     if (pricePerUnit <= 0) continue;
 
                     // The AWS Price List API returns pricePerUnit as the price for one unit.
-                    // The unit field (unitOfMeasure) tells us what "one unit" is.
+                    // The unit field (unitOfMeasure) tells us what "one unit" is for THIS item.
                     // For API Gateway: unit is typically "per request" (individual request),
                     // so we multiply by 1,000,000 to get the per-million rate.
                     // Guard: if the unit already expresses a bulk quantity (e.g. "per 1 million"),
                     // use the price as-is to avoid a 1,000,000× overcharge.
-                    const unitStr = this.parsePricingUnit(response.body);
-                    const perMillionFactor = unitStr.includes('million') ? 1 : 1_000_000;
+                    const perMillionFactor = itemUnit.includes('million') ? 1 : 1_000_000;
 
                     // Match WebSocket connection minutes
                     if (usageType.includes('connectionminute') || group.includes('websocket-connection')) {
