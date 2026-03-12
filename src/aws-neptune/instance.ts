@@ -778,12 +778,21 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
             cli.output(`   ⚠️ CloudWatch metrics unavailable - storage cost not included`);
         }
 
-        // I/O cost info
+        // I/O cost (from CloudWatch if available)
+        // GremlinRequestsPerSec and SparqlRequestsPerSec are Average values over the window.
+        // Multiply by seconds in 30 days to get total monthly I/O requests.
+        let ioCostMonthly = 0;
+        const secondsPerMonth = 30 * 24 * 3600;
         cli.output(`\n📈 I/O Costs:`);
         cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O requests`);
         if (metrics) {
+            const totalRequestsPerSec = metrics.gremlinRequestsPerSecond + metrics.sparqlRequestsPerSecond;
+            const totalMonthlyRequests = totalRequestsPerSec * secondsPerMonth;
+            ioCostMonthly = (totalMonthlyRequests / 1_000_000) * pricing.ioPerMillion;
             cli.output(`   Gremlin Requests/sec (avg): ${metrics.gremlinRequestsPerSecond.toFixed(2)}`);
             cli.output(`   SPARQL Requests/sec (avg): ${metrics.sparqlRequestsPerSecond.toFixed(2)}`);
+            cli.output(`   Total Monthly Requests: ~${Math.round(totalMonthlyRequests).toLocaleString()}`);
+            cli.output(`   Monthly I/O Cost: $${ioCostMonthly.toFixed(2)}`);
         } else {
             cli.output(`   ⚠️ CloudWatch metrics unavailable - I/O cost not included`);
         }
@@ -792,7 +801,7 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         cli.output(`\n🔒 Backup Storage:`);
         cli.output(`   Rate: $0.023/GB-month (beyond free retention)`);
 
-        const totalMonthlyCost = instanceCostMonthly + storageCostMonthly;
+        const totalMonthlyCost = instanceCostMonthly + storageCostMonthly + ioCostMonthly;
 
         cli.output(`\n${'='.repeat(60)}`);
         cli.output(`💰 ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
@@ -802,7 +811,7 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         cli.output(`   - Pricing from ${pricing.source}`);
         cli.output(`   - Compute cost is for this instance only (cluster may have multiple instances)`);
         cli.output(`   - Storage is shared across the cluster`);
-        cli.output(`   - Does not include: I/O requests, backup beyond retention, data transfer`);
+        cli.output(`   - Does not include: backup beyond retention, data transfer`);
     }
 
     /**
@@ -835,11 +844,19 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
             const hoursPerMonth = 730;
             let totalMonthlyCost = pricing.instanceHourly * hoursPerMonth;
 
-            // Add storage cost from CloudWatch if available
+            // Add storage and I/O costs from CloudWatch if available
             const metrics = this.getCloudWatchNeptuneMetrics();
-            if (metrics && metrics.volumeBytesUsed > 0) {
-                const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
-                totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
+            if (metrics) {
+                if (metrics.volumeBytesUsed > 0) {
+                    const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
+                    totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
+                }
+                // GremlinRequestsPerSec and SparqlRequestsPerSec are Average values;
+                // multiply by seconds in 30 days to get total monthly I/O requests.
+                const secondsPerMonth = 30 * 24 * 3600;
+                const totalRequestsPerSec = metrics.gremlinRequestsPerSecond + metrics.sparqlRequestsPerSecond;
+                const totalMonthlyRequests = totalRequestsPerSec * secondsPerMonth;
+                totalMonthlyCost += (totalMonthlyRequests / 1_000_000) * pricing.ioPerMillion;
             }
 
             const result = {

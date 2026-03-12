@@ -826,6 +826,40 @@ ${pathsXml}
     }
 
     /**
+     * Extract the unitOfMeasure string from the first price dimension in an AWS
+     * Price List API response body. Returns a lower-cased string so callers can
+     * check for keywords like "10,000" or "million".
+     *
+     * The AWS Price List API stores pricing in two ways depending on the service:
+     *   - Per individual unit: pricePerUnit = 0.0000010, unit = "per request"
+     *   - Per bulk quantity:   pricePerUnit = 0.01,      unit = "per 10,000 requests"
+     *
+     * Reading the unit field prevents applying a bulk-quantity multiplier when the
+     * API has already expressed the price at that scale.
+     */
+    private parsePricingUnit(responseBody: string): string {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) return '';
+            const product = typeof data.PriceList[0] === 'string'
+                ? JSON.parse(data.PriceList[0])
+                : data.PriceList[0];
+            const terms = product.terms?.OnDemand;
+            if (!terms) return '';
+            for (const termKey of Object.keys(terms)) {
+                const priceDimensions = terms[termKey].priceDimensions;
+                for (const dimKey of Object.keys(priceDimensions)) {
+                    const unit: string = priceDimensions[dimKey].unit || '';
+                    if (unit) return unit.toLowerCase();
+                }
+            }
+        } catch {
+            // Ignore parse errors — caller will use the safe default (per-unit)
+        }
+        return '';
+    }
+
+    /**
      * Fetch CloudFront pricing from AWS Price List API
      */
     private fetchCloudFrontPricing(): {
@@ -891,12 +925,18 @@ ${pathsXml}
             throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for CloudFront request pricing`);
         }
 
-        // Request pricing is per request; convert to per 10k
+        // The AWS Price List API returns pricePerUnit as the price for one unit.
+        // The unitOfMeasure field tells us what "one unit" is:
+        //   - "per request": pricePerUnit is per individual request → multiply by 10,000
+        //   - "per 10,000 requests" (or similar): pricePerUnit is already per-10k → use as-is
+        // Reading the unit prevents a 10,000× overcharge if AWS ever changes the scale.
         const requestPerUnit = this.parsePricingResponse(requestResponse.body);
         if (requestPerUnit <= 0) {
             throw new Error('Could not parse CloudFront request pricing from AWS Price List API response');
         }
-        const requestsPer10k = requestPerUnit * 10000;
+        const requestUnit = this.parsePricingUnit(requestResponse.body);
+        const per10kFactor = (requestUnit.includes('10,000') || requestUnit.includes('10000')) ? 1 : 10_000;
+        const requestsPer10k = requestPerUnit * per10kFactor;
 
         return {
             requestsPer10k,
