@@ -400,6 +400,40 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
     }
 
     /**
+     * Extract the unitOfMeasure string from the first price dimension in an AWS
+     * Price List API response body. Returns a lower-cased string so callers can
+     * check for keywords like "million" or "request".
+     *
+     * The AWS Price List API stores pricing in two ways depending on the service:
+     *   - Per individual unit: pricePerUnit = 0.000001, unit = "per request"
+     *   - Per bulk quantity:   pricePerUnit = 1.00,     unit = "per 1 million requests"
+     *
+     * Reading the unit field prevents applying a bulk-quantity multiplier when the
+     * API has already expressed the price at that scale.
+     */
+    private parsePricingUnit(responseBody: string): string {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) return '';
+            const product = typeof data.PriceList[0] === 'string'
+                ? JSON.parse(data.PriceList[0])
+                : data.PriceList[0];
+            const terms = product.terms?.OnDemand;
+            if (!terms) return '';
+            for (const termKey of Object.keys(terms)) {
+                const priceDimensions = terms[termKey].priceDimensions;
+                for (const dimKey of Object.keys(priceDimensions)) {
+                    const unit: string = priceDimensions[dimKey].unit || '';
+                    if (unit) return unit.toLowerCase();
+                }
+            }
+        } catch {
+            // Ignore parse errors — caller will use the safe default (per-unit)
+        }
+        return '';
+    }
+
+    /**
      * Map AWS region codes to location names for Pricing API
      */
     private getRegionToLocationMap(): Record<string, string> {
@@ -502,13 +536,22 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
 
                     if (pricePerUnit <= 0) continue;
 
+                    // The AWS Price List API returns pricePerUnit as the price for one unit.
+                    // The unit field (unitOfMeasure) tells us what "one unit" is.
+                    // For API Gateway: unit is typically "per request" (individual request),
+                    // so we multiply by 1,000,000 to get the per-million rate.
+                    // Guard: if the unit already expresses a bulk quantity (e.g. "per 1 million"),
+                    // use the price as-is to avoid a 1,000,000× overcharge.
+                    const unitStr = this.parsePricingUnit(response.body);
+                    const perMillionFactor = unitStr.includes('million') ? 1 : 1_000_000;
+
                     // Match WebSocket connection minutes
                     if (usageType.includes('connectionminute') || group.includes('websocket-connection')) {
-                        connectionMinutePerMillion = pricePerUnit * 1000000;
+                        connectionMinutePerMillion = pricePerUnit * perMillionFactor;
                     }
                     // Match API requests (HTTP or WebSocket messages)
                     else if (requestPerMillion === 0 && (usageType.includes('apirequest') || usageType.includes('message') || group.includes('api-request'))) {
-                        requestPerMillion = pricePerUnit * 1000000;
+                        requestPerMillion = pricePerUnit * perMillionFactor;
                     }
                 }
             }
@@ -522,7 +565,10 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
             if (perRequest <= 0) {
                 throw new Error('Could not parse API Gateway pricing from AWS Price List API response');
             }
-            requestPerMillion = perRequest * 1000000;
+            // parsePricingResponse returns raw pricePerUnit; apply the same unit-aware conversion.
+            const fallbackUnit = this.parsePricingUnit(response.body);
+            const perMillionFactor = fallbackUnit.includes('million') ? 1 : 1_000_000;
+            requestPerMillion = perRequest * perMillionFactor;
         }
 
         return {
