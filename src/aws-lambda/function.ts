@@ -785,10 +785,11 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             const provisionedConcurrency = this.getProvisionedConcurrency(functionName);
             let provisionedCost = 0;
             if (provisionedConcurrency > 0) {
-                // Provisioned concurrency is charged per GB-hour
+                // provisionedConcurrencyRate is per GB-second (same unit as durationRate).
+                // Convert GB-hours to GB-seconds by multiplying by 3600.
                 const hoursInMonth = 730;
-                const provisionedGBHours = provisionedConcurrency * memoryGB * hoursInMonth;
-                provisionedCost = provisionedGBHours * pricing.provisionedConcurrencyRate;
+                const provisionedGBSeconds = provisionedConcurrency * memoryGB * hoursInMonth * 3600;
+                provisionedCost = provisionedGBSeconds * pricing.provisionedConcurrencyRate;
             }
 
             const totalMonthlyCost = totalComputeCost + provisionedCost;
@@ -818,7 +819,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                 },
                 provisioned_concurrency_costs: {
                     provisioned_concurrency: provisionedConcurrency,
-                    rate_per_gb_hour: pricing.provisionedConcurrencyRate,
+                    rate_per_gb_second: pricing.provisionedConcurrencyRate,
                     monthly_cost_usd: Math.round(provisionedCost * 100) / 100,
                     note: provisionedConcurrency > 0 
                         ? `${provisionedConcurrency} units provisioned` 
@@ -839,7 +840,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                     currency: "USD",
                     request_rate_per_million: pricing.requestRate,
                     duration_rate_per_gb_second: pricing.durationRate,
-                    provisioned_concurrency_rate_per_gb_hour: pricing.provisionedConcurrencyRate
+                    provisioned_concurrency_rate_per_gb_second: pricing.provisionedConcurrencyRate
                 },
                 disclaimer: "Pricing from AWS Price List API. Metrics from CloudWatch. Free tier not included. Actual costs may vary."
             };
@@ -914,9 +915,11 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             const provisionedConcurrency = this.getProvisionedConcurrency(functionName);
             let provisionedCost = 0;
             if (provisionedConcurrency > 0) {
+                // provisionedConcurrencyRate is per GB-second (same unit as durationRate).
+                // Convert GB-hours to GB-seconds by multiplying by 3600.
                 const hoursInMonth = 730;
-                const provisionedGBHours = provisionedConcurrency * memoryGB * hoursInMonth;
-                provisionedCost = provisionedGBHours * pricing.provisionedConcurrencyRate;
+                const provisionedGBSeconds = provisionedConcurrency * memoryGB * hoursInMonth * 3600;
+                provisionedCost = provisionedGBSeconds * pricing.provisionedConcurrencyRate;
             }
 
             const totalMonthlyCost = totalComputeCost + provisionedCost;
@@ -959,7 +962,10 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
     } {
         const pricingRegion = 'us-east-1';
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
-        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+        const location = this.getRegionToLocationMap()[this.region];
+        if (!location) {
+            throw new Error(`Unsupported region for Lambda pricing: ${this.region}`);
+        }
 
         // Determine architecture filter value
         const archFilter = architecture === 'arm64' ? 'ARM' : 'x86';

@@ -1138,18 +1138,30 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             'us-east-2': 'US East (Ohio)',
             'us-west-1': 'US West (N. California)',
             'us-west-2': 'US West (Oregon)',
+            'af-south-1': 'Africa (Cape Town)',
+            'ap-east-1': 'Asia Pacific (Hong Kong)',
+            'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-south-2': 'Asia Pacific (Hyderabad)',
+            'ap-southeast-1': 'Asia Pacific (Singapore)',
+            'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-southeast-3': 'Asia Pacific (Jakarta)',
+            'ap-southeast-4': 'Asia Pacific (Melbourne)',
+            'ap-northeast-1': 'Asia Pacific (Tokyo)',
+            'ap-northeast-2': 'Asia Pacific (Seoul)',
+            'ap-northeast-3': 'Asia Pacific (Osaka)',
+            'ca-central-1': 'Canada (Central)',
+            'eu-central-1': 'EU (Frankfurt)',
+            'eu-central-2': 'EU (Zurich)',
             'eu-west-1': 'EU (Ireland)',
             'eu-west-2': 'EU (London)',
             'eu-west-3': 'EU (Paris)',
-            'eu-central-1': 'EU (Frankfurt)',
+            'eu-south-1': 'EU (Milan)',
+            'eu-south-2': 'EU (Spain)',
             'eu-north-1': 'EU (Stockholm)',
-            'ap-southeast-1': 'Asia Pacific (Singapore)',
-            'ap-southeast-2': 'Asia Pacific (Sydney)',
-            'ap-northeast-1': 'Asia Pacific (Tokyo)',
-            'ap-northeast-2': 'Asia Pacific (Seoul)',
-            'ap-south-1': 'Asia Pacific (Mumbai)',
-            'sa-east-1': 'South America (Sao Paulo)',
-            'ca-central-1': 'Canada (Central)'
+            'il-central-1': 'Israel (Tel Aviv)',
+            'me-south-1': 'Middle East (Bahrain)',
+            'me-central-1': 'Middle East (UAE)',
+            'sa-east-1': 'South America (Sao Paulo)'
         };
     }
 
@@ -1165,7 +1177,10 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     } {
         const pricingRegion = 'us-east-1';
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
-        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+        const location = this.getRegionToLocationMap()[this.region];
+        if (!location) {
+            throw new Error(`Unsupported region for DynamoDB pricing: ${this.region}`);
+        }
 
         // Fetch on-demand read pricing
         const readFilters = [
