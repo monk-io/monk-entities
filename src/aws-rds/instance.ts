@@ -1236,6 +1236,9 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             if (storageType === 'io1' || storageType === 'io2') {
                 const provisionedIOPS = (dbInstance as any).Iops || 1000;
                 iopsCostMonthly = provisionedIOPS * pricing.iopsPerMonth;
+                if (multiAZ) {
+                    iopsCostMonthly *= 2; // Multi-AZ doubles provisioned IOPS cost
+                }
             }
             
             // Calculate data transfer cost (from CloudWatch)
@@ -1425,6 +1428,9 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             if (storageType === 'io1' || storageType === 'io2') {
                 const provisionedIOPS = (dbInstance as any).Iops || 1000;
                 iopsCostMonthly = provisionedIOPS * pricing.iopsPerMonth;
+                if (multiAZ) {
+                    iopsCostMonthly *= 2; // Multi-AZ doubles provisioned IOPS cost
+                }
             }
             
             // Calculate data transfer cost (from CloudWatch)

@@ -550,6 +550,37 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
     }
 
     /**
+     * Extract the unit string from the first non-zero price dimension in an AWS
+     * Price List API response body.  Used to detect whether a price is already
+     * expressed per-bulk-quantity (e.g. "per 1 million requests") so we can
+     * avoid applying an extra multiplier and causing a massive overcharge.
+     */
+    private parsePricingUnit(responseBody: string): string {
+        try {
+            const data = JSON.parse(responseBody);
+            if (!data.PriceList || data.PriceList.length === 0) return '';
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const dim = priceDimensions[dimKey];
+                        const p = parseFloat(dim.pricePerUnit?.USD || '0');
+                        if (p > 0) {
+                            return (dim.unit || '').toLowerCase();
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Ignore parse errors — caller will use the safe default (per-unit)
+        }
+        return '';
+    }
+
+    /**
      * Fetch Neptune instance pricing from AWS Price List API
      */
     private fetchNeptunePricing(instanceClass: string): {
@@ -654,7 +685,10 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         if (ioPerRequest <= 0) {
             throw new Error('Could not parse Neptune I/O pricing from AWS Price List API response');
         }
-        const ioPerMillion = ioPerRequest * 1000000;
+        // Guard against a 1,000,000× overcharge: if the API already returns the
+        // price per million requests (unit contains "million"), use it as-is.
+        const ioUnit = this.parsePricingUnit(ioResponse.body);
+        const ioPerMillion = ioUnit.includes('million') ? ioPerRequest : ioPerRequest * 1_000_000;
 
         return {
             instanceHourly,
