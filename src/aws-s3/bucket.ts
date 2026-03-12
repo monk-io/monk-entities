@@ -550,8 +550,8 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
      * - cloudwatch:GetMetricStatistics (for request metrics)
      * - s3:ListBucket (for storage analysis)
      */
-    @action()
-    getCostEstimate(_args?: Args): void {
+   @action("get-cost-estimate")
+   getCostEstimate(_args?: Args): void {
         if (!this.state.bucket_name) {
             throw new Error('Bucket not created yet');
         }
