@@ -1939,7 +1939,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             throw new Error(`AWS Pricing API returned status ${response.statusCode} for data transfer pricing`);
         }
 
-        const rate = this.parseGenericPricingResponse(response.body);
+        const rate = this.parseFirstNonZeroPrice(response.body);
         if (rate <= 0) {
             throw new Error('Could not parse data transfer pricing from AWS Price List API response');
         }
@@ -1982,50 +1982,12 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             throw new Error(`AWS Pricing API returned status ${response.statusCode} for RDS backup storage pricing`);
         }
 
-        const rate = this.parseGenericPricingResponse(response.body);
+        const rate = this.parseFirstNonZeroPrice(response.body);
         if (rate <= 0) {
             throw new Error('Could not parse RDS backup storage pricing from AWS Price List API response');
         }
 
         return rate;
-    }
-
-    /**
-     * Generic parser for AWS Price List API responses that extracts the first non-zero USD price.
-     */
-    private parseGenericPricingResponse(responseBody: string): number {
-        try {
-            const data = JSON.parse(responseBody);
-            if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
-            }
-
-            for (const priceItem of data.PriceList) {
-                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
-                const terms = product.terms;
-                if (!terms || !terms.OnDemand) continue;
-
-                for (const termKey of Object.keys(terms.OnDemand)) {
-                    const term = terms.OnDemand[termKey];
-                    const priceDimensions = term.priceDimensions;
-                    if (!priceDimensions) continue;
-
-                    for (const dimKey of Object.keys(priceDimensions)) {
-                        const dimension = priceDimensions[dimKey];
-                        const pricePerUnit = dimension.pricePerUnit;
-                        if (pricePerUnit && pricePerUnit.USD) {
-                            const price = parseFloat(pricePerUnit.USD);
-                            if (price > 0) {
-                                return price;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            cli.output(`Warning: Failed to parse pricing response: ${(error as Error).message}`);
-        }
-        return 0;
     }
 
     private updateStateFromAWS(): void {

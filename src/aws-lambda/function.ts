@@ -995,15 +995,17 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for request pricing`);
         }
 
-        // parseLambdaPricing returns the raw pricePerUnit.USD from the API, which for
-        // Lambda requests is the price per individual request (e.g. 0.0000002 for $0.20/1M).
-        // Multiply by 1_000_000 so requestRate is expressed as "price per million requests",
+        // parseLambdaPricingWithUnit returns the raw pricePerUnit.USD and the unit string.
+        // Normally Lambda request pricing is per individual request (e.g. $0.0000002/request),
+        // so we multiply by 1_000_000 to express requestRate as "price per million requests",
         // matching the formula: (invocations / 1_000_000) * requestRate.
-        const requestRatePerUnit = this.parseLambdaPricing(requestResponse.body);
+        // Guard: if the API already returns a per-million price, skip the multiplier to
+        // avoid a 1,000,000× overcharge.
+        const { price: requestRatePerUnit, unit: requestUnit } = this.parseLambdaPricingWithUnit(requestResponse.body);
         if (requestRatePerUnit === 0) {
             throw new Error(`No request pricing found for Lambda in ${location}`);
         }
-        const requestRate = requestRatePerUnit * 1_000_000;
+        const requestRate = requestUnit.includes('million') ? requestRatePerUnit : requestRatePerUnit * 1_000_000;
 
         // Get duration pricing (GB-Second)
         const durationFilters = [
@@ -1073,10 +1075,20 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
      * Parse Lambda pricing from API response
      */
     private parseLambdaPricing(responseBody: string): number {
+        return this.parseLambdaPricingWithUnit(responseBody).price;
+    }
+
+    /**
+     * Parse Lambda pricing and return both the price and the unit string from
+     * the same price dimension.  The unit is used to detect whether the API
+     * already expresses the price per-bulk-quantity (e.g. "per 1 million
+     * requests") so callers can avoid applying a redundant multiplier.
+     */
+    private parseLambdaPricingWithUnit(responseBody: string): { price: number; unit: string } {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
+                return { price: 0, unit: '' };
             }
 
             for (const priceItem of data.PriceList) {
@@ -1095,7 +1107,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                         if (pricePerUnit && pricePerUnit.USD) {
                             const price = parseFloat(pricePerUnit.USD);
                             if (price > 0) {
-                                return price;
+                                return { price, unit: (dimension.unit || '').toLowerCase() };
                             }
                         }
                     }
@@ -1104,7 +1116,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
         } catch (error) {
             cli.output(`Warning: Failed to parse Lambda pricing: ${(error as Error).message}`);
         }
-        return 0;
+        return { price: 0, unit: '' };
     }
 
     /**
