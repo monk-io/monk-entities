@@ -1506,8 +1506,11 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
         
         // Map region to location name for Pricing API
-        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
-        
+        const location = this.getRegionToLocationMap()[this.region];
+        if (!location) {
+            throw new Error(`Unsupported region for RDS pricing: ${this.region}`);
+        }
+
         // Map engine to database engine name for Pricing API
         const databaseEngine = this.getEngineToPricingName(engine);
         
@@ -1541,7 +1544,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             return null;
         }
 
-        const instanceHourly = this.parseRDSInstancePricing(instanceResponse.body);
+        const instanceHourly = this.parseFirstNonZeroPrice(instanceResponse.body);
         if (instanceHourly === 0) {
             cli.output(`No pricing found for instance class ${instanceClass} with engine ${databaseEngine} in ${location}`);
             return null;
@@ -1576,7 +1579,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             return null;
         }
 
-        const storagePerGBMonth = this.parseRDSStoragePricing(storageResponse.body);
+        const storagePerGBMonth = this.parseFirstNonZeroPrice(storageResponse.body);
         if (storagePerGBMonth === 0) {
             cli.output(`No pricing found for storage type ${storageType} in ${location}`);
             return null;
@@ -1609,7 +1612,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             });
 
             if (iopsResponse.statusCode === 200) {
-                iopsPerMonth = this.parseRDSIOPSPricing(iopsResponse.body);
+                iopsPerMonth = this.parseFirstNonZeroPrice(iopsResponse.body);
             }
             
             if (iopsPerMonth === 0) {
@@ -1628,45 +1631,12 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     /**
      * Parse RDS IOPS pricing from API response
      */
-    private parseRDSIOPSPricing(responseBody: string): number {
-        try {
-            const data = JSON.parse(responseBody);
-            if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
-            }
-
-            for (const priceItem of data.PriceList) {
-                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
-                const terms = product.terms;
-                if (!terms || !terms.OnDemand) continue;
-
-                for (const termKey of Object.keys(terms.OnDemand)) {
-                    const term = terms.OnDemand[termKey];
-                    const priceDimensions = term.priceDimensions;
-                    if (!priceDimensions) continue;
-
-                    for (const dimKey of Object.keys(priceDimensions)) {
-                        const dimension = priceDimensions[dimKey];
-                        const pricePerUnit = dimension.pricePerUnit;
-                        if (pricePerUnit && pricePerUnit.USD) {
-                            const price = parseFloat(pricePerUnit.USD);
-                            if (price > 0) {
-                                return price;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            cli.output(`Warning: Failed to parse RDS IOPS pricing: ${(error as Error).message}`);
-        }
-        return 0;
-    }
-
     /**
-     * Parse RDS instance pricing from API response
+     * Parse the first non-zero USD price from an AWS Price List API response.
+     * Used for RDS instance, storage, and IOPS pricing — all of which return a
+     * single price dimension per filtered product.
      */
-    private parseRDSInstancePricing(responseBody: string): number {
+    private parseFirstNonZeroPrice(responseBody: string): number {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) {
@@ -1696,45 +1666,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                 }
             }
         } catch (error) {
-            cli.output(`Warning: Failed to parse RDS instance pricing: ${(error as Error).message}`);
-        }
-        return 0;
-    }
-
-    /**
-     * Parse RDS storage pricing from API response
-     */
-    private parseRDSStoragePricing(responseBody: string): number {
-        try {
-            const data = JSON.parse(responseBody);
-            if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
-            }
-
-            for (const priceItem of data.PriceList) {
-                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
-                const terms = product.terms;
-                if (!terms || !terms.OnDemand) continue;
-
-                for (const termKey of Object.keys(terms.OnDemand)) {
-                    const term = terms.OnDemand[termKey];
-                    const priceDimensions = term.priceDimensions;
-                    if (!priceDimensions) continue;
-
-                    for (const dimKey of Object.keys(priceDimensions)) {
-                        const dimension = priceDimensions[dimKey];
-                        const pricePerUnit = dimension.pricePerUnit;
-                        if (pricePerUnit && pricePerUnit.USD) {
-                            const price = parseFloat(pricePerUnit.USD);
-                            if (price > 0) {
-                                return price;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            cli.output(`Warning: Failed to parse RDS storage pricing: ${(error as Error).message}`);
+            cli.output(`Warning: Failed to parse RDS pricing: ${(error as Error).message}`);
         }
         return 0;
     }
@@ -1865,19 +1797,26 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             'af-south-1': 'Africa (Cape Town)',
             'ap-east-1': 'Asia Pacific (Hong Kong)',
             'ap-south-1': 'Asia Pacific (Mumbai)',
+            'ap-south-2': 'Asia Pacific (Hyderabad)',
             'ap-southeast-1': 'Asia Pacific (Singapore)',
             'ap-southeast-2': 'Asia Pacific (Sydney)',
+            'ap-southeast-3': 'Asia Pacific (Jakarta)',
+            'ap-southeast-4': 'Asia Pacific (Melbourne)',
             'ap-northeast-1': 'Asia Pacific (Tokyo)',
             'ap-northeast-2': 'Asia Pacific (Seoul)',
             'ap-northeast-3': 'Asia Pacific (Osaka)',
             'ca-central-1': 'Canada (Central)',
             'eu-central-1': 'EU (Frankfurt)',
+            'eu-central-2': 'EU (Zurich)',
             'eu-west-1': 'EU (Ireland)',
             'eu-west-2': 'EU (London)',
             'eu-west-3': 'EU (Paris)',
             'eu-south-1': 'EU (Milan)',
+            'eu-south-2': 'EU (Spain)',
             'eu-north-1': 'EU (Stockholm)',
+            'il-central-1': 'Israel (Tel Aviv)',
             'me-south-1': 'Middle East (Bahrain)',
+            'me-central-1': 'Middle East (UAE)',
             'sa-east-1': 'South America (Sao Paulo)'
         };
     }
@@ -2008,7 +1947,10 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
     private fetchBackupStorageRate(): number {
         const pricingRegion = 'us-east-1';
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
-        const location = this.getRegionToLocationMap()[this.region] || 'US East (N. Virginia)';
+        const location = this.getRegionToLocationMap()[this.region];
+        if (!location) {
+            throw new Error(`Unsupported region for RDS backup pricing: ${this.region}`);
+        }
 
         const filters = [
             { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonRDS' },
