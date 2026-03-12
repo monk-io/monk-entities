@@ -1376,6 +1376,69 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
      * 
      * @returns Data transfer bytes or null if CloudWatch is unavailable
      */
+    /**
+     * Fetch total bucket size in bytes from CloudWatch BucketSizeBytes metric.
+     *
+     * BucketSizeBytes with StorageType=AllStorageTypes is a daily storage metric
+     * that reports the total size of all objects in the bucket. It is far more
+     * efficient than paginated ListObjectsV2 for large buckets.
+     *
+     * Period is set to 86400 (1 day) with Average statistic, which is the correct
+     * combination for this daily metric. Returns 0 if the metric is unavailable
+     * (e.g. new bucket with no data, or CloudWatch storage metrics not yet populated).
+     */
+    private getCloudWatchBucketSizeBytes(): number {
+        try {
+            const bucketName = this.getBucketName();
+            const url = `https://monitoring.${this.region}.amazonaws.com/`;
+
+            const endTime = new Date();
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate() - 2); // 2-day window to ensure at least one daily data point
+
+            const queryParams = [
+                'Action=GetMetricStatistics',
+                'Version=2010-08-01',
+                'Namespace=AWS%2FS3',
+                'MetricName=BucketSizeBytes',
+                `StartTime=${encodeURIComponent(startTime.toISOString())}`,
+                `EndTime=${encodeURIComponent(endTime.toISOString())}`,
+                'Period=86400', // 1 day — BucketSizeBytes is a daily metric
+                'Statistics.member.1=Average',
+                'Dimensions.member.1.Name=BucketName',
+                `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
+                'Dimensions.member.2.Name=StorageType',
+                'Dimensions.member.2.Value=AllStorageTypes'
+            ];
+
+            const response = aws.get(`${url}?${queryParams.join('&')}`, {
+                service: 'monitoring',
+                region: this.region
+            });
+
+            if (response.statusCode !== 200) {
+                return 0;
+            }
+
+            // Extract the most recent Average value from the response
+            const averages: number[] = [];
+            const avgRegex = /<Average>([\d.]+)<\/Average>/g;
+            let match: RegExpExecArray | null;
+            while ((match = avgRegex.exec(response.body)) !== null) {
+                averages.push(parseFloat(match[1]));
+            }
+
+            if (averages.length === 0) {
+                return 0;
+            }
+
+            // Return the maximum value (most recent daily snapshot may not be the last)
+            return Math.max(...averages);
+        } catch (_error) {
+            return 0;
+        }
+    }
+
     private getCloudWatchDataTransferMetrics(): {
         bytesDownloaded: number;
         bytesUploaded: number;
@@ -1513,45 +1576,23 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         }
 
         try {
-            // Collect storage statistics by storage class
-            const storageByClass: Record<string, { bytes: number; objects: number }> = {};
-            let totalSize = 0;
-            let continuationToken: string | undefined;
-            
-            do {
-                let listUrl = this.getBucketUrl(this.getBucketName(), '?list-type=2&max-keys=1000');
-                if (continuationToken) {
-                    listUrl += `&continuation-token=${encodeURIComponent(continuationToken)}`;
-                }
-                
-                const listResponse = this.listBucketObjects(listUrl);
-                const objectsWithClass = this.parseObjectsWithStorageClass(listResponse.body);
-                
-                for (const obj of objectsWithClass) {
-                    const storageClass = obj.storageClass || 'STANDARD';
-                    if (!storageByClass[storageClass]) {
-                        storageByClass[storageClass] = { bytes: 0, objects: 0 };
-                    }
-                    storageByClass[storageClass].bytes += obj.size;
-                    storageByClass[storageClass].objects += 1;
-                    totalSize += obj.size;
-                }
-                
-                const nextTokenMatch = listResponse.body.match(/<NextContinuationToken>(.*?)<\/NextContinuationToken>/);
-                continuationToken = nextTokenMatch ? nextTokenMatch[1] : undefined;
-                
-            } while (continuationToken);
+            // Use CloudWatch BucketSizeBytes metric to get total storage size without
+            // listing objects. For buckets with millions of objects, paginated
+            // ListObjectsV2 would require thousands of API calls and could time out.
+            // BucketSizeBytes with StorageType=AllStorageTypes is a daily metric that
+            // reports the total bucket size in bytes, updated once per day.
+            const bucketSizeBytes = this.getCloudWatchBucketSizeBytes();
 
             // Get pricing rates for the region
             const pricing = this.getS3PricingRates();
-            
-            // Calculate storage costs
-            let totalStorageCost = 0;
-            for (const [storageClass, data] of Object.entries(storageByClass)) {
-                const sizeGB = data.bytes / (1024 * 1024 * 1024);
-                const rate = pricing.storage[storageClass] || pricing.storage['STANDARD'];
-                totalStorageCost += sizeGB * rate;
-            }
+
+            // Calculate storage cost using STANDARD rate for the total bucket size.
+            // BucketSizeBytes with AllStorageTypes aggregates all storage classes, so
+            // we apply the STANDARD rate as a conservative estimate. Per-class breakdown
+            // is available in getCostEstimate (which uses ListObjectsV2) but is too
+            // expensive to run in the billing-system costs action.
+            const totalSizeGB = bucketSizeBytes / (1024 * 1024 * 1024);
+            const totalStorageCost = totalSizeGB * (pricing.storage['STANDARD'] || 0);
             
             // Get request metrics from CloudWatch
             const requestMetrics = this.getCloudWatchRequestMetrics();

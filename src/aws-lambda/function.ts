@@ -989,10 +989,15 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
             throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for request pricing`);
         }
 
-        const requestRate = this.parseLambdaPricing(requestResponse.body);
-        if (requestRate === 0) {
+        // parseLambdaPricing returns the raw pricePerUnit.USD from the API, which for
+        // Lambda requests is the price per individual request (e.g. 0.0000002 for $0.20/1M).
+        // Multiply by 1_000_000 so requestRate is expressed as "price per million requests",
+        // matching the formula: (invocations / 1_000_000) * requestRate.
+        const requestRatePerUnit = this.parseLambdaPricing(requestResponse.body);
+        if (requestRatePerUnit === 0) {
             throw new Error(`No request pricing found for Lambda in ${location}`);
         }
+        const requestRate = requestRatePerUnit * 1_000_000;
 
         // Get duration pricing (GB-Second)
         const durationFilters = [
