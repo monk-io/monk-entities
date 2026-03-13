@@ -1,0 +1,7 @@
+REPO hetzner-object-storage
+VERSION_HASH 7f4b7b6b4d01
+DESCRIPTION S3-compatible object storage via Hetzner.
+HOSTING managed
+TAGS hetzner,storage,object-storage,s3
+LOAD bucket.yaml credentials.yaml s3-base.yaml
+RESOURCES bucket-sync.js s3-base.js credentials-sync.js
