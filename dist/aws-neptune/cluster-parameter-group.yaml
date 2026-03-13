@@ -18,7 +18,7 @@ cluster-parameter-group:
       ## Composing with Other Entities
       Works with:
       - `aws-neptune/cluster` - Apply this parameter group to clusters
-    version-hash: cc63d75a37cf
+    version-hash: 41b1d11abf9b
   schema:
     region:
       type: string

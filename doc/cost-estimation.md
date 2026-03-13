@@ -406,7 +406,7 @@ Calculates estimated monthly costs by combining data from:
 
 1. **Neptune API** — Instance configuration (class, cluster, engine version)
 2. **AWS Price List API** — Instance, storage, and I/O pricing
-3. **CloudWatch Metrics** — Gremlin/SPARQL requests, volume bytes used
+3. **CloudWatch Metrics** — `VolumeReadIOPs`, `VolumeWriteIOPs`, `VolumeBytesUsed`
 
 ### Pricing API Filters
 
@@ -425,7 +425,7 @@ ProductFamily: Database Storage, System Operation
 | I/O | `(io_requests / 1M) × io_rate` | CloudWatch |
 | Backup | `backup_gb × $0.023/GB` | Estimated |
 
-I/O cost is included in the total monthly estimate. The I/O rate is fetched from the Price List API (`productFamily: System Operation`) with a unit-aware guard: if the API returns the price already expressed per-million requests (unit string contains `"million"`), the rate is used as-is; otherwise it is multiplied by 1,000,000. I/O requests are derived from CloudWatch Gremlin and SPARQL request-rate metrics.
+I/O cost is included in the total monthly estimate. The I/O rate is fetched from the Price List API (`productFamily: System Operation`) with a unit-aware guard: if the API returns the price already expressed per-million (unit string contains `"million"`), the rate is used as-is; otherwise it is multiplied by 1,000,000. I/O operations are measured using the CloudWatch `VolumeReadIOPs` and `VolumeWriteIOPs` metrics (fetched as **Sum** over the 30-day window), which directly represent the billed storage-level I/O count. These are the correct metrics — a single Gremlin or SPARQL query can generate many storage I/O operations, so API-request metrics would significantly underestimate I/O costs.
 
 ### What's NOT Included
 
@@ -977,7 +977,8 @@ Fixed monthly price based on subscription tier. No usage-based charges.
 6. **Backup cost is still partly approximate for some databases** — Cloud SQL and Azure PostgreSQL derive billable backup size from configuration rather than a provider billing metric
 7. **BigQuery long-term storage is not separated yet** — The implementation fetches the long-term storage rate but currently prices all measured storage at the active-storage rate
 8. **Cosmos DB storage depends on Azure Monitor** — If the `DataUsage` metric is unavailable, storage cost is omitted from the total
-9. **Neptune I/O without CloudWatch metrics** — If Gremlin/SPARQL request-rate metrics are unavailable, I/O cost is omitted from the total and a warning is displayed
+9. **Neptune I/O without CloudWatch metrics** — If `VolumeReadIOPs`/`VolumeWriteIOPs` metrics are unavailable, I/O cost is omitted from the total and a warning is displayed
+10. **Region map duplication** — `getRegionToLocationMap()`, `parsePricingResponse()`, and `parsePricingUnit()` are copy-pasted across seven AWS entity files (API Gateway, CloudFront, DynamoDB, Lambda, Neptune, RDS, S3, SNS). Because each module compiles independently, a shared cross-module utility is not currently possible. Adding a new AWS region requires updating all seven copies.
 
 ## Future Improvements
 

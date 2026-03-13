@@ -22,7 +22,7 @@ subnet-group:
       - `aws-neptune/cluster` - Apply this subnet group to clusters
       - `aws-ec2/subnet` - Subnets to include in the group
       - `aws-ec2/vpc` - VPC containing the subnets
-    version-hash: cc63d75a37cf
+    version-hash: 41b1d11abf9b
   schema:
     region:
       type: string
