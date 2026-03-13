@@ -1377,66 +1377,94 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
      * @returns Data transfer bytes or null if CloudWatch is unavailable
      */
     /**
-     * Fetch total bucket size in bytes from CloudWatch BucketSizeBytes metric.
+     * Fetch bucket size in bytes from CloudWatch BucketSizeBytes metric, broken down
+     * by storage class.
      *
-     * BucketSizeBytes with StorageType=AllStorageTypes is a daily storage metric
-     * that reports the total size of all objects in the bucket. It is far more
-     * efficient than paginated ListObjectsV2 for large buckets.
+     * CloudWatch publishes a separate BucketSizeBytes data point for each StorageType
+     * dimension value (StandardStorage, StandardIAStorage, GlacierStorage, etc.) as a
+     * daily metric. Fetching per-class sizes lets costs() apply the correct per-class
+     * rate instead of always using the STANDARD rate.
      *
-     * Period is set to 86400 (1 day) with Average statistic, which is the correct
-     * combination for this daily metric. Returns 0 if the metric is unavailable
-     * (e.g. new bucket with no data, or CloudWatch storage metrics not yet populated).
+     * Period is set to 86400 (1 day) with Average statistic. Returns a map of
+     * internal storage-class name → bytes. Falls back to { STANDARD: totalBytes }
+     * using AllStorageTypes if per-class queries all return 0 (e.g. new bucket).
      */
-    private getCloudWatchBucketSizeBytes(): number {
-        try {
-            const bucketName = this.getBucketName();
-            const url = `https://monitoring.${this.region}.amazonaws.com/`;
+    private getCloudWatchBucketSizeBytes(): Record<string, number> {
+        const bucketName = this.getBucketName();
+        const url = `https://monitoring.${this.region}.amazonaws.com/`;
 
-            const endTime = new Date();
-            const startTime = new Date();
-            startTime.setDate(startTime.getDate() - 2); // 2-day window to ensure at least one daily data point
+        const endTime = new Date();
+        const startTime = new Date();
+        startTime.setDate(startTime.getDate() - 2); // 2-day window to ensure at least one daily data point
 
-            const queryParams = [
-                'Action=GetMetricStatistics',
-                'Version=2010-08-01',
-                'Namespace=AWS%2FS3',
-                'MetricName=BucketSizeBytes',
-                `StartTime=${encodeURIComponent(startTime.toISOString())}`,
-                `EndTime=${encodeURIComponent(endTime.toISOString())}`,
-                'Period=86400', // 1 day — BucketSizeBytes is a daily metric
-                'Statistics.member.1=Average',
-                'Dimensions.member.1.Name=BucketName',
-                `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
-                'Dimensions.member.2.Name=StorageType',
-                'Dimensions.member.2.Value=AllStorageTypes'
-            ];
+        const fetchSizeForStorageType = (storageType: string): number => {
+            try {
+                const queryParams = [
+                    'Action=GetMetricStatistics',
+                    'Version=2010-08-01',
+                    'Namespace=AWS%2FS3',
+                    'MetricName=BucketSizeBytes',
+                    `StartTime=${encodeURIComponent(startTime.toISOString())}`,
+                    `EndTime=${encodeURIComponent(endTime.toISOString())}`,
+                    'Period=86400', // 1 day — BucketSizeBytes is a daily metric
+                    'Statistics.member.1=Average',
+                    'Dimensions.member.1.Name=BucketName',
+                    `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
+                    'Dimensions.member.2.Name=StorageType',
+                    `Dimensions.member.2.Value=${encodeURIComponent(storageType)}`
+                ];
 
-            const response = aws.get(`${url}?${queryParams.join('&')}`, {
-                service: 'monitoring',
-                region: this.region
-            });
+                const response = aws.get(`${url}?${queryParams.join('&')}`, {
+                    service: 'monitoring',
+                    region: this.region
+                });
 
-            if (response.statusCode !== 200) {
+                if (response.statusCode !== 200) return 0;
+
+                const averages: number[] = [];
+                const avgRegex = /<Average>([\d.]+)<\/Average>/g;
+                let match: RegExpExecArray | null;
+                while ((match = avgRegex.exec(response.body)) !== null) {
+                    averages.push(parseFloat(match[1]));
+                }
+                return averages.length > 0 ? Math.max(...averages) : 0;
+            } catch (_error) {
                 return 0;
             }
+        };
 
-            // Extract the most recent Average value from the response
-            const averages: number[] = [];
-            const avgRegex = /<Average>([\d.]+)<\/Average>/g;
-            let match: RegExpExecArray | null;
-            while ((match = avgRegex.exec(response.body)) !== null) {
-                averages.push(parseFloat(match[1]));
+        // CloudWatch StorageType dimension values → internal storage class names
+        const storageTypeMap: Array<[string, string]> = [
+            ['StandardStorage',               'STANDARD'],
+            ['StandardIAStorage',             'STANDARD_IA'],
+            ['OneZoneIAStorage',              'ONEZONE_IA'],
+            ['IntelligentTieringFAStorage',   'INTELLIGENT_TIERING'],
+            ['GlacierInstantRetrievalStorage','GLACIER_IR'],
+            ['GlacierStorage',                'GLACIER'],
+            ['DeepArchiveStorage',            'DEEP_ARCHIVE'],
+            ['ReducedRedundancyStorage',      'REDUCED_REDUNDANCY']
+        ];
+
+        const result: Record<string, number> = {};
+        let totalPerClass = 0;
+        for (const [cwType, internalClass] of storageTypeMap) {
+            const bytes = fetchSizeForStorageType(cwType);
+            if (bytes > 0) {
+                result[internalClass] = bytes;
+                totalPerClass += bytes;
             }
-
-            if (averages.length === 0) {
-                return 0;
-            }
-
-            // Return the maximum value (most recent daily snapshot may not be the last)
-            return Math.max(...averages);
-        } catch (_error) {
-            return 0;
         }
+
+        // If no per-class data was returned (e.g. new bucket, metrics not yet populated),
+        // fall back to AllStorageTypes so costs() still gets a total size.
+        if (totalPerClass === 0) {
+            const total = fetchSizeForStorageType('AllStorageTypes');
+            if (total > 0) {
+                result['STANDARD'] = total; // conservative: treat all as STANDARD
+            }
+        }
+
+        return result;
     }
 
     private getCloudWatchDataTransferMetrics(): {
@@ -1576,23 +1604,24 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         }
 
         try {
-            // Use CloudWatch BucketSizeBytes metric to get total storage size without
-            // listing objects. For buckets with millions of objects, paginated
+            // Use CloudWatch BucketSizeBytes metric to get storage size per storage class
+            // without listing objects. For buckets with millions of objects, paginated
             // ListObjectsV2 would require thousands of API calls and could time out.
-            // BucketSizeBytes with StorageType=AllStorageTypes is a daily metric that
-            // reports the total bucket size in bytes, updated once per day.
-            const bucketSizeBytes = this.getCloudWatchBucketSizeBytes();
+            // CloudWatch publishes a separate daily BucketSizeBytes data point for each
+            // StorageType dimension, so we can apply the correct per-class rate.
+            const bucketSizeByClass = this.getCloudWatchBucketSizeBytes();
 
             // Get pricing rates for the region
             const pricing = this.getS3PricingRates();
 
-            // Calculate storage cost using STANDARD rate for the total bucket size.
-            // BucketSizeBytes with AllStorageTypes aggregates all storage classes, so
-            // we apply the STANDARD rate as a conservative estimate. Per-class breakdown
-            // is available in getCostEstimate (which uses ListObjectsV2) but is too
-            // expensive to run in the billing-system costs action.
-            const totalSizeGB = bucketSizeBytes / (1024 * 1024 * 1024);
-            const totalStorageCost = totalSizeGB * (pricing.storage['STANDARD'] || 0);
+            // Calculate storage cost by applying each class's rate to its measured size.
+            let totalStorageCost = 0;
+            for (const [storageClass, bytes] of Object.entries(bucketSizeByClass)) {
+                const sizeGB = bytes / (1024 * 1024 * 1024);
+                // Fall back to STANDARD rate for any unmapped class (should not happen)
+                const rate = pricing.storage[storageClass] ?? pricing.storage['STANDARD'] ?? 0;
+                totalStorageCost += sizeGB * rate;
+            }
             
             // Get request metrics from CloudWatch
             const requestMetrics = this.getCloudWatchRequestMetrics();
