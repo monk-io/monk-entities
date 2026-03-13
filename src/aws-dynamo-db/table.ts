@@ -1254,9 +1254,20 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             throw new Error(`AWS Pricing API error for DynamoDB storage: ${storageResponse.statusCode} ${storageResponse.body}`);
         }
 
-        const onDemandReadUnit = this.parsePricingResponse(readResponse.body);
-        const onDemandWriteUnit = this.parsePricingResponse(writeResponse.body);
+        // On-demand pricing: AWS documents as "$X per million RRUs/WRUs".
+        // Callers use: consumedUnits * onDemandReadUnit
+        // So we need the price expressed per single RRU/WRU.
+        const { price: rawOnDemandRead, unit: onDemandReadUnit_unit } = this.parsePricingResponseWithUnit(readResponse.body);
+        const { price: rawOnDemandWrite, unit: onDemandWriteUnit_unit } = this.parsePricingResponseWithUnit(writeResponse.body);
         const storagePerGBMonth = this.parsePricingResponse(storageResponse.body);
+
+        // Normalize on-demand rates to per-single-unit (per RRU / per WRU)
+        const onDemandReadUnit = onDemandReadUnit_unit.includes('million')
+            ? rawOnDemandRead / 1_000_000
+            : rawOnDemandRead;
+        const onDemandWriteUnit = onDemandWriteUnit_unit.includes('million')
+            ? rawOnDemandWrite / 1_000_000
+            : rawOnDemandWrite;
 
         if (onDemandReadUnit <= 0 || onDemandWriteUnit <= 0 || storagePerGBMonth <= 0) {
             const missing: string[] = [];
@@ -1313,8 +1324,19 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
             throw new Error(`AWS Pricing API error for DynamoDB provisioned write capacity: ${provWriteResponse.statusCode} ${provWriteResponse.body}`);
         }
 
-        const readCapacityUnit = this.parsePricingResponse(provReadResponse.body);
-        const writeCapacityUnit = this.parsePricingResponse(provWriteResponse.body);
+        // Provisioned capacity pricing: AWS documents as "$X per RCU-hour".
+        // Callers use: capacityUnits * readCapacityUnit * 730 (hours/month)
+        // So we need the price expressed per RCU-hour.
+        const { price: rawReadCap, unit: readCap_unit } = this.parsePricingResponseWithUnit(provReadResponse.body);
+        const { price: rawWriteCap, unit: writeCap_unit } = this.parsePricingResponseWithUnit(provWriteResponse.body);
+
+        // Guard: if API returns per-month instead of per-hour, convert to per-hour
+        const readCapacityUnit = (readCap_unit.includes('month') && !readCap_unit.includes('hour'))
+            ? rawReadCap / 730
+            : rawReadCap;
+        const writeCapacityUnit = (writeCap_unit.includes('month') && !writeCap_unit.includes('hour'))
+            ? rawWriteCap / 730
+            : rawWriteCap;
 
         if (readCapacityUnit <= 0 || writeCapacityUnit <= 0) {
             const missing: string[] = [];
@@ -1333,13 +1355,14 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
     }
 
     /**
-     * Parse pricing response from AWS Price List API
+     * Parse pricing response from AWS Price List API.
+     * Returns the raw price and the unit string from the first non-zero price dimension.
      */
-    private parsePricingResponse(responseBody: string): number {
+    private parsePricingResponseWithUnit(responseBody: string): { price: number; unit: string } {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
+                return { price: 0, unit: '' };
             }
 
             for (const priceItem of data.PriceList) {
@@ -1350,9 +1373,10 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 for (const termKey of Object.keys(terms)) {
                     const priceDimensions = terms[termKey].priceDimensions;
                     for (const dimKey of Object.keys(priceDimensions)) {
-                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
-                        if (pricePerUnit > 0) {
-                            return pricePerUnit;
+                        const dim = priceDimensions[dimKey];
+                        const price = parseFloat(dim.pricePerUnit?.USD || '0');
+                        if (price > 0) {
+                            return { price, unit: (dim.unit || '').toLowerCase() };
                         }
                     }
                 }
@@ -1360,7 +1384,15 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
         } catch (error) {
             // Parsing failed
         }
-        return 0;
+        return { price: 0, unit: '' };
+    }
+
+    /**
+     * Parse pricing response from AWS Price List API.
+     * Returns only the raw price (wrapper around parsePricingResponseWithUnit).
+     */
+    private parsePricingResponse(responseBody: string): number {
+        return this.parsePricingResponseWithUnit(responseBody).price;
     }
 
     /**
