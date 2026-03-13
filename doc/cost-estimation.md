@@ -65,9 +65,9 @@ If an error occurs, the output includes an `error` field:
 | Cloud SQL Instance | `gcp/cloud-sql-instance` | Cloud Billing Catalog API | Cloud Monitoring |
 | Cloud Storage | `gcp/cloud-storage` | Cloud Billing Catalog API | Cloud Monitoring |
 | Cloud Function | `gcp/cloud-function` | Cloud Billing Catalog API | Cloud Monitoring |
-| BigQuery Dataset | `gcp/big-query` | Cloud Billing Catalog API | BigQuery API |
-| Memorystore Redis | `gcp/memorystore-redis` | Cloud Billing Catalog API | — |
-| Firestore | `gcp/firestore` | Cloud Billing Catalog API | — |
+| BigQuery Dataset | `gcp/big-query` | Cloud Billing Catalog API | Cloud Monitoring + BigQuery API |
+| Memorystore Redis | `gcp/memorystore-redis` | Cloud Billing Catalog API | Cloud Monitoring |
+| Firestore | `gcp/firestore` | Cloud Billing Catalog API | Cloud Monitoring |
 
 ### Azure (5 entities)
 
@@ -75,9 +75,9 @@ If an error occurs, the output includes an `error` field:
 |--------|------|---------------|---------------|
 | Storage Account | `azure-storage-account/storage-account` | Azure Retail Prices API | Azure Monitor |
 | PostgreSQL Flexible Server | `azure-postgresql/flexible-server` | Azure Retail Prices API | Azure Monitor |
-| Cosmos DB Account | `azure-cosmosdb/database-account` | Azure Retail Prices API | Azure Management API |
-| Event Hubs Namespace | `azure-eventhubs/namespace` | Azure Retail Prices API | — |
-| Service Bus Namespace | `azure-servicebus/namespace` | Azure Retail Prices API | — |
+| Cosmos DB Account | `azure-cosmosdb/database-account` | Azure Retail Prices API | Azure Management API + Azure Monitor |
+| Event Hubs Namespace | `azure-eventhubs/namespace` | Azure Retail Prices API | Azure Monitor |
+| Service Bus Namespace | `azure-servicebus/namespace` | Azure Retail Prices API | Azure Monitor |
 
 ### DigitalOcean (3 entities)
 
@@ -164,10 +164,12 @@ Calculates estimated monthly costs by combining data from:
 
 | Component | Calculation | Source |
 |-----------|-------------|--------|
-| Storage | `size_gb × rate_per_gb_month` per class | S3 API + Price List API |
+| Storage | `size_gb × rate_per_gb_month` per class | CloudWatch `BucketSizeBytes` + Price List API |
 | PUT Requests | `(put_requests / 1000) × put_rate` | CloudWatch |
 | GET Requests | `(get_requests / 1000) × get_rate` | CloudWatch |
 | Data Transfer OUT | Tiered pricing ($0.09-$0.05/GB) | CloudWatch |
+
+Storage size in the `costs` action is retrieved via the CloudWatch `BucketSizeBytes` metric (`StorageType=AllStorageTypes`, daily period) rather than paginated `ListObjectsV2` calls. This avoids thousands of API calls for large buckets and returns the same total-storage figure without iterating every object.
 
 ### What's NOT Included
 
@@ -195,9 +197,13 @@ Calculates estimated monthly costs by combining data from:
 |-----------|-------------|--------|
 | Instance | `hourly_rate × 730 × multi_az_multiplier` | Price List API |
 | Storage | `allocated_gb × rate_per_gb_month` | Price List API |
-| IOPS (io1/io2) | `provisioned_iops × iops_rate` | Price List API |
-| Data Transfer | `network_bytes_out_gb × $0.09` | CloudWatch |
-| Backup | `estimated_backup_gb × $0.095` | Estimated |
+| IOPS (io1/io2) | `provisioned_iops × iops_rate × multi_az_multiplier` | Price List API |
+| Data Transfer | `network_bytes_out_gb × data_transfer_rate` | CloudWatch + Price List API |
+| Backup | `backup_gb × backup_rate` | CloudWatch + Price List API |
+
+The Multi-AZ multiplier (2×) is applied to both the instance hourly rate **and** provisioned IOPS cost for io1/io2 storage, reflecting AWS's actual billing for Multi-AZ deployments. The `MultiAZ` flag is read from the live RDS API response using `??` (nullish coalescing) so an explicit `false` from AWS is never overridden by the definition's `multi_az` property.
+
+Backup storage cost is based on CloudWatch's `TotalBackupStorageBilled` metric when available, and the per-GB backup rate is fetched from the AWS Price List API. If the backup metric is unavailable, backup cost is omitted rather than guessed.
 
 ### What's NOT Included
 
@@ -225,9 +231,13 @@ Calculates estimated monthly costs by combining data from:
 |-----------|-------------|--------|
 | Requests | `(invocations / 1M) × request_rate` | CloudWatch |
 | Duration | `gb_seconds × duration_rate` | CloudWatch |
-| Provisioned Concurrency | `provisioned_gb_hours × rate` | Lambda API |
+| Provisioned Concurrency | `provisioned_gb_seconds × rate_per_gb_second` | Lambda API |
 
 Architecture-specific pricing: arm64 is ~20% cheaper than x86_64.
+
+Provisioned concurrency cost uses GB-seconds (`provisioned_concurrency × memory_gb × 730h × 3600`), matching the per-GB-second unit returned by the AWS Price List API for the `AWS-Lambda-Provisioned-Concurrency` group.
+
+The request rate is fetched from the Price List API and normalised to "price per million requests" at fetch time. A unit-aware guard checks whether the API already returns a per-million price (unit string contains `"million"`) to prevent a 1,000,000× overcharge if the pricing unit ever changes.
 
 ### What's NOT Included
 
@@ -412,8 +422,10 @@ ProductFamily: Database Storage, System Operation
 |-----------|-------------|--------|
 | Instance | `hourly_rate × 730` | Price List API |
 | Storage | `volume_gb × $0.10/GB` | CloudWatch |
-| I/O | `(io_requests / 1M) × $0.20` | CloudWatch |
+| I/O | `(io_requests / 1M) × io_rate` | CloudWatch |
 | Backup | `backup_gb × $0.023/GB` | Estimated |
+
+I/O cost is included in the total monthly estimate. The I/O rate is fetched from the Price List API (`productFamily: System Operation`) with a unit-aware guard: if the API returns the price already expressed per-million requests (unit string contains `"million"`), the rate is used as-is; otherwise it is multiplied by 1,000,000. I/O requests are derived from CloudWatch Gremlin and SPARQL request-rate metrics.
 
 ### What's NOT Included
 
@@ -446,9 +458,11 @@ ServiceCode: AmazonApiGateway
 
 | Component | Calculation | Source |
 |-----------|-------------|--------|
-| HTTP API Requests | `(requests / 1M) × $1.00` | CloudWatch |
-| WebSocket Messages | `(messages / 1M) × $1.00` | CloudWatch |
-| WebSocket Connection Minutes | `(minutes / 1M) × $0.25` | Not estimated |
+| HTTP API Requests | `(requests / 1M) × request_rate` | CloudWatch |
+| WebSocket Messages | `(messages / 1M) × request_rate` | CloudWatch |
+| WebSocket Connection Minutes | `(minutes / 1M) × connection_rate` | Not estimated |
+
+Rates are fetched from the Price List API. Each item's unit string is read from its own price dimension (not from the first item in the response) to correctly determine whether the price is already expressed per-million. This prevents a 1,000,000× overcharge when the response mixes product types (e.g. connection-minute SKUs alongside request SKUs).
 
 ### What's NOT Included
 
@@ -572,7 +586,8 @@ Calculates estimated monthly costs by combining data from:
 Calculates estimated monthly costs by combining data from:
 
 1. **BigQuery API** — Dataset metadata, table listing with storage sizes
-2. **Cloud Billing Catalog API** — Storage and query pricing
+2. **Cloud Billing Catalog API** — Storage, query, and streaming insert pricing
+3. **Cloud Monitoring API** — Query bytes scanned and streaming insert bytes
 
 ### Pricing API Service ID: `24E6-581D-38E5`
 
@@ -580,17 +595,17 @@ Calculates estimated monthly costs by combining data from:
 
 | Component | Calculation | Source |
 |-----------|-------------|--------|
-| Active Storage | `size_gb × $0.02/GB/month` | BigQuery API + Billing API |
-| Long-term Storage | `size_gb × $0.01/GB/month` | BigQuery API + Billing API |
-| On-demand Queries | `tb_scanned × $6.25/TB` | Not estimated (usage-based) |
-| Streaming Inserts | `gb × $0.01/GB` | Not estimated (usage-based) |
+| Storage | `billable_size_gb × active_storage_rate` | BigQuery API + Billing API |
+| On-demand Queries | `billable_tb_scanned × query_rate` | Cloud Monitoring + Billing API |
+| Streaming Inserts | `streaming_gb × streaming_insert_rate` | Cloud Monitoring + Billing API |
 
-### Concerns
+### Notes
 
-- **Query costs are not estimated** — BigQuery's primary cost driver is query volume, which varies greatly by workload. The `costs` action only includes storage costs.
-- First 10 GB storage and 1 TB queries/month are free tier.
+- The first 10 GB of storage and 1 TB of queries per month are deducted before calculating billable usage.
+- The implementation fetches both active and long-term storage SKUs, but the current monthly estimate does not split table bytes into active vs long-term storage classes; storage is therefore costed using the active-storage rate.
+- Query and streaming insert costs depend on Cloud Monitoring metrics from the last 30 days; if those metrics are unavailable, those usage-driven components are omitted rather than guessed.
 
-### Accuracy: 95-98% (storage only), N/A (queries not estimated)
+### Accuracy: 90-98% (depending on Cloud Monitoring availability)
 
 ---
 
@@ -602,6 +617,7 @@ Calculates estimated monthly costs by combining data from:
 
 1. **Memorystore API** — Instance configuration (tier, memory, replicas)
 2. **Cloud Billing Catalog API** — Per-GB-per-hour pricing by tier and region
+3. **Cloud Monitoring API** — Network egress usage
 
 ### Pricing API Service ID: `3905-3524-EC04`
 
@@ -611,6 +627,7 @@ Calculates estimated monthly costs by combining data from:
 |-----------|-------------|--------|
 | Primary Instance | `memory_gb × per_gb_hour × 730` | Billing API |
 | Read Replicas | `replicas × memory_gb × per_gb_hour × 730` | Config |
+| Network Egress | `egress_gb × egress_rate` | Cloud Monitoring + Billing API |
 
 Pricing varies by tier:
 - **Basic**: ~$0.034/GB/hour (~$24.82/GB/month)
@@ -618,10 +635,9 @@ Pricing varies by tier:
 
 ### What's NOT Included
 
-- Network egress charges
 - No free tier for Memorystore
 
-### Accuracy: 95-98%
+### Accuracy: 90-98% (depending on Cloud Monitoring availability)
 
 ---
 
@@ -633,26 +649,27 @@ Calculates estimated monthly costs by combining data from:
 
 1. **Firestore API** — Database configuration (type, location, PITR)
 2. **Cloud Billing Catalog API** — Document operations, storage, network pricing
+3. **Cloud Monitoring API** — Reads, writes, deletes, storage size, and network egress
 
 ### Pricing API Service ID: `6F81-5844-456A`
 
 ### Cost Components
 
-| Component | Rate | Source |
+| Component | Calculation | Source |
 |-----------|------|--------|
-| Storage | $0.18/GiB/month | Billing API |
-| Document Reads | $0.06 per 100K | Billing API |
-| Document Writes | $0.18 per 100K | Billing API |
-| Document Deletes | $0.02 per 100K | Billing API |
-| Network Egress | $0.12/GB | Billing API |
+| Storage | `storage_gib × storage_rate` | Cloud Monitoring + Billing API |
+| Document Reads | `(reads / 100K) × read_rate` | Cloud Monitoring + Billing API |
+| Document Writes | `(writes / 100K) × write_rate` | Cloud Monitoring + Billing API |
+| Document Deletes | `(deletes / 100K) × delete_rate` | Cloud Monitoring + Billing API |
+| Network Egress | `egress_gb × egress_rate` | Cloud Monitoring + Billing API |
 
-### Concerns
+### Notes
 
-- **Firestore is purely usage-based** — The `costs` action returns `$0.00` as the base cost since actual costs depend entirely on application usage patterns (reads, writes, deletes).
+- Firestore estimates are based on the last 30 days of Cloud Monitoring usage and include storage, document operations, and network egress when those metrics are available.
 - PITR adds ~30% to storage costs when enabled.
 - Free tier: 1 GiB storage, 50K reads, 20K writes, 20K deletes per day.
 
-### Accuracy: N/A (usage-based, returns pricing rates only)
+### Accuracy: 90-98% (depending on Cloud Monitoring availability)
 
 ---
 
@@ -688,8 +705,8 @@ Calculates estimated monthly costs by combining data from:
 | Component | Calculation | Source |
 |-----------|-------------|--------|
 | Storage | `storage_gb × rate_per_gb` | Azure Monitor + Retail Prices |
-| Operations | `(ops / 10K) × rate` (60% reads, 30% writes, 10% list) | Azure Monitor |
-| Network Egress | Tiered pricing ($0.087-$0.05/GB) | Azure Monitor |
+| Operations | `((reads + writes + list) / 10K) × per-operation rates` | Azure Monitor + Retail Prices API |
+| Network Egress | Tiered pricing | Azure Monitor + Retail Prices API |
 | Data Retrieval | `retrieval_gb × rate` (Cool/Archive only) | Azure Monitor |
 
 ### Accuracy: 90-98% (depending on tier and redundancy)
@@ -729,7 +746,7 @@ Calculates estimated monthly costs by combining data from:
 
 1. **Azure Management API** — Account configuration (kind, regions, consistency)
 2. **Azure Retail Prices API** — RU/s and storage pricing
-3. **Azure Management API** — Throughput settings and region configuration
+3. **Azure Management API + Azure Monitor** — Throughput settings, region configuration, and `DataUsage` storage metrics
 
 ### Retail Prices API Filter
 
@@ -741,17 +758,17 @@ serviceName eq 'Azure Cosmos DB' and armRegionName eq '<region>'
 
 | Component | Calculation | Source |
 |-----------|-------------|--------|
-| Throughput | `(RU/s / 100) × $0.008/hour × 730 × region_count` | Management API + Retail Prices |
-| Multi-region Writes | 1.25× multiplier on throughput | Config |
-| Storage | `data_gb × $0.25/GB/month` | Not estimated (usage-based) |
+| Throughput | `(RU/s / 100) × ru_rate × 730 × region_count` | Management API + Retail Prices API |
+| Multi-region Writes | `throughput_cost × multi_region_write_multiplier` | Retail Prices API |
+| Storage | `data_gb × storage_rate × region_count` | Azure Monitor + Retail Prices API |
 
 ### Concerns
 
-- **Storage cost is not included in the total** — Only throughput (RU/s) cost is calculated. Storage depends on actual data volume.
-- Default RU/s is assumed to be 400 if throughput settings cannot be retrieved.
+- Throughput is discovered from account-, database-, or container-level throughput settings; the implementation fails if it cannot determine RU/s instead of assuming a default.
+- Storage cost is included when Azure Monitor's `DataUsage` metric is available; if that metric is unavailable, storage is omitted rather than guessed.
 - Free tier: 1000 RU/s and 25 GB storage (first account per subscription).
 
-### Accuracy: 85-95% (throughput only, storage not included)
+### Accuracy: 90-98% (depending on Azure Monitor availability)
 
 ---
 
@@ -762,7 +779,8 @@ serviceName eq 'Azure Cosmos DB' and armRegionName eq '<region>'
 Calculates estimated monthly costs by combining data from:
 
 1. **Azure Management API** — Namespace configuration (SKU, capacity)
-2. **Azure Retail Prices API** — Throughput Unit (TU) / Processing Unit (PU) pricing
+2. **Azure Retail Prices API** — Throughput Unit (TU) / Processing Unit (PU) and ingress pricing
+3. **Azure Monitor** — Incoming message counts
 
 ### Retail Prices API Filter
 
@@ -776,20 +794,14 @@ serviceName eq 'Event Hubs' and armRegionName eq '<region>'
 |-----------|-------------|--------|
 | Throughput Units (Basic/Standard) | `capacity × tu_rate/hour × 730` | Retail Prices |
 | Processing Units (Premium) | `capacity × pu_rate/hour × 730` | Retail Prices |
-| Ingress Events | Usage-based (not estimated) | — |
-
-Fallback rates by tier:
-- **Basic**: $0.015/TU/hour
-- **Standard**: $0.03/TU/hour
-- **Premium**: $0.90/PU/hour (ingress included)
+| Ingress Events | `(incoming_messages / 1M) × ingress_rate` | Azure Monitor + Retail Prices API |
 
 ### What's NOT Included
 
-- Ingress event charges (Basic/Standard)
 - Capture feature storage costs
 - Auto-inflate scaling costs
 
-### Accuracy: 95-98% (fixed capacity), 80-90% (with auto-inflate)
+### Accuracy: 90-98% (depending on Azure Monitor availability and auto-inflate behavior)
 
 ---
 
@@ -800,7 +812,8 @@ Fallback rates by tier:
 Calculates estimated monthly costs by combining data from:
 
 1. **Azure Management API** — Namespace configuration (SKU, capacity)
-2. **Azure Retail Prices API** — Messaging unit and operations pricing
+2. **Azure Retail Prices API** — Messaging unit, base, and operations pricing
+3. **Azure Monitor** — `IncomingRequests` operations counts
 
 ### Retail Prices API Filter
 
@@ -812,22 +825,16 @@ serviceName eq 'Service Bus' and armRegionName eq '<region>'
 
 | Component | Calculation | Source |
 |-----------|-------------|--------|
-| Premium Messaging Units | `capacity × base_rate/hour × 730` | Retail Prices |
-| Standard Base | ~$10/month fixed | Retail Prices |
-| Operations (Basic/Standard) | `(ops / 1M) × rate` | Not estimated |
-
-Pricing by tier:
-- **Basic**: $0.05 per million operations (no base charge)
-- **Standard**: ~$10/month base + $0.0135 per million operations
-- **Premium**: $0.928/messaging unit/hour (operations included)
+| Premium Messaging Units | `capacity × messaging_unit_rate × 730` | Retail Prices API |
+| Standard Base | `base_rate/hour × 730` | Retail Prices API |
+| Operations (Basic/Standard) | `(incoming_requests / 1M) × operations_rate` | Azure Monitor + Retail Prices API |
 
 ### What's NOT Included
 
 - Brokered connection charges
 - Hybrid connection pricing
-- Operations costs (Basic/Standard are usage-based)
 
-### Accuracy: 95-98% (Premium), 80-90% (Basic/Standard — operations not estimated)
+### Accuracy: 90-98% (depending on Azure Monitor availability)
 
 ---
 
@@ -947,11 +954,9 @@ Fixed monthly price based on subscription tier. No usage-based charges.
 
 ## Fallback Behavior
 
-All entities implement fallback pricing when API calls fail:
-
-- **AWS**: Hardcoded fallback rates per service
-- **GCP**: Hardcoded fallback rates per service
-- **Azure**: Hardcoded fallback rates per service
+- **AWS**: Pricing API failures surface as errors in `costs` output; rate tables are not silently substituted.
+- **GCP**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Cloud Monitoring data is unavailable instead of being guessed.
+- **Azure**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Azure Monitor data is unavailable or insufficient for an accurate breakdown.
 - **DigitalOcean**: Always uses hardcoded rates (no API available)
 
 ## Usage-Based vs Fixed Cost Entities
@@ -960,17 +965,19 @@ All entities implement fallback pricing when API calls fail:
 |------|----------|-----------------|
 | **Fixed cost** | RDS, Cloud SQL, Neptune, Memorystore Redis, Event Hubs (Premium), Service Bus (Premium), DO Database, DO Registry | Returns calculated monthly cost |
 | **Usage-based** | S3, Lambda, DynamoDB, CloudFront, SQS, SNS, API Gateway, Cloud Function, Cloud Storage, BigQuery, Firestore | Returns cost based on CloudWatch/Monitoring metrics (may be $0 if no metrics) |
-| **Hybrid** | Cosmos DB, Event Hubs (Basic/Standard), Service Bus (Basic/Standard), DO Spaces | Returns fixed component; usage component not estimated |
+| **Hybrid** | Cosmos DB, Event Hubs, Service Bus, DO Spaces | Returns fixed components plus measured usage components when metrics are available |
 
 ## Known Limitations
 
 1. **No discount support** — Reserved instances, savings plans, committed use discounts, and enterprise agreements are not reflected in estimates
-2. **Free tier not deducted** — Estimates show gross costs without subtracting free tier allowances
-3. **Usage-based services may show $0** — If CloudWatch/Monitoring metrics are unavailable or the resource is new
+2. **Free tier handling varies by service** — Most entities show gross cost without free-tier deduction; BigQuery is a notable exception and deducts its storage/query free tier
+3. **Metrics-dependent usage components may be omitted** — If CloudWatch, Cloud Monitoring, or Azure Monitor data is unavailable, usage-driven portions are omitted rather than guessed
 4. **DigitalOcean pricing staleness** — Hardcoded prices may become outdated
 5. **Cross-region data transfer** — Not estimated for most services
-6. **Firestore and BigQuery queries** — Usage-based components cannot be estimated without actual usage data
-7. **Multi-region Cosmos DB** — Storage costs are not included in the total (only throughput)
+6. **Backup cost is still partly approximate for some databases** — Cloud SQL and Azure PostgreSQL derive billable backup size from configuration rather than a provider billing metric
+7. **BigQuery long-term storage is not separated yet** — The implementation fetches the long-term storage rate but currently prices all measured storage at the active-storage rate
+8. **Cosmos DB storage depends on Azure Monitor** — If the `DataUsage` metric is unavailable, storage cost is omitted from the total
+9. **Neptune I/O without CloudWatch metrics** — If Gremlin/SPARQL request-rate metrics are unavailable, I/O cost is omitted from the total and a warning is displayed
 
 ## Future Improvements
 
