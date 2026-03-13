@@ -62,7 +62,11 @@ export class Zone extends HetznerDNSEntity<ZoneDefinition, ZoneState> {
                 return;
             }
         } catch (getError: any) {
-            cli.output(`Zone ${zoneName} doesn't exist, will create new one`);
+            if (getError.message && (getError.message.includes("404") || getError.message.includes("not found"))) {
+                cli.output(`Zone ${zoneName} doesn't exist, will create new one`);
+            } else {
+                throw getError;
+            }
         }
 
         // Create new zone
