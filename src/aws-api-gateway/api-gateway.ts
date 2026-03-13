@@ -618,11 +618,20 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
                 totalRequests = sumMatch ? parseFloat(sumMatch[1]) : 0;
             }
 
-            // For WebSocket APIs, estimate connection minutes from ConnectCount × IntegrationLatency.
-            // **Known platform limitation**: AWS CloudWatch does not expose a direct "connection duration"
-            // or "connection minutes" metric for API Gateway WebSocket APIs. IntegrationLatency measures
-            // backend response time, not total connection lifetime, so this is an approximation.
-            // There is currently no better alternative available through CloudWatch.
+            // For WebSocket APIs, estimate connection minutes from ConnectCount × assumed
+            // average session duration.
+            //
+            // **Known platform limitation**: AWS CloudWatch does not expose a direct
+            // "connection duration" or "connection minutes" metric for API Gateway WebSocket
+            // APIs.  IntegrationLatency (backend response time, typically milliseconds) was
+            // previously used as a proxy, but it measures per-message latency, not session
+            // lifetime — WebSocket connections typically stay open for minutes to hours, so
+            // that approach underestimated connection minutes by several orders of magnitude.
+            //
+            // The current approach uses ConnectCount × AVG_SESSION_MINUTES (10 minutes),
+            // which is a rough but order-of-magnitude-correct estimate for most workloads.
+            // Users with known session durations should treat this as an approximation.
+            const AVG_WEBSOCKET_SESSION_MINUTES = 10;
             const isWebSocket = String(this.state.protocol_type || this.definition.protocol_type).toUpperCase() === 'WEBSOCKET';
             let connectionMinutes: number | undefined;
 
@@ -651,34 +660,8 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
                     if (connectResponse.statusCode === 200) {
                         const connectMatch = connectResponse.body.match(/<Sum>([\d.]+)<\/Sum>/);
                         const connectCount = connectMatch ? parseFloat(connectMatch[1]) : 0;
-
-                        // Also fetch IntegrationLatency to estimate average connection duration
-                        const latencyParams = [
-                            'Action=GetMetricStatistics',
-                            'Version=2010-08-01',
-                            'Namespace=AWS%2FApiGateway',
-                            'MetricName=IntegrationLatency',
-                            `StartTime=${encodeURIComponent(startTime)}`,
-                            `EndTime=${encodeURIComponent(endTime)}`,
-                            'Period=2592000',
-                            'Statistics.member.1=Average',
-                            'Dimensions.member.1.Name=ApiId',
-                            `Dimensions.member.1.Value=${encodeURIComponent(this.state.api_id)}`
-                        ];
-
-                        const latencyUrl = `https://monitoring.${this.region}.amazonaws.com/?${latencyParams.join('&')}`;
-                        const latencyResponse = aws.get(latencyUrl, {
-                            service: 'monitoring',
-                            region: this.region
-                        });
-
-                        if (latencyResponse.statusCode === 200) {
-                            const avgMatch = latencyResponse.body.match(/<Average>([\d.]+)<\/Average>/);
-                            const avgLatencyMs = avgMatch ? parseFloat(avgMatch[1]) : 0;
-                            // Convert: connectCount * avgLatencyMs / 60000 = connection minutes
-                            if (connectCount > 0 && avgLatencyMs > 0) {
-                                connectionMinutes = (connectCount * avgLatencyMs) / 60000;
-                            }
+                        if (connectCount > 0) {
+                            connectionMinutes = connectCount * AVG_WEBSOCKET_SESSION_MINUTES;
                         }
                     }
                 } catch {
@@ -742,7 +725,7 @@ export class APIGateway extends AWSAPIGatewayEntity<APIGatewayDefinition, APIGat
             if (!isHttp && pricing.connectionMinutePerMillion > 0 && metrics.connectionMinutes !== undefined && metrics.connectionMinutes > 0) {
                 const connectionCost = (metrics.connectionMinutes / 1000000) * pricing.connectionMinutePerMillion;
                 totalMonthlyCost += connectionCost;
-                cli.output(`   Connection Minutes: ${metrics.connectionMinutes.toLocaleString()} × $${pricing.connectionMinutePerMillion.toFixed(2)}/M = $${connectionCost.toFixed(4)}`);
+                cli.output(`   Connection Minutes: ${metrics.connectionMinutes.toLocaleString()} (estimated: ConnectCount × 10 min avg session) × $${pricing.connectionMinutePerMillion.toFixed(2)}/M = $${connectionCost.toFixed(4)}`);
             } else if (!isHttp) {
                 cli.output(`   Connection Minutes: Not measured from CloudWatch`);
             }

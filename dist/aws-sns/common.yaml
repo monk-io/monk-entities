@@ -3,5 +3,5 @@ namespace: aws-sns
 common:
   defines: module
   metadata:
-    version-hash: 077107ca8f80
+    version-hash: 91dd11d9bb0e
   source: <<< common.js

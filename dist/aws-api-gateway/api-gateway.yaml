@@ -22,7 +22,7 @@ api-gateway:
       - `aws-lambda/function` - Backend integrations for API routes
       - `aws-cognito/user-pool` - JWT authorizers for authentication
       - `aws-iam/role` - IAM authorization for API access
-    version-hash: 607b2a762fac
+    version-hash: a62ed87bb5aa
   schema:
     region:
       type: string

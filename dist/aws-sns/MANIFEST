@@ -1,5 +1,5 @@
 REPO aws-sns
-VERSION_HASH 077107ca8f80
+VERSION_HASH 91dd11d9bb0e
 namespace: aws-sns
 topic:
   defines: entity
