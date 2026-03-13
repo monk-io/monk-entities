@@ -3,5 +3,5 @@ VERSION_HASH 8b63de20f0b6
 DESCRIPTION AWS identity and access management (users, roles, policies).
 HOSTING managed
 TAGS aws,iam,identity,policy,role,user
-LOAD iam-policy.yaml base.yaml iam-base.yaml common.yaml iam-role.yaml iam-user.yaml
-RESOURCES common.js iam-user-sync.js iam-policy-sync.js iam-role-sync.js iam-base.js base.js
+LOAD iam-policy.yaml iam-role.yaml iam-user.yaml iam-base.yaml base.yaml common.yaml
+RESOURCES iam-user-sync.js base.js iam-policy-sync.js iam-base.js common.js iam-role-sync.js

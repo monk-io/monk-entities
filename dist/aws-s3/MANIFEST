@@ -3,5 +3,5 @@ VERSION_HASH 3bd4cf1a41ec
 DESCRIPTION Object storage on AWS.
 HOSTING managed
 TAGS aws,storage,s3,object-storage
-LOAD s3-bucket.yaml base.yaml s3-base.yaml common.yaml
-RESOURCES common.js s3-bucket-sync.js base.js s3-base.js
+LOAD s3-bucket.yaml s3-base.yaml base.yaml common.yaml
+RESOURCES base.js s3-bucket-sync.js s3-base.js common.js
