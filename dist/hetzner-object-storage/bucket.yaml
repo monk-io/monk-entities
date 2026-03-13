@@ -1,0 +1,135 @@
+namespace: hetzner-object-storage
+bucket:
+  defines: entity
+  metadata:
+    name: Bucket
+    description: |-
+      Hetzner Object Storage Bucket entity.
+      Creates and manages S3-compatible buckets on Hetzner Object Storage.
+
+      ## Secrets
+      - Reads: `hetzner-s3-access-key`, `hetzner-s3-secret-key` - S3 credentials
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.bucket_name` - Bucket name
+      - `state.region` - Hetzner region
+      - `state.endpoint` - S3-compatible endpoint URL
+
+      ## Composing with Other Entities
+      Works with `hetzner-object-storage/credentials` to create S3 access credentials.
+    version-hash: 7f4b7b6b4d01
+  schema:
+    region:
+      type: string
+      description: 'Hetzner Object Storage region, e.g. fsn1, nbg1, hel1'
+    access_key_secret_ref:
+      type: string
+      description: Secret name for access key (defaults to hetzner-s3-access-key)
+    secret_key_secret_ref:
+      type: string
+      description: Secret name for secret key (defaults to hetzner-s3-secret-key)
+    bucket_name:
+      type: string
+      description: Bucket name
+    versioning:
+      type: boolean
+      description: 'Enable or disable bucket versioning (default: false)'
+    cors_configuration:
+      type: object
+      properties:
+        cors_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              allowed_headers:
+                type: array
+                items:
+                  type: string
+              allowed_methods:
+                type: array
+                items:
+                  type: string
+              allowed_origins:
+                type: array
+                items:
+                  type: string
+              max_age_seconds:
+                type: number
+            required:
+              - allowed_methods
+              - allowed_origins
+            additionalProperties: false
+      required:
+        - cors_rules
+      additionalProperties: false
+      description: CORS configuration for the bucket
+    lifecycle_configuration:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              status:
+                type: string
+                enum:
+                  - Enabled
+                  - Disabled
+              filter:
+                type: object
+                properties:
+                  prefix:
+                    type: string
+                additionalProperties: false
+              expiration:
+                type: object
+                properties:
+                  days:
+                    type: number
+                additionalProperties: false
+            required:
+              - id
+              - status
+            additionalProperties: false
+      required:
+        - rules
+      additionalProperties: false
+      description: Lifecycle rules (S3-compatible)
+    required:
+      - region
+      - bucket_name
+  state-schema:
+    existing:
+      type: boolean
+    endpoint:
+      type: string
+      description: S3-compatible endpoint
+    bucket_name:
+      type: string
+      description: Bucket name
+    region:
+      type: string
+      description: Hetzner region
+  lifecycle:
+    sync: <<< bucket-sync.js
+    get-bucket-info: ''
+    list-objects: ''
+    generate-presigned-url: ''
+    empty-bucket: ''
+    get-bucket-statistics: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - hetzner-object-storage/s3-base
+    - cli
+    - monkec/base

@@ -1,0 +1,7 @@
+REPO hetzner-dns
+VERSION_HASH dc199f935fcc
+DESCRIPTION Managed DNS via Hetzner DNS.
+HOSTING managed
+TAGS hetzner,dns,domains
+LOAD zone.yaml common.yaml
+RESOURCES common.js zone-sync.js

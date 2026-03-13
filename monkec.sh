@@ -43,9 +43,21 @@ if [ "$1" = "test" ]; then
 else
   # For compile command and others
   # you can go inside the container with ./.monkec.sh sh
+  # Mount local builtins and lib/modules to pick up new type declarations (e.g. hetzner.d.ts)
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  BUILTINS_DIR="$SCRIPT_DIR/src/lib/builtins"
+  MODULES_DIR="$SCRIPT_DIR/src/lib/modules"
+  EXTRA_MOUNTS=""
+  if [ -d "$BUILTINS_DIR" ]; then
+    EXTRA_MOUNTS="$EXTRA_MOUNTS -v $BUILTINS_DIR:/monkec/lib/builtins"
+  fi
+  if [ -d "$MODULES_DIR" ]; then
+    EXTRA_MOUNTS="$EXTRA_MOUNTS -v $MODULES_DIR:/monkec/lib/src"
+  fi
   exec podman run --pull newer -ti --rm \
     -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
     -v "$OUTPUT_DIR_ABS:/monkec/output/" \
+    $EXTRA_MOUNTS \
     -e INPUT_DIR="/monkec/input/$BASENAME" \
     -e OUTPUT_DIR="/monkec/output/" \
     -w "/monkec" \
