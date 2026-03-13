@@ -904,9 +904,11 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (storageResponse.statusCode !== 200) {
       throw new Error(`AWS Pricing API error for DynamoDB storage: ${storageResponse.statusCode} ${storageResponse.body}`);
     }
-    const onDemandReadUnit = this.parsePricingResponse(readResponse.body);
-    const onDemandWriteUnit = this.parsePricingResponse(writeResponse.body);
+    const { price: rawOnDemandRead, unit: onDemandReadUnit_unit } = this.parsePricingResponseWithUnit(readResponse.body);
+    const { price: rawOnDemandWrite, unit: onDemandWriteUnit_unit } = this.parsePricingResponseWithUnit(writeResponse.body);
     const storagePerGBMonth = this.parsePricingResponse(storageResponse.body);
+    const onDemandReadUnit = onDemandReadUnit_unit.includes("million") ? rawOnDemandRead / 1e6 : rawOnDemandRead;
+    const onDemandWriteUnit = onDemandWriteUnit_unit.includes("million") ? rawOnDemandWrite / 1e6 : rawOnDemandWrite;
     if (onDemandReadUnit <= 0 || onDemandWriteUnit <= 0 || storagePerGBMonth <= 0) {
       const missing = [];
       if (onDemandReadUnit <= 0) missing.push("on-demand read");
@@ -956,8 +958,10 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     if (provWriteResponse.statusCode !== 200) {
       throw new Error(`AWS Pricing API error for DynamoDB provisioned write capacity: ${provWriteResponse.statusCode} ${provWriteResponse.body}`);
     }
-    const readCapacityUnit = this.parsePricingResponse(provReadResponse.body);
-    const writeCapacityUnit = this.parsePricingResponse(provWriteResponse.body);
+    const { price: rawReadCap, unit: readCap_unit } = this.parsePricingResponseWithUnit(provReadResponse.body);
+    const { price: rawWriteCap, unit: writeCap_unit } = this.parsePricingResponseWithUnit(provWriteResponse.body);
+    const readCapacityUnit = readCap_unit.includes("month") && !readCap_unit.includes("hour") ? rawReadCap / 730 : rawReadCap;
+    const writeCapacityUnit = writeCap_unit.includes("month") && !writeCap_unit.includes("hour") ? rawWriteCap / 730 : rawWriteCap;
     if (readCapacityUnit <= 0 || writeCapacityUnit <= 0) {
       const missing = [];
       if (readCapacityUnit <= 0) missing.push("provisioned read capacity");
@@ -973,13 +977,14 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
     };
   }
   /**
-   * Parse pricing response from AWS Price List API
+   * Parse pricing response from AWS Price List API.
+   * Returns the raw price and the unit string from the first non-zero price dimension.
    */
-  parsePricingResponse(responseBody) {
+  parsePricingResponseWithUnit(responseBody) {
     try {
       const data = JSON.parse(responseBody);
       if (!data.PriceList || data.PriceList.length === 0) {
-        return 0;
+        return { price: 0, unit: "" };
       }
       for (const priceItem of data.PriceList) {
         const product = typeof priceItem === "string" ? JSON.parse(priceItem) : priceItem;
@@ -988,16 +993,24 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
         for (const termKey of Object.keys(terms)) {
           const priceDimensions = terms[termKey].priceDimensions;
           for (const dimKey of Object.keys(priceDimensions)) {
-            const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || "0");
-            if (pricePerUnit > 0) {
-              return pricePerUnit;
+            const dim = priceDimensions[dimKey];
+            const price = parseFloat(dim.pricePerUnit?.USD || "0");
+            if (price > 0) {
+              return { price, unit: (dim.unit || "").toLowerCase() };
             }
           }
         }
       }
     } catch (error) {
     }
-    return 0;
+    return { price: 0, unit: "" };
+  }
+  /**
+   * Parse pricing response from AWS Price List API.
+   * Returns only the raw price (wrapper around parsePricingResponseWithUnit).
+   */
+  parsePricingResponse(responseBody) {
+    return this.parsePricingResponseWithUnit(responseBody).price;
   }
   /**
    * Get CloudWatch metrics for DynamoDB table
