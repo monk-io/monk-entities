@@ -339,44 +339,23 @@ ${JSON.stringify(statistics, null, 2)}`);
       throw new Error("Bucket not created yet");
     }
     try {
-      const storageByClass = {};
-      let totalObjects = 0;
-      let totalSize = 0;
-      let continuationToken;
-      do {
-        let listUrl = this.getBucketUrl(this.getBucketName(), "?list-type=2&max-keys=1000");
-        if (continuationToken) {
-          listUrl += `&continuation-token=${encodeURIComponent(continuationToken)}`;
-        }
-        const listResponse = this.listBucketObjects(listUrl);
-        const objectsWithClass = this.parseObjectsWithStorageClass(listResponse.body);
-        for (const obj of objectsWithClass) {
-          const storageClass = obj.storageClass || "STANDARD";
-          if (!storageByClass[storageClass]) {
-            storageByClass[storageClass] = { bytes: 0, objects: 0 };
-          }
-          storageByClass[storageClass].bytes += obj.size;
-          storageByClass[storageClass].objects += 1;
-          totalObjects += 1;
-          totalSize += obj.size;
-        }
-        const nextTokenMatch = listResponse.body.match(/<NextContinuationToken>(.*?)<\/NextContinuationToken>/);
-        continuationToken = nextTokenMatch ? nextTokenMatch[1] : void 0;
-      } while (continuationToken);
+      const bucketSizeByClass = this.getCloudWatchBucketSizeBytes();
+      const totalObjects = this.getCloudWatchObjectCount();
       const pricing = this.getS3PricingRates();
       const costBreakdown = {};
       let totalStorageCost = 0;
-      for (const [storageClass, data] of Object.entries(storageByClass)) {
-        const sizeGB = data.bytes / (1024 * 1024 * 1024);
-        const rate = pricing.storage[storageClass] || pricing.storage["STANDARD"];
+      let totalSize = 0;
+      for (const [storageClass, bytes] of Object.entries(bucketSizeByClass)) {
+        const sizeGB = bytes / (1024 * 1024 * 1024);
+        const rate = pricing.storage[storageClass] ?? pricing.storage["STANDARD"] ?? 0;
         const cost = sizeGB * rate;
         costBreakdown[storageClass] = {
           size_gb: Math.round(sizeGB * 1e3) / 1e3,
-          objects: data.objects,
           storage_cost: Math.round(cost * 100) / 100,
           rate_per_gb: rate
         };
         totalStorageCost += cost;
+        totalSize += bytes;
       }
       const requestMetrics = this.getCloudWatchRequestMetrics();
       const dataTransferMetrics = this.getCloudWatchDataTransferMetrics();
@@ -407,9 +386,10 @@ ${JSON.stringify(statistics, null, 2)}`);
         bucket_name: this.state.bucket_name,
         region: this.region,
         summary: {
-          total_objects: totalObjects,
+          total_objects: totalObjects ?? "unavailable",
           total_size_bytes: totalSize,
           total_size_gb: Math.round(totalSize / (1024 * 1024 * 1024) * 1e3) / 1e3,
+          storage_source: "CloudWatch BucketSizeBytes (daily metric, per storage class)",
           estimated_monthly_cost_usd: Math.round(totalEstimatedCost * 100) / 100
         },
         storage_costs: {
@@ -617,25 +597,6 @@ ${JSON.stringify(costEstimate, null, 2)}`);
       }
     });
   }
-  parseObjectsWithStorageClass(xmlResponse) {
-    const objects = [];
-    const contentMatches = xmlResponse.match(/<Contents>[\s\S]*?<\/Contents>/g);
-    if (contentMatches) {
-      for (const match of contentMatches) {
-        const keyMatch = match.match(/<Key>(.*?)<\/Key>/);
-        const sizeMatch = match.match(/<Size>(.*?)<\/Size>/);
-        const storageClassMatch = match.match(/<StorageClass>(.*?)<\/StorageClass>/);
-        if (keyMatch && sizeMatch) {
-          objects.push({
-            key: keyMatch[1],
-            size: parseInt(sizeMatch[1], 10),
-            storageClass: storageClassMatch ? storageClassMatch[1] : "STANDARD"
-          });
-        }
-      }
-    }
-    return objects;
-  }
   /**
    * Get S3 pricing rates for the current region.
    * Fetches real-time pricing from AWS Price List API.
@@ -663,7 +624,6 @@ ${JSON.stringify(costEstimate, null, 2)}`);
     const regionToLocation = this.getRegionToLocationMap();
     const location = regionToLocation[this.region];
     if (!location) {
-      cli.output(`Warning: Unknown region ${this.region} for pricing lookup, using fallback`);
       return null;
     }
     const storageFilters = [
@@ -1064,6 +1024,50 @@ ${JSON.stringify(costEstimate, null, 2)}`);
       }
     }
     return result;
+  }
+  /**
+   * Fetch total object count from CloudWatch NumberOfObjects metric.
+   *
+   * NumberOfObjects uses the same BucketName + StorageType=AllStorageTypes dimensions
+   * as BucketSizeBytes and is a daily metric. Returns null if the metric is
+   * unavailable (e.g. new bucket or CloudWatch storage metrics not yet populated).
+   */
+  getCloudWatchObjectCount() {
+    try {
+      const bucketName = this.getBucketName();
+      const url = `https://monitoring.${this.region}.amazonaws.com/`;
+      const endTime = /* @__PURE__ */ new Date();
+      const startTime = /* @__PURE__ */ new Date();
+      startTime.setDate(startTime.getDate() - 2);
+      const queryParams = [
+        "Action=GetMetricStatistics",
+        "Version=2010-08-01",
+        "Namespace=AWS%2FS3",
+        "MetricName=NumberOfObjects",
+        `StartTime=${encodeURIComponent(startTime.toISOString())}`,
+        `EndTime=${encodeURIComponent(endTime.toISOString())}`,
+        "Period=86400",
+        "Statistics.member.1=Average",
+        "Dimensions.member.1.Name=BucketName",
+        `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
+        "Dimensions.member.2.Name=StorageType",
+        "Dimensions.member.2.Value=AllStorageTypes"
+      ];
+      const response = aws.get(`${url}?${queryParams.join("&")}`, {
+        service: "monitoring",
+        region: this.region
+      });
+      if (response.statusCode !== 200) return null;
+      const averages = [];
+      const avgRegex = /<Average>([\d.]+)<\/Average>/g;
+      let match;
+      while ((match = avgRegex.exec(response.body)) !== null) {
+        averages.push(parseFloat(match[1]));
+      }
+      return averages.length > 0 ? Math.round(Math.max(...averages)) : null;
+    } catch (_error) {
+      return null;
+    }
   }
   getCloudWatchDataTransferMetrics() {
     try {
