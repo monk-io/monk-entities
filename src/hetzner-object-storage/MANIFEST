@@ -1,0 +1,4 @@
+REPO hetzner-object-storage
+DESCRIPTION S3-compatible object storage via Hetzner.
+HOSTING managed
+TAGS hetzner,storage,object-storage,s3

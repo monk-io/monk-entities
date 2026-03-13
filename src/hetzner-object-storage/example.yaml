@@ -1,0 +1,42 @@
+namespace: hetzner-storage-example
+
+# -----------------------------------------------------------------------------
+# Hetzner Object Storage Credentials
+# Creates S3-compatible credentials via Hetzner API and stores them
+# into Monk secrets for bucket operations.
+# Requires Hetzner provider to be configured with API token.
+# -----------------------------------------------------------------------------
+s3-credentials:
+  defines: hetzner-object-storage/credentials
+  description: monk-storage-keys
+  permitted-secrets:
+    hetzner-s3-access-key: true
+    hetzner-s3-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+# -----------------------------------------------------------------------------
+# Hetzner Object Storage Bucket
+# Creates an S3-compatible bucket using the credentials above.
+# -----------------------------------------------------------------------------
+bucket:
+  defines: hetzner-object-storage/bucket
+  region: fsn1
+  bucket_name: my-test-bucket
+  versioning: false
+  permitted-secrets:
+    hetzner-s3-access-key: true
+    hetzner-s3-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+# Usage:
+# 1) Configure Hetzner provider with your API token
+# 2) Load:    monk load dist/hetzner-object-storage/MANIFEST
+# 3) Create credentials: monk run hetzner-storage-example/s3-credentials
+# 4) Create bucket:      monk run hetzner-storage-example/bucket
+# 5) List objects:        monk do hetzner-storage-example/bucket/listObjects
+# 6) Delete:             monk delete hetzner-storage-example/bucket
+#                        monk delete hetzner-storage-example/s3-credentials
