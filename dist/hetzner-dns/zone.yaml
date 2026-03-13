@@ -1,0 +1,61 @@
+namespace: hetzner-dns
+zone:
+  defines: entity
+  metadata:
+    name: Zone
+    description: |-
+      Hetzner DNS Zone entity.
+      Creates and manages DNS zones in Hetzner DNS.
+      Zones are top-level DNS containers for managing DNS records.
+
+      ## Secrets
+      - Reads: none (authenticated via Hetzner provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Zone ID (used for record management)
+      - `state.name` - Domain name (e.g., example.com)
+      - `state.ttl` - Default TTL for DNS records
+    version-hash: dc199f935fcc
+  schema:
+    name:
+      type: string
+      description: 'Domain name (e.g., example.com)'
+    ttl:
+      type: number
+      description: 'TTL for DNS records in seconds (default: 86400)'
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+      description: Zone ID
+    name:
+      type: string
+      description: Domain name
+    ttl:
+      type: number
+      description: Zone TTL
+    status:
+      type: string
+      description: Zone status
+  lifecycle:
+    sync: <<< zone-sync.js
+    info: ''
+    records: ''
+    add-a-record: ''
+    add-cname-record: ''
+    add-record: ''
+    list-all-zones: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - hetzner-dns/common
+    - monkec/base
+    - monkec/base
+    - cli

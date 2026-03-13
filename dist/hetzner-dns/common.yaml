@@ -1,0 +1,7 @@
+namespace: hetzner-dns
+
+common:
+  defines: module
+  metadata:
+    version-hash: dc199f935fcc
+  source: <<< common.js
