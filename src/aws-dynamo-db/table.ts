@@ -1202,6 +1202,9 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 MaxResults: 10
             })
         });
+        if (readResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API error for DynamoDB on-demand read: ${readResponse.statusCode} ${readResponse.body}`);
+        }
 
         // Fetch on-demand write pricing
         const writeFilters = [
@@ -1223,6 +1226,9 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 MaxResults: 10
             })
         });
+        if (writeResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API error for DynamoDB on-demand write: ${writeResponse.statusCode} ${writeResponse.body}`);
+        }
 
         // Fetch storage pricing
         const storageFilters = [
@@ -1244,6 +1250,9 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 MaxResults: 10
             })
         });
+        if (storageResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API error for DynamoDB storage: ${storageResponse.statusCode} ${storageResponse.body}`);
+        }
 
         const onDemandReadUnit = this.parsePricingResponse(readResponse.body);
         const onDemandWriteUnit = this.parsePricingResponse(writeResponse.body);
@@ -1277,6 +1286,9 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 MaxResults: 10
             })
         });
+        if (provReadResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API error for DynamoDB provisioned read capacity: ${provReadResponse.statusCode} ${provReadResponse.body}`);
+        }
 
         const provWriteFilters = [
             { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonDynamoDB' },
@@ -1297,6 +1309,9 @@ export class DynamoDBTable extends AWSDynamoDBEntity<DynamoDBTableDefinition, Dy
                 MaxResults: 10
             })
         });
+        if (provWriteResponse.statusCode !== 200) {
+            throw new Error(`AWS Pricing API error for DynamoDB provisioned write capacity: ${provWriteResponse.statusCode} ${provWriteResponse.body}`);
+        }
 
         const readCapacityUnit = this.parsePricingResponse(provReadResponse.body);
         const writeCapacityUnit = this.parsePricingResponse(provWriteResponse.body);

@@ -21,7 +21,7 @@ dynamo-db-table:
       Works with:
       - `aws-iam/role` - Grant table access to Lambda functions or other services
       - `aws-lambda/function` - Read/write data from serverless functions
-    version-hash: 949cadcff61f
+    version-hash: a2334a20a0d0
   schema:
     region:
       type: string
