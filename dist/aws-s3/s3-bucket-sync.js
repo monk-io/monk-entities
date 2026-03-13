@@ -601,7 +601,8 @@ ${JSON.stringify(costEstimate, null, 2)}`);
    * Get S3 pricing rates for the current region.
    * Fetches real-time pricing from AWS Price List API.
    * 
-   * Prices are in USD per GB per month for storage, and per 1000 requests.
+   * Prices are in USD per GB per month for storage, and per 1,000 requests
+   * (normalized from whatever bulk unit the AWS Price List API returns).
    * 
    * @throws Error if pricing cannot be fetched from AWS API
    */
@@ -753,6 +754,13 @@ ${JSON.stringify(costEstimate, null, 2)}`);
   }
   /**
    * Parse request pricing from AWS Price List API response.
+   * 
+   * Returns prices normalized to USD per 1,000 requests, matching the unit assumed
+   * by callers: `(requestCount / 1000) * price`.
+   * 
+   * The unit field from the pricing dimension is inspected to determine the bulk
+   * quantity the API used, and a corrective multiplier is applied so the returned
+   * value is always "per 1,000 requests" regardless of what the API returns.
    */
   parseRequestPricingResponse(responseBody) {
     let putPrice = null;
@@ -787,10 +795,21 @@ ${JSON.stringify(costEstimate, null, 2)}`);
             const dimension = priceDimensions[dimKey];
             const pricePerUnit = dimension.pricePerUnit;
             if (pricePerUnit && pricePerUnit.USD) {
-              const price = parseFloat(pricePerUnit.USD);
-              if (price > 0) {
-                if (isPut && putPrice === null) putPrice = price;
-                if (isGet && getPrice === null) getPrice = price;
+              const rawPrice = parseFloat(pricePerUnit.USD);
+              if (rawPrice > 0) {
+                const unit = (dimension.unit || "").toLowerCase();
+                let per1000Price;
+                if (unit.includes("million") || unit.includes("1,000,000") || unit.includes("1000000")) {
+                  per1000Price = rawPrice / 1e3;
+                } else if (unit.includes("10,000") || unit.includes("10000")) {
+                  per1000Price = rawPrice / 10;
+                } else if (unit.includes("1,000") || unit.includes("1000") || unit.includes("requests")) {
+                  per1000Price = rawPrice;
+                } else {
+                  per1000Price = rawPrice * 1e3;
+                }
+                if (isPut && putPrice === null) putPrice = per1000Price;
+                if (isGet && getPrice === null) getPrice = per1000Price;
               }
             }
           }
