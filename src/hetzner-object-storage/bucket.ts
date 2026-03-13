@@ -184,7 +184,7 @@ export class Bucket extends HetznerS3Entity<HetznerBucketDefinition, HetznerBuck
         const method = args?.method as string || 'GET';
         const expires = parseInt(args?.expires as string || '3600', 10);
         if (!objectKey) throw new Error('object_key parameter is required');
-        const url = this.getBucketUrl(bucketName, objectKey);
+        const url = this.getBucketUrl(bucketName, encodeURIComponent(objectKey));
         try {
             const presigned = this.generatePresignedUrlForObject(url, method, expires);
             cli.output(`Presigned URL for ${method} ${objectKey}:`);
