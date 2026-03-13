@@ -1,0 +1,32 @@
+namespace: hetzner-dns-example
+
+# -----------------------------------------------------------------------------
+# Hetzner DNS Zone Management
+# Creates and manages DNS zones using Hetzner DNS API. Requires Hetzner
+# provider to be configured with API token.
+# See docs: https://dns.hetzner.com/api-docs
+# -----------------------------------------------------------------------------
+
+# Create a zone for a domain
+zone:
+  defines: hetzner-dns/zone
+  name: example.com
+  ttl: 3600
+  services:
+    data:
+      protocol: custom
+
+# Usage:
+# 1) Configure Hetzner provider with your API token
+# 2) Load the module:
+#    monk load dist/hetzner-dns/MANIFEST
+# 3) Create zone:
+#    monk run hetzner-dns-example/zone
+# 4) Add records:
+#    monk do hetzner-dns-example/zone/add-a-record --name=www --ip=1.2.3.4
+#    monk do hetzner-dns-example/zone/add-cname-record --name=blog --target=www.example.com
+#    monk do hetzner-dns-example/zone/add-record --type=MX --name=@ --value="10 mail.example.com"
+# 5) List records:
+#    monk do hetzner-dns-example/zone/records
+# 6) Delete zone:
+#    monk delete hetzner-dns-example/zone

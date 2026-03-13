@@ -1,0 +1,4 @@
+REPO hetzner-dns
+DESCRIPTION Managed DNS via Hetzner DNS.
+HOSTING managed
+TAGS hetzner,dns,domains
