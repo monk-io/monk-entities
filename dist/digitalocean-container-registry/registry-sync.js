@@ -58,8 +58,8 @@ const validateRegistryRegion = common.validateRegistryRegion;
 const validateSubscriptionTier = common.validateSubscriptionTier;
 const validateGarbageCollectionType = common.validateGarbageCollectionType;
 const cli = require("cli");
-var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
-var _Registry = class _Registry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
+var _listRegistries_dec, _deleteRegistry_dec, _createRegistry_dec, _getStorageUsage_dec, _runGarbageCollection_dec, _costs_dec, _getCostEstimate_dec, _listRepositories_dec, _getRegistry_dec, _a, _init;
+var _Registry = class _Registry extends (_a = DOProviderEntity, _getRegistry_dec = [action()], _listRepositories_dec = [action()], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _runGarbageCollection_dec = [action()], _getStorageUsage_dec = [action()], _createRegistry_dec = [action()], _deleteRegistry_dec = [action()], _listRegistries_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -260,6 +260,110 @@ Server: ${this.state.server_url}`);
       return void 0;
     } catch (error) {
       return void 0;
+    }
+  }
+  // =========================================================================
+  // Cost Estimation
+  // =========================================================================
+  /**
+   * DigitalOcean Container Registry has fixed, tier-based pricing.
+   *
+   * **No pricing API exists** for DigitalOcean Container Registry.
+   * The DigitalOcean API (`GET /v2/registry/subscription`) returns the current
+   * subscription tier but does not include pricing information. Prices are
+   * therefore hard-coded from the official pricing page:
+   * @see https://www.digitalocean.com/pricing/container-registry (last verified 2026-03-11)
+   *
+   * DigitalOcean allows only one registry per account.
+   *
+   * - Starter: Free (500 MB storage, 1 repo) - only via web
+   * - Basic: $5/month (5 GB storage, unlimited repos)
+   * - Professional: $20/month (unlimited storage, unlimited repos)
+   */
+  getRegistryPricing(tier) {
+    const tierLower = tier.toLowerCase();
+    switch (tierLower) {
+      case "starter":
+        return { monthlyPrice: 0, includedStorageGb: 0.5, source: "DigitalOcean Container Registry (Starter)" };
+      case "basic":
+        return { monthlyPrice: 5, includedStorageGb: 5, source: "DigitalOcean Container Registry (Basic)" };
+      case "professional":
+        return { monthlyPrice: 20, includedStorageGb: -1, source: "DigitalOcean Container Registry (Professional)" };
+      // -1 = unlimited
+      default:
+        return { monthlyPrice: 5, includedStorageGb: 5, source: "DigitalOcean Container Registry (Basic - default)" };
+    }
+  }
+  getCostEstimate(_args) {
+    const registryName = this.definition.name;
+    cli.output(`
+\u{1F4B0} Cost Estimate for DO Container Registry: ${registryName}`);
+    cli.output(`${"=".repeat(60)}`);
+    const tier = this.definition.subscription_tier;
+    const region = this.definition.region;
+    cli.output(`
+\u{1F4CA} Registry Configuration:`);
+    cli.output(`   Name: ${registryName}`);
+    cli.output(`   Region: ${region}`);
+    cli.output(`   Subscription Tier: ${tier}`);
+    const pricing = this.getRegistryPricing(tier);
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Monthly Price: $${pricing.monthlyPrice.toFixed(2)}`);
+    cli.output(`   Included Storage: ${pricing.includedStorageGb === -1 ? "Unlimited" : `${pricing.includedStorageGb} GB`}`);
+    try {
+      const existingRegistry = this.findExistingRegistry();
+      if (existingRegistry) {
+        const usageBytes = existingRegistry.storage_usage_bytes || 0;
+        const usageGb = usageBytes / (1024 * 1024 * 1024);
+        cli.output(`
+\u{1F4C8} Current Usage:`);
+        cli.output(`   Storage: ${usageGb.toFixed(4)} GB (${usageBytes.toLocaleString()} bytes)`);
+        if (existingRegistry.storage_quota_bytes) {
+          const quotaGb = existingRegistry.storage_quota_bytes / (1024 * 1024 * 1024);
+          cli.output(`   Quota: ${quotaGb.toFixed(2)} GB`);
+        }
+      }
+    } catch {
+    }
+    const totalMonthlyCost = pricing.monthlyPrice;
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - DigitalOcean allows only one registry per account`);
+    cli.output(`   - Basic: 5 GB storage, unlimited repositories`);
+    cli.output(`   - Professional: Unlimited storage, unlimited repositories`);
+    cli.output(`   - Pricing is fixed per tier, no usage-based charges`);
+  }
+  costs() {
+    try {
+      const tier = this.definition.subscription_tier;
+      const pricing = this.getRegistryPricing(tier);
+      const result = {
+        type: "digitalocean-container-registry",
+        costs: {
+          month: {
+            amount: pricing.monthlyPrice.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "digitalocean-container-registry",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
     }
   }
   runGarbageCollection(args) {
@@ -494,6 +598,8 @@ Server: ${this.state.server_url}`);
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getRegistry", _getRegistry_dec, _Registry);
 __decorateElement(_init, 1, "listRepositories", _listRepositories_dec, _Registry);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _Registry);
+__decorateElement(_init, 1, "costs", _costs_dec, _Registry);
 __decorateElement(_init, 1, "runGarbageCollection", _runGarbageCollection_dec, _Registry);
 __decorateElement(_init, 1, "getStorageUsage", _getStorageUsage_dec, _Registry);
 __decorateElement(_init, 1, "createRegistry", _createRegistry_dec, _Registry);

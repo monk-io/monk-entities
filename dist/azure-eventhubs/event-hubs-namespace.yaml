@@ -20,7 +20,7 @@ event-hubs-namespace:
       Works with:
       - `azure-eventhubs/eventhub` - Create event hubs within the namespace
       - `azure-eventhubs/consumer-group` - Create consumer groups for event hubs
-    version-hash: 682d0839a1d0
+    version-hash: c20df3d0196d
   schema:
     subscription_id:
       type: string
@@ -147,6 +147,8 @@ event-hubs-namespace:
     sync: <<< event-hubs-namespace-sync.js
     get-info: ''
     list-eventhubs: ''
+    get-cost-estimate: ''
+    costs: ''
     regenerate-key: ''
   checks:
     readiness:
@@ -157,4 +159,5 @@ event-hubs-namespace:
     - azure-eventhubs/azure-eventhubs-base
     - cli
     - secret
+    - http
     - monkec/base

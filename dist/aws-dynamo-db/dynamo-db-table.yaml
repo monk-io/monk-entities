@@ -21,7 +21,7 @@ dynamo-db-table:
       Works with:
       - `aws-iam/role` - Grant table access to Lambda functions or other services
       - `aws-lambda/function` - Read/write data from serverless functions
-    version-hash: d44530ab04d8
+    version-hash: 949cadcff61f
   schema:
     region:
       type: string
@@ -269,6 +269,8 @@ dynamo-db-table:
     delete-snapshot: ''
     restore: ''
     get-restore-status: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 10
@@ -279,4 +281,5 @@ dynamo-db-table:
   requires:
     - aws-dynamo-db/dynamo-db-base
     - cli
+    - cloud/aws
     - aws-dynamo-db/common

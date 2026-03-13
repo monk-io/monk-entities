@@ -56,14 +56,15 @@ const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
 const secret = require("secret");
+const aws = require("cloud/aws");
 const common = require("aws-rds/common");
 const validateDBInstanceIdentifier = common.validateDBInstanceIdentifier;
 const validateStorageSize = common.validateStorageSize;
 const buildCreateInstanceParams = common.buildCreateInstanceParams;
 const buildModifyInstanceParams = common.buildModifyInstanceParams;
 const formatInstanceState = common.formatInstanceState;
-var _getConnectionInfo_dec, _getRestoreStatus_dec, _restoreFromSnapshot_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
-var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action("get-instance-info")], _updatePassword_dec = [action("update-password")], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _restoreFromSnapshot_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _getConnectionInfo_dec = [action("get-connection-info")], _a) {
+var _getConnectionInfo_dec, _costs_dec, _getCostEstimate_dec, _getRestoreStatus_dec, _restoreFromSnapshot_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _updatePassword_dec, _getInstanceInfo_dec, _a, _init;
+var _RDSInstance = class _RDSInstance extends (_a = AWSRDSEntity, _getInstanceInfo_dec = [action("get-instance-info")], _updatePassword_dec = [action("update-password")], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _restoreFromSnapshot_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _getConnectionInfo_dec = [action("get-connection-info")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -849,6 +850,512 @@ The instance_id is the target_id used in the restore operation.`);
         return "\u{1F504}";
     }
   }
+  getCostEstimate(_args) {
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    if (!this.state.db_instance_identifier) {
+      throw new Error("RDS instance not created yet");
+    }
+    try {
+      const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+      if (!response || !response.DBInstance) {
+        throw new Error(`RDS instance ${dbInstanceIdentifier} not found`);
+      }
+      const dbInstance = response.DBInstance;
+      const instanceClass = dbInstance.DBInstanceClass || this.definition.db_instance_class;
+      const engine = dbInstance.Engine || this.definition.engine;
+      const allocatedStorage = dbInstance.AllocatedStorage || this.definition.allocated_storage;
+      const storageType = dbInstance.StorageType || this.definition.storage_type || "gp2";
+      const multiAZ = dbInstance.MultiAZ ?? this.definition.multi_az ?? false;
+      const pricing = this.getRDSPricingRates(instanceClass, engine, storageType);
+      const metrics = this.getCloudWatchRDSMetrics(dbInstanceIdentifier);
+      let instanceCostPerHour = pricing.instanceHourly;
+      if (multiAZ) {
+        instanceCostPerHour *= 2;
+      }
+      const instanceCostMonthly = instanceCostPerHour * 730;
+      const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      let iopsCostMonthly = 0;
+      if (storageType === "io1" || storageType === "io2") {
+        const provisionedIOPS = dbInstance.Iops || 1e3;
+        iopsCostMonthly = provisionedIOPS * pricing.iopsPerMonth;
+        if (multiAZ) {
+          iopsCostMonthly *= 2;
+        }
+      }
+      let dataTransferCostMonthly = 0;
+      let dataTransferRate = 0;
+      if (metrics && metrics.networkBytesOut > 0) {
+        const dataTransferGB = metrics.networkBytesOut / (1024 * 1024 * 1024);
+        dataTransferRate = this.fetchDataTransferOutRate();
+        dataTransferCostMonthly = dataTransferGB * dataTransferRate;
+      }
+      let backupCostMonthly = 0;
+      let backupRate = 0;
+      let estimatedBackupGB = 0;
+      const backupRetention = dbInstance.BackupRetentionPeriod || this.definition.backup_retention_period || 0;
+      if (backupRetention > 0) {
+        backupRate = this.fetchBackupStorageRate();
+        if (metrics && metrics.totalBackupStorageBilled > 0) {
+          estimatedBackupGB = metrics.totalBackupStorageBilled / (1024 * 1024 * 1024);
+        }
+        backupCostMonthly = estimatedBackupGB * backupRate;
+      }
+      const totalEstimatedCost = instanceCostMonthly + storageCostMonthly + iopsCostMonthly + dataTransferCostMonthly + backupCostMonthly;
+      const costEstimate = {
+        db_instance_identifier: dbInstanceIdentifier,
+        region: this.region,
+        summary: {
+          instance_class: instanceClass,
+          engine,
+          allocated_storage_gb: allocatedStorage,
+          storage_type: storageType,
+          multi_az: multiAZ,
+          estimated_monthly_cost_usd: Math.round(totalEstimatedCost * 100) / 100
+        },
+        instance_costs: {
+          hourly_rate: Math.round(instanceCostPerHour * 1e4) / 1e4,
+          monthly_cost_usd: Math.round(instanceCostMonthly * 100) / 100,
+          multi_az_multiplier: multiAZ ? 2 : 1,
+          note: multiAZ ? "Multi-AZ deployment doubles instance cost" : "Single-AZ deployment"
+        },
+        storage_costs: {
+          allocated_gb: allocatedStorage,
+          storage_type: storageType,
+          rate_per_gb_month: pricing.storagePerGBMonth,
+          monthly_cost_usd: Math.round(storageCostMonthly * 100) / 100
+        },
+        iops_costs: {
+          provisioned_iops: storageType === "io1" || storageType === "io2" ? dbInstance.Iops || 1e3 : 0,
+          rate_per_iops_month: pricing.iopsPerMonth,
+          monthly_cost_usd: Math.round(iopsCostMonthly * 100) / 100,
+          note: storageType === "gp2" || storageType === "gp3" ? "IOPS included with gp2/gp3 storage" : "Provisioned IOPS"
+        },
+        data_transfer_costs: {
+          source: metrics ? "CloudWatch (last 30 days)" : "Not available",
+          bytes_out: metrics ? metrics.networkBytesOut : 0,
+          gb_out: metrics ? Math.round(metrics.networkBytesOut / (1024 * 1024 * 1024) * 1e3) / 1e3 : 0,
+          monthly_cost_usd: Math.round(dataTransferCostMonthly * 100) / 100,
+          pricing_note: "Data OUT pricing fetched from AWS Price List API. Data IN: Free."
+        },
+        backup_costs: {
+          retention_days: backupRetention,
+          estimated_backup_gb: Math.round(estimatedBackupGB * 100) / 100,
+          rate_per_gb_month: backupRate,
+          monthly_cost_usd: Math.round(backupCostMonthly * 100) / 100,
+          note: backupRetention > 0 ? estimatedBackupGB > 0 ? "Backup storage from CloudWatch TotalBackupStorageBilled metric - rate from AWS Price List API" : "Backup retention enabled but CloudWatch TotalBackupStorageBilled metric unavailable - backup cost not estimated" : "Automated backups disabled"
+        },
+        cloudwatch_metrics: metrics ? {
+          source: "CloudWatch (last 30 days)",
+          cpu_utilization_avg: Math.round(metrics.cpuUtilization * 100) / 100,
+          database_connections_avg: Math.round(metrics.databaseConnections),
+          read_iops_avg: Math.round(metrics.readIOPS),
+          write_iops_avg: Math.round(metrics.writeIOPS),
+          network_bytes_in: metrics.networkBytesIn,
+          network_bytes_out: metrics.networkBytesOut
+        } : {
+          source: "Not available",
+          note: "CloudWatch metrics not available or instance is new"
+        },
+        pricing_rates: {
+          source: pricing.source,
+          region: this.region,
+          currency: "USD",
+          instance_hourly: pricing.instanceHourly,
+          storage_per_gb_month: pricing.storagePerGBMonth,
+          iops_per_month: pricing.iopsPerMonth
+        },
+        disclaimer: "Pricing from AWS Price List API. Metrics from CloudWatch. Actual costs may vary based on reserved instances, savings plans, and additional features."
+      };
+      cli.output(`RDS Cost Estimate:
+${JSON.stringify(costEstimate, null, 2)}`);
+    } catch (error) {
+      throw new Error(`Failed to get cost estimate: ${error.message}`);
+    }
+  }
+  costs() {
+    const dbInstanceIdentifier = this.getDBInstanceIdentifier();
+    if (!this.state.db_instance_identifier) {
+      const result = {
+        type: "aws-rds-instance",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+      return;
+    }
+    try {
+      const response = this.checkDBInstanceExists(dbInstanceIdentifier);
+      if (!response || !response.DBInstance) {
+        const result2 = {
+          type: "aws-rds-instance",
+          costs: {
+            month: {
+              amount: "0",
+              currency: "USD"
+            }
+          }
+        };
+        cli.output(JSON.stringify(result2));
+        return;
+      }
+      const dbInstance = response.DBInstance;
+      const instanceClass = dbInstance.DBInstanceClass || this.definition.db_instance_class;
+      const engine = dbInstance.Engine || this.definition.engine;
+      const allocatedStorage = dbInstance.AllocatedStorage || this.definition.allocated_storage;
+      const storageType = dbInstance.StorageType || this.definition.storage_type || "gp2";
+      const multiAZ = dbInstance.MultiAZ ?? this.definition.multi_az ?? false;
+      const pricing = this.getRDSPricingRates(instanceClass, engine, storageType);
+      let instanceCostPerHour = pricing.instanceHourly;
+      if (multiAZ) {
+        instanceCostPerHour *= 2;
+      }
+      const instanceCostMonthly = instanceCostPerHour * 730;
+      const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      let iopsCostMonthly = 0;
+      if (storageType === "io1" || storageType === "io2") {
+        const provisionedIOPS = dbInstance.Iops || 1e3;
+        iopsCostMonthly = provisionedIOPS * pricing.iopsPerMonth;
+        if (multiAZ) {
+          iopsCostMonthly *= 2;
+        }
+      }
+      const metrics = this.getCloudWatchRDSMetrics(dbInstanceIdentifier);
+      let dataTransferCostMonthly = 0;
+      if (metrics && metrics.networkBytesOut > 0) {
+        const dataTransferGB = metrics.networkBytesOut / (1024 * 1024 * 1024);
+        const dataTransferRate = this.fetchDataTransferOutRate();
+        dataTransferCostMonthly = dataTransferGB * dataTransferRate;
+      }
+      let backupCostMonthly = 0;
+      const backupRetention = dbInstance.BackupRetentionPeriod || this.definition.backup_retention_period || 0;
+      if (backupRetention > 0) {
+        const backupRate = this.fetchBackupStorageRate();
+        let estimatedBackupGB = 0;
+        if (metrics && metrics.totalBackupStorageBilled > 0) {
+          estimatedBackupGB = metrics.totalBackupStorageBilled / (1024 * 1024 * 1024);
+        }
+        backupCostMonthly = estimatedBackupGB * backupRate;
+      }
+      const totalMonthlyCost = instanceCostMonthly + storageCostMonthly + iopsCostMonthly + dataTransferCostMonthly + backupCostMonthly;
+      const result = {
+        type: "aws-rds-instance",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "aws-rds-instance",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
+  /**
+   * Get RDS pricing rates from AWS Price List API
+   */
+  getRDSPricingRates(instanceClass, engine, storageType) {
+    const apiPricing = this.fetchRDSPricingFromAPI(instanceClass, engine, storageType);
+    if (!apiPricing) {
+      throw new Error("Failed to fetch pricing from AWS Price List API. Ensure you have pricing:GetProducts permission.");
+    }
+    return { ...apiPricing, source: "AWS Price List API" };
+  }
+  /**
+   * Fetch RDS pricing from AWS Price List API
+   */
+  fetchRDSPricingFromAPI(instanceClass, engine, storageType) {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const location = this.getRegionToLocationMap()[this.region];
+    if (!location) {
+      throw new Error(`Unsupported region for RDS pricing: ${this.region}`);
+    }
+    const databaseEngine = this.getEngineToPricingName(engine);
+    const instanceFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonRDS" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "instanceType", Value: instanceClass },
+      { Type: "TERM_MATCH", Field: "databaseEngine", Value: databaseEngine },
+      { Type: "TERM_MATCH", Field: "deploymentOption", Value: "Single-AZ" }
+    ];
+    const instanceRequestBody = {
+      ServiceCode: "AmazonRDS",
+      Filters: instanceFilters,
+      MaxResults: 10
+    };
+    const instanceResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify(instanceRequestBody)
+    });
+    if (instanceResponse.statusCode !== 200) {
+      cli.output(`AWS Pricing API returned status ${instanceResponse.statusCode} for instance pricing`);
+      return null;
+    }
+    const instanceHourly = this.parseFirstNonZeroPrice(instanceResponse.body);
+    if (instanceHourly === 0) {
+      cli.output(`No pricing found for instance class ${instanceClass} with engine ${databaseEngine} in ${location}`);
+      return null;
+    }
+    const storageFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonRDS" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "productFamily", Value: "Database Storage" },
+      { Type: "TERM_MATCH", Field: "volumeType", Value: this.getStorageTypePricingName(storageType) }
+    ];
+    const storageRequestBody = {
+      ServiceCode: "AmazonRDS",
+      Filters: storageFilters,
+      MaxResults: 10
+    };
+    const storageResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify(storageRequestBody)
+    });
+    if (storageResponse.statusCode !== 200) {
+      cli.output(`AWS Pricing API returned status ${storageResponse.statusCode} for storage pricing`);
+      return null;
+    }
+    const storagePerGBMonth = this.parseFirstNonZeroPrice(storageResponse.body);
+    if (storagePerGBMonth === 0) {
+      cli.output(`No pricing found for storage type ${storageType} in ${location}`);
+      return null;
+    }
+    let iopsPerMonth = 0;
+    if (storageType === "io1" || storageType === "io2") {
+      const iopsFilters = [
+        { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonRDS" },
+        { Type: "TERM_MATCH", Field: "location", Value: location },
+        { Type: "TERM_MATCH", Field: "productFamily", Value: "Provisioned IOPS" },
+        { Type: "TERM_MATCH", Field: "deploymentOption", Value: "Single-AZ" }
+      ];
+      const iopsRequestBody = {
+        ServiceCode: "AmazonRDS",
+        Filters: iopsFilters,
+        MaxResults: 10
+      };
+      const iopsResponse = aws.post(url, {
+        service: "pricing",
+        region: pricingRegion,
+        headers: {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "AWSPriceListService.GetProducts"
+        },
+        body: JSON.stringify(iopsRequestBody)
+      });
+      if (iopsResponse.statusCode === 200) {
+        iopsPerMonth = this.parseFirstNonZeroPrice(iopsResponse.body);
+      }
+      if (iopsPerMonth === 0) {
+        cli.output(`No IOPS pricing found for ${storageType} in ${location}`);
+        return null;
+      }
+    }
+    return {
+      instanceHourly,
+      storagePerGBMonth,
+      iopsPerMonth
+    };
+  }
+  /**
+   * Parse RDS IOPS pricing from API response
+   */
+  /**
+   * Parse the first non-zero USD price from an AWS Price List API response.
+   * Used for RDS instance, storage, and IOPS pricing — all of which return a
+   * single price dimension per filtered product.
+   */
+  parseFirstNonZeroPrice(responseBody) {
+    try {
+      const data = JSON.parse(responseBody);
+      if (!data.PriceList || data.PriceList.length === 0) {
+        return 0;
+      }
+      for (const priceItem of data.PriceList) {
+        const product = typeof priceItem === "string" ? JSON.parse(priceItem) : priceItem;
+        const terms = product.terms;
+        if (!terms || !terms.OnDemand) continue;
+        for (const termKey of Object.keys(terms.OnDemand)) {
+          const term = terms.OnDemand[termKey];
+          const priceDimensions = term.priceDimensions;
+          if (!priceDimensions) continue;
+          for (const dimKey of Object.keys(priceDimensions)) {
+            const dimension = priceDimensions[dimKey];
+            const pricePerUnit = dimension.pricePerUnit;
+            if (pricePerUnit && pricePerUnit.USD) {
+              const price = parseFloat(pricePerUnit.USD);
+              if (price > 0) {
+                return price;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      cli.output(`Warning: Failed to parse RDS pricing: ${error.message}`);
+    }
+    return 0;
+  }
+  /**
+   * Get CloudWatch metrics for RDS instance
+   */
+  getCloudWatchRDSMetrics(dbInstanceIdentifier) {
+    try {
+      const endTime = /* @__PURE__ */ new Date();
+      const startTime = /* @__PURE__ */ new Date();
+      startTime.setDate(startTime.getDate() - 30);
+      const startTimeISO = startTime.toISOString();
+      const endTimeISO = endTime.toISOString();
+      const url = `https://monitoring.${this.region}.amazonaws.com/`;
+      const cpuUtilization = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "CPUUtilization", startTimeISO, endTimeISO, "Average") || 0;
+      const databaseConnections = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "DatabaseConnections", startTimeISO, endTimeISO, "Average") || 0;
+      const readIOPS = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "ReadIOPS", startTimeISO, endTimeISO, "Average") || 0;
+      const writeIOPS = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "WriteIOPS", startTimeISO, endTimeISO, "Average") || 0;
+      const periodSeconds = 2592e3;
+      const networkBytesInAvg = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "NetworkReceiveThroughput", startTimeISO, endTimeISO, "Average") || 0;
+      const networkBytesIn = networkBytesInAvg * periodSeconds;
+      const networkBytesOutAvg = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "NetworkTransmitThroughput", startTimeISO, endTimeISO, "Average") || 0;
+      const networkBytesOut = networkBytesOutAvg * periodSeconds;
+      const totalBackupStorageBilled = this.getCloudWatchRDSMetric(url, dbInstanceIdentifier, "TotalBackupStorageBilled", startTimeISO, endTimeISO, "Average") || 0;
+      return {
+        cpuUtilization,
+        databaseConnections,
+        readIOPS,
+        writeIOPS,
+        networkBytesIn,
+        networkBytesOut,
+        totalBackupStorageBilled
+      };
+    } catch (error) {
+      cli.output(`Note: CloudWatch metrics unavailable: ${error.message}`);
+      return null;
+    }
+  }
+  /**
+   * Fetch a single CloudWatch metric for RDS
+   */
+  getCloudWatchRDSMetric(url, dbInstanceIdentifier, metricName, startTime, endTime, statistic) {
+    try {
+      const queryParams = [
+        "Action=GetMetricStatistics",
+        "Version=2010-08-01",
+        "Namespace=AWS%2FRDS",
+        `MetricName=${encodeURIComponent(metricName)}`,
+        `StartTime=${encodeURIComponent(startTime)}`,
+        `EndTime=${encodeURIComponent(endTime)}`,
+        "Period=2592000",
+        // 30 days in seconds
+        `Statistics.member.1=${statistic}`,
+        "Dimensions.member.1.Name=DBInstanceIdentifier",
+        `Dimensions.member.1.Value=${encodeURIComponent(dbInstanceIdentifier)}`
+      ];
+      const requestUrl = `${url}?${queryParams.join("&")}`;
+      const response = aws.get(requestUrl, {
+        service: "monitoring",
+        region: this.region
+      });
+      if (response.statusCode !== 200) {
+        return null;
+      }
+      const statMatch = statistic === "Sum" ? response.body.match(/<Sum>([\d.]+)<\/Sum>/) : response.body.match(/<Average>([\d.]+)<\/Average>/);
+      if (statMatch) {
+        return parseFloat(statMatch[1]);
+      }
+      return 0;
+    } catch (_error) {
+      return null;
+    }
+  }
+  /**
+   * Map AWS region codes to location names for Pricing API
+   */
+  getRegionToLocationMap() {
+    return {
+      "us-east-1": "US East (N. Virginia)",
+      "us-east-2": "US East (Ohio)",
+      "us-west-1": "US West (N. California)",
+      "us-west-2": "US West (Oregon)",
+      "af-south-1": "Africa (Cape Town)",
+      "ap-east-1": "Asia Pacific (Hong Kong)",
+      "ap-south-1": "Asia Pacific (Mumbai)",
+      "ap-south-2": "Asia Pacific (Hyderabad)",
+      "ap-southeast-1": "Asia Pacific (Singapore)",
+      "ap-southeast-2": "Asia Pacific (Sydney)",
+      "ap-southeast-3": "Asia Pacific (Jakarta)",
+      "ap-southeast-4": "Asia Pacific (Melbourne)",
+      "ap-northeast-1": "Asia Pacific (Tokyo)",
+      "ap-northeast-2": "Asia Pacific (Seoul)",
+      "ap-northeast-3": "Asia Pacific (Osaka)",
+      "ca-central-1": "Canada (Central)",
+      "eu-central-1": "EU (Frankfurt)",
+      "eu-central-2": "EU (Zurich)",
+      "eu-west-1": "EU (Ireland)",
+      "eu-west-2": "EU (London)",
+      "eu-west-3": "EU (Paris)",
+      "eu-south-1": "EU (Milan)",
+      "eu-south-2": "EU (Spain)",
+      "eu-north-1": "EU (Stockholm)",
+      "il-central-1": "Israel (Tel Aviv)",
+      "me-south-1": "Middle East (Bahrain)",
+      "me-central-1": "Middle East (UAE)",
+      "sa-east-1": "South America (Sao Paulo)"
+    };
+  }
+  /**
+   * Map engine name to Pricing API database engine name
+   */
+  getEngineToPricingName(engine) {
+    const engineMap = {
+      "mysql": "MySQL",
+      "postgres": "PostgreSQL",
+      "mariadb": "MariaDB",
+      "oracle-ee": "Oracle",
+      "oracle-se2": "Oracle",
+      "sqlserver-ex": "SQL Server",
+      "sqlserver-web": "SQL Server",
+      "sqlserver-se": "SQL Server",
+      "sqlserver-ee": "SQL Server"
+    };
+    return engineMap[engine.toLowerCase()] || "MySQL";
+  }
+  /**
+   * Map storage type to Pricing API volume type name
+   */
+  getStorageTypePricingName(storageType) {
+    const storageMap = {
+      "gp2": "General Purpose",
+      "gp3": "General Purpose",
+      "io1": "Provisioned IOPS",
+      "io2": "Provisioned IOPS",
+      "standard": "Magnetic",
+      "magnetic": "Magnetic"
+    };
+    return storageMap[storageType] || "General Purpose";
+  }
   getConnectionInfo(_args) {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
@@ -884,6 +1391,80 @@ The instance_id is the target_id used in the restore operation.`);
       throw new Error(errorMsg);
     }
   }
+  /**
+   * Fetch data transfer out rate from AWS Price List API.
+   */
+  fetchDataTransferOutRate() {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const location = this.getRegionToLocationMap()[this.region];
+    if (!location) {
+      throw new Error(`Unknown region ${this.region} for data transfer pricing lookup`);
+    }
+    const filters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AWSDataTransfer" },
+      { Type: "TERM_MATCH", Field: "fromLocation", Value: location },
+      { Type: "TERM_MATCH", Field: "transferType", Value: "AWS Outbound" }
+    ];
+    const response = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AWSDataTransfer",
+        Filters: filters,
+        MaxResults: 10
+      })
+    });
+    if (response.statusCode !== 200) {
+      throw new Error(`AWS Pricing API returned status ${response.statusCode} for data transfer pricing`);
+    }
+    const rate = this.parseFirstNonZeroPrice(response.body);
+    if (rate <= 0) {
+      throw new Error("Could not parse data transfer pricing from AWS Price List API response");
+    }
+    return rate;
+  }
+  /**
+   * Fetch RDS backup storage rate from AWS Price List API.
+   */
+  fetchBackupStorageRate() {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const location = this.getRegionToLocationMap()[this.region];
+    if (!location) {
+      throw new Error(`Unsupported region for RDS backup pricing: ${this.region}`);
+    }
+    const filters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonRDS" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "productFamily", Value: "Storage Snapshot" }
+    ];
+    const response = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonRDS",
+        Filters: filters,
+        MaxResults: 10
+      })
+    });
+    if (response.statusCode !== 200) {
+      throw new Error(`AWS Pricing API returned status ${response.statusCode} for RDS backup storage pricing`);
+    }
+    const rate = this.parseFirstNonZeroPrice(response.body);
+    if (rate <= 0) {
+      throw new Error("Could not parse RDS backup storage pricing from AWS Price List API response");
+    }
+    return rate;
+  }
   updateStateFromAWS() {
     const dbInstanceIdentifier = this.getDBInstanceIdentifier();
     try {
@@ -908,6 +1489,8 @@ __decorateElement(_init, 1, "describeSnapshot", _describeSnapshot_dec, _RDSInsta
 __decorateElement(_init, 1, "deleteSnapshot", _deleteSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "restoreFromSnapshot", _restoreFromSnapshot_dec, _RDSInstance);
 __decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _RDSInstance);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _RDSInstance);
+__decorateElement(_init, 1, "costs", _costs_dec, _RDSInstance);
 __decorateElement(_init, 1, "getConnectionInfo", _getConnectionInfo_dec, _RDSInstance);
 __decoratorMetadata(_init, _RDSInstance);
 __name(_RDSInstance, "RDSInstance");

@@ -19,7 +19,7 @@ access-list:
       ## Composing with Other Entities
       Works with:
       - `azure-cosmosdb/database-account` - The account to configure access for
-    version-hash: da28c99abf2b
+    version-hash: 50ab373ca587
   schema:
     subscription_id:
       type: string

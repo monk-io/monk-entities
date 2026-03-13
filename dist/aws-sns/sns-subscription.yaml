@@ -23,7 +23,7 @@ sns-subscription:
       - `aws-sns/topic` - The topic to subscribe to
       - `aws-sqs/queue` - Use queue ARN as endpoint for SQS subscriptions
       - `aws-lambda/function` - Use function ARN for Lambda subscriptions
-    version-hash: 19c30697f8af
+    version-hash: 077107ca8f80
   schema:
     region:
       type: string

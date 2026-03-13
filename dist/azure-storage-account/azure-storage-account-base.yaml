@@ -4,5 +4,5 @@ azure-storage-account-base:
   defines: module
   metadata:
     version: 1.0.0
-    version-hash: dc3e61f9cf70
+    version-hash: 01fdfce27efa
   source: <<< azure-storage-account-base.js

@@ -3,5 +3,5 @@ namespace: aws-neptune
 neptune-base:
   defines: module
   metadata:
-    version-hash: c1f3bf4cd8f7
+    version-hash: cc63d75a37cf
   source: <<< neptune-base.js

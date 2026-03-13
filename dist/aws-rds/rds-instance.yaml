@@ -83,7 +83,7 @@ rds-instance:
       If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
 
       ---
-    version-hash: e3e917ffb0c7
+    version-hash: 1446d06e7cbf
   schema:
     region:
       type: string
@@ -240,6 +240,8 @@ rds-instance:
     delete-snapshot: ''
     restore: ''
     get-restore-status: ''
+    get-cost-estimate: ''
+    costs: ''
     get-connection-info: ''
   checks:
     readiness:
@@ -253,4 +255,5 @@ rds-instance:
     - monkec/base
     - cli
     - secret
+    - cloud/aws
     - aws-rds/common

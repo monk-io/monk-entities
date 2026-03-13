@@ -59,8 +59,8 @@ const http = require("http");
 const blobs = require("blobs");
 const common = require("gcp/common");
 const CLOUD_FUNCTIONS_API_URL = common.CLOUD_FUNCTIONS_API_URL;
-var _invokeFunction_dec, _testIamPermissions_dec, _setIamPolicy_dec, _getIamPolicy_dec, _getInfo_dec, _a, _init;
-var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec = [action("get")], _getIamPolicy_dec = [action("get-iam-policy")], _setIamPolicy_dec = [action("set-iam-policy")], _testIamPermissions_dec = [action("test-iam-permissions")], _invokeFunction_dec = [action("invoke")], _a) {
+var _costs_dec, _getCostEstimate_dec, _invokeFunction_dec, _testIamPermissions_dec, _setIamPolicy_dec, _getIamPolicy_dec, _getInfo_dec, _a, _init;
+var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec = [action("get")], _getIamPolicy_dec = [action("get-iam-policy")], _setIamPolicy_dec = [action("set-iam-policy")], _testIamPermissions_dec = [action("test-iam-permissions")], _invokeFunction_dec = [action("invoke")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -390,6 +390,305 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
     cli.output(`Status: ${response.statusCode}`);
     cli.output(`Response: ${response.body}`);
   }
+  // ==================== COST ESTIMATION ====================
+  /**
+   * Parse memory string to MB (e.g., "256Mi" -> 256, "1Gi" -> 1024)
+   */
+  parseMemoryMb(memStr) {
+    if (memStr.endsWith("Gi")) {
+      return parseFloat(memStr.replace("Gi", "")) * 1024;
+    }
+    if (memStr.endsWith("Mi")) {
+      return parseFloat(memStr.replace("Mi", ""));
+    }
+    return 256;
+  }
+  /**
+   * Get Cloud Function pricing from GCP Cloud Billing Catalog API
+   */
+  fetchCloudFunctionPricing() {
+    try {
+      const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
+      const serviceId = "29E7-DA93-CA13";
+      const skusUrl = `${billingApiUrl}/services/${serviceId}/skus?currencyCode=USD`;
+      const response = this.get(skusUrl);
+      if (response.skus && Array.isArray(response.skus)) {
+        let invocationRate = 0;
+        let cpuRate = 0;
+        let memoryRate = 0;
+        let idleCpuRate = 0;
+        let idleMemoryRate = 0;
+        let networkRate = 0;
+        const location = this.definition.location || "us-central1";
+        for (const sku of response.skus) {
+          const desc = (sku.description || "").toLowerCase();
+          const serviceRegions = sku.serviceRegions || [];
+          if (!serviceRegions.includes(location) && !serviceRegions.includes("global")) {
+            continue;
+          }
+          const price = this.extractPriceFromSku(sku);
+          if (price <= 0) continue;
+          if (desc.includes("invocation")) {
+            invocationRate = price;
+          } else if (desc.includes("idle") && desc.includes("cpu")) {
+            idleCpuRate = price;
+          } else if (desc.includes("idle") && desc.includes("memory")) {
+            idleMemoryRate = price;
+          } else if (desc.includes("cpu") && desc.includes("time")) {
+            cpuRate = price;
+          } else if (desc.includes("memory") && desc.includes("time")) {
+            memoryRate = price;
+          } else if (desc.includes("network") && desc.includes("egress")) {
+            networkRate = price;
+          }
+        }
+        if (invocationRate > 0 || cpuRate > 0) {
+          if (invocationRate <= 0 || cpuRate <= 0 || memoryRate <= 0) {
+            const missing = [];
+            if (invocationRate <= 0) missing.push("invocation");
+            if (cpuRate <= 0) missing.push("cpu");
+            if (memoryRate <= 0) missing.push("memory");
+            throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(", ")}`);
+          }
+          return {
+            invocationPer1M: invocationRate * 1e6,
+            cpuGhzSecond: cpuRate,
+            memoryGbSecond: memoryRate,
+            idleCpuGhzSecond: idleCpuRate,
+            idleMemoryGbSecond: idleMemoryRate,
+            networkEgressPerGb: networkRate > 0 ? networkRate : 0,
+            source: "GCP Cloud Billing Catalog API"
+          };
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch Cloud Functions pricing from GCP API: ${error.message}`);
+    }
+    throw new Error("Could not retrieve Cloud Functions pricing from GCP Cloud Billing Catalog API");
+  }
+  /**
+   * Extract price from a GCP Billing SKU
+   */
+  extractPriceFromSku(sku) {
+    try {
+      const pricingInfo = sku.pricingInfo;
+      if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+        return 0;
+      }
+      const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+      if (!tieredRates || !Array.isArray(tieredRates)) {
+        return 0;
+      }
+      for (const rate of tieredRates) {
+        const unitPrice = rate.unitPrice;
+        if (unitPrice) {
+          const units = parseInt(unitPrice.units || "0", 10);
+          const nanos = unitPrice.nanos || 0;
+          const price = units + nanos / 1e9;
+          if (price > 0) {
+            return price;
+          }
+        }
+      }
+    } catch (_error) {
+    }
+    return 0;
+  }
+  /**
+   * Get Cloud Monitoring metrics for the function (last 30 days)
+   */
+  getCloudFunctionMetrics() {
+    try {
+      const endTime = (/* @__PURE__ */ new Date()).toISOString();
+      const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString();
+      const functionName = this.definition.name;
+      const countFilter = encodeURIComponent(
+        `metric.type="cloudfunctions.googleapis.com/function/execution_count" AND resource.labels.function_name="${functionName}"`
+      );
+      const countUrl = `https://monitoring.googleapis.com/v3/projects/${this.projectId}/timeSeries?filter=${countFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
+      let executionCount = 0;
+      try {
+        const countResponse = this.get(countUrl);
+        if (countResponse.timeSeries && countResponse.timeSeries.length > 0) {
+          for (const ts of countResponse.timeSeries) {
+            for (const point of ts.points || []) {
+              executionCount += parseInt(point.value?.int64Value || point.value?.doubleValue || "0", 10);
+            }
+          }
+        }
+      } catch (_e) {
+      }
+      const timeFilter = encodeURIComponent(
+        `metric.type="cloudfunctions.googleapis.com/function/execution_times" AND resource.labels.function_name="${functionName}"`
+      );
+      const timeUrl = `https://monitoring.googleapis.com/v3/projects/${this.projectId}/timeSeries?filter=${timeFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
+      let executionTimeMs = 0;
+      try {
+        const timeResponse = this.get(timeUrl);
+        if (timeResponse.timeSeries && timeResponse.timeSeries.length > 0) {
+          for (const ts of timeResponse.timeSeries) {
+            for (const point of ts.points || []) {
+              executionTimeMs += parseFloat(point.value?.doubleValue || point.value?.int64Value || "0");
+            }
+          }
+        }
+      } catch (_e) {
+      }
+      const egressFilter = encodeURIComponent(
+        `metric.type="cloudfunctions.googleapis.com/function/network_egress" AND resource.labels.function_name="${functionName}"`
+      );
+      const egressUrl = `https://monitoring.googleapis.com/v3/projects/${this.projectId}/timeSeries?filter=${egressFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
+      let networkEgressBytes = 0;
+      try {
+        const egressResponse = this.get(egressUrl);
+        if (egressResponse.timeSeries && egressResponse.timeSeries.length > 0) {
+          for (const ts of egressResponse.timeSeries) {
+            for (const point of ts.points || []) {
+              networkEgressBytes += parseFloat(point.value?.doubleValue || point.value?.int64Value || "0");
+            }
+          }
+        }
+      } catch (_e) {
+      }
+      return { executionCount, executionTimeMs, networkEgressBytes };
+    } catch (error) {
+      return null;
+    }
+  }
+  getCostEstimate() {
+    const funcName = this.state.name || this.definition.name;
+    cli.output(`
+\u{1F4B0} Cost Estimate for Cloud Function: ${funcName}`);
+    cli.output(`${"=".repeat(60)}`);
+    const memoryStr = this.definition.service?.available_memory || "256Mi";
+    const memoryMb = this.parseMemoryMb(memoryStr);
+    const memoryGb = memoryMb / 1024;
+    const cpuStr = this.definition.service?.available_cpu || "0.167";
+    const cpu = parseFloat(cpuStr);
+    const minInstances = this.definition.service?.min_instance_count || 0;
+    cli.output(`
+\u{1F4CA} Function Configuration:`);
+    cli.output(`   Name: ${funcName}`);
+    cli.output(`   Runtime: ${this.definition.build.runtime}`);
+    cli.output(`   Memory: ${memoryStr} (${memoryMb} MB)`);
+    cli.output(`   CPU: ${cpuStr}`);
+    cli.output(`   Min Instances: ${minInstances}`);
+    cli.output(`   Max Instances: ${this.definition.service?.max_instance_count || 100}`);
+    cli.output(`   Location: ${this.definition.location}`);
+    cli.output(`   State: ${this.state.state || "unknown"}`);
+    const pricing = this.fetchCloudFunctionPricing();
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Invocations: $${pricing.invocationPer1M.toFixed(2)} per million`);
+    cli.output(`   CPU: $${pricing.cpuGhzSecond.toFixed(7)}/GHz-second`);
+    cli.output(`   Memory: $${pricing.memoryGbSecond.toFixed(7)}/GB-second`);
+    if (pricing.idleCpuGhzSecond > 0) {
+      cli.output(`   Idle CPU: $${pricing.idleCpuGhzSecond.toFixed(7)}/GHz-second`);
+    }
+    if (pricing.idleMemoryGbSecond > 0) {
+      cli.output(`   Idle Memory: $${pricing.idleMemoryGbSecond.toFixed(7)}/GB-second`);
+    }
+    cli.output(`   Network Egress: $${pricing.networkEgressPerGb.toFixed(2)}/GB`);
+    const metrics = this.getCloudFunctionMetrics();
+    let totalMonthlyCost = 0;
+    if (metrics && metrics.executionCount > 0) {
+      const invocationCost = metrics.executionCount / 1e6 * pricing.invocationPer1M;
+      const executionTimeSec = metrics.executionTimeMs / 1e3;
+      const cpuCost = executionTimeSec * cpu * pricing.cpuGhzSecond;
+      const memoryCost = executionTimeSec * memoryGb * pricing.memoryGbSecond;
+      totalMonthlyCost = invocationCost + cpuCost + memoryCost;
+      cli.output(`
+\u{1F4C8} Usage (Last 30 Days from Cloud Monitoring):`);
+      cli.output(`   Invocations: ${metrics.executionCount.toLocaleString()}`);
+      cli.output(`   Total Execution Time: ${(executionTimeSec / 3600).toFixed(2)} hours`);
+      cli.output(`
+\u{1F4B5} Cost Breakdown:`);
+      cli.output(`   Invocation Costs: $${invocationCost.toFixed(4)}`);
+      cli.output(`   CPU Costs: $${cpuCost.toFixed(4)}`);
+      cli.output(`   Memory Costs: $${memoryCost.toFixed(4)}`);
+      if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+        const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        const egressCost = egressGb * pricing.networkEgressPerGb;
+        totalMonthlyCost += egressCost;
+        cli.output(`   Network Egress: $${egressCost.toFixed(4)} (${egressGb.toFixed(4)} GB)`);
+      }
+    } else {
+      cli.output(`
+\u26A0\uFE0F Cloud Monitoring metrics unavailable - usage costs not included`);
+    }
+    if (minInstances > 0) {
+      const idleHoursPerMonth = 730;
+      if (pricing.idleCpuGhzSecond > 0 && pricing.idleMemoryGbSecond > 0) {
+        const idleCpuCost = minInstances * cpu * idleHoursPerMonth * 3600 * pricing.idleCpuGhzSecond;
+        const idleMemoryCost = minInstances * memoryGb * idleHoursPerMonth * 3600 * pricing.idleMemoryGbSecond;
+        const idleCost = idleCpuCost + idleMemoryCost;
+        totalMonthlyCost += idleCost;
+        cli.output(`
+\u{1F504} Min Instances Idle Cost (${minInstances} instances): $${idleCost.toFixed(2)}`);
+        cli.output(`   (Using idle rates from GCP Cloud Billing API)`);
+      } else {
+        cli.output(`
+\u26A0\uFE0F Min instances idle cost cannot be estimated: idle pricing rates not available from GCP Cloud Billing API`);
+      }
+    }
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Cloud Functions Gen 2 pricing (runs on Cloud Run)`);
+    cli.output(`   - Free tier: 2M invocations, 400K GB-seconds, 200K GHz-seconds/month`);
+    cli.output(`   - Network egress included when Cloud Monitoring metrics are available`);
+    cli.output(`   - Does not include: Cloud Build costs`);
+  }
+  costs() {
+    if (!this.state.name && !this.definition.name) {
+      const result = {
+        type: "gcp-cloud-function",
+        costs: { month: { amount: "0", currency: "USD" } }
+      };
+      cli.output(JSON.stringify(result));
+      return;
+    }
+    try {
+      const pricing = this.fetchCloudFunctionPricing();
+      const metrics = this.getCloudFunctionMetrics();
+      let totalMonthlyCost = 0;
+      if (metrics && metrics.executionCount > 0) {
+        const memoryStr = this.definition.service?.available_memory || "256Mi";
+        const memoryGb = this.parseMemoryMb(memoryStr) / 1024;
+        const cpu = parseFloat(this.definition.service?.available_cpu || "0.167");
+        totalMonthlyCost += metrics.executionCount / 1e6 * pricing.invocationPer1M;
+        const executionTimeSec = metrics.executionTimeMs / 1e3;
+        totalMonthlyCost += executionTimeSec * cpu * pricing.cpuGhzSecond;
+        totalMonthlyCost += executionTimeSec * memoryGb * pricing.memoryGbSecond;
+        if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+          const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+          totalMonthlyCost += egressGb * pricing.networkEgressPerGb;
+        }
+      }
+      const minInstances = this.definition.service?.min_instance_count || 0;
+      if (minInstances > 0 && pricing.idleCpuGhzSecond > 0 && pricing.idleMemoryGbSecond > 0) {
+        const memoryGb = this.parseMemoryMb(this.definition.service?.available_memory || "256Mi") / 1024;
+        const cpu = parseFloat(this.definition.service?.available_cpu || "0.167");
+        const idleHours = 730;
+        totalMonthlyCost += minInstances * cpu * idleHours * 3600 * pricing.idleCpuGhzSecond;
+        totalMonthlyCost += minInstances * memoryGb * idleHours * 3600 * pricing.idleMemoryGbSecond;
+      }
+      const result = {
+        type: "gcp-cloud-function",
+        costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "gcp-cloud-function",
+        costs: { month: { amount: "0", currency: "USD", error: error.message } }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudFunction);
@@ -397,6 +696,8 @@ __decorateElement(_init, 1, "getIamPolicy", _getIamPolicy_dec, _CloudFunction);
 __decorateElement(_init, 1, "setIamPolicy", _setIamPolicy_dec, _CloudFunction);
 __decorateElement(_init, 1, "testIamPermissions", _testIamPermissions_dec, _CloudFunction);
 __decorateElement(_init, 1, "invokeFunction", _invokeFunction_dec, _CloudFunction);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _CloudFunction);
+__decorateElement(_init, 1, "costs", _costs_dec, _CloudFunction);
 __decoratorMetadata(_init, _CloudFunction);
 __name(_CloudFunction, "CloudFunction");
 __publicField(_CloudFunction, "readiness", { period: 10, initialDelay: 5, attempts: 60 });

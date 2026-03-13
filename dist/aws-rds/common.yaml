@@ -3,5 +3,5 @@ namespace: aws-rds
 common:
   defines: module
   metadata:
-    version-hash: e3e917ffb0c7
+    version-hash: 1446d06e7cbf
   source: <<< common.js

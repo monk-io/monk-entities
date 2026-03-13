@@ -22,7 +22,7 @@ database:
       Works with:
       - `digitalocean/database-user` - Create additional database users
       - `digitalocean/database-db` - Create databases within the cluster
-    version-hash: d091f98dc1ad
+    version-hash: fd2bd03b2810
   schema:
     name:
       type: string
@@ -146,6 +146,8 @@ database:
     describe-backup: ''
     restore: ''
     get-restore-status: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 15

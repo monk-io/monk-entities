@@ -53,10 +53,11 @@ const azureEventhubsBase = require("azure-eventhubs/azure-eventhubs-base");
 const AzureEventHubsEntity = azureEventhubsBase.AzureEventHubsEntity;
 const cli = require("cli");
 const secret = require("secret");
+const http = require("http");
 const base = require("monkec/base");
 const action = base.action;
-var _regenerateKey_dec, _listEventHubs_dec, _getInfo_dec, _a, _init;
-var _EventHubsNamespace = class _EventHubsNamespace extends (_a = AzureEventHubsEntity, _getInfo_dec = [action("get-info")], _listEventHubs_dec = [action("list-eventhubs")], _regenerateKey_dec = [action("regenerate-key")], _a) {
+var _regenerateKey_dec, _costs_dec, _getCostEstimate_dec, _listEventHubs_dec, _getInfo_dec, _a, _init;
+var _EventHubsNamespace = class _EventHubsNamespace extends (_a = AzureEventHubsEntity, _getInfo_dec = [action("get-info")], _listEventHubs_dec = [action("list-eventhubs")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _regenerateKey_dec = [action("regenerate-key")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -288,6 +289,192 @@ Found ${eventHubs.length} event hub(s):
     }
     cli.output("==================================================");
   }
+  // ========================================
+  // Cost Estimation
+  // ========================================
+  /**
+   * Make an external HTTP request (for Azure Retail Prices API)
+   */
+  makeExternalRequest(url) {
+    try {
+      const response = http.get(url, {
+        headers: { "Accept": "application/json" }
+      });
+      if (response.body) {
+        return JSON.parse(response.body);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Fetch Event Hubs pricing from Azure Retail Prices API
+   */
+  fetchEventHubsPricing(location, skuName) {
+    try {
+      const baseUrl = "https://prices.azure.com/api/retail/prices";
+      const armRegionName = location.toLowerCase().replace(/\s+/g, "");
+      const filter = `serviceName eq 'Event Hubs' and armRegionName eq '${armRegionName}'`;
+      const encodedFilter = encodeURIComponent(filter);
+      const url = `${baseUrl}?$filter=${encodedFilter}`;
+      const response = this.makeExternalRequest(url);
+      if (response && response.Items && Array.isArray(response.Items)) {
+        let tuRate = 0;
+        let ingressRate = 0;
+        const tierLower = skuName.toLowerCase();
+        for (const item of response.Items) {
+          const meterName = (item.meterName || "").toLowerCase();
+          const productName = (item.productName || "").toLowerCase();
+          const itemSku = (item.skuName || "").toLowerCase();
+          const price = item.unitPrice || 0;
+          if (price <= 0) continue;
+          if (!productName.includes(tierLower) && !itemSku.includes(tierLower)) continue;
+          if (meterName.includes("throughput unit") || meterName.includes("processing unit")) {
+            if (tuRate === 0) tuRate = price;
+          } else if (meterName.includes("ingress") && meterName.includes("event")) {
+            if (ingressRate === 0) ingressRate = price;
+          }
+        }
+        if (tuRate > 0) {
+          return {
+            throughputUnitPerHour: tuRate,
+            ingressPerMillion: ingressRate > 0 ? ingressRate : 0,
+            source: "Azure Retail Prices API"
+          };
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch Event Hubs pricing from Azure API: ${error.message}`);
+    }
+    throw new Error(`Could not retrieve Event Hubs ${skuName} pricing from Azure Retail Prices API`);
+  }
+  getCostEstimate(_args) {
+    const namespaceName = this.definition.namespace_name;
+    cli.output(`
+\u{1F4B0} Cost Estimate for Event Hubs Namespace: ${namespaceName}`);
+    cli.output(`${"=".repeat(60)}`);
+    const skuName = this.definition.sku.name;
+    const capacity = this.definition.sku.capacity || 1;
+    const location = this.definition.location;
+    cli.output(`
+\u{1F4CA} Namespace Configuration:`);
+    cli.output(`   Name: ${namespaceName}`);
+    cli.output(`   Location: ${location}`);
+    cli.output(`   SKU: ${skuName}`);
+    cli.output(`   Capacity: ${capacity} ${skuName === "Premium" ? "Processing Unit(s)" : "Throughput Unit(s)"}`);
+    cli.output(`   Auto-Inflate: ${this.definition.is_auto_inflate_enabled || false}`);
+    if (this.definition.is_auto_inflate_enabled && this.definition.maximum_throughput_units) {
+      cli.output(`   Max Throughput Units: ${this.definition.maximum_throughput_units}`);
+    }
+    cli.output(`   Kafka Enabled: ${this.definition.kafka_enabled || false}`);
+    const pricing = this.fetchEventHubsPricing(location, skuName);
+    const hoursPerMonth = 730;
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Per ${skuName === "Premium" ? "PU" : "TU"}/hour: $${pricing.throughputUnitPerHour.toFixed(4)}`);
+    if (pricing.ingressPerMillion > 0) {
+      cli.output(`   Ingress Events: $${pricing.ingressPerMillion.toFixed(4)} per million`);
+    }
+    const tuMonthlyCost = capacity * pricing.throughputUnitPerHour * hoursPerMonth;
+    const metrics = this.getEventHubsMetrics();
+    let ingressCost = 0;
+    if (metrics.incomingMessages > 0 && pricing.ingressPerMillion > 0 && skuName !== "Premium") {
+      ingressCost = metrics.incomingMessages / 1e6 * pricing.ingressPerMillion;
+    }
+    cli.output(`
+\u{1F4B5} Cost Breakdown (Monthly):`);
+    cli.output(`   ${skuName === "Premium" ? "Processing Units" : "Throughput Units"} (${capacity} x $${pricing.throughputUnitPerHour.toFixed(4)}/hr x ${hoursPerMonth}hrs): $${tuMonthlyCost.toFixed(2)}`);
+    if (skuName === "Premium") {
+      cli.output(`   Ingress Events: Included in PU cost`);
+    } else if (metrics.incomingMessages > 0) {
+      cli.output(`   Ingress Events (${metrics.incomingMessages.toLocaleString()} from Azure Monitor): $${ingressCost.toFixed(4)}`);
+    } else {
+      cli.output(`   Ingress Events: Azure Monitor metrics unavailable`);
+    }
+    const totalMonthlyCost = tuMonthlyCost + ingressCost;
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Cost is primarily based on provisioned throughput/processing units`);
+    cli.output(`   - Ingress events are charged per million events (Basic/Standard)`);
+    cli.output(`   - Premium tier includes ingress events in the PU cost`);
+    cli.output(`   - Auto-inflate may increase costs if TUs scale up`);
+    cli.output(`   - Capture feature (if enabled) has additional storage costs`);
+  }
+  /**
+   * Get Azure Monitor metrics for Event Hubs namespace (last 30 days).
+   * Returns total incoming messages count.
+   */
+  getEventHubsMetrics() {
+    try {
+      const now = /* @__PURE__ */ new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+      const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
+      const resourcePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.EventHub/namespaces/${this.definition.namespace_name}`;
+      const metricsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=IncomingMessages&timespan=${timespan}&interval=P1D&aggregation=Total`;
+      const response = this.makeAzureRequest("GET", metricsPath);
+      if (response.error || !response.body) {
+        return { incomingMessages: 0 };
+      }
+      const data = JSON.parse(response.body);
+      const metrics = data.value || [];
+      let incomingMessages = 0;
+      for (const metric of metrics) {
+        const timeseries = metric.timeseries || [];
+        for (const ts of timeseries) {
+          const dataPoints = ts.data || [];
+          for (const point of dataPoints) {
+            incomingMessages += point.total || 0;
+          }
+        }
+      }
+      return { incomingMessages };
+    } catch {
+      return { incomingMessages: 0 };
+    }
+  }
+  costs() {
+    try {
+      const skuName = this.definition.sku.name;
+      const capacity = this.definition.sku.capacity || 1;
+      const location = this.definition.location;
+      const hoursPerMonth = 730;
+      const pricing = this.fetchEventHubsPricing(location, skuName);
+      let totalMonthlyCost = capacity * pricing.throughputUnitPerHour * hoursPerMonth;
+      if (skuName !== "Premium" && pricing.ingressPerMillion > 0) {
+        const metrics = this.getEventHubsMetrics();
+        if (metrics.incomingMessages > 0) {
+          totalMonthlyCost += metrics.incomingMessages / 1e6 * pricing.ingressPerMillion;
+        }
+      }
+      const result = {
+        type: "azure-eventhubs-namespace",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "azure-eventhubs-namespace",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
   regenerateKey(args) {
     const keyType = args?.key_type || "PrimaryKey";
     const ruleName = args?.rule_name || "RootManageSharedAccessKey";
@@ -307,6 +494,8 @@ Found ${eventHubs.length} event hub(s):
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _EventHubsNamespace);
 __decorateElement(_init, 1, "listEventHubs", _listEventHubs_dec, _EventHubsNamespace);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _EventHubsNamespace);
+__decorateElement(_init, 1, "costs", _costs_dec, _EventHubsNamespace);
 __decorateElement(_init, 1, "regenerateKey", _regenerateKey_dec, _EventHubsNamespace);
 __decoratorMetadata(_init, _EventHubsNamespace);
 __name(_EventHubsNamespace, "EventHubsNamespace");

@@ -22,7 +22,7 @@ cloud-front-distribution:
       Works with:
       - `aws-s3/bucket` - S3 bucket as origin for static content
       - `aws-lambda/function` - Lambda@Edge for request/response customization
-    version-hash: 0a4dca3d773f
+    version-hash: d6491c59b204
   schema:
     region:
       type: string
@@ -384,6 +384,8 @@ cloud-front-distribution:
     get-distribution-config: ''
     create-invalidation: ''
     list-invalidations: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 30
