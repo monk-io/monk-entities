@@ -1,5 +1,5 @@
 REPO aws-dynamo-db
-VERSION_HASH 949cadcff61f
+VERSION_HASH a2334a20a0d0
 DESCRIPTION Fully managed NoSQL database.
 HOSTING managed
 TAGS aws,dynamodb,nosql,database,key-value

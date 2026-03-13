@@ -801,39 +801,48 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         cli.output(`   Hourly Rate: $${pricing.instanceHourly.toFixed(4)}`);
         cli.output(`   Monthly Cost: $${instanceCostMonthly.toFixed(2)}`);
 
-        // Storage cost (from CloudWatch if available)
+        // Storage and I/O are cluster-level costs billed once per cluster, not per instance.
+        // Only the writer instance includes them to avoid double-counting when costs are
+        // aggregated across all instances in the cluster.
+        const isWriter = this.state.is_cluster_writer === true;
         let storageCostMonthly = 0;
-        const metrics = this.getCloudWatchNeptuneMetrics();
-
-        if (metrics && metrics.volumeBytesUsed > 0) {
-            const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
-            storageCostMonthly = storageGB * pricing.storagePerGBMonth;
-
-            cli.output(`\n💾 Storage Costs:`);
-            cli.output(`   Volume Used: ${storageGB.toFixed(2)} GB`);
-            cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
-            cli.output(`   Monthly Cost: $${storageCostMonthly.toFixed(2)}`);
-        } else {
-            cli.output(`\n💾 Storage Costs:`);
-            cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
-            cli.output(`   ⚠️ CloudWatch metrics unavailable - storage cost not included`);
-        }
-
-        // I/O cost (from CloudWatch if available)
-        // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over the 30-day period,
-        // so they directly represent total billed storage I/O operations for the month.
         let ioCostMonthly = 0;
-        cli.output(`\n📈 I/O Costs:`);
-        cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O operations`);
-        if (metrics) {
-            const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
-            ioCostMonthly = (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
-            cli.output(`   Volume Read I/O ops (30d): ${Math.round(metrics.volumeReadIOPs).toLocaleString()}`);
-            cli.output(`   Volume Write I/O ops (30d): ${Math.round(metrics.volumeWriteIOPs).toLocaleString()}`);
-            cli.output(`   Total Monthly I/O ops: ~${Math.round(totalMonthlyIOPs).toLocaleString()}`);
-            cli.output(`   Monthly I/O Cost: $${ioCostMonthly.toFixed(2)}`);
+        const metrics = isWriter ? this.getCloudWatchNeptuneMetrics() : null;
+
+        if (isWriter) {
+            if (metrics && metrics.volumeBytesUsed > 0) {
+                const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
+                storageCostMonthly = storageGB * pricing.storagePerGBMonth;
+
+                cli.output(`\n💾 Storage Costs (cluster-level, writer only):`);
+                cli.output(`   Volume Used: ${storageGB.toFixed(2)} GB`);
+                cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
+                cli.output(`   Monthly Cost: $${storageCostMonthly.toFixed(2)}`);
+            } else {
+                cli.output(`\n💾 Storage Costs (cluster-level, writer only):`);
+                cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB-month`);
+                cli.output(`   ⚠️ CloudWatch metrics unavailable - storage cost not included`);
+            }
+
+            // I/O cost (from CloudWatch if available)
+            // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over the 30-day period,
+            // so they directly represent total billed storage I/O operations for the month.
+            cli.output(`\n📈 I/O Costs (cluster-level, writer only):`);
+            cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O operations`);
+            if (metrics) {
+                const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
+                ioCostMonthly = (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
+                cli.output(`   Volume Read I/O ops (30d): ${Math.round(metrics.volumeReadIOPs).toLocaleString()}`);
+                cli.output(`   Volume Write I/O ops (30d): ${Math.round(metrics.volumeWriteIOPs).toLocaleString()}`);
+                cli.output(`   Total Monthly I/O ops: ~${Math.round(totalMonthlyIOPs).toLocaleString()}`);
+                cli.output(`   Monthly I/O Cost: $${ioCostMonthly.toFixed(2)}`);
+            } else {
+                cli.output(`   ⚠️ CloudWatch metrics unavailable - I/O cost not included`);
+            }
         } else {
-            cli.output(`   ⚠️ CloudWatch metrics unavailable - I/O cost not included`);
+            cli.output(`\n💾 Storage & I/O Costs:`);
+            cli.output(`   ℹ️ Skipped for reader instances — storage is shared and billed once per cluster`);
+            cli.output(`   ℹ️ These costs are reported by the writer instance to avoid double-counting`);
         }
 
         // Backup cost info
@@ -849,7 +858,7 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         cli.output(`\n📝 Notes:`);
         cli.output(`   - Pricing from ${pricing.source}`);
         cli.output(`   - Compute cost is for this instance only (cluster may have multiple instances)`);
-        cli.output(`   - Storage is shared across the cluster`);
+        cli.output(`   - Storage and I/O are cluster-level costs included only on the writer instance`);
         cli.output(`   - Does not include: backup beyond retention, data transfer`);
     }
 
@@ -883,17 +892,22 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
             const hoursPerMonth = 730;
             let totalMonthlyCost = pricing.instanceHourly * hoursPerMonth;
 
-            // Add storage and I/O costs from CloudWatch if available
-            const metrics = this.getCloudWatchNeptuneMetrics();
-            if (metrics) {
-                if (metrics.volumeBytesUsed > 0) {
-                    const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
-                    totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
+            // Storage and I/O are cluster-level costs billed once per cluster.
+            // Only include them on the writer instance to avoid double-counting when
+            // costs() results are aggregated across all instances in the cluster.
+            const isWriter = this.state.is_cluster_writer === true;
+            if (isWriter) {
+                const metrics = this.getCloudWatchNeptuneMetrics();
+                if (metrics) {
+                    if (metrics.volumeBytesUsed > 0) {
+                        const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
+                        totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
+                    }
+                    // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over 30 days,
+                    // so they directly represent total billed storage I/O ops for the month.
+                    const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
+                    totalMonthlyCost += (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
                 }
-                // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over 30 days,
-                // so they directly represent total billed storage I/O ops for the month.
-                const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
-                totalMonthlyCost += (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
             }
 
             const result = {
