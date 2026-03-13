@@ -21,7 +21,7 @@ s3-bucket:
       - `aws-iam/role` - Create IAM roles with S3 access permissions
       - `aws-lambda/function` - Store Lambda deployment packages
       - `aws-cloudfront/distribution` - Serve static content via CDN
-    version-hash: 876ff47580d7
+    version-hash: fdc446e8cfeb
   schema:
     region:
       type: string

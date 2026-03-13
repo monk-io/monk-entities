@@ -83,7 +83,7 @@ rds-instance:
       If deployed before client: `runnable-peers()` returns empty → no access → connection fails.
 
       ---
-    version-hash: 1446d06e7cbf
+    version-hash: f78b1d1931d0
   schema:
     region:
       type: string

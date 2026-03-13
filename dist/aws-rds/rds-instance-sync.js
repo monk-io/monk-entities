@@ -873,7 +873,10 @@ The instance_id is the target_id used in the restore operation.`);
         instanceCostPerHour *= 2;
       }
       const instanceCostMonthly = instanceCostPerHour * 730;
-      const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      let storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      if (multiAZ) {
+        storageCostMonthly *= 2;
+      }
       let iopsCostMonthly = 0;
       if (storageType === "io1" || storageType === "io2") {
         const provisionedIOPS = dbInstance.Iops || 1e3;
@@ -922,6 +925,7 @@ The instance_id is the target_id used in the restore operation.`);
           allocated_gb: allocatedStorage,
           storage_type: storageType,
           rate_per_gb_month: pricing.storagePerGBMonth,
+          multi_az_multiplier: multiAZ ? 2 : 1,
           monthly_cost_usd: Math.round(storageCostMonthly * 100) / 100
         },
         iops_costs: {
@@ -1014,7 +1018,10 @@ ${JSON.stringify(costEstimate, null, 2)}`);
         instanceCostPerHour *= 2;
       }
       const instanceCostMonthly = instanceCostPerHour * 730;
-      const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      let storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+      if (multiAZ) {
+        storageCostMonthly *= 2;
+      }
       let iopsCostMonthly = 0;
       if (storageType === "io1" || storageType === "io2") {
         const provisionedIOPS = dbInstance.Iops || 1e3;
@@ -1120,7 +1127,8 @@ ${JSON.stringify(costEstimate, null, 2)}`);
       { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonRDS" },
       { Type: "TERM_MATCH", Field: "location", Value: location },
       { Type: "TERM_MATCH", Field: "productFamily", Value: "Database Storage" },
-      { Type: "TERM_MATCH", Field: "volumeType", Value: this.getStorageTypePricingName(storageType) }
+      { Type: "TERM_MATCH", Field: "volumeType", Value: this.getStorageTypePricingName(storageType) },
+      { Type: "TERM_MATCH", Field: "deploymentOption", Value: "Single-AZ" }
     ];
     const storageRequestBody = {
       ServiceCode: "AmazonRDS",

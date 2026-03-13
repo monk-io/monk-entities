@@ -1228,8 +1228,12 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             }
             const instanceCostMonthly = instanceCostPerHour * 730;
             
-            // Calculate storage cost
-            const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+            // Calculate storage cost. Pricing is fetched for Single-AZ; AWS charges
+            // approximately double for storage in Multi-AZ deployments.
+            let storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+            if (multiAZ) {
+                storageCostMonthly *= 2; // Multi-AZ doubles storage cost
+            }
             
             // Calculate IOPS cost (for io1/io2 storage types)
             let iopsCostMonthly = 0;
@@ -1295,6 +1299,7 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
                     allocated_gb: allocatedStorage,
                     storage_type: storageType,
                     rate_per_gb_month: pricing.storagePerGBMonth,
+                    multi_az_multiplier: multiAZ ? 2 : 1,
                     monthly_cost_usd: Math.round(storageCostMonthly * 100) / 100
                 },
                 iops_costs: {
@@ -1420,8 +1425,12 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             }
             const instanceCostMonthly = instanceCostPerHour * 730;
             
-            // Calculate storage cost
-            const storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+            // Calculate storage cost. Pricing is fetched for Single-AZ; AWS charges
+            // approximately double for storage in Multi-AZ deployments.
+            let storageCostMonthly = allocatedStorage * pricing.storagePerGBMonth;
+            if (multiAZ) {
+                storageCostMonthly *= 2; // Multi-AZ doubles storage cost
+            }
             
             // Calculate IOPS cost (for io1/io2 storage types)
             let iopsCostMonthly = 0;
@@ -1556,12 +1565,15 @@ export class RDSInstance extends AWSRDSEntity<RDSInstanceDefinition, RDSInstance
             return null;
         }
 
-        // Get storage pricing
+        // Get storage pricing — filter by Single-AZ so we always get a deterministic
+        // single-tier rate. For Multi-AZ the storage cost is doubled at the call site,
+        // mirroring the same pattern used for instance cost and IOPS cost.
         const storageFilters = [
             { Type: 'TERM_MATCH', Field: 'serviceCode', Value: 'AmazonRDS' },
             { Type: 'TERM_MATCH', Field: 'location', Value: location },
             { Type: 'TERM_MATCH', Field: 'productFamily', Value: 'Database Storage' },
-            { Type: 'TERM_MATCH', Field: 'volumeType', Value: this.getStorageTypePricingName(storageType) }
+            { Type: 'TERM_MATCH', Field: 'volumeType', Value: this.getStorageTypePricingName(storageType) },
+            { Type: 'TERM_MATCH', Field: 'deploymentOption', Value: 'Single-AZ' }
         ];
 
         const storageRequestBody = {
