@@ -392,13 +392,16 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
   }
   // ==================== COST ESTIMATION ====================
   /**
-   * Parse pricing response from AWS Price List API
+   * Parse pricing response from AWS Price List API — returns the first non-zero
+   * USD price together with its unit string.  The unit is used by callers to
+   * detect whether the API already expresses the price per-bulk-quantity (e.g.
+   * "per 1 million requests") so they can avoid applying a redundant multiplier.
    */
   parsePricingResponse(responseBody) {
     try {
       const data = JSON.parse(responseBody);
       if (!data.PriceList || data.PriceList.length === 0) {
-        return 0;
+        return { price: 0, unit: "" };
       }
       for (const priceItem of data.PriceList) {
         const product = typeof priceItem === "string" ? JSON.parse(priceItem) : priceItem;
@@ -407,9 +410,10 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
         for (const termKey of Object.keys(terms)) {
           const priceDimensions = terms[termKey].priceDimensions;
           for (const dimKey of Object.keys(priceDimensions)) {
-            const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || "0");
-            if (pricePerUnit > 0) {
-              return pricePerUnit;
+            const dim = priceDimensions[dimKey];
+            const price = parseFloat(dim.pricePerUnit?.USD || "0");
+            if (price > 0) {
+              return { price, unit: (dim.unit || "").toLowerCase() };
             }
           }
         }
@@ -417,7 +421,7 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
     } catch (error) {
       cli.output(`Warning: Failed to parse pricing: ${error.message}`);
     }
-    return 0;
+    return { price: 0, unit: "" };
   }
   /**
    * Map AWS region codes to location names for Pricing API
@@ -503,25 +507,33 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
     if (publishResponse.statusCode !== 200) {
       throw new Error(`AWS Pricing API returned status ${publishResponse.statusCode} for SNS publish pricing`);
     }
-    const publishPerRequest = this.parsePricingResponse(publishResponse.body);
+    const { price: publishPerRequest, unit: publishUnit } = this.parsePricingResponse(publishResponse.body);
     if (publishPerRequest <= 0) {
       throw new Error("Could not parse SNS publish pricing from AWS Price List API response");
     }
+    const publishPerMillion = publishUnit.includes("million") ? publishPerRequest : publishPerRequest * 1e6;
     if (httpResponse.statusCode !== 200) {
       throw new Error(`AWS Pricing API returned status ${httpResponse.statusCode} for SNS HTTP delivery pricing`);
     }
-    const httpPerDelivery = this.parsePricingResponse(httpResponse.body);
+    const { price: httpPerDelivery, unit: httpUnit } = this.parsePricingResponse(httpResponse.body);
     if (httpPerDelivery <= 0) {
       throw new Error("Could not parse SNS HTTP delivery pricing from AWS Price List API response");
     }
+    const httpDeliveryPer100k = httpUnit.includes("100,000") || httpUnit.includes("100000") ? httpPerDelivery : httpPerDelivery * 1e5;
     return {
-      publishPerMillion: publishPerRequest * 1e6,
-      httpDeliveryPer100k: httpPerDelivery * 1e5,
+      publishPerMillion,
+      httpDeliveryPer100k,
       source: "AWS Price List API"
     };
   }
   /**
-   * Get CloudWatch metrics for SNS topic (last 30 days)
+   * Get CloudWatch metrics for SNS topic (last 30 days).
+   *
+   * Also returns httpHttpsDeliveryFraction: the fraction of subscriptions that
+   * use HTTP or HTTPS protocols.  SNS CloudWatch does not expose per-protocol
+   * delivery counts, so we approximate billable HTTP/HTTPS deliveries by
+   * multiplying total deliveries by this fraction.  SQS and Lambda deliveries
+   * are free and must not be included in the delivery cost calculation.
    */
   getSNSCloudWatchMetrics() {
     if (!this.state.topic_name) return null;
@@ -556,10 +568,24 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
           return 0;
         }
       }, "getMetric");
+      let httpHttpsDeliveryFraction = 1;
+      try {
+        if (this.state.topic_arn) {
+          const subscriptions = this.listSubscriptionsByTopic(this.state.topic_arn);
+          if (subscriptions.length > 0) {
+            const httpHttpsCount = subscriptions.filter(
+              (s) => s.Protocol === "http" || s.Protocol === "https"
+            ).length;
+            httpHttpsDeliveryFraction = httpHttpsCount / subscriptions.length;
+          }
+        }
+      } catch (_e) {
+      }
       return {
         numberOfMessagesPublished: getMetric("NumberOfMessagesPublished"),
         numberOfNotificationsDelivered: getMetric("NumberOfNotificationsDelivered"),
-        numberOfNotificationsFailed: getMetric("NumberOfNotificationsFailed")
+        numberOfNotificationsFailed: getMetric("NumberOfNotificationsFailed"),
+        httpHttpsDeliveryFraction
       };
     } catch (error) {
       return null;
@@ -592,17 +618,19 @@ Note: Email subscriptions require confirmation. Check ${endpoint} for a confirma
     let totalMonthlyCost = 0;
     if (metrics) {
       const publishCost = metrics.numberOfMessagesPublished / 1e6 * pricing.publishPerMillion;
-      const deliveryCost = metrics.numberOfNotificationsDelivered / 1e5 * pricing.httpDeliveryPer100k;
+      const httpHttpsDeliveries = metrics.numberOfNotificationsDelivered * metrics.httpHttpsDeliveryFraction;
+      const deliveryCost = httpHttpsDeliveries / 1e5 * pricing.httpDeliveryPer100k;
       totalMonthlyCost = publishCost + deliveryCost;
       cli.output(`
 \u{1F4C8} Usage (Last 30 Days from CloudWatch):`);
       cli.output(`   Messages Published: ${metrics.numberOfMessagesPublished.toLocaleString()}`);
-      cli.output(`   Notifications Delivered: ${metrics.numberOfNotificationsDelivered.toLocaleString()}`);
+      cli.output(`   Notifications Delivered (total): ${metrics.numberOfNotificationsDelivered.toLocaleString()}`);
+      cli.output(`   HTTP/HTTPS Deliveries (billable): ${Math.round(httpHttpsDeliveries).toLocaleString()} (${Math.round(metrics.httpHttpsDeliveryFraction * 100)}% of subscriptions)`);
       cli.output(`   Notifications Failed: ${metrics.numberOfNotificationsFailed.toLocaleString()}`);
       cli.output(`
 \u{1F4B5} Cost Breakdown:`);
       cli.output(`   Publish Costs: $${publishCost.toFixed(4)}`);
-      cli.output(`   Delivery Costs: $${deliveryCost.toFixed(4)}`);
+      cli.output(`   HTTP/HTTPS Delivery Costs: $${deliveryCost.toFixed(4)}`);
     } else {
       cli.output(`
 \u26A0\uFE0F CloudWatch metrics unavailable - usage costs not included`);
@@ -633,7 +661,8 @@ ${"=".repeat(60)}`);
       const metrics = this.getSNSCloudWatchMetrics();
       if (metrics) {
         const publishCost = metrics.numberOfMessagesPublished / 1e6 * pricing.publishPerMillion;
-        const deliveryCost = metrics.numberOfNotificationsDelivered / 1e5 * pricing.httpDeliveryPer100k;
+        const httpHttpsDeliveries = metrics.numberOfNotificationsDelivered * metrics.httpHttpsDeliveryFraction;
+        const deliveryCost = httpHttpsDeliveries / 1e5 * pricing.httpDeliveryPer100k;
         totalMonthlyCost = publishCost + deliveryCost;
       }
       const result = {

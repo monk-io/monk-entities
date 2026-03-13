@@ -532,6 +532,7 @@ var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRout
         const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
         totalRequests = sumMatch ? parseFloat(sumMatch[1]) : 0;
       }
+      const AVG_WEBSOCKET_SESSION_MINUTES = 10;
       const isWebSocket = String(this.state.protocol_type || this.definition.protocol_type).toUpperCase() === "WEBSOCKET";
       let connectionMinutes;
       if (isWebSocket) {
@@ -556,29 +557,8 @@ var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRout
           if (connectResponse.statusCode === 200) {
             const connectMatch = connectResponse.body.match(/<Sum>([\d.]+)<\/Sum>/);
             const connectCount = connectMatch ? parseFloat(connectMatch[1]) : 0;
-            const latencyParams = [
-              "Action=GetMetricStatistics",
-              "Version=2010-08-01",
-              "Namespace=AWS%2FApiGateway",
-              "MetricName=IntegrationLatency",
-              `StartTime=${encodeURIComponent(startTime)}`,
-              `EndTime=${encodeURIComponent(endTime)}`,
-              "Period=2592000",
-              "Statistics.member.1=Average",
-              "Dimensions.member.1.Name=ApiId",
-              `Dimensions.member.1.Value=${encodeURIComponent(this.state.api_id)}`
-            ];
-            const latencyUrl = `https://monitoring.${this.region}.amazonaws.com/?${latencyParams.join("&")}`;
-            const latencyResponse = aws.get(latencyUrl, {
-              service: "monitoring",
-              region: this.region
-            });
-            if (latencyResponse.statusCode === 200) {
-              const avgMatch = latencyResponse.body.match(/<Average>([\d.]+)<\/Average>/);
-              const avgLatencyMs = avgMatch ? parseFloat(avgMatch[1]) : 0;
-              if (connectCount > 0 && avgLatencyMs > 0) {
-                connectionMinutes = connectCount * avgLatencyMs / 6e4;
-              }
+            if (connectCount > 0) {
+              connectionMinutes = connectCount * AVG_WEBSOCKET_SESSION_MINUTES;
             }
           }
         } catch {
@@ -630,7 +610,7 @@ var _APIGateway = class _APIGateway extends (_a = AWSAPIGatewayEntity, _syncRout
       if (!isHttp && pricing.connectionMinutePerMillion > 0 && metrics.connectionMinutes !== void 0 && metrics.connectionMinutes > 0) {
         const connectionCost = metrics.connectionMinutes / 1e6 * pricing.connectionMinutePerMillion;
         totalMonthlyCost += connectionCost;
-        cli.output(`   Connection Minutes: ${metrics.connectionMinutes.toLocaleString()} \xD7 $${pricing.connectionMinutePerMillion.toFixed(2)}/M = $${connectionCost.toFixed(4)}`);
+        cli.output(`   Connection Minutes: ${metrics.connectionMinutes.toLocaleString()} (estimated: ConnectCount \xD7 10 min avg session) \xD7 $${pricing.connectionMinutePerMillion.toFixed(2)}/M = $${connectionCost.toFixed(4)}`);
       } else if (!isHttp) {
         cli.output(`   Connection Minutes: Not measured from CloudWatch`);
       }

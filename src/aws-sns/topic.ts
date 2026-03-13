@@ -502,13 +502,16 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
     // ==================== COST ESTIMATION ====================
 
     /**
-     * Parse pricing response from AWS Price List API
+     * Parse pricing response from AWS Price List API — returns the first non-zero
+     * USD price together with its unit string.  The unit is used by callers to
+     * detect whether the API already expresses the price per-bulk-quantity (e.g.
+     * "per 1 million requests") so they can avoid applying a redundant multiplier.
      */
-    private parsePricingResponse(responseBody: string): number {
+    private parsePricingResponse(responseBody: string): { price: number; unit: string } {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
+                return { price: 0, unit: '' };
             }
 
             for (const priceItem of data.PriceList) {
@@ -519,9 +522,10 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
                 for (const termKey of Object.keys(terms)) {
                     const priceDimensions = terms[termKey].priceDimensions;
                     for (const dimKey of Object.keys(priceDimensions)) {
-                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
-                        if (pricePerUnit > 0) {
-                            return pricePerUnit;
+                        const dim = priceDimensions[dimKey];
+                        const price = parseFloat(dim.pricePerUnit?.USD || '0');
+                        if (price > 0) {
+                            return { price, unit: (dim.unit || '').toLowerCase() };
                         }
                     }
                 }
@@ -529,7 +533,7 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
         } catch (error) {
             cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
         }
-        return 0;
+        return { price: 0, unit: '' };
     }
 
     /**
@@ -576,6 +580,10 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
         httpDeliveryPer100k: number;
         source: string;
     } {
+        // NOTE: publishPerMillion and httpDeliveryPer100k are normalised to their
+        // respective bulk-quantity units at fetch time.  A unit-aware guard checks
+        // whether the API already returns a per-million / per-100k price to avoid
+        // a massive overcharge if the pricing unit ever changes.
         const pricingRegion = 'us-east-1';
         const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
         const location = this.getRegionToLocationMap()[this.region];
@@ -628,33 +636,46 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
         if (publishResponse.statusCode !== 200) {
             throw new Error(`AWS Pricing API returned status ${publishResponse.statusCode} for SNS publish pricing`);
         }
-        const publishPerRequest = this.parsePricingResponse(publishResponse.body);
+        const { price: publishPerRequest, unit: publishUnit } = this.parsePricingResponse(publishResponse.body);
         if (publishPerRequest <= 0) {
             throw new Error('Could not parse SNS publish pricing from AWS Price List API response');
         }
+        // Guard: if the API already returns a per-million price, use it as-is.
+        const publishPerMillion = publishUnit.includes('million') ? publishPerRequest : publishPerRequest * 1_000_000;
 
         if (httpResponse.statusCode !== 200) {
             throw new Error(`AWS Pricing API returned status ${httpResponse.statusCode} for SNS HTTP delivery pricing`);
         }
-        const httpPerDelivery = this.parsePricingResponse(httpResponse.body);
+        const { price: httpPerDelivery, unit: httpUnit } = this.parsePricingResponse(httpResponse.body);
         if (httpPerDelivery <= 0) {
             throw new Error('Could not parse SNS HTTP delivery pricing from AWS Price List API response');
         }
+        // Guard: if the API already returns a per-100k price, use it as-is.
+        const httpDeliveryPer100k = httpUnit.includes('100,000') || httpUnit.includes('100000')
+            ? httpPerDelivery
+            : httpPerDelivery * 100_000;
 
         return {
-            publishPerMillion: publishPerRequest * 1000000,
-            httpDeliveryPer100k: httpPerDelivery * 100000,
+            publishPerMillion,
+            httpDeliveryPer100k,
             source: 'AWS Price List API'
         };
     }
 
     /**
-     * Get CloudWatch metrics for SNS topic (last 30 days)
+     * Get CloudWatch metrics for SNS topic (last 30 days).
+     *
+     * Also returns httpHttpsDeliveryFraction: the fraction of subscriptions that
+     * use HTTP or HTTPS protocols.  SNS CloudWatch does not expose per-protocol
+     * delivery counts, so we approximate billable HTTP/HTTPS deliveries by
+     * multiplying total deliveries by this fraction.  SQS and Lambda deliveries
+     * are free and must not be included in the delivery cost calculation.
      */
     private getSNSCloudWatchMetrics(): {
         numberOfMessagesPublished: number;
         numberOfNotificationsDelivered: number;
         numberOfNotificationsFailed: number;
+        httpHttpsDeliveryFraction: number;
     } | null {
         if (!this.state.topic_name) return null;
 
@@ -693,10 +714,29 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
                 }
             };
 
+            // Determine the fraction of subscriptions that are HTTP/HTTPS (billable).
+            // SQS and Lambda deliveries are free; applying the HTTP rate to them would
+            // overestimate costs for mixed-protocol topics.
+            let httpHttpsDeliveryFraction = 1; // default: assume all deliveries are billable
+            try {
+                if (this.state.topic_arn) {
+                    const subscriptions = this.listSubscriptionsByTopic(this.state.topic_arn);
+                    if (subscriptions.length > 0) {
+                        const httpHttpsCount = subscriptions.filter(
+                            s => s.Protocol === 'http' || s.Protocol === 'https'
+                        ).length;
+                        httpHttpsDeliveryFraction = httpHttpsCount / subscriptions.length;
+                    }
+                }
+            } catch (_e) {
+                // If subscription listing fails, fall back to 1 (conservative overestimate)
+            }
+
             return {
                 numberOfMessagesPublished: getMetric('NumberOfMessagesPublished'),
                 numberOfNotificationsDelivered: getMetric('NumberOfNotificationsDelivered'),
-                numberOfNotificationsFailed: getMetric('NumberOfNotificationsFailed')
+                numberOfNotificationsFailed: getMetric('NumberOfNotificationsFailed'),
+                httpHttpsDeliveryFraction
             };
         } catch (error) {
             return null;
@@ -737,17 +777,21 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
 
         if (metrics) {
             const publishCost = (metrics.numberOfMessagesPublished / 1000000) * pricing.publishPerMillion;
-            const deliveryCost = (metrics.numberOfNotificationsDelivered / 100000) * pricing.httpDeliveryPer100k;
+            // Only HTTP/HTTPS deliveries are billable; SQS and Lambda deliveries are free.
+            // httpHttpsDeliveryFraction is derived from the topic's subscription list.
+            const httpHttpsDeliveries = metrics.numberOfNotificationsDelivered * metrics.httpHttpsDeliveryFraction;
+            const deliveryCost = (httpHttpsDeliveries / 100000) * pricing.httpDeliveryPer100k;
             totalMonthlyCost = publishCost + deliveryCost;
 
             cli.output(`\n📈 Usage (Last 30 Days from CloudWatch):`);
             cli.output(`   Messages Published: ${metrics.numberOfMessagesPublished.toLocaleString()}`);
-            cli.output(`   Notifications Delivered: ${metrics.numberOfNotificationsDelivered.toLocaleString()}`);
+            cli.output(`   Notifications Delivered (total): ${metrics.numberOfNotificationsDelivered.toLocaleString()}`);
+            cli.output(`   HTTP/HTTPS Deliveries (billable): ${Math.round(httpHttpsDeliveries).toLocaleString()} (${Math.round(metrics.httpHttpsDeliveryFraction * 100)}% of subscriptions)`);
             cli.output(`   Notifications Failed: ${metrics.numberOfNotificationsFailed.toLocaleString()}`);
 
             cli.output(`\n💵 Cost Breakdown:`);
             cli.output(`   Publish Costs: $${publishCost.toFixed(4)}`);
-            cli.output(`   Delivery Costs: $${deliveryCost.toFixed(4)}`);
+            cli.output(`   HTTP/HTTPS Delivery Costs: $${deliveryCost.toFixed(4)}`);
         } else {
             cli.output(`\n⚠️ CloudWatch metrics unavailable - usage costs not included`);
         }
@@ -784,7 +828,9 @@ export class SNSTopic extends AWSSNSEntity<SNSTopicDefinition, SNSTopicState> {
             const metrics = this.getSNSCloudWatchMetrics();
             if (metrics) {
                 const publishCost = (metrics.numberOfMessagesPublished / 1000000) * pricing.publishPerMillion;
-                const deliveryCost = (metrics.numberOfNotificationsDelivered / 100000) * pricing.httpDeliveryPer100k;
+                // Only HTTP/HTTPS deliveries are billable; SQS and Lambda deliveries are free.
+                const httpHttpsDeliveries = metrics.numberOfNotificationsDelivered * metrics.httpHttpsDeliveryFraction;
+                const deliveryCost = (httpHttpsDeliveries / 100000) * pricing.httpDeliveryPer100k;
                 totalMonthlyCost = publishCost + deliveryCost;
             }
 
