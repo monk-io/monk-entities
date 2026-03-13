@@ -16,4 +16,5 @@
 /// <reference path="./helpers.d.ts" />
 /// <reference path="./crypto.d.ts" />
 /// <reference path="./digitalocean.d.ts" />
+/// <reference path="./hetzner.d.ts" />
 /// <reference path="./monkrpc.d.ts" />
