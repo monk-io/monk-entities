@@ -700,10 +700,16 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
 
     /**
      * Get CloudWatch metrics for Neptune instance (last 30 days)
+     *
+     * I/O metrics use VolumeReadIOPs and VolumeWriteIOPs (Sum over the period),
+     * which measure actual billed storage-level I/O operations. These are fetched
+     * with a single 30-day period so the Sum equals total monthly I/O ops directly.
+     * GremlinRequestsPerSec / SparqlRequestsPerSec are API-level request counts and
+     * do NOT map 1:1 to storage I/O — a single query can generate many storage ops.
      */
     private getCloudWatchNeptuneMetrics(): {
-        gremlinRequestsPerSecond: number;
-        sparqlRequestsPerSecond: number;
+        volumeReadIOPs: number;
+        volumeWriteIOPs: number;
         volumeBytesUsed: number;
     } | null {
         try {
@@ -747,8 +753,9 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
             };
 
             return {
-                gremlinRequestsPerSecond: getMetric('GremlinRequestsPerSec'),
-                sparqlRequestsPerSecond: getMetric('SparqlRequestsPerSec'),
+                // Sum over the 30-day period = total I/O operations billed this month
+                volumeReadIOPs: getMetric('VolumeReadIOPs', 'Sum'),
+                volumeWriteIOPs: getMetric('VolumeWriteIOPs', 'Sum'),
                 volumeBytesUsed: getMetric('VolumeBytesUsed', 'Average')
             };
         } catch (error) {
@@ -813,19 +820,17 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
         }
 
         // I/O cost (from CloudWatch if available)
-        // GremlinRequestsPerSec and SparqlRequestsPerSec are Average values over the window.
-        // Multiply by seconds in 30 days to get total monthly I/O requests.
+        // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over the 30-day period,
+        // so they directly represent total billed storage I/O operations for the month.
         let ioCostMonthly = 0;
-        const secondsPerMonth = 30 * 24 * 3600;
         cli.output(`\n📈 I/O Costs:`);
-        cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O requests`);
+        cli.output(`   Rate: $${pricing.ioPerMillion.toFixed(2)} per million I/O operations`);
         if (metrics) {
-            const totalRequestsPerSec = metrics.gremlinRequestsPerSecond + metrics.sparqlRequestsPerSecond;
-            const totalMonthlyRequests = totalRequestsPerSec * secondsPerMonth;
-            ioCostMonthly = (totalMonthlyRequests / 1_000_000) * pricing.ioPerMillion;
-            cli.output(`   Gremlin Requests/sec (avg): ${metrics.gremlinRequestsPerSecond.toFixed(2)}`);
-            cli.output(`   SPARQL Requests/sec (avg): ${metrics.sparqlRequestsPerSecond.toFixed(2)}`);
-            cli.output(`   Total Monthly Requests: ~${Math.round(totalMonthlyRequests).toLocaleString()}`);
+            const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
+            ioCostMonthly = (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
+            cli.output(`   Volume Read I/O ops (30d): ${Math.round(metrics.volumeReadIOPs).toLocaleString()}`);
+            cli.output(`   Volume Write I/O ops (30d): ${Math.round(metrics.volumeWriteIOPs).toLocaleString()}`);
+            cli.output(`   Total Monthly I/O ops: ~${Math.round(totalMonthlyIOPs).toLocaleString()}`);
             cli.output(`   Monthly I/O Cost: $${ioCostMonthly.toFixed(2)}`);
         } else {
             cli.output(`   ⚠️ CloudWatch metrics unavailable - I/O cost not included`);
@@ -885,12 +890,10 @@ export class Instance extends AWSNeptuneEntity<InstanceDefinition, InstanceState
                     const storageGB = metrics.volumeBytesUsed / (1024 * 1024 * 1024);
                     totalMonthlyCost += storageGB * pricing.storagePerGBMonth;
                 }
-                // GremlinRequestsPerSec and SparqlRequestsPerSec are Average values;
-                // multiply by seconds in 30 days to get total monthly I/O requests.
-                const secondsPerMonth = 30 * 24 * 3600;
-                const totalRequestsPerSec = metrics.gremlinRequestsPerSecond + metrics.sparqlRequestsPerSecond;
-                const totalMonthlyRequests = totalRequestsPerSec * secondsPerMonth;
-                totalMonthlyCost += (totalMonthlyRequests / 1_000_000) * pricing.ioPerMillion;
+                // VolumeReadIOPs and VolumeWriteIOPs are fetched as Sum over 30 days,
+                // so they directly represent total billed storage I/O ops for the month.
+                const totalMonthlyIOPs = metrics.volumeReadIOPs + metrics.volumeWriteIOPs;
+                totalMonthlyCost += (totalMonthlyIOPs / 1_000_000) * pricing.ioPerMillion;
             }
 
             const result = {
