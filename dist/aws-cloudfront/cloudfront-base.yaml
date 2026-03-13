@@ -3,5 +3,5 @@ namespace: aws-cloudfront
 cloudfront-base:
   defines: module
   metadata:
-    version-hash: d6491c59b204
+    version-hash: 81d5872b9074
   source: <<< cloudfront-base.js

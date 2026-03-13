@@ -1,5 +1,5 @@
 REPO aws-api-gateway
-VERSION_HASH a62ed87bb5aa
+VERSION_HASH 31c7a22b803e
 DESCRIPTION API management for building and securing APIs.
 HOSTING managed
 TAGS aws,api,gateway

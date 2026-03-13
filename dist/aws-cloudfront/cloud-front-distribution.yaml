@@ -22,7 +22,7 @@ cloud-front-distribution:
       Works with:
       - `aws-s3/bucket` - S3 bucket as origin for static content
       - `aws-lambda/function` - Lambda@Edge for request/response customization
-    version-hash: d6491c59b204
+    version-hash: 81d5872b9074
   schema:
     region:
       type: string

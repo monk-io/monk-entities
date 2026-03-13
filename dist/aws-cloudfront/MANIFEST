@@ -1,5 +1,5 @@
 REPO aws-cloudfront
-VERSION_HASH d6491c59b204
+VERSION_HASH 81d5872b9074
 DESCRIPTION Global CDN and edge delivery.
 HOSTING managed
 TAGS aws,cloudfront,cdn,edge

@@ -826,9 +826,9 @@ ${pathsXml}
     }
 
     /**
-     * Extract the unitOfMeasure string from the first price dimension in an AWS
-     * Price List API response body. Returns a lower-cased string so callers can
-     * check for keywords like "10,000" or "million".
+     * Extract the unitOfMeasure string from the price dimension that carries a
+     * non-zero price in an AWS Price List API response body. Returns a lower-cased
+     * string so callers can check for keywords like "10,000" or "million".
      *
      * The AWS Price List API stores pricing in two ways depending on the service:
      *   - Per individual unit: pricePerUnit = 0.0000010, unit = "per request"
@@ -836,21 +836,28 @@ ${pathsXml}
      *
      * Reading the unit field prevents applying a bulk-quantity multiplier when the
      * API has already expressed the price at that scale.
+     *
+     * Iterates all PriceList items (not just PriceList[0]) and returns the unit from
+     * the same dimension that has a non-zero price, ensuring the unit always matches
+     * the price returned by parsePricingResponse for the same response body.
      */
     private parsePricingUnit(responseBody: string): string {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) return '';
-            const product = typeof data.PriceList[0] === 'string'
-                ? JSON.parse(data.PriceList[0])
-                : data.PriceList[0];
-            const terms = product.terms?.OnDemand;
-            if (!terms) return '';
-            for (const termKey of Object.keys(terms)) {
-                const priceDimensions = terms[termKey].priceDimensions;
-                for (const dimKey of Object.keys(priceDimensions)) {
-                    const unit: string = priceDimensions[dimKey].unit || '';
-                    if (unit) return unit.toLowerCase();
+            for (const priceItem of data.PriceList) {
+                const product = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
+                const terms = product.terms?.OnDemand;
+                if (!terms) continue;
+                for (const termKey of Object.keys(terms)) {
+                    const priceDimensions = terms[termKey].priceDimensions;
+                    for (const dimKey of Object.keys(priceDimensions)) {
+                        const dim = priceDimensions[dimKey];
+                        const price = parseFloat(dim.pricePerUnit?.USD || '0');
+                        if (price > 0) {
+                            return (dim.unit || '').toLowerCase();
+                        }
+                    }
                 }
             }
         } catch {
