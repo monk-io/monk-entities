@@ -3,5 +3,5 @@ namespace: aws-dynamo-db
 dynamo-db-base:
   defines: module
   metadata:
-    version-hash: d44530ab04d8
+    version-hash: 949cadcff61f
   source: <<< dynamo-db-base.js

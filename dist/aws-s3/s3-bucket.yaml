@@ -21,7 +21,7 @@ s3-bucket:
       - `aws-iam/role` - Create IAM roles with S3 access permissions
       - `aws-lambda/function` - Store Lambda deployment packages
       - `aws-cloudfront/distribution` - Serve static content via CDN
-    version-hash: b9846217413b
+    version-hash: 876ff47580d7
   schema:
     region:
       type: string
@@ -254,6 +254,8 @@ s3-bucket:
     empty-bucket: ''
     get-bucket-statistics: ''
     get-website-info: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 5

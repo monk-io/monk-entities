@@ -22,7 +22,7 @@ database-account:
       Works with:
       - `azure-cosmosdb/database` - Create databases within the account
       - `azure-cosmosdb/container` - Create containers within databases
-    version-hash: da28c99abf2b
+    version-hash: 50ab373ca587
   schema:
     subscription_id:
       type: string
@@ -241,6 +241,8 @@ database-account:
       description: Earliest restore time for continuous backup (ISO 8601 format)
   lifecycle:
     sync: <<< database-account-sync.js
+    get-cost-estimate: ''
+    costs: ''
     get-backup-info: ''
     list-restorable-accounts: ''
     list-restorable-databases: ''
@@ -257,4 +259,5 @@ database-account:
     - azure-cosmosdb/azure-cosmosdb-base
     - cli
     - secret
+    - http
     - monkec/base

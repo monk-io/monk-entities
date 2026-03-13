@@ -59,8 +59,8 @@ const common = require("gcp/common");
 const MEMORYSTORE_REDIS_API_URL = common.MEMORYSTORE_REDIS_API_URL;
 const isOperationDone = common.isOperationDone;
 const isOperationFailed = common.isOperationFailed;
-var _getRestoreStatus_dec, _restore_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _getInfo_dec, _a, _init;
-var _MemorystoreRedis = class _MemorystoreRedis extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
+var _getRestoreStatus_dec, _restore_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _costs_dec, _getCostEstimate_dec, _getInfo_dec, _a, _init;
+var _MemorystoreRedis = class _MemorystoreRedis extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -340,6 +340,210 @@ var _MemorystoreRedis = class _MemorystoreRedis extends (_a = GcpEntity, _getInf
     }
     cli.output(JSON.stringify(instance, null, 2));
   }
+  // =========================================================================
+  // Cost Estimation
+  // =========================================================================
+  /**
+   * Extract price from a GCP Billing SKU
+   */
+  extractPriceFromSku(sku) {
+    try {
+      const pricingInfo = sku.pricingInfo;
+      if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+        return 0;
+      }
+      const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+      if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+        return 0;
+      }
+      for (const rate of tieredRates) {
+        const unitPrice = rate.unitPrice;
+        if (unitPrice) {
+          const units = parseInt(unitPrice.units || "0", 10);
+          const nanos = parseInt(unitPrice.nanos || "0", 10);
+          const price = units + nanos / 1e9;
+          if (price > 0) {
+            return price;
+          }
+        }
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
+  /**
+   * Get Memorystore for Redis pricing from GCP Cloud Billing Catalog API
+   */
+  fetchMemorystoreRedisPricing() {
+    try {
+      const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
+      const serviceId = "3905-3524-EC04";
+      const skusUrl = `${billingApiUrl}/services/${serviceId}/skus?currencyCode=USD`;
+      const response = this.get(skusUrl);
+      if (response.skus && Array.isArray(response.skus)) {
+        const tier = (this.definition.tier || "BASIC").toUpperCase();
+        const region = this.region;
+        let perGbPerHour = 0;
+        let networkEgressPerGb = 0;
+        for (const sku of response.skus) {
+          const desc = (sku.description || "").toLowerCase();
+          const serviceRegions = sku.serviceRegions || [];
+          const regionMatch = serviceRegions.some((r) => r.toLowerCase() === region.toLowerCase());
+          if (!regionMatch) continue;
+          const price = this.extractPriceFromSku(sku);
+          if (price <= 0) continue;
+          if (perGbPerHour === 0) {
+            if (tier === "BASIC" && desc.includes("basic") && desc.includes("redis") && desc.includes("capacity")) {
+              perGbPerHour = price;
+            }
+            if (tier === "STANDARD_HA" && desc.includes("standard") && desc.includes("redis") && desc.includes("capacity")) {
+              perGbPerHour = price;
+            }
+          }
+          if (networkEgressPerGb === 0 && desc.includes("network") && (desc.includes("egress") || desc.includes("internet"))) {
+            networkEgressPerGb = price;
+          }
+        }
+        if (perGbPerHour > 0) {
+          return { perGbPerHour, networkEgressPerGb, source: "GCP Cloud Billing Catalog API" };
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch Memorystore Redis pricing from GCP API: ${error.message}`);
+    }
+    throw new Error("Could not retrieve Memorystore Redis pricing from GCP Cloud Billing Catalog API");
+  }
+  /**
+   * Get Cloud Monitoring metrics for Memorystore Redis (last 30 days).
+   * Returns network egress bytes.
+   */
+  getMemorystoreMetrics() {
+    try {
+      const monitoringApiUrl = "https://monitoring.googleapis.com/v3";
+      const now = /* @__PURE__ */ new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+      const endTime = now.toISOString();
+      const startTime = thirtyDaysAgo.toISOString();
+      const filter = encodeURIComponent(
+        `metric.type="redis.googleapis.com/stats/network_traffic" AND resource.labels.instance_id="${this.definition.name}" AND metric.labels.direction="output"`
+      );
+      const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?filter=${filter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
+      const response = this.get(url);
+      let totalBytes = 0;
+      if (response.timeSeries && response.timeSeries.length > 0) {
+        for (const series of response.timeSeries) {
+          for (const point of series.points || []) {
+            totalBytes += parseFloat(point.value?.int64Value || point.value?.doubleValue || "0");
+          }
+        }
+      }
+      return { networkEgressBytes: totalBytes };
+    } catch {
+      return { networkEgressBytes: 0 };
+    }
+  }
+  getCostEstimate(_args) {
+    const instanceName = this.definition.name;
+    cli.output(`
+\u{1F4B0} Cost Estimate for Memorystore Redis: ${instanceName}`);
+    cli.output(`${"=".repeat(60)}`);
+    const tier = this.definition.tier || "BASIC";
+    const memorySizeGb = this.definition.memory_size_gb;
+    const replicaCount = this.definition.replica_count || 0;
+    const readReplicasMode = this.definition.read_replicas_mode || "READ_REPLICAS_DISABLED";
+    cli.output(`
+\u{1F4CA} Instance Configuration:`);
+    cli.output(`   Name: ${instanceName}`);
+    cli.output(`   Project: ${this.projectId}`);
+    cli.output(`   Region: ${this.region}`);
+    cli.output(`   Tier: ${tier}`);
+    cli.output(`   Memory: ${memorySizeGb} GB`);
+    cli.output(`   Redis Version: ${this.definition.redis_version || "default"}`);
+    if (readReplicasMode !== "READ_REPLICAS_DISABLED") {
+      cli.output(`   Read Replicas: ${replicaCount}`);
+    }
+    const pricing = this.fetchMemorystoreRedisPricing();
+    const hoursPerMonth = 730;
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Per GB/hour: $${pricing.perGbPerHour.toFixed(4)}`);
+    cli.output(`   Per GB/month: $${(pricing.perGbPerHour * hoursPerMonth).toFixed(2)}`);
+    const primaryMonthlyCost = memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+    cli.output(`
+\u{1F4B5} Cost Breakdown (Monthly):`);
+    cli.output(`   Primary Instance (${memorySizeGb} GB): $${primaryMonthlyCost.toFixed(2)}`);
+    let totalMonthlyCost = primaryMonthlyCost;
+    if (tier === "STANDARD_HA") {
+      cli.output(`   HA Replica (included in Standard tier pricing): $0.00`);
+    }
+    if (readReplicasMode !== "READ_REPLICAS_DISABLED" && replicaCount > 0) {
+      const replicaCost = replicaCount * memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+      totalMonthlyCost += replicaCost;
+      cli.output(`   Read Replicas (${replicaCount} x ${memorySizeGb} GB): $${replicaCost.toFixed(2)}`);
+    }
+    const metrics = this.getMemorystoreMetrics();
+    if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+      const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+      const egressCost = egressGb * pricing.networkEgressPerGb;
+      totalMonthlyCost += egressCost;
+      cli.output(`   Network Egress: ${egressGb.toFixed(2)} GB \xD7 $${pricing.networkEgressPerGb.toFixed(4)}/GB = $${egressCost.toFixed(2)}`);
+    } else if (pricing.networkEgressPerGb > 0) {
+      cli.output(`   Network Egress: No egress measured (rate: $${pricing.networkEgressPerGb.toFixed(4)}/GB)`);
+    } else {
+      cli.output(`   Network Egress: Egress rate not available from API`);
+    }
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Pricing is per GB of provisioned capacity per hour`);
+    cli.output(`   - Standard HA tier includes automatic failover replica`);
+    cli.output(`   - Network egress based on Cloud Monitoring metrics (last 30 days)`);
+    cli.output(`   - No free tier for Memorystore`);
+  }
+  costs() {
+    try {
+      const pricing = this.fetchMemorystoreRedisPricing();
+      const memorySizeGb = this.definition.memory_size_gb;
+      const hoursPerMonth = 730;
+      let totalMonthlyCost = memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+      const replicaCount = this.definition.replica_count || 0;
+      const readReplicasMode = this.definition.read_replicas_mode || "READ_REPLICAS_DISABLED";
+      if (readReplicasMode !== "READ_REPLICAS_DISABLED" && replicaCount > 0) {
+        totalMonthlyCost += replicaCount * memorySizeGb * pricing.perGbPerHour * hoursPerMonth;
+      }
+      const metrics = this.getMemorystoreMetrics();
+      if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+        const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        totalMonthlyCost += egressGb * pricing.networkEgressPerGb;
+      }
+      const result = {
+        type: "gcp-memorystore-redis",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "gcp-memorystore-redis",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
   getBackupInfo(_args) {
     cli.output(`==================================================`);
     cli.output(`\u{1F4E6} Backup Information for Memorystore Redis`);
@@ -516,6 +720,8 @@ Usage: monk do namespace/instance get-restore-status operation_name="projects/..
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _MemorystoreRedis);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _MemorystoreRedis);
+__decorateElement(_init, 1, "costs", _costs_dec, _MemorystoreRedis);
 __decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _MemorystoreRedis);
 __decorateElement(_init, 1, "createSnapshot", _createSnapshot_dec, _MemorystoreRedis);
 __decorateElement(_init, 1, "listSnapshots", _listSnapshots_dec, _MemorystoreRedis);

@@ -22,7 +22,7 @@ sqs-queue:
       - `aws-lambda/function` - Trigger Lambda functions from queue messages
       - `aws-sns/topic` - Subscribe queue to SNS topic for fanout patterns
       - `aws-iam/role` - Grant queue access to other services
-    version-hash: 79428ecb12e9
+    version-hash: b9f7d1a4e944
   schema:
     region:
       type: string
@@ -134,6 +134,8 @@ sqs-queue:
     receive-messages: ''
     purge-messages: ''
     get-statistics: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 5
@@ -145,4 +147,5 @@ sqs-queue:
     - aws-sqs/sqs-base
     - monkec/base
     - cli
+    - cloud/aws
     - aws-sqs/common

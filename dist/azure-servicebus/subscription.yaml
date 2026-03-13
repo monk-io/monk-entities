@@ -22,7 +22,7 @@ subscription:
       Depends on:
       - `azure-servicebus/namespace` - Parent namespace must exist
       - `azure-servicebus/topic` - Parent topic must exist
-    version-hash: b3d1c1813873
+    version-hash: 36ae818a70c4
   schema:
     subscription_id:
       type: string

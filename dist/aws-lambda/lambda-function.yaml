@@ -23,7 +23,7 @@ lambda-function:
       - `aws-api-gateway/api-gateway` - HTTP endpoints for Lambda functions
       - `aws-sqs/queue` - Event source mappings for queue processing
       - `aws-sns/topic` - Subscribe to topic notifications
-    version-hash: a20663d70a06
+    version-hash: 60c8873570a0
   schema:
     region:
       type: string
@@ -252,6 +252,8 @@ lambda-function:
     invoke: ''
     get-logs: ''
     update-code: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 10
@@ -263,3 +265,4 @@ lambda-function:
     - aws-lambda/lambda-base
     - monkec/base
     - cli
+    - cloud/aws

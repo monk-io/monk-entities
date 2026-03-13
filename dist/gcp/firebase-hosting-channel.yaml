@@ -33,7 +33,7 @@ firebase-hosting-channel:
 
       ## Composing with Other Entities
       - `gcp/firebase-hosting-site` - The parent site for this channel
-    version-hash: e313ae71ccd1
+    version-hash: 7aff9e03e05d
   schema:
     project:
       type: string

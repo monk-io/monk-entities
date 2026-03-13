@@ -3,5 +3,5 @@ VERSION_HASH d6f2dba6e42b
 DESCRIPTION Managed DNS and CDN.
 HOSTING managed
 TAGS cloudflare,dns,cdn
-LOAD cloudflare-dns-record.yaml cloudflare-tunnel.yaml cloudflare-dns-zone.yaml cloudflare-tunnel-application.yaml cloudflare-base.yaml
-RESOURCES cloudflare-base.js cloudflare-tunnel-sync.js cloudflare-dns-record-sync.js cloudflare-tunnel-application-sync.js cloudflare-dns-zone-sync.js
+LOAD cloudflare-tunnel.yaml cloudflare-base.yaml cloudflare-dns-zone.yaml cloudflare-dns-record.yaml cloudflare-tunnel-application.yaml
+RESOURCES cloudflare-tunnel-sync.js cloudflare-base.js cloudflare-dns-zone-sync.js cloudflare-dns-record-sync.js cloudflare-tunnel-application-sync.js

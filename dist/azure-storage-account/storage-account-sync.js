@@ -53,10 +53,11 @@ const azureStorageAccountBase = require("azure-storage-account/azure-storage-acc
 const AzureStorageEntity = azureStorageAccountBase.AzureStorageEntity;
 const cli = require("cli");
 const secret = require("secret");
+const http = require("http");
 const base = require("monkec/base");
 const action = base.action;
-var _listContainers_dec, _regenerateKey_dec, _getInfo_dec, _a, _init;
-var _StorageAccount = class _StorageAccount extends (_a = AzureStorageEntity, _getInfo_dec = [action("get-info")], _regenerateKey_dec = [action("regenerate-key")], _listContainers_dec = [action("list-containers")], _a) {
+var _costs_dec, _getCostEstimate_dec, _listContainers_dec, _regenerateKey_dec, _getInfo_dec, _a, _init;
+var _StorageAccount = class _StorageAccount extends (_a = AzureStorageEntity, _getInfo_dec = [action("get-info")], _regenerateKey_dec = [action("regenerate-key")], _listContainers_dec = [action("list-containers")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -501,11 +502,502 @@ Found ${containers.length} container(s):
       throw new Error(`List containers failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+  getCostEstimate(_args) {
+    cli.output(`==================================================`);
+    cli.output(`\u{1F4B0} Cost Estimate for Azure Storage Account`);
+    cli.output(`Account: ${this.definition.account_name}`);
+    cli.output(`==================================================`);
+    const account = this.checkResourceExists(this.definition.account_name);
+    if (!account) {
+      throw new Error(`Storage account ${this.definition.account_name} not found`);
+    }
+    const properties = account.properties;
+    const sku = account.sku;
+    const skuName = sku?.name || this.definition.sku.name;
+    const accessTier = properties?.accessTier || this.definition.access_tier || "Hot";
+    const location = account.location || this.definition.location;
+    const accountKind = account.kind || this.definition.account_kind || "StorageV2";
+    cli.output(`
+\u{1F4CA} Account Configuration:`);
+    cli.output(`   Location: ${location}`);
+    cli.output(`   SKU: ${skuName}`);
+    cli.output(`   Kind: ${accountKind}`);
+    cli.output(`   Access Tier: ${accessTier}`);
+    const storageStats = this.getStorageStatistics();
+    cli.output(`
+\u{1F4E6} Storage Statistics:`);
+    cli.output(`   Total Containers: ${storageStats.containerCount}`);
+    cli.output(`   Total Blobs: ${storageStats.blobCount}`);
+    cli.output(`   Total Size: ${this.formatBytes(storageStats.totalBytes)}`);
+    const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
+    if (!pricing) {
+      cli.output(`
+\u274C Error: Could not fetch pricing from Azure Retail Prices API`);
+      cli.output(`   Location: ${location}`);
+      cli.output(`   SKU: ${skuName}`);
+      cli.output(`   Access Tier: ${accessTier}`);
+      cli.output(`
+Please check that the Azure Retail Prices API is accessible.`);
+      return;
+    }
+    const metrics = this.getAzureMonitorMetrics();
+    const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
+    const storageCost = storageGb * pricing.storagePerGb;
+    const writeOps = metrics.writeOperations;
+    const readOps = metrics.readOperations;
+    const listOps = metrics.listOperations;
+    const writeOpsCost = writeOps / 1e4 * pricing.writeOperationsPer10k;
+    const readOpsCost = readOps / 1e4 * pricing.readOperationsPer10k;
+    const listOpsCost = listOps / 1e4 * pricing.listOperationsPer10k;
+    const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
+    const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
+    const networkCost = this.calculateEgressCost(egressGb);
+    let retrievalCost = 0;
+    if (accessTier === "Cool" || accessTier === "Archive") {
+      const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
+      retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
+    }
+    const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
+    cli.output(`
+\u{1F4B5} Cost Breakdown (Monthly):`);
+    cli.output(`   Storage: $${storageCost.toFixed(2)}`);
+    cli.output(`      \u2514\u2500 ${storageGb.toFixed(2)} GB \xD7 $${pricing.storagePerGb.toFixed(4)}/GB = $${storageCost.toFixed(2)}`);
+    cli.output(`   Operations: $${operationsCost.toFixed(2)}`);
+    cli.output(`      \u2514\u2500 Write: ${writeOps.toLocaleString()} ops \xD7 $${pricing.writeOperationsPer10k.toFixed(4)}/10k = $${writeOpsCost.toFixed(2)}`);
+    cli.output(`      \u2514\u2500 Read: ${readOps.toLocaleString()} ops \xD7 $${pricing.readOperationsPer10k.toFixed(4)}/10k = $${readOpsCost.toFixed(2)}`);
+    cli.output(`      \u2514\u2500 List: ${listOps.toLocaleString()} ops \xD7 $${pricing.listOperationsPer10k.toFixed(4)}/10k = $${listOpsCost.toFixed(2)}`);
+    cli.output(`   Network Egress: $${networkCost.toFixed(2)}`);
+    cli.output(`      \u2514\u2500 ${egressGb.toFixed(2)} GB egress`);
+    if (retrievalCost > 0) {
+      cli.output(`   Data Retrieval: $${retrievalCost.toFixed(2)}`);
+    }
+    cli.output(`   \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+    cli.output(`   TOTAL: $${totalCost.toFixed(2)}/month`);
+    cli.output(`
+\u{1F4C8} Azure Monitor Metrics (last 30 days):`);
+    cli.output(`   Write Operations: ${writeOps.toLocaleString()}`);
+    cli.output(`   Read Operations: ${readOps.toLocaleString()}`);
+    cli.output(`   List Operations: ${listOps.toLocaleString()}`);
+    cli.output(`   Egress: ${this.formatBytes(metrics.egressBytes)}`);
+    cli.output(`   Ingress: ${this.formatBytes(metrics.ingressBytes)}`);
+    const summary = {
+      account: {
+        name: this.definition.account_name,
+        subscription_id: this.definition.subscription_id,
+        resource_group: this.definition.resource_group_name,
+        location,
+        sku: skuName,
+        kind: accountKind,
+        access_tier: accessTier
+      },
+      storage_statistics: {
+        container_count: storageStats.containerCount,
+        blob_count: storageStats.blobCount,
+        total_bytes: storageStats.totalBytes,
+        total_gb: parseFloat(storageGb.toFixed(2))
+      },
+      pricing_rates: {
+        source: pricing.source,
+        currency: "USD",
+        storage_per_gb_month: pricing.storagePerGb,
+        write_operations_per_10k: pricing.writeOperationsPer10k,
+        read_operations_per_10k: pricing.readOperationsPer10k,
+        list_operations_per_10k: pricing.listOperationsPer10k,
+        data_retrieval_per_gb: pricing.dataRetrievalPerGb
+      },
+      cost_breakdown: {
+        storage_monthly: parseFloat(storageCost.toFixed(2)),
+        operations_monthly: parseFloat(operationsCost.toFixed(2)),
+        network_monthly: parseFloat(networkCost.toFixed(2)),
+        retrieval_monthly: parseFloat(retrievalCost.toFixed(2)),
+        total_monthly: parseFloat(totalCost.toFixed(2))
+      },
+      metrics: {
+        period_days: 30,
+        write_operations: writeOps,
+        read_operations: readOps,
+        list_operations: listOps,
+        egress_bytes: metrics.egressBytes,
+        ingress_bytes: metrics.ingressBytes
+      },
+      disclaimer: "Pricing from Azure Retail Prices API. Metrics from Azure Monitor. Actual costs may vary based on reserved capacity and additional features."
+    };
+    cli.output(`
+\u{1F4CB} JSON Summary:`);
+    cli.output(JSON.stringify(summary, null, 2));
+    cli.output(`
+==================================================`);
+  }
+  costs(_args) {
+    const account = this.checkResourceExists(this.definition.account_name);
+    if (!account) {
+      const result2 = {
+        type: "azure-storage-account",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result2));
+      return;
+    }
+    const properties = account.properties;
+    const sku = account.sku;
+    const skuName = sku?.name || this.definition.sku.name;
+    const accessTier = properties?.accessTier || this.definition.access_tier || "Hot";
+    const location = account.location || this.definition.location;
+    const storageStats = this.getStorageStatistics();
+    const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
+    if (!pricing) {
+      const errorResult = {
+        type: "azure-storage-account",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: "Could not fetch pricing from Azure Retail Prices API"
+          }
+        }
+      };
+      cli.output(JSON.stringify(errorResult));
+      return;
+    }
+    const metrics = this.getAzureMonitorMetrics();
+    const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
+    const storageCost = storageGb * pricing.storagePerGb;
+    const writeOps = metrics.writeOperations;
+    const readOps = metrics.readOperations;
+    const listOps = metrics.listOperations;
+    const writeOpsCost = writeOps / 1e4 * pricing.writeOperationsPer10k;
+    const readOpsCost = readOps / 1e4 * pricing.readOperationsPer10k;
+    const listOpsCost = listOps / 1e4 * pricing.listOperationsPer10k;
+    const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
+    const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
+    const networkCost = this.calculateEgressCost(egressGb);
+    let retrievalCost = 0;
+    if (accessTier === "Cool" || accessTier === "Archive") {
+      const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
+      retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
+    }
+    const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
+    const result = {
+      type: "azure-storage-account",
+      costs: {
+        month: {
+          amount: totalCost.toFixed(2),
+          currency: "USD"
+        }
+      }
+    };
+    cli.output(JSON.stringify(result));
+  }
+  /**
+   * Get storage statistics by listing containers and blobs
+   */
+  getStorageStatistics() {
+    const stats = {
+      containerCount: 0,
+      blobCount: 0,
+      totalBytes: 0
+    };
+    try {
+      const containersPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.account_name}/blobServices/default/containers?api-version=${this.apiVersion}`;
+      const containersResponse = this.makeAzureRequest("GET", containersPath);
+      if (!containersResponse.error && containersResponse.body) {
+        const containersData = JSON.parse(containersResponse.body);
+        const containers = containersData.value || [];
+        stats.containerCount = containers.length;
+      }
+    } catch (error) {
+      cli.output(`Warning: Could not get storage statistics: ${error.message}`);
+    }
+    try {
+      const metricsPath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.account_name}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=UsedCapacity&timespan=PT1H&interval=PT1H`;
+      const metricsResponse = this.makeAzureRequest("GET", metricsPath);
+      if (!metricsResponse.error && metricsResponse.body) {
+        const metricsData = JSON.parse(metricsResponse.body);
+        const metrics = metricsData.value || [];
+        for (const metric of metrics) {
+          if (metric.name?.value === "UsedCapacity") {
+            const timeseries = metric.timeseries || [];
+            if (timeseries.length > 0) {
+              const data = timeseries[0].data || [];
+              if (data.length > 0) {
+                const latestValue = data[data.length - 1];
+                stats.totalBytes = latestValue.average || latestValue.total || 0;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      cli.output(`Warning: Could not get capacity metrics: ${error.message}`);
+    }
+    return stats;
+  }
+  /**
+   * Get Azure Storage pricing from Azure Retail Prices API
+   */
+  /**
+   * Get Azure Storage pricing from Azure Retail Prices API.
+   * Returns null only if no matching SKU was found in the API response.
+   * Throws if the API call itself fails (network error, HTTP error, etc.)
+   * so callers can surface the root cause.
+   */
+  getAzureStoragePricing(location, skuName, accessTier) {
+    const apiPricing = this.fetchAzureRetailPrices(location, skuName, accessTier);
+    if (apiPricing) {
+      return { ...apiPricing, source: "Azure Retail Prices API" };
+    }
+    return null;
+  }
+  /**
+   * Fetch pricing from Azure Retail Prices API
+   */
+  fetchAzureRetailPrices(location, skuName, accessTier) {
+    const baseUrl = "https://prices.azure.com/api/retail/prices";
+    const armRegionName = location.toLowerCase().replace(/\s+/g, "");
+    let redundancy = "LRS";
+    if (skuName.includes("GRS")) redundancy = "GRS";
+    else if (skuName.includes("RAGRS")) redundancy = "RA-GRS";
+    else if (skuName.includes("ZRS")) redundancy = "ZRS";
+    else if (skuName.includes("GZRS")) redundancy = "GZRS";
+    else if (skuName.includes("RAGZRS")) redundancy = "RA-GZRS";
+    const tierFilter = accessTier.toLowerCase();
+    const filter = `serviceName eq 'Storage' and armRegionName eq '${armRegionName}'`;
+    const encodedFilter = encodeURIComponent(filter);
+    const url = `${baseUrl}?$filter=${encodedFilter}`;
+    try {
+      const response = this.makeExternalRequest(url);
+      if (!response || !response.Items) {
+        return null;
+      }
+      const items = response.Items;
+      let storagePerGb = 0;
+      let writeOperationsPer10k = 0;
+      let readOperationsPer10k = 0;
+      let listOperationsPer10k = 0;
+      let dataRetrievalPerGb = 0;
+      for (const item of items) {
+        const productName = (item.productName || "").toLowerCase();
+        const meterName = (item.meterName || "").toLowerCase();
+        const itemSkuName = (item.skuName || "").toLowerCase();
+        const price = item.unitPrice || 0;
+        if (!itemSkuName.includes(redundancy.toLowerCase().replace("-", " "))) {
+          continue;
+        }
+        if (meterName.includes(tierFilter) && meterName.includes("data stored") && productName.includes("blob")) {
+          storagePerGb = price;
+        }
+        if (meterName.includes(tierFilter) && productName.includes("blob")) {
+          if (meterName.includes("write operations")) {
+            writeOperationsPer10k = price;
+          } else if (meterName.includes("read operations")) {
+            readOperationsPer10k = price;
+          } else if (meterName.includes("list") && meterName.includes("operations")) {
+            listOperationsPer10k = price;
+          } else if (meterName.includes("data retrieval")) {
+            dataRetrievalPerGb = price;
+          }
+        }
+      }
+      if (storagePerGb > 0) {
+        if (writeOperationsPer10k <= 0 || readOperationsPer10k <= 0 || listOperationsPer10k <= 0) {
+          const missing = [];
+          if (writeOperationsPer10k <= 0) missing.push("write operations");
+          if (readOperationsPer10k <= 0) missing.push("read operations");
+          if (listOperationsPer10k <= 0) missing.push("list operations");
+          throw new Error(`Incomplete Azure Storage pricing: missing rates for ${missing.join(", ")}`);
+        }
+        return {
+          storagePerGb,
+          writeOperationsPer10k,
+          readOperationsPer10k,
+          listOperationsPer10k,
+          dataRetrievalPerGb
+        };
+      }
+      return null;
+    } catch (error) {
+      throw error;
+    }
+  }
+  /**
+   * Make an external HTTP request (for Azure Retail Prices API which doesn't need Azure auth)
+   */
+  makeExternalRequest(url) {
+    try {
+      const response = http.get(url, {
+        headers: { "Accept": "application/json" }
+      });
+      if (response.body) {
+        return JSON.parse(response.body);
+      }
+      return null;
+    } catch (error) {
+      throw new Error(`External HTTP request to ${url} failed: ${error.message}`);
+    }
+  }
+  /**
+   * Get metrics from Azure Monitor
+   */
+  getAzureMonitorMetrics() {
+    const defaultMetrics = {
+      writeOperations: 0,
+      readOperations: 0,
+      listOperations: 0,
+      egressBytes: 0,
+      ingressBytes: 0,
+      retrievalBytes: 0
+    };
+    try {
+      const now = /* @__PURE__ */ new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+      const timespan = `${thirtyDaysAgo.toISOString()}/${now.toISOString()}`;
+      const resourcePath = `/subscriptions/${this.definition.subscription_id}/resourceGroups/${this.definition.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${this.definition.account_name}`;
+      const results = { ...defaultMetrics };
+      const egressIngressPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=Egress,Ingress&timespan=${timespan}&interval=P1D&aggregation=Total`;
+      const egressIngressResponse = this.makeAzureRequest("GET", egressIngressPath);
+      if (!egressIngressResponse.error && egressIngressResponse.body) {
+        const data = JSON.parse(egressIngressResponse.body);
+        const metrics = data.value || [];
+        for (const metric of metrics) {
+          const metricName = metric.name?.value;
+          const timeseries = metric.timeseries || [];
+          let total = 0;
+          for (const ts of timeseries) {
+            const dataPoints = ts.data || [];
+            for (const point of dataPoints) {
+              total += point.total || 0;
+            }
+          }
+          if (metricName === "Egress") {
+            results.egressBytes = total;
+          } else if (metricName === "Ingress") {
+            results.ingressBytes = total;
+          }
+        }
+      }
+      const transactionsPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=Transactions&timespan=${timespan}&interval=P1D&aggregation=Total&$filter=ApiName eq '*'`;
+      const transactionsResponse = this.makeAzureRequest("GET", transactionsPath);
+      if (!transactionsResponse.error && transactionsResponse.body) {
+        const data = JSON.parse(transactionsResponse.body);
+        const metrics = data.value || [];
+        for (const metric of metrics) {
+          const timeseries = metric.timeseries || [];
+          for (const ts of timeseries) {
+            const dimensionValue = (ts.metadatavalues || []).find(
+              (m) => m.name?.value === "apiname"
+            )?.value?.toLowerCase() || "";
+            let total = 0;
+            const dataPoints = ts.data || [];
+            for (const point of dataPoints) {
+              total += point.total || 0;
+            }
+            if (dimensionValue.startsWith("put") || dimensionValue.startsWith("set") || dimensionValue.startsWith("create") || dimensionValue.startsWith("copy") || dimensionValue.startsWith("delete") || dimensionValue.startsWith("undelete") || dimensionValue.startsWith("append") || dimensionValue.startsWith("snapshot")) {
+              results.writeOperations += total;
+            } else if (dimensionValue.startsWith("list")) {
+              results.listOperations += total;
+            } else if (dimensionValue.startsWith("get") || dimensionValue.startsWith("head") || dimensionValue.startsWith("blob") || dimensionValue.startsWith("query")) {
+              results.readOperations += total;
+            } else if (total > 0) {
+              results.readOperations += total;
+            }
+          }
+        }
+      }
+      if (results.readOperations === 0 && results.writeOperations === 0 && results.listOperations === 0) {
+        const simpleTxPath = `${resourcePath}/providers/Microsoft.Insights/metrics?api-version=2023-10-01&metricnames=Transactions&timespan=${timespan}&interval=P1D&aggregation=Total`;
+        const simpleTxResponse = this.makeAzureRequest("GET", simpleTxPath);
+        if (!simpleTxResponse.error && simpleTxResponse.body) {
+          const data = JSON.parse(simpleTxResponse.body);
+          const metrics = data.value || [];
+          let totalTransactions = 0;
+          for (const metric of metrics) {
+            const timeseries = metric.timeseries || [];
+            for (const ts of timeseries) {
+              const dataPoints = ts.data || [];
+              for (const point of dataPoints) {
+                totalTransactions += point.total || 0;
+              }
+            }
+          }
+          if (totalTransactions > 0) {
+            throw new Error(
+              `Azure Monitor returned ${totalTransactions} total transactions but per-operation-type breakdown (ApiName dimension) is not available. Cannot accurately estimate operation costs without knowing the distribution of read, write, and list operations.`
+            );
+          }
+        }
+      }
+      return results;
+    } catch (error) {
+      throw new Error(`Failed to fetch Azure Monitor metrics for storage account: ${error.message}`);
+    }
+  }
+  /**
+   * Fetch Azure egress pricing tiers from Azure Retail Prices API
+   */
+  fetchEgressPricingTiers() {
+    const baseUrl = "https://prices.azure.com/api/retail/prices";
+    const location = (this.definition.location || "eastus").toLowerCase().replace(/\s+/g, "");
+    const filter = `serviceName eq 'Bandwidth' and armRegionName eq '${location}' and meterName eq 'Standard Data Transfer Out'`;
+    const encodedFilter = encodeURIComponent(filter);
+    const url = `${baseUrl}?$filter=${encodedFilter}`;
+    const response = this.makeExternalRequest(url);
+    if (response && response.Items && Array.isArray(response.Items)) {
+      const tiers = [];
+      for (const item of response.Items) {
+        const price = item.unitPrice || 0;
+        if (price > 0) {
+          const tierMin = item.tierMinimumUnits || 0;
+          tiers.push({ limit: tierMin, rate: price });
+        }
+      }
+      if (tiers.length > 0) {
+        tiers.sort((a, b) => a.limit - b.limit);
+        return tiers;
+      }
+    }
+    throw new Error("Could not retrieve Azure egress pricing from Azure Retail Prices API");
+  }
+  /**
+   * Calculate egress cost with tiered pricing from Azure Retail Prices API
+   */
+  calculateEgressCost(egressGb) {
+    if (egressGb <= 5) {
+      return 0;
+    }
+    const tiers = this.fetchEgressPricingTiers();
+    const billableGb = egressGb - 5;
+    let cost = 0;
+    let remaining = billableGb;
+    for (let i = 0; i < tiers.length && remaining > 0; i++) {
+      const tierLimit = i + 1 < tiers.length ? tiers[i + 1].limit - tiers[i].limit : Infinity;
+      const tierGb = Math.min(remaining, tierLimit);
+      cost += tierGb * tiers[i].rate;
+      remaining -= tierGb;
+    }
+    return cost;
+  }
+  /**
+   * Format bytes to human-readable string
+   */
+  formatBytes(bytes) {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _StorageAccount);
 __decorateElement(_init, 1, "regenerateKey", _regenerateKey_dec, _StorageAccount);
 __decorateElement(_init, 1, "listContainers", _listContainers_dec, _StorageAccount);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _StorageAccount);
+__decorateElement(_init, 1, "costs", _costs_dec, _StorageAccount);
 __decoratorMetadata(_init, _StorageAccount);
 __name(_StorageAccount, "StorageAccount");
 var StorageAccount = _StorageAccount;

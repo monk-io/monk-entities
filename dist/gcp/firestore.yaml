@@ -37,7 +37,7 @@ firestore:
       - `gcp/service-account` - Create SA with `roles/datastore.user` or `roles/datastore.owner`
       - `gcp/service-usage` - Enable firestore.googleapis.com
       - `gcp/cloud-function` - Functions triggered by Firestore document changes
-    version-hash: e313ae71ccd1
+    version-hash: 7aff9e03e05d
   schema:
     project:
       type: string
@@ -200,6 +200,8 @@ firestore:
     list-fields: ''
     export-documents: ''
     import-documents: ''
+    get-cost-estimate: ''
+    costs: ''
     get-backup-info: ''
     list-backups: ''
     describe-backup: ''

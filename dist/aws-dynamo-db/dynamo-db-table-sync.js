@@ -54,14 +54,15 @@ const dynamoDbBase = require("aws-dynamo-db/dynamo-db-base");
 const AWSDynamoDBEntity = dynamoDbBase.AWSDynamoDBEntity;
 const action = dynamoDbBase.action;
 const cli = require("cli");
+const aws = require("cloud/aws");
 const common = require("aws-dynamo-db/common");
 const validateTableName = common.validateTableName;
 const validateBillingMode = common.validateBillingMode;
 const validateKeySchemaAttributes = common.validateKeySchemaAttributes;
 const convertTagsToArray = common.convertTagsToArray;
 const convertTagsToObject = common.convertTagsToObject;
-var _getRestoreStatus_dec, _restore_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _listTags_dec, _scanTable_dec, _deleteItem_dec, _getItem_dec, _putItem_dec, _getTableDetails_dec, _a, _init;
-var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getTableDetails_dec = [action()], _putItem_dec = [action()], _getItem_dec = [action()], _deleteItem_dec = [action()], _scanTable_dec = [action()], _listTags_dec = [action()], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
+var _costs_dec, _getCostEstimate_dec, _getRestoreStatus_dec, _restore_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _listTags_dec, _scanTable_dec, _deleteItem_dec, _getItem_dec, _putItem_dec, _getTableDetails_dec, _a, _init;
+var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getTableDetails_dec = [action()], _putItem_dec = [action()], _getItem_dec = [action()], _deleteItem_dec = [action()], _scanTable_dec = [action()], _listTags_dec = [action()], _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -794,6 +795,395 @@ var _DynamoDBTable = class _DynamoDBTable extends (_a = AWSDynamoDBEntity, _getT
       });
     }
   }
+  // ==================== COST ESTIMATION ====================
+  /**
+   * Region to location name mapping for AWS Price List API
+   */
+  getRegionToLocationMap() {
+    return {
+      "us-east-1": "US East (N. Virginia)",
+      "us-east-2": "US East (Ohio)",
+      "us-west-1": "US West (N. California)",
+      "us-west-2": "US West (Oregon)",
+      "af-south-1": "Africa (Cape Town)",
+      "ap-east-1": "Asia Pacific (Hong Kong)",
+      "ap-south-1": "Asia Pacific (Mumbai)",
+      "ap-south-2": "Asia Pacific (Hyderabad)",
+      "ap-southeast-1": "Asia Pacific (Singapore)",
+      "ap-southeast-2": "Asia Pacific (Sydney)",
+      "ap-southeast-3": "Asia Pacific (Jakarta)",
+      "ap-southeast-4": "Asia Pacific (Melbourne)",
+      "ap-northeast-1": "Asia Pacific (Tokyo)",
+      "ap-northeast-2": "Asia Pacific (Seoul)",
+      "ap-northeast-3": "Asia Pacific (Osaka)",
+      "ca-central-1": "Canada (Central)",
+      "eu-central-1": "EU (Frankfurt)",
+      "eu-central-2": "EU (Zurich)",
+      "eu-west-1": "EU (Ireland)",
+      "eu-west-2": "EU (London)",
+      "eu-west-3": "EU (Paris)",
+      "eu-south-1": "EU (Milan)",
+      "eu-south-2": "EU (Spain)",
+      "eu-north-1": "EU (Stockholm)",
+      "il-central-1": "Israel (Tel Aviv)",
+      "me-south-1": "Middle East (Bahrain)",
+      "me-central-1": "Middle East (UAE)",
+      "sa-east-1": "South America (Sao Paulo)"
+    };
+  }
+  /**
+   * Fetch DynamoDB pricing from AWS Price List API
+   */
+  fetchDynamoDBPricing() {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const location = this.getRegionToLocationMap()[this.region];
+    if (!location) {
+      throw new Error(`Unsupported region for DynamoDB pricing: ${this.region}`);
+    }
+    const readFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonDynamoDB" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "group", Value: "DDB-ReadUnits" }
+    ];
+    const readResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonDynamoDB",
+        Filters: readFilters,
+        MaxResults: 10
+      })
+    });
+    const writeFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonDynamoDB" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "group", Value: "DDB-WriteUnits" }
+    ];
+    const writeResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonDynamoDB",
+        Filters: writeFilters,
+        MaxResults: 10
+      })
+    });
+    const storageFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonDynamoDB" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "productFamily", Value: "Database Storage" }
+    ];
+    const storageResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonDynamoDB",
+        Filters: storageFilters,
+        MaxResults: 10
+      })
+    });
+    const onDemandReadUnit = this.parsePricingResponse(readResponse.body);
+    const onDemandWriteUnit = this.parsePricingResponse(writeResponse.body);
+    const storagePerGBMonth = this.parsePricingResponse(storageResponse.body);
+    if (onDemandReadUnit <= 0 || onDemandWriteUnit <= 0 || storagePerGBMonth <= 0) {
+      const missing = [];
+      if (onDemandReadUnit <= 0) missing.push("on-demand read");
+      if (onDemandWriteUnit <= 0) missing.push("on-demand write");
+      if (storagePerGBMonth <= 0) missing.push("storage");
+      throw new Error(`Could not retrieve DynamoDB pricing from AWS Price List API: missing rates for ${missing.join(", ")}`);
+    }
+    const provReadFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonDynamoDB" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "group", Value: "DDB-ReadCapacityUnit-Hrs" }
+    ];
+    const provReadResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonDynamoDB",
+        Filters: provReadFilters,
+        MaxResults: 10
+      })
+    });
+    const provWriteFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonDynamoDB" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "group", Value: "DDB-WriteCapacityUnit-Hrs" }
+    ];
+    const provWriteResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AmazonDynamoDB",
+        Filters: provWriteFilters,
+        MaxResults: 10
+      })
+    });
+    const readCapacityUnit = this.parsePricingResponse(provReadResponse.body);
+    const writeCapacityUnit = this.parsePricingResponse(provWriteResponse.body);
+    if (readCapacityUnit <= 0 || writeCapacityUnit <= 0) {
+      const missing = [];
+      if (readCapacityUnit <= 0) missing.push("provisioned read capacity");
+      if (writeCapacityUnit <= 0) missing.push("provisioned write capacity");
+      throw new Error(`Could not retrieve DynamoDB provisioned pricing from AWS Price List API: missing rates for ${missing.join(", ")}`);
+    }
+    return {
+      readCapacityUnit,
+      writeCapacityUnit,
+      onDemandReadUnit,
+      onDemandWriteUnit,
+      storagePerGBMonth
+    };
+  }
+  /**
+   * Parse pricing response from AWS Price List API
+   */
+  parsePricingResponse(responseBody) {
+    try {
+      const data = JSON.parse(responseBody);
+      if (!data.PriceList || data.PriceList.length === 0) {
+        return 0;
+      }
+      for (const priceItem of data.PriceList) {
+        const product = typeof priceItem === "string" ? JSON.parse(priceItem) : priceItem;
+        const terms = product.terms?.OnDemand;
+        if (!terms) continue;
+        for (const termKey of Object.keys(terms)) {
+          const priceDimensions = terms[termKey].priceDimensions;
+          for (const dimKey of Object.keys(priceDimensions)) {
+            const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || "0");
+            if (pricePerUnit > 0) {
+              return pricePerUnit;
+            }
+          }
+        }
+      }
+    } catch (error) {
+    }
+    return 0;
+  }
+  /**
+   * Get CloudWatch metrics for DynamoDB table
+   */
+  getCloudWatchDynamoDBMetrics() {
+    try {
+      const endTime = (/* @__PURE__ */ new Date()).toISOString();
+      const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString();
+      const period = 2592e3;
+      const getMetric = /* @__PURE__ */ __name((metricName) => {
+        const queryParams = [
+          "Action=GetMetricStatistics",
+          "Version=2010-08-01",
+          "Namespace=AWS%2FDynamoDB",
+          `MetricName=${encodeURIComponent(metricName)}`,
+          `StartTime=${encodeURIComponent(startTime)}`,
+          `EndTime=${encodeURIComponent(endTime)}`,
+          `Period=${period.toString()}`,
+          "Statistics.member.1=Sum",
+          "Dimensions.member.1.Name=TableName",
+          `Dimensions.member.1.Value=${encodeURIComponent(this.state.table_name)}`
+        ];
+        const url = `https://monitoring.${this.region}.amazonaws.com/?${queryParams.join("&")}`;
+        const response = aws.get(url, {
+          service: "monitoring",
+          region: this.region
+        });
+        if (response.statusCode === 200) {
+          const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
+          return sumMatch ? parseFloat(sumMatch[1]) : 0;
+        }
+        return 0;
+      }, "getMetric");
+      return {
+        consumedReadCapacity: getMetric("ConsumedReadCapacityUnits"),
+        consumedWriteCapacity: getMetric("ConsumedWriteCapacityUnits")
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+  getCostEstimate() {
+    if (!this.state.table_name) {
+      throw new Error("Table not created yet");
+    }
+    cli.output(`
+\u{1F4B0} Cost Estimate for DynamoDB Table: ${this.state.table_name}`);
+    cli.output(`${"=".repeat(60)}`);
+    const tableInfo = this.getTableInfo(this.state.table_name);
+    if (!tableInfo) {
+      throw new Error(`Table ${this.state.table_name} not found`);
+    }
+    const billingMode = tableInfo.BillingModeSummary?.BillingMode || "PROVISIONED";
+    const tableClass = tableInfo.TableClassSummary?.TableClass || "STANDARD";
+    const tableSizeBytes = tableInfo.TableSizeBytes || 0;
+    const tableSizeGB = tableSizeBytes / (1024 * 1024 * 1024);
+    const itemCount = tableInfo.ItemCount || 0;
+    cli.output(`
+\u{1F4CA} Table Configuration:`);
+    cli.output(`   Table Name: ${this.state.table_name}`);
+    cli.output(`   Billing Mode: ${billingMode}`);
+    cli.output(`   Table Class: ${tableClass}`);
+    cli.output(`   Item Count: ${itemCount}`);
+    cli.output(`   Table Size: ${tableSizeGB.toFixed(4)} GB (${tableSizeBytes} bytes)`);
+    cli.output(`   Region: ${this.region}`);
+    const gsiCount = tableInfo.GlobalSecondaryIndexes?.length || 0;
+    if (gsiCount > 0) {
+      cli.output(`   Global Secondary Indexes: ${gsiCount}`);
+    }
+    const pricing = this.fetchDynamoDBPricing();
+    let totalMonthlyCost = 0;
+    const storageCost = tableSizeGB * pricing.storagePerGBMonth;
+    totalMonthlyCost += storageCost;
+    cli.output(`
+\u{1F4BE} Storage Costs:`);
+    cli.output(`   Table Size: ${tableSizeGB.toFixed(4)} GB`);
+    cli.output(`   Rate: $${pricing.storagePerGBMonth.toFixed(3)}/GB/month`);
+    cli.output(`   Monthly Cost: $${storageCost.toFixed(4)}`);
+    if (billingMode === "PAY_PER_REQUEST") {
+      const metrics = this.getCloudWatchDynamoDBMetrics();
+      cli.output(`
+\u{1F4C8} On-Demand Capacity (Pay-per-Request):`);
+      if (metrics) {
+        const readCost = metrics.consumedReadCapacity * pricing.onDemandReadUnit;
+        const writeCost = metrics.consumedWriteCapacity * pricing.onDemandWriteUnit;
+        totalMonthlyCost += readCost + writeCost;
+        cli.output(`   Read Request Units (30d): ${metrics.consumedReadCapacity.toFixed(0)}`);
+        cli.output(`   Write Request Units (30d): ${metrics.consumedWriteCapacity.toFixed(0)}`);
+        cli.output(`   Read Cost: $${readCost.toFixed(4)}`);
+        cli.output(`   Write Cost: $${writeCost.toFixed(4)}`);
+      } else {
+        cli.output(`   \u26A0\uFE0F CloudWatch metrics unavailable - capacity costs not included`);
+      }
+    } else {
+      const readCapacity = tableInfo.ProvisionedThroughput?.ReadCapacityUnits || 0;
+      const writeCapacity = tableInfo.ProvisionedThroughput?.WriteCapacityUnits || 0;
+      const readCost = readCapacity * pricing.readCapacityUnit * 730;
+      const writeCost = writeCapacity * pricing.writeCapacityUnit * 730;
+      totalMonthlyCost += readCost + writeCost;
+      cli.output(`
+\u{1F4C8} Provisioned Capacity:`);
+      cli.output(`   Read Capacity Units: ${readCapacity}`);
+      cli.output(`   Write Capacity Units: ${writeCapacity}`);
+      cli.output(`   Read Cost: $${readCost.toFixed(2)}/month`);
+      cli.output(`   Write Cost: $${writeCost.toFixed(2)}/month`);
+    }
+    if (gsiCount > 0) {
+      let gsiStorageCost = 0;
+      let gsiCapacityCost = 0;
+      cli.output(`
+\u{1F4CA} Global Secondary Indexes (${gsiCount}):`);
+      for (const gsi of tableInfo.GlobalSecondaryIndexes) {
+        const gsiSizeBytes = gsi.IndexSizeBytes || 0;
+        const gsiSizeGB = gsiSizeBytes / (1024 * 1024 * 1024);
+        gsiStorageCost += gsiSizeGB * pricing.storagePerGBMonth;
+        if (billingMode === "PROVISIONED") {
+          const gsiReadCap = gsi.ProvisionedThroughput?.ReadCapacityUnits || 0;
+          const gsiWriteCap = gsi.ProvisionedThroughput?.WriteCapacityUnits || 0;
+          const gsiRead = gsiReadCap * pricing.readCapacityUnit * 730;
+          const gsiWrite = gsiWriteCap * pricing.writeCapacityUnit * 730;
+          gsiCapacityCost += gsiRead + gsiWrite;
+          cli.output(`   ${gsi.IndexName}: ${gsiSizeGB.toFixed(4)} GB, RCU: ${gsiReadCap}, WCU: ${gsiWriteCap}`);
+        } else {
+          cli.output(`   ${gsi.IndexName}: ${gsiSizeGB.toFixed(4)} GB (on-demand)`);
+        }
+      }
+      totalMonthlyCost += gsiStorageCost + gsiCapacityCost;
+      cli.output(`   GSI Storage Cost: $${gsiStorageCost.toFixed(4)}`);
+      if (gsiCapacityCost > 0) {
+        cli.output(`   GSI Capacity Cost: $${gsiCapacityCost.toFixed(2)}`);
+      }
+    }
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Pricing from AWS Price List API`);
+    cli.output(`   - ${billingMode === "PAY_PER_REQUEST" ? "On-demand costs based on CloudWatch metrics (last 30 days)" : "Provisioned capacity costs based on current settings"}`);
+    cli.output(`   - Does not include: Reserved capacity discounts, DAX, DynamoDB Streams, backups, data transfer`);
+  }
+  costs() {
+    if (!this.state.table_name) {
+      const result = {
+        type: "aws-dynamodb-table",
+        costs: { month: { amount: "0", currency: "USD" } }
+      };
+      cli.output(JSON.stringify(result));
+      return;
+    }
+    try {
+      const tableInfo = this.getTableInfo(this.state.table_name);
+      if (!tableInfo) {
+        const result2 = {
+          type: "aws-dynamodb-table",
+          costs: { month: { amount: "0", currency: "USD" } }
+        };
+        cli.output(JSON.stringify(result2));
+        return;
+      }
+      const billingMode = tableInfo.BillingModeSummary?.BillingMode || "PROVISIONED";
+      const tableSizeGB = (tableInfo.TableSizeBytes || 0) / (1024 * 1024 * 1024);
+      const pricing = this.fetchDynamoDBPricing();
+      let totalMonthlyCost = 0;
+      totalMonthlyCost += tableSizeGB * pricing.storagePerGBMonth;
+      if (billingMode === "PAY_PER_REQUEST") {
+        const metrics = this.getCloudWatchDynamoDBMetrics();
+        if (metrics) {
+          totalMonthlyCost += metrics.consumedReadCapacity * pricing.onDemandReadUnit;
+          totalMonthlyCost += metrics.consumedWriteCapacity * pricing.onDemandWriteUnit;
+        }
+      } else {
+        const readCap = tableInfo.ProvisionedThroughput?.ReadCapacityUnits || 0;
+        const writeCap = tableInfo.ProvisionedThroughput?.WriteCapacityUnits || 0;
+        totalMonthlyCost += readCap * pricing.readCapacityUnit * 730;
+        totalMonthlyCost += writeCap * pricing.writeCapacityUnit * 730;
+      }
+      if (tableInfo.GlobalSecondaryIndexes) {
+        for (const gsi of tableInfo.GlobalSecondaryIndexes) {
+          const gsiSizeGB = (gsi.IndexSizeBytes || 0) / (1024 * 1024 * 1024);
+          totalMonthlyCost += gsiSizeGB * pricing.storagePerGBMonth;
+          if (billingMode === "PROVISIONED") {
+            totalMonthlyCost += (gsi.ProvisionedThroughput?.ReadCapacityUnits || 0) * pricing.readCapacityUnit * 730;
+            totalMonthlyCost += (gsi.ProvisionedThroughput?.WriteCapacityUnits || 0) * pricing.writeCapacityUnit * 730;
+          }
+        }
+      }
+      const result = {
+        type: "aws-dynamodb-table",
+        costs: { month: { amount: totalMonthlyCost.toFixed(2), currency: "USD" } }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "aws-dynamodb-table",
+        costs: { month: { amount: "0", currency: "USD", error: error.message } }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getTableDetails", _getTableDetails_dec, _DynamoDBTable);
@@ -809,6 +1199,8 @@ __decorateElement(_init, 1, "describeSnapshot", _describeSnapshot_dec, _DynamoDB
 __decorateElement(_init, 1, "deleteSnapshot", _deleteSnapshot_dec, _DynamoDBTable);
 __decorateElement(_init, 1, "restore", _restore_dec, _DynamoDBTable);
 __decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _DynamoDBTable);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _DynamoDBTable);
+__decorateElement(_init, 1, "costs", _costs_dec, _DynamoDBTable);
 __decoratorMetadata(_init, _DynamoDBTable);
 __name(_DynamoDBTable, "DynamoDBTable");
 __publicField(_DynamoDBTable, "readiness", { period: 10, initialDelay: 5, attempts: 30 });

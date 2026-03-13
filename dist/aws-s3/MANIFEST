@@ -1,7 +1,7 @@
 REPO aws-s3
-VERSION_HASH b9846217413b
+VERSION_HASH 876ff47580d7
 DESCRIPTION Object storage on AWS.
 HOSTING managed
 TAGS aws,storage,s3,object-storage
-LOAD s3-bucket.yaml s3-base.yaml base.yaml common.yaml
-RESOURCES base.js s3-bucket-sync.js s3-base.js common.js
+LOAD s3-bucket.yaml base.yaml s3-base.yaml common.yaml
+RESOURCES common.js s3-bucket-sync.js base.js s3-base.js

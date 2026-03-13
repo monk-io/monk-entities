@@ -24,7 +24,7 @@ instance:
       - `aws-neptune/cluster` - Parent cluster for this instance
       - `aws-neptune/parameter-group` - Instance parameter configuration
       - `aws-iam/role` - Grant instance access to other services
-    version-hash: c1f3bf4cd8f7
+    version-hash: cc63d75a37cf
   schema:
     region:
       type: string
@@ -156,6 +156,8 @@ instance:
     reboot: ''
     promote: ''
     get-logs: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 10
@@ -166,4 +168,5 @@ instance:
   requires:
     - aws-neptune/neptune-base
     - cli
+    - cloud/aws
     - aws-neptune/common

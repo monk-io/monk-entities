@@ -61,8 +61,8 @@ const DEFAULT_BUCKET_CONFIG = common.DEFAULT_BUCKET_CONFIG;
 const buildLifecycleConfigXml = common.buildLifecycleConfigXml;
 const buildEncryptionConfigXml = common.buildEncryptionConfigXml;
 const parseS3Error = common.parseS3Error;
-var _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _getWebsiteInfo_dec = [action()], _a) {
+var _costs_dec, _getCostEstimate_dec, _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
+var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _getWebsiteInfo_dec = [action()], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -334,6 +334,124 @@ ${JSON.stringify(statistics, null, 2)}`);
       throw new Error(`Failed to get website info: ${error.message}`);
     }
   }
+  getCostEstimate(_args) {
+    if (!this.state.bucket_name) {
+      throw new Error("Bucket not created yet");
+    }
+    try {
+      const storageByClass = {};
+      let totalObjects = 0;
+      let totalSize = 0;
+      let continuationToken;
+      do {
+        let listUrl = this.getBucketUrl(this.getBucketName(), "?list-type=2&max-keys=1000");
+        if (continuationToken) {
+          listUrl += `&continuation-token=${encodeURIComponent(continuationToken)}`;
+        }
+        const listResponse = this.listBucketObjects(listUrl);
+        const objectsWithClass = this.parseObjectsWithStorageClass(listResponse.body);
+        for (const obj of objectsWithClass) {
+          const storageClass = obj.storageClass || "STANDARD";
+          if (!storageByClass[storageClass]) {
+            storageByClass[storageClass] = { bytes: 0, objects: 0 };
+          }
+          storageByClass[storageClass].bytes += obj.size;
+          storageByClass[storageClass].objects += 1;
+          totalObjects += 1;
+          totalSize += obj.size;
+        }
+        const nextTokenMatch = listResponse.body.match(/<NextContinuationToken>(.*?)<\/NextContinuationToken>/);
+        continuationToken = nextTokenMatch ? nextTokenMatch[1] : void 0;
+      } while (continuationToken);
+      const pricing = this.getS3PricingRates();
+      const costBreakdown = {};
+      let totalStorageCost = 0;
+      for (const [storageClass, data] of Object.entries(storageByClass)) {
+        const sizeGB = data.bytes / (1024 * 1024 * 1024);
+        const rate = pricing.storage[storageClass] || pricing.storage["STANDARD"];
+        const cost = sizeGB * rate;
+        costBreakdown[storageClass] = {
+          size_gb: Math.round(sizeGB * 1e3) / 1e3,
+          objects: data.objects,
+          storage_cost: Math.round(cost * 100) / 100,
+          rate_per_gb: rate
+        };
+        totalStorageCost += cost;
+      }
+      const requestMetrics = this.getCloudWatchRequestMetrics();
+      const dataTransferMetrics = this.getCloudWatchDataTransferMetrics();
+      let putRequests = 0;
+      let getRequests = 0;
+      let putRequestCost = 0;
+      let getRequestCost = 0;
+      let requestMetricsSource;
+      if (requestMetrics) {
+        putRequests = requestMetrics.putRequests;
+        getRequests = requestMetrics.getRequests;
+        requestMetricsSource = "CloudWatch (last 30 days)";
+        putRequestCost = putRequests / 1e3 * pricing.requests.put;
+        getRequestCost = getRequests / 1e3 * pricing.requests.get;
+      } else {
+        requestMetricsSource = "Not available (CloudWatch request metrics not enabled)";
+      }
+      const dataTransferOutGB = dataTransferMetrics ? dataTransferMetrics.bytesDownloaded / (1024 * 1024 * 1024) : 0;
+      const dataTransferInGB = dataTransferMetrics ? dataTransferMetrics.bytesUploaded / (1024 * 1024 * 1024) : 0;
+      let dataTransferOutCost = 0;
+      if (dataTransferOutGB > 0) {
+        const dataTransferTiers = this.fetchDataTransferOutTiers();
+        dataTransferOutCost = this.calculateTieredDataTransferCost(dataTransferOutGB, dataTransferTiers);
+      }
+      const totalEstimatedCost = totalStorageCost + putRequestCost + getRequestCost + dataTransferOutCost;
+      const hasCloudWatchMetrics = requestMetrics !== null || dataTransferMetrics !== null;
+      const costEstimate = {
+        bucket_name: this.state.bucket_name,
+        region: this.region,
+        summary: {
+          total_objects: totalObjects,
+          total_size_bytes: totalSize,
+          total_size_gb: Math.round(totalSize / (1024 * 1024 * 1024) * 1e3) / 1e3,
+          estimated_monthly_cost_usd: Math.round(totalEstimatedCost * 100) / 100
+        },
+        storage_costs: {
+          breakdown_by_class: costBreakdown,
+          total_storage_cost_usd: Math.round(totalStorageCost * 100) / 100
+        },
+        request_costs: {
+          source: requestMetricsSource,
+          put_requests: putRequests,
+          get_requests: getRequests,
+          all_requests: requestMetrics ? requestMetrics.allRequests : putRequests + getRequests,
+          put_cost_usd: Math.round(putRequestCost * 100) / 100,
+          get_cost_usd: Math.round(getRequestCost * 100) / 100,
+          total_request_cost_usd: Math.round((putRequestCost + getRequestCost) * 100) / 100
+        },
+        data_transfer_costs: {
+          source: dataTransferMetrics ? "CloudWatch (last 30 days)" : "Not available (CloudWatch metrics not enabled)",
+          bytes_downloaded: dataTransferMetrics ? dataTransferMetrics.bytesDownloaded : 0,
+          bytes_uploaded: dataTransferMetrics ? dataTransferMetrics.bytesUploaded : 0,
+          download_gb: Math.round(dataTransferOutGB * 1e3) / 1e3,
+          upload_gb: Math.round(dataTransferInGB * 1e3) / 1e3,
+          download_cost_usd: Math.round(dataTransferOutCost * 100) / 100,
+          upload_cost_usd: 0,
+          // Data transfer IN is free
+          total_transfer_cost_usd: Math.round(dataTransferOutCost * 100) / 100,
+          pricing_note: "Data OUT tiered pricing fetched from AWS Price List API. Data IN: Free."
+        },
+        pricing_rates: {
+          source: "AWS Price List API",
+          region: this.region,
+          currency: "USD",
+          storage_per_gb_month: pricing.storage,
+          requests_per_1000: pricing.requests
+        },
+        disclaimer: hasCloudWatchMetrics ? "Pricing from AWS Price List API. Metrics from CloudWatch (last 30 days). Enable S3 Request Metrics for accurate request/transfer data." : "Pricing from AWS Price List API. CloudWatch metrics unavailable - enable S3 Request Metrics for accurate data."
+      };
+      cli.output(`S3 Cost Estimate:
+${JSON.stringify(costEstimate, null, 2)}`);
+    } catch (error) {
+      throw new Error(`Failed to get cost estimate: ${error.message}`);
+    }
+  }
   // Helper methods for custom actions
   listBucketObjects(url) {
     const response = aws.get(url, {
@@ -499,6 +617,612 @@ ${JSON.stringify(statistics, null, 2)}`);
       }
     });
   }
+  parseObjectsWithStorageClass(xmlResponse) {
+    const objects = [];
+    const contentMatches = xmlResponse.match(/<Contents>[\s\S]*?<\/Contents>/g);
+    if (contentMatches) {
+      for (const match of contentMatches) {
+        const keyMatch = match.match(/<Key>(.*?)<\/Key>/);
+        const sizeMatch = match.match(/<Size>(.*?)<\/Size>/);
+        const storageClassMatch = match.match(/<StorageClass>(.*?)<\/StorageClass>/);
+        if (keyMatch && sizeMatch) {
+          objects.push({
+            key: keyMatch[1],
+            size: parseInt(sizeMatch[1], 10),
+            storageClass: storageClassMatch ? storageClassMatch[1] : "STANDARD"
+          });
+        }
+      }
+    }
+    return objects;
+  }
+  /**
+   * Get S3 pricing rates for the current region.
+   * Fetches real-time pricing from AWS Price List API.
+   * 
+   * Prices are in USD per GB per month for storage, and per 1000 requests.
+   * 
+   * @throws Error if pricing cannot be fetched from AWS API
+   */
+  getS3PricingRates() {
+    const apiPricing = this.fetchS3PricingFromAPI();
+    if (!apiPricing) {
+      throw new Error("Failed to fetch pricing from AWS Price List API. Ensure your credentials have pricing:GetProducts permission.");
+    }
+    return apiPricing;
+  }
+  /**
+   * Fetch S3 pricing from AWS Price List Service API.
+   * The API is only available in us-east-1 and ap-south-1 regions.
+   * 
+   * @see https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/priceChanges.html
+   */
+  fetchS3PricingFromAPI() {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const regionToLocation = this.getRegionToLocationMap();
+    const location = regionToLocation[this.region];
+    if (!location) {
+      cli.output(`Warning: Unknown region ${this.region} for pricing lookup, using fallback`);
+      return null;
+    }
+    const storageFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonS3" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "productFamily", Value: "Storage" }
+    ];
+    const storageRequestBody = {
+      ServiceCode: "AmazonS3",
+      Filters: storageFilters,
+      MaxResults: 100
+    };
+    const storageResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify(storageRequestBody)
+    });
+    if (storageResponse.statusCode !== 200) {
+      cli.output(`AWS Pricing API returned status ${storageResponse.statusCode}: ${storageResponse.body}`);
+      return null;
+    }
+    const storagePricing = this.parseStoragePricingResponse(storageResponse.body);
+    const requestFilters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AmazonS3" },
+      { Type: "TERM_MATCH", Field: "location", Value: location },
+      { Type: "TERM_MATCH", Field: "productFamily", Value: "API Request" }
+    ];
+    const requestRequestBody = {
+      ServiceCode: "AmazonS3",
+      Filters: requestFilters,
+      MaxResults: 100
+    };
+    const requestResponse = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify(requestRequestBody)
+    });
+    if (requestResponse.statusCode !== 200) {
+      throw new Error(`AWS Pricing API returned status ${requestResponse.statusCode} for S3 request pricing`);
+    }
+    const requestPricing = this.parseRequestPricingResponse(requestResponse.body);
+    if (!requestPricing) {
+      throw new Error("Could not parse S3 request pricing from AWS Price List API response");
+    }
+    if (Object.keys(storagePricing).length > 0) {
+      return {
+        storage: storagePricing,
+        requests: requestPricing
+      };
+    }
+    return null;
+  }
+  /**
+   * Parse storage pricing from AWS Price List API response.
+   */
+  parseStoragePricingResponse(responseBody) {
+    const pricing = {};
+    try {
+      const data = JSON.parse(responseBody);
+      const priceList = data.PriceList || [];
+      for (const priceItemStr of priceList) {
+        const priceItem = typeof priceItemStr === "string" ? JSON.parse(priceItemStr) : priceItemStr;
+        const product = priceItem.product;
+        const terms = priceItem.terms;
+        if (!product || !terms) continue;
+        const attributes = product.attributes || {};
+        const storageClass = attributes.storageClass || attributes.volumeType;
+        const usageType = attributes.usagetype || "";
+        const storageClassMap = {
+          "General Purpose": "STANDARD",
+          "Standard": "STANDARD",
+          "Standard - Infrequent Access": "STANDARD_IA",
+          "Infrequent Access": "STANDARD_IA",
+          "One Zone - Infrequent Access": "ONEZONE_IA",
+          "Intelligent-Tiering": "INTELLIGENT_TIERING",
+          "Glacier Flexible Retrieval": "GLACIER",
+          "Glacier": "GLACIER",
+          "Glacier Instant Retrieval": "GLACIER_IR",
+          "Glacier Deep Archive": "DEEP_ARCHIVE",
+          "Reduced Redundancy": "REDUCED_REDUNDANCY"
+        };
+        let mappedClass;
+        if (storageClass) {
+          mappedClass = storageClassMap[storageClass];
+        }
+        if (!mappedClass && usageType) {
+          if (usageType.includes("TimedStorage-ByteHrs")) mappedClass = "STANDARD";
+          else if (usageType.includes("TimedStorage-SIA-ByteHrs")) mappedClass = "STANDARD_IA";
+          else if (usageType.includes("TimedStorage-ZIA-ByteHrs")) mappedClass = "ONEZONE_IA";
+          else if (usageType.includes("TimedStorage-INT-FA-ByteHrs")) mappedClass = "INTELLIGENT_TIERING";
+          else if (usageType.includes("TimedStorage-GlacierByteHrs")) mappedClass = "GLACIER";
+          else if (usageType.includes("TimedStorage-GDA-ByteHrs")) mappedClass = "DEEP_ARCHIVE";
+          else if (usageType.includes("TimedStorage-GIR-ByteHrs")) mappedClass = "GLACIER_IR";
+          else if (usageType.includes("TimedStorage-RRS-ByteHrs")) mappedClass = "REDUCED_REDUNDANCY";
+        }
+        if (!mappedClass) continue;
+        const onDemand = terms.OnDemand;
+        if (!onDemand) continue;
+        for (const termKey of Object.keys(onDemand)) {
+          const term = onDemand[termKey];
+          const priceDimensions = term.priceDimensions;
+          if (!priceDimensions) continue;
+          for (const dimKey of Object.keys(priceDimensions)) {
+            const dimension = priceDimensions[dimKey];
+            const pricePerUnit = dimension.pricePerUnit;
+            if (pricePerUnit && pricePerUnit.USD) {
+              const price = parseFloat(pricePerUnit.USD);
+              if (price > 0 && !pricing[mappedClass]) {
+                pricing[mappedClass] = price;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      cli.output(`Warning: Failed to parse storage pricing response: ${error.message}`);
+    }
+    return pricing;
+  }
+  /**
+   * Parse request pricing from AWS Price List API response.
+   */
+  parseRequestPricingResponse(responseBody) {
+    let putPrice = null;
+    let getPrice = null;
+    try {
+      const data = JSON.parse(responseBody);
+      const priceList = data.PriceList || [];
+      for (const priceItemStr of priceList) {
+        const priceItem = typeof priceItemStr === "string" ? JSON.parse(priceItemStr) : priceItemStr;
+        const product = priceItem.product;
+        const terms = priceItem.terms;
+        if (!product || !terms) continue;
+        const attributes = product.attributes || {};
+        const usageType = attributes.usagetype || "";
+        const group = attributes.group || "";
+        const groupDescription = attributes.groupDescription || "";
+        let isPut = false;
+        let isGet = false;
+        if (group.includes("S3-API-Tier1") || groupDescription.includes("PUT") || groupDescription.includes("COPY") || groupDescription.includes("POST") || groupDescription.includes("LIST") || usageType.includes("Requests-Tier1")) {
+          isPut = true;
+        } else if (group.includes("S3-API-Tier2") || groupDescription.includes("GET") || groupDescription.includes("SELECT") || usageType.includes("Requests-Tier2")) {
+          isGet = true;
+        }
+        if (!isPut && !isGet) continue;
+        const onDemand = terms.OnDemand;
+        if (!onDemand) continue;
+        for (const termKey of Object.keys(onDemand)) {
+          const term = onDemand[termKey];
+          const priceDimensions = term.priceDimensions;
+          if (!priceDimensions) continue;
+          for (const dimKey of Object.keys(priceDimensions)) {
+            const dimension = priceDimensions[dimKey];
+            const pricePerUnit = dimension.pricePerUnit;
+            if (pricePerUnit && pricePerUnit.USD) {
+              const price = parseFloat(pricePerUnit.USD);
+              if (price > 0) {
+                if (isPut && putPrice === null) putPrice = price;
+                if (isGet && getPrice === null) getPrice = price;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      cli.output(`Warning: Failed to parse request pricing response: ${error.message}`);
+    }
+    if (putPrice !== null && getPrice !== null) {
+      return {
+        put: putPrice,
+        get: getPrice
+      };
+    }
+    return null;
+  }
+  /**
+   * Fetch AWS data transfer out tiered pricing from AWS Price List API.
+   * Returns an array of tier objects with beginRange (GB), endRange (GB), and pricePerGB.
+   * AWS data transfer out pricing is tiered:
+   *   - First 1 GB/month: free (0.00)
+   *   - Up to 10 TB/month: tier 1 rate
+   *   - Next 40 TB/month: tier 2 rate
+   *   - Next 100 TB/month: tier 3 rate
+   *   - Over 150 TB/month: tier 4 rate
+   * @throws Error if pricing cannot be fetched
+   */
+  fetchDataTransferOutTiers() {
+    const pricingRegion = "us-east-1";
+    const url = `https://api.pricing.${pricingRegion}.amazonaws.com/`;
+    const location = this.getRegionToLocationMap()[this.region];
+    if (!location) {
+      throw new Error(`Unknown region ${this.region} for data transfer pricing lookup`);
+    }
+    const filters = [
+      { Type: "TERM_MATCH", Field: "serviceCode", Value: "AWSDataTransfer" },
+      { Type: "TERM_MATCH", Field: "fromLocation", Value: location },
+      { Type: "TERM_MATCH", Field: "transferType", Value: "AWS Outbound" }
+    ];
+    const response = aws.post(url, {
+      service: "pricing",
+      region: pricingRegion,
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSPriceListService.GetProducts"
+      },
+      body: JSON.stringify({
+        ServiceCode: "AWSDataTransfer",
+        Filters: filters,
+        MaxResults: 10
+      })
+    });
+    if (response.statusCode !== 200) {
+      throw new Error(`AWS Pricing API returned status ${response.statusCode} for data transfer pricing`);
+    }
+    const tiers = this.parseDataTransferTiers(response.body);
+    if (tiers.length === 0) {
+      throw new Error("Could not parse data transfer tier pricing from AWS Price List API response");
+    }
+    return tiers;
+  }
+  /**
+   * Parse tiered data transfer pricing from AWS Price List API response.
+   * Extracts all price dimensions with their beginRange/endRange.
+   */
+  parseDataTransferTiers(responseBody) {
+    const tiers = [];
+    try {
+      const data = JSON.parse(responseBody);
+      if (!data.PriceList || data.PriceList.length === 0) {
+        return tiers;
+      }
+      for (const priceItemStr of data.PriceList) {
+        const product = typeof priceItemStr === "string" ? JSON.parse(priceItemStr) : priceItemStr;
+        const terms = product.terms?.OnDemand;
+        if (!terms) continue;
+        for (const termKey of Object.keys(terms)) {
+          const priceDimensions = terms[termKey].priceDimensions;
+          if (!priceDimensions) continue;
+          for (const dimKey of Object.keys(priceDimensions)) {
+            const dim = priceDimensions[dimKey];
+            const pricePerGb = parseFloat(dim.pricePerUnit?.USD || "0");
+            const beginRange = parseFloat(dim.beginRange || "0");
+            const endRange = dim.endRange === "Inf" ? Infinity : parseFloat(dim.endRange || "0");
+            tiers.push({ beginRange, endRange, pricePerGb });
+          }
+        }
+        if (tiers.length > 0) break;
+      }
+    } catch (_error) {
+    }
+    tiers.sort((a, b) => a.beginRange - b.beginRange);
+    return tiers;
+  }
+  /**
+   * Calculate data transfer out cost using tiered pricing from the AWS Price List API.
+   * Applies each tier's rate to the corresponding volume slice.
+   */
+  calculateTieredDataTransferCost(totalGb, tiers) {
+    let totalCost = 0;
+    let remainingGb = totalGb;
+    for (const tier of tiers) {
+      if (remainingGb <= 0) break;
+      const tierSize = tier.endRange === Infinity ? remainingGb : Math.min(remainingGb, tier.endRange - tier.beginRange);
+      totalCost += tierSize * tier.pricePerGb;
+      remainingGb -= tierSize;
+    }
+    return totalCost;
+  }
+  /**
+   * Map AWS region codes to location names used in the Pricing API.
+   */
+  getRegionToLocationMap() {
+    return {
+      "us-east-1": "US East (N. Virginia)",
+      "us-east-2": "US East (Ohio)",
+      "us-west-1": "US West (N. California)",
+      "us-west-2": "US West (Oregon)",
+      "af-south-1": "Africa (Cape Town)",
+      "ap-east-1": "Asia Pacific (Hong Kong)",
+      "ap-south-1": "Asia Pacific (Mumbai)",
+      "ap-south-2": "Asia Pacific (Hyderabad)",
+      "ap-southeast-1": "Asia Pacific (Singapore)",
+      "ap-southeast-2": "Asia Pacific (Sydney)",
+      "ap-southeast-3": "Asia Pacific (Jakarta)",
+      "ap-southeast-4": "Asia Pacific (Melbourne)",
+      "ap-northeast-1": "Asia Pacific (Tokyo)",
+      "ap-northeast-2": "Asia Pacific (Seoul)",
+      "ap-northeast-3": "Asia Pacific (Osaka)",
+      "ca-central-1": "Canada (Central)",
+      "eu-central-1": "EU (Frankfurt)",
+      "eu-central-2": "EU (Zurich)",
+      "eu-west-1": "EU (Ireland)",
+      "eu-west-2": "EU (London)",
+      "eu-west-3": "EU (Paris)",
+      "eu-south-1": "EU (Milan)",
+      "eu-south-2": "EU (Spain)",
+      "eu-north-1": "EU (Stockholm)",
+      "il-central-1": "Israel (Tel Aviv)",
+      "me-south-1": "Middle East (Bahrain)",
+      "me-central-1": "Middle East (UAE)",
+      "sa-east-1": "South America (Sao Paulo)"
+    };
+  }
+  /**
+   * Get S3 data transfer metrics from CloudWatch for the last 30 days.
+   * 
+   * Fetches metrics:
+   * - BytesDownloaded: Total bytes downloaded (data transfer OUT)
+   * - BytesUploaded: Total bytes uploaded (data transfer IN)
+   * 
+   * Note: These metrics require S3 Request Metrics to be enabled on the bucket.
+   * 
+   * @returns Data transfer bytes or null if CloudWatch is unavailable
+   */
+  /**
+   * Fetch total bucket size in bytes from CloudWatch BucketSizeBytes metric.
+   *
+   * BucketSizeBytes with StorageType=AllStorageTypes is a daily storage metric
+   * that reports the total size of all objects in the bucket. It is far more
+   * efficient than paginated ListObjectsV2 for large buckets.
+   *
+   * Period is set to 86400 (1 day) with Average statistic, which is the correct
+   * combination for this daily metric. Returns 0 if the metric is unavailable
+   * (e.g. new bucket with no data, or CloudWatch storage metrics not yet populated).
+   */
+  getCloudWatchBucketSizeBytes() {
+    try {
+      const bucketName = this.getBucketName();
+      const url = `https://monitoring.${this.region}.amazonaws.com/`;
+      const endTime = /* @__PURE__ */ new Date();
+      const startTime = /* @__PURE__ */ new Date();
+      startTime.setDate(startTime.getDate() - 2);
+      const queryParams = [
+        "Action=GetMetricStatistics",
+        "Version=2010-08-01",
+        "Namespace=AWS%2FS3",
+        "MetricName=BucketSizeBytes",
+        `StartTime=${encodeURIComponent(startTime.toISOString())}`,
+        `EndTime=${encodeURIComponent(endTime.toISOString())}`,
+        "Period=86400",
+        // 1 day — BucketSizeBytes is a daily metric
+        "Statistics.member.1=Average",
+        "Dimensions.member.1.Name=BucketName",
+        `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
+        "Dimensions.member.2.Name=StorageType",
+        "Dimensions.member.2.Value=AllStorageTypes"
+      ];
+      const response = aws.get(`${url}?${queryParams.join("&")}`, {
+        service: "monitoring",
+        region: this.region
+      });
+      if (response.statusCode !== 200) {
+        return 0;
+      }
+      const averages = [];
+      const avgRegex = /<Average>([\d.]+)<\/Average>/g;
+      let match;
+      while ((match = avgRegex.exec(response.body)) !== null) {
+        averages.push(parseFloat(match[1]));
+      }
+      if (averages.length === 0) {
+        return 0;
+      }
+      return Math.max(...averages);
+    } catch (_error) {
+      return 0;
+    }
+  }
+  getCloudWatchDataTransferMetrics() {
+    try {
+      const bucketName = this.getBucketName();
+      const endTime = /* @__PURE__ */ new Date();
+      const startTime = /* @__PURE__ */ new Date();
+      startTime.setDate(startTime.getDate() - 30);
+      const startTimeISO = startTime.toISOString();
+      const endTimeISO = endTime.toISOString();
+      const url = `https://monitoring.${this.region}.amazonaws.com/`;
+      const bytesDownloaded = this.getCloudWatchMetric(
+        url,
+        bucketName,
+        "BytesDownloaded",
+        startTimeISO,
+        endTimeISO
+      );
+      const bytesUploaded = this.getCloudWatchMetric(
+        url,
+        bucketName,
+        "BytesUploaded",
+        startTimeISO,
+        endTimeISO
+      );
+      if (bytesDownloaded !== null || bytesUploaded !== null) {
+        return {
+          bytesDownloaded: bytesDownloaded ?? 0,
+          bytesUploaded: bytesUploaded ?? 0
+        };
+      }
+      return null;
+    } catch (error) {
+      cli.output(`Note: CloudWatch data transfer metrics unavailable: ${error.message}`);
+      return null;
+    }
+  }
+  /**
+   * Get S3 request metrics from CloudWatch for the last 30 days.
+   * 
+   * Fetches metrics:
+   * - AllRequests: Total number of HTTP requests
+   * - GetRequests: Number of GET requests
+   * - PutRequests: Number of PUT requests
+   * 
+   * @returns Request counts or null if CloudWatch is unavailable
+   */
+  getCloudWatchRequestMetrics() {
+    try {
+      const bucketName = this.getBucketName();
+      const endTime = /* @__PURE__ */ new Date();
+      const startTime = /* @__PURE__ */ new Date();
+      startTime.setDate(startTime.getDate() - 30);
+      const startTimeISO = startTime.toISOString();
+      const endTimeISO = endTime.toISOString();
+      const url = `https://monitoring.${this.region}.amazonaws.com/`;
+      const allRequestsCount = this.getCloudWatchMetric(
+        url,
+        bucketName,
+        "AllRequests",
+        startTimeISO,
+        endTimeISO
+      );
+      const getRequestsCount = this.getCloudWatchMetric(
+        url,
+        bucketName,
+        "GetRequests",
+        startTimeISO,
+        endTimeISO
+      );
+      const putRequestsCount = this.getCloudWatchMetric(
+        url,
+        bucketName,
+        "PutRequests",
+        startTimeISO,
+        endTimeISO
+      );
+      if (allRequestsCount !== null || getRequestsCount !== null || putRequestsCount !== null) {
+        return {
+          allRequests: allRequestsCount ?? 0,
+          getRequests: getRequestsCount ?? 0,
+          putRequests: putRequestsCount ?? 0
+        };
+      }
+      return null;
+    } catch (error) {
+      cli.output(`Note: CloudWatch metrics unavailable: ${error.message}`);
+      return null;
+    }
+  }
+  costs() {
+    if (!this.state.bucket_name) {
+      const result = {
+        type: "aws-s3-bucket",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+      return;
+    }
+    try {
+      const bucketSizeBytes = this.getCloudWatchBucketSizeBytes();
+      const pricing = this.getS3PricingRates();
+      const totalSizeGB = bucketSizeBytes / (1024 * 1024 * 1024);
+      const totalStorageCost = totalSizeGB * (pricing.storage["STANDARD"] || 0);
+      const requestMetrics = this.getCloudWatchRequestMetrics();
+      let requestCost = 0;
+      if (requestMetrics) {
+        const putRequestCost = requestMetrics.putRequests / 1e3 * pricing.requests.put;
+        const getRequestCost = requestMetrics.getRequests / 1e3 * pricing.requests.get;
+        requestCost = putRequestCost + getRequestCost;
+      }
+      const dataTransferMetrics = this.getCloudWatchDataTransferMetrics();
+      let dataTransferCost = 0;
+      if (dataTransferMetrics && dataTransferMetrics.bytesDownloaded > 0) {
+        const dataTransferOutGB = dataTransferMetrics.bytesDownloaded / (1024 * 1024 * 1024);
+        const dataTransferTiers = this.fetchDataTransferOutTiers();
+        dataTransferCost = this.calculateTieredDataTransferCost(dataTransferOutGB, dataTransferTiers);
+      }
+      const totalMonthlyCost = totalStorageCost + requestCost + dataTransferCost;
+      const result = {
+        type: "aws-s3-bucket",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "aws-s3-bucket",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
+  }
+  /**
+   * Fetch a single CloudWatch metric for the S3 bucket.
+   */
+  getCloudWatchMetric(url, bucketName, metricName, startTime, endTime) {
+    try {
+      const queryParams = [
+        "Action=GetMetricStatistics",
+        "Version=2010-08-01",
+        "Namespace=AWS%2FS3",
+        `MetricName=${encodeURIComponent(metricName)}`,
+        `StartTime=${encodeURIComponent(startTime)}`,
+        `EndTime=${encodeURIComponent(endTime)}`,
+        "Period=2592000",
+        // 30 days in seconds
+        "Statistics.member.1=Sum",
+        "Dimensions.member.1.Name=BucketName",
+        `Dimensions.member.1.Value=${encodeURIComponent(bucketName)}`,
+        "Dimensions.member.2.Name=FilterId",
+        "Dimensions.member.2.Value=EntireBucket"
+      ];
+      const requestUrl = `${url}?${queryParams.join("&")}`;
+      const response = aws.get(requestUrl, {
+        service: "monitoring",
+        region: this.region
+      });
+      if (response.statusCode !== 200) {
+        return null;
+      }
+      const sumMatch = response.body.match(/<Sum>([\d.]+)<\/Sum>/);
+      if (sumMatch) {
+        return Math.round(parseFloat(sumMatch[1]));
+      }
+      return 0;
+    } catch (error) {
+      return null;
+    }
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getBucketInfo", _getBucketInfo_dec, _S3Bucket);
@@ -507,6 +1231,8 @@ __decorateElement(_init, 1, "generatePresignedUrl", _generatePresignedUrl_dec, _
 __decorateElement(_init, 1, "emptyBucket", _emptyBucket_dec, _S3Bucket);
 __decorateElement(_init, 1, "getBucketStatistics", _getBucketStatistics_dec, _S3Bucket);
 __decorateElement(_init, 1, "getWebsiteInfo", _getWebsiteInfo_dec, _S3Bucket);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _S3Bucket);
+__decorateElement(_init, 1, "costs", _costs_dec, _S3Bucket);
 __decoratorMetadata(_init, _S3Bucket);
 __name(_S3Bucket, "S3Bucket");
 var S3Bucket = _S3Bucket;

@@ -19,7 +19,7 @@ registry:
 
       ## Composing with Other Entities
       DigitalOcean Container Registry is standalone for image storage.
-    version-hash: 344c3dcd9d5a
+    version-hash: 5772a4e7f1db
   schema:
     name:
       type: string
@@ -74,6 +74,8 @@ registry:
     sync: <<< registry-sync.js
     get-registry: ''
     list-repositories: ''
+    get-cost-estimate: ''
+    costs: ''
     run-garbage-collection: ''
     get-storage-usage: ''
     create-registry: ''

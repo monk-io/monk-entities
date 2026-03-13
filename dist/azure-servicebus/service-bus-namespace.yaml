@@ -20,7 +20,7 @@ service-bus-namespace:
       Works with:
       - `azure-servicebus/queue` - Create queues within the namespace
       - `azure-servicebus/topic` - Create topics within the namespace
-    version-hash: b3d1c1813873
+    version-hash: 36ae818a70c4
   schema:
     subscription_id:
       type: string
@@ -138,6 +138,8 @@ service-bus-namespace:
     get-info: ''
     list-queues: ''
     list-topics: ''
+    get-cost-estimate: ''
+    costs: ''
     regenerate-key: ''
   checks:
     readiness:
@@ -148,4 +150,5 @@ service-bus-namespace:
     - azure-servicebus/azure-servicebus-base
     - cli
     - secret
+    - http
     - monkec/base

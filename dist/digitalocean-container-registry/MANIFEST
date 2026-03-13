@@ -1,5 +1,5 @@
 REPO digitalocean-container-registry
-VERSION_HASH 344c3dcd9d5a
+VERSION_HASH 5772a4e7f1db
 DESCRIPTION Private container registries.
 HOSTING managed
 TAGS digitalocean,registry,docker

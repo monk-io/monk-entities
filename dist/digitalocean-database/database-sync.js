@@ -58,8 +58,8 @@ const validateDatabaseEngine = common.validateDatabaseEngine;
 const validateDatabaseRegion = common.validateDatabaseRegion;
 const validateDatabaseSize = common.validateDatabaseSize;
 const cli = require("cli");
-var _getRestoreStatus_dec, _restore_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _resizeCluster_dec, _getConnectionInfo_dec, _deleteDatabase_dec, _createDatabase_dec, _listDatabases_dec, _getDatabase_dec, _a, _init;
-var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
+var _costs_dec, _getCostEstimate_dec, _getRestoreStatus_dec, _restore_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _resizeCluster_dec, _getConnectionInfo_dec, _deleteDatabase_dec, _createDatabase_dec, _listDatabases_dec, _getDatabase_dec, _a, _init;
+var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec = [action("getDatabase")], _listDatabases_dec = [action("listDatabases")], _createDatabase_dec = [action("createDatabase")], _deleteDatabase_dec = [action("deleteDatabase")], _getConnectionInfo_dec = [action("getConnectionInfo")], _resizeCluster_dec = [action("resizeCluster")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _restore_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -607,6 +607,161 @@ Cluster ID: ${this.state.id}
     this.state.connection_database = database.connection.database;
     this.state.connection_ssl = database.connection.ssl;
   }
+  // ==================== COST ESTIMATION ACTIONS ====================
+  /**
+   * DigitalOcean Database pricing by size slug (monthly USD)
+   * Prices are fixed per size and engine type
+   * Source: https://www.digitalocean.com/pricing/managed-databases
+   */
+  getDatabasePricing() {
+    const size = this.state.size || this.definition.size;
+    const engine = this.state.engine || this.definition.engine;
+    try {
+      const response = this.makeRequest("GET", `/databases/options`);
+      const options = response.options;
+      if (!options || !options.layouts) {
+        cli.output(`\u26A0\uFE0F Could not parse database options response`);
+        return null;
+      }
+      const engineLayout = options.layouts.find((layout) => layout.slug === engine);
+      if (!engineLayout || !engineLayout.sizes) {
+        cli.output(`\u26A0\uFE0F No layout found for engine: ${engine}`);
+        return null;
+      }
+      const sizeInfo = engineLayout.sizes.find((s) => s.slug === size);
+      if (!sizeInfo) {
+        cli.output(`\u26A0\uFE0F Unknown database size: ${size} for engine: ${engine}`);
+        return null;
+      }
+      const pricePerNode = parseFloat(sizeInfo.price_monthly || "0");
+      if (pricePerNode <= 0) {
+        cli.output(`\u26A0\uFE0F Could not determine price for size: ${size}`);
+        return null;
+      }
+      return {
+        basePrice: pricePerNode,
+        pricePerNode,
+        storageIncludedGb: sizeInfo.disk || 0,
+        source: "DigitalOcean Database Options API"
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch pricing from DigitalOcean API: ${error.message}`);
+    }
+  }
+  getCostEstimate() {
+    cli.output(`
+\u{1F4B0} Cost Estimate for DigitalOcean Database: ${this.state.name || this.definition.name}`);
+    cli.output(`${"=".repeat(60)}`);
+    let dbInfo = null;
+    if (this.state.id) {
+      try {
+        const response = this.makeRequest("GET", `/databases/${this.state.id}`);
+        dbInfo = response.database;
+      } catch (error) {
+        cli.output(`\u26A0\uFE0F Could not fetch current database info: ${error.message}`);
+      }
+    }
+    const size = dbInfo?.size || this.state.size || this.definition.size;
+    const engine = dbInfo?.engine || this.state.engine || this.definition.engine;
+    const numNodes = dbInfo?.num_nodes || this.state.num_nodes || this.definition.num_nodes;
+    const region = dbInfo?.region || this.state.region || this.definition.region;
+    const version = dbInfo?.version || this.state.version || this.definition.version;
+    cli.output(`
+\u{1F4CA} Cluster Configuration:`);
+    cli.output(`   Name: ${this.state.name || this.definition.name}`);
+    cli.output(`   Engine: ${engine} ${version ? `v${version}` : ""}`);
+    cli.output(`   Size: ${size}`);
+    cli.output(`   Nodes: ${numNodes}`);
+    cli.output(`   Region: ${region}`);
+    cli.output(`   Status: ${this.state.status || "unknown"}`);
+    const pricing = this.getDatabasePricing();
+    if (!pricing) {
+      cli.output(`
+\u274C Error: Could not determine pricing for size: ${size}`);
+      return;
+    }
+    cli.output(`
+\u{1F4B5} Pricing Information:`);
+    cli.output(`   Source: ${pricing.source}`);
+    cli.output(`   Base Price per Node: $${pricing.basePrice.toFixed(2)}/month`);
+    cli.output(`   Storage Included: ${pricing.storageIncludedGb} GB per node`);
+    const computeCost = pricing.pricePerNode * numNodes;
+    const totalStorageIncluded = pricing.storageIncludedGb * numNodes;
+    cli.output(`
+\u{1F4C8} Cost Breakdown:`);
+    cli.output(`   Compute (${numNodes} node${numNodes > 1 ? "s" : ""} \xD7 $${pricing.pricePerNode.toFixed(2)}): $${computeCost.toFixed(2)}/month`);
+    cli.output(`   Storage Included: ${totalStorageIncluded} GB`);
+    cli.output(`   Additional Storage: $0.10/GB/month (if needed, not included in total)`);
+    if (numNodes > 1) {
+      cli.output(`
+\u{1F504} High Availability:`);
+      cli.output(`   Standby Nodes: ${numNodes - 1}`);
+      cli.output(`   Automatic Failover: Enabled`);
+    }
+    cli.output(`
+\u{1F4BE} Backups:`);
+    cli.output(`   Daily Backups: Included`);
+    cli.output(`   Retention: 7 days`);
+    cli.output(`   Point-in-Time Recovery: ${engine === "pg" || engine === "mysql" ? "Supported" : "Not supported"}`);
+    const totalCost = computeCost;
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Prices are estimates based on DigitalOcean's /v2/databases/options API`);
+    cli.output(`   - DigitalOcean database pricing is uniform across regions`);
+    cli.output(`   - Additional storage and network transfer are usage-based and NOT included in the total`);
+    cli.output(`   - Network transfer: First 1TB outbound free, then $0.01/GB (published rate, not API-sourced)`);
+  }
+  costs() {
+    let dbInfo = null;
+    if (this.state.id) {
+      try {
+        const response = this.makeRequest("GET", `/databases/${this.state.id}`);
+        dbInfo = response.database;
+      } catch (error) {
+        cli.output(JSON.stringify({
+          type: "digitalocean-database",
+          costs: {
+            month: {
+              amount: "0",
+              currency: "USD",
+              error: `Could not retrieve database info: ${error.message}`
+            }
+          }
+        }));
+        return;
+      }
+    }
+    const numNodes = dbInfo?.num_nodes || this.state.num_nodes || this.definition.num_nodes;
+    const pricing = this.getDatabasePricing();
+    if (!pricing) {
+      cli.output(JSON.stringify({
+        type: "digitalocean-database",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: "Could not determine pricing for database size"
+          }
+        }
+      }));
+      return;
+    }
+    const totalCost = pricing.pricePerNode * numNodes;
+    const result = {
+      type: "digitalocean-database",
+      costs: {
+        month: {
+          amount: totalCost.toFixed(2),
+          currency: "USD"
+        }
+      }
+    };
+    cli.output(JSON.stringify(result));
+  }
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getDatabase", _getDatabase_dec, _Database);
@@ -620,6 +775,8 @@ __decorateElement(_init, 1, "listBackups", _listBackups_dec, _Database);
 __decorateElement(_init, 1, "describeBackup", _describeBackup_dec, _Database);
 __decorateElement(_init, 1, "restore", _restore_dec, _Database);
 __decorateElement(_init, 1, "getRestoreStatus", _getRestoreStatus_dec, _Database);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _Database);
+__decorateElement(_init, 1, "costs", _costs_dec, _Database);
 __decoratorMetadata(_init, _Database);
 __name(_Database, "Database");
 var Database = _Database;

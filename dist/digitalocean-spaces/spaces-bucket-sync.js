@@ -54,8 +54,8 @@ const DOSpacesS3Entity = doS3Base.DOSpacesS3Entity;
 const cli = require("cli");
 const base = require("monkec/base");
 const action = base.action;
-var _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _a) {
+var _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _costs_dec, _getCostEstimate_dec, _a, _init;
+var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -153,6 +153,140 @@ var _SpacesBucket = class _SpacesBucket extends (_a = DOSpacesS3Entity, _getBuck
       } catch (e) {
         cli.output(`Warning: failed to set tags: ${e.message}`);
       }
+    }
+  }
+  // =========================================================================
+  // Cost Estimation
+  // =========================================================================
+  /**
+   * DigitalOcean Spaces has fixed, published pricing with no dynamic pricing API.
+   * This is a known limitation: DigitalOcean does not expose Spaces pricing
+   * through an API endpoint, so these values are sourced from the official
+   * pricing page (https://www.digitalocean.com/pricing/spaces).
+   *
+   * Pricing is per-account (not per-bucket), so per-bucket reporting is
+   * inherently approximate when multiple buckets exist.
+   *
+   * - $5/month base: includes 250 GB storage + 1 TB outbound transfer
+   * - $0.02/GB for additional storage beyond 250 GB
+   * - $0.01/GB for additional outbound transfer beyond 1 TB
+   */
+  getSpacesPricing() {
+    return {
+      baseMonthly: 5,
+      includedStorageGb: 250,
+      includedTransferGb: 1024,
+      // 1 TB
+      additionalStoragePerGb: 0.02,
+      additionalTransferPerGb: 0.01,
+      source: "DigitalOcean Spaces fixed pricing"
+    };
+  }
+  /**
+   * Get current bucket storage usage
+   */
+  getBucketStorageUsage() {
+    const bucketName = this.getBucketName();
+    try {
+      let totalSize = 0;
+      let totalObjects = 0;
+      let continuationToken;
+      do {
+        let listUrl = this.getBucketUrl(bucketName, "?list-type=2&max-keys=1000");
+        if (continuationToken) listUrl += `&continuation-token=${encodeURIComponent(continuationToken)}`;
+        const listResponse = this.listBucketObjects(listUrl);
+        const objectInfo = this.parseObjectInfoFromResponse(listResponse.body);
+        totalObjects += objectInfo.length;
+        totalSize += objectInfo.reduce((sum, obj) => sum + parseInt(obj.size, 10), 0);
+        const nextTokenMatch = listResponse.body.match(/<NextContinuationToken>(.*?)<\/NextContinuationToken>/);
+        continuationToken = nextTokenMatch ? nextTokenMatch[1] : void 0;
+      } while (continuationToken);
+      return { totalSizeBytes: totalSize, objectCount: totalObjects };
+    } catch {
+      return { totalSizeBytes: 0, objectCount: 0 };
+    }
+  }
+  getCostEstimate(_args) {
+    const bucketName = this.getBucketName();
+    cli.output(`
+\u{1F4B0} Cost Estimate for DigitalOcean Spaces: ${bucketName}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4CA} Bucket Configuration:`);
+    cli.output(`   Bucket Name: ${bucketName}`);
+    cli.output(`   Region: ${this.region}`);
+    cli.output(`   Versioning: ${this.definition.versioning || false}`);
+    const pricing = this.getSpacesPricing();
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Base: $${pricing.baseMonthly.toFixed(2)}/month`);
+    cli.output(`   Included Storage: ${pricing.includedStorageGb} GB`);
+    cli.output(`   Included Transfer: ${pricing.includedTransferGb} GB (1 TB)`);
+    cli.output(`   Additional Storage: $${pricing.additionalStoragePerGb.toFixed(2)}/GB`);
+    cli.output(`   Additional Transfer: $${pricing.additionalTransferPerGb.toFixed(2)}/GB`);
+    const usage = this.getBucketStorageUsage();
+    const storageSizeGb = usage.totalSizeBytes / (1024 * 1024 * 1024);
+    cli.output(`
+\u{1F4C8} Current Usage:`);
+    cli.output(`   Objects: ${usage.objectCount}`);
+    cli.output(`   Storage: ${storageSizeGb.toFixed(4)} GB (${usage.totalSizeBytes.toLocaleString()} bytes)`);
+    let totalMonthlyCost = pricing.baseMonthly;
+    const additionalStorageGb = Math.max(0, storageSizeGb - pricing.includedStorageGb);
+    if (additionalStorageGb > 0) {
+      const additionalStorageCost = additionalStorageGb * pricing.additionalStoragePerGb;
+      totalMonthlyCost += additionalStorageCost;
+      cli.output(`   Additional Storage: ${additionalStorageGb.toFixed(2)} GB ($${additionalStorageCost.toFixed(2)})`);
+    }
+    cli.output(`
+\u{1F4B5} Cost Breakdown (Monthly):`);
+    cli.output(`   Base Plan: $${pricing.baseMonthly.toFixed(2)}`);
+    if (additionalStorageGb > 0) {
+      cli.output(`   Additional Storage: $${(additionalStorageGb * pricing.additionalStoragePerGb).toFixed(2)}`);
+    }
+    cli.output(`   Transfer: Usage-based (not estimated)`);
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Base plan includes 250 GB storage and 1 TB outbound transfer`);
+    cli.output(`   - Inbound transfer is always free`);
+    cli.output(`   - CDN transfer is included in the outbound transfer allowance`);
+    cli.output(`   - Spaces pricing is per-account, not per-bucket`);
+  }
+  costs() {
+    try {
+      const pricing = this.getSpacesPricing();
+      const usage = this.getBucketStorageUsage();
+      const storageSizeGb = usage.totalSizeBytes / (1024 * 1024 * 1024);
+      let totalMonthlyCost = pricing.baseMonthly;
+      const additionalStorageGb = Math.max(0, storageSizeGb - pricing.includedStorageGb);
+      if (additionalStorageGb > 0) {
+        totalMonthlyCost += additionalStorageGb * pricing.additionalStoragePerGb;
+      }
+      const result = {
+        type: "digitalocean-spaces-bucket",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "digitalocean-spaces-bucket",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
     }
   }
   getBucketInfo(_args) {
@@ -258,6 +392,8 @@ ${JSON.stringify(stats, null, 2)}`);
   }
 };
 _init = __decoratorStart(_a);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _SpacesBucket);
+__decorateElement(_init, 1, "costs", _costs_dec, _SpacesBucket);
 __decorateElement(_init, 1, "getBucketInfo", _getBucketInfo_dec, _SpacesBucket);
 __decorateElement(_init, 1, "listObjects", _listObjects_dec, _SpacesBucket);
 __decorateElement(_init, 1, "generatePresignedUrl", _generatePresignedUrl_dec, _SpacesBucket);

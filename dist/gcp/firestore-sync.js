@@ -57,8 +57,8 @@ const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
 const common = require("gcp/common");
 const FIRESTORE_API_URL = common.FIRESTORE_API_URL;
-var _getRestoreStatus_dec, _restoreDatabase_dec, _deleteBackup_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _importDocuments_dec, _exportDocuments_dec, _listFields_dec, _listIndexes_dec, _getInfo_dec, _a, _init;
-var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [action("get")], _listIndexes_dec = [action("list-indexes")], _listFields_dec = [action("list-fields")], _exportDocuments_dec = [action("export-documents")], _importDocuments_dec = [action("import-documents")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _deleteBackup_dec = [action("delete-backup")], _restoreDatabase_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
+var _getRestoreStatus_dec, _restoreDatabase_dec, _deleteBackup_dec, _describeBackup_dec, _listBackups_dec, _getBackupInfo_dec, _costs_dec, _getCostEstimate_dec, _importDocuments_dec, _exportDocuments_dec, _listFields_dec, _listIndexes_dec, _getInfo_dec, _a, _init;
+var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [action("get")], _listIndexes_dec = [action("list-indexes")], _listFields_dec = [action("list-fields")], _exportDocuments_dec = [action("export-documents")], _importDocuments_dec = [action("import-documents")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _getBackupInfo_dec = [action("get-backup-info")], _listBackups_dec = [action("list-backups")], _describeBackup_dec = [action("describe-backup")], _deleteBackup_dec = [action("delete-backup")], _restoreDatabase_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -277,6 +277,292 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
     }
     const operation = this.post(url, body);
     cli.output(`Import started: ${operation.name}`);
+  }
+  // =========================================================================
+  // Cost Estimation
+  // =========================================================================
+  /**
+   * Extract price from a GCP Billing SKU
+   */
+  extractPriceFromSku(sku) {
+    try {
+      const pricingInfo = sku.pricingInfo;
+      if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+        return 0;
+      }
+      const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+      if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+        return 0;
+      }
+      for (const rate of tieredRates) {
+        const unitPrice = rate.unitPrice;
+        if (unitPrice) {
+          const units = parseInt(unitPrice.units || "0", 10);
+          const nanos = parseInt(unitPrice.nanos || "0", 10);
+          const price = units + nanos / 1e9;
+          if (price > 0) {
+            return price;
+          }
+        }
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
+  /**
+   * Get Firestore pricing from GCP Cloud Billing Catalog API
+   */
+  fetchFirestorePricing() {
+    try {
+      const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
+      const serviceId = "6F81-5844-456A";
+      const skusUrl = `${billingApiUrl}/services/${serviceId}/skus?currencyCode=USD`;
+      const response = this.get(skusUrl);
+      if (response.skus && Array.isArray(response.skus)) {
+        let storageRate = 0;
+        let readRate = 0;
+        let writeRate = 0;
+        let deleteRate = 0;
+        let networkRate = 0;
+        const location = (this.definition.location || "nam5").toLowerCase();
+        for (const sku of response.skus) {
+          const desc = (sku.description || "").toLowerCase();
+          const serviceRegions = sku.serviceRegions || [];
+          const regionMatch = serviceRegions.some((r) => {
+            const rl = r.toLowerCase();
+            return rl === location || rl.includes(location) || rl === "global";
+          });
+          if (!regionMatch) continue;
+          const price = this.extractPriceFromSku(sku);
+          if (price <= 0) continue;
+          if (desc.includes("storage") && !desc.includes("network")) {
+            storageRate = price;
+          } else if (desc.includes("document read") || desc.includes("read") && desc.includes("entity")) {
+            readRate = price;
+          } else if (desc.includes("document write") || desc.includes("write") && desc.includes("entity")) {
+            writeRate = price;
+          } else if (desc.includes("document delete") || desc.includes("delete") && desc.includes("entity")) {
+            deleteRate = price;
+          } else if (desc.includes("network") && desc.includes("egress")) {
+            networkRate = price;
+          }
+        }
+        if (storageRate > 0 || readRate > 0) {
+          if (storageRate <= 0 || readRate <= 0 || writeRate <= 0 || deleteRate <= 0) {
+            const missing = [];
+            if (storageRate <= 0) missing.push("storage");
+            if (readRate <= 0) missing.push("read");
+            if (writeRate <= 0) missing.push("write");
+            if (deleteRate <= 0) missing.push("delete");
+            throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(", ")}`);
+          }
+          return {
+            storagePerGibMonth: storageRate,
+            readPer100K: readRate * 1e5,
+            writePer100K: writeRate * 1e5,
+            deletePer100K: deleteRate * 1e5,
+            networkEgressPerGb: networkRate > 0 ? networkRate : 0,
+            source: "GCP Cloud Billing Catalog API"
+          };
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch Firestore pricing from GCP API: ${error.message}`);
+    }
+    throw new Error("Could not retrieve Firestore pricing from GCP Cloud Billing Catalog API");
+  }
+  getCostEstimate(_args) {
+    const dbId = this.getDatabaseId();
+    cli.output(`
+\u{1F4B0} Cost Estimate for Firestore Database: ${dbId}`);
+    cli.output(`${"=".repeat(60)}`);
+    const location = this.definition.location || "nam5";
+    const dbType = this.definition.database_type || "FIRESTORE_NATIVE";
+    const pitrEnabled = this.definition.point_in_time_recovery === "POINT_IN_TIME_RECOVERY_ENABLED";
+    cli.output(`
+\u{1F4CA} Database Configuration:`);
+    cli.output(`   Database ID: ${dbId}`);
+    cli.output(`   Project: ${this.projectId}`);
+    cli.output(`   Location: ${location}`);
+    cli.output(`   Type: ${dbType}`);
+    cli.output(`   Point-in-Time Recovery: ${pitrEnabled ? "Enabled" : "Disabled"}`);
+    const pricing = this.fetchFirestorePricing();
+    cli.output(`
+\u{1F4B5} Pricing (${pricing.source}):`);
+    cli.output(`   Storage: $${pricing.storagePerGibMonth.toFixed(2)}/GiB/month`);
+    cli.output(`   Document Reads: $${pricing.readPer100K.toFixed(2)} per 100K`);
+    cli.output(`   Document Writes: $${pricing.writePer100K.toFixed(2)} per 100K`);
+    cli.output(`   Document Deletes: $${pricing.deletePer100K.toFixed(2)} per 100K`);
+    cli.output(`   Network Egress: $${pricing.networkEgressPerGb.toFixed(2)}/GB`);
+    const metrics = this.getFirestoreMetrics();
+    let totalMonthlyCost = 0;
+    cli.output(`
+\u{1F4B5} Cost Breakdown (based on last 30 days of usage):`);
+    const storageGib = metrics.storageSizeBytes / (1024 * 1024 * 1024);
+    const storageCost = storageGib * pricing.storagePerGibMonth;
+    totalMonthlyCost += storageCost;
+    cli.output(`   Storage: ${storageGib.toFixed(2)} GiB \xD7 $${pricing.storagePerGibMonth.toFixed(2)}/GiB = $${storageCost.toFixed(2)}/month`);
+    const readsCost = metrics.documentReads / 1e5 * pricing.readPer100K;
+    totalMonthlyCost += readsCost;
+    cli.output(`   Document Reads: ${metrics.documentReads.toLocaleString()} \xD7 $${pricing.readPer100K.toFixed(2)}/100K = $${readsCost.toFixed(2)}/month`);
+    const writesCost = metrics.documentWrites / 1e5 * pricing.writePer100K;
+    totalMonthlyCost += writesCost;
+    cli.output(`   Document Writes: ${metrics.documentWrites.toLocaleString()} \xD7 $${pricing.writePer100K.toFixed(2)}/100K = $${writesCost.toFixed(2)}/month`);
+    const deletesCost = metrics.documentDeletes / 1e5 * pricing.deletePer100K;
+    totalMonthlyCost += deletesCost;
+    cli.output(`   Document Deletes: ${metrics.documentDeletes.toLocaleString()} \xD7 $${pricing.deletePer100K.toFixed(2)}/100K = $${deletesCost.toFixed(2)}/month`);
+    let egressCost = 0;
+    if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+      const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+      egressCost = egressGb * pricing.networkEgressPerGb;
+      totalMonthlyCost += egressCost;
+      cli.output(`   Network Egress: ${egressGb.toFixed(4)} GB \xD7 $${pricing.networkEgressPerGb.toFixed(2)}/GB = $${egressCost.toFixed(2)}/month`);
+    } else if (pricing.networkEgressPerGb > 0) {
+      cli.output(`   Network Egress: No egress measured (rate: $${pricing.networkEgressPerGb.toFixed(2)}/GB)`);
+    }
+    cli.output(`
+${"=".repeat(60)}`);
+    cli.output(`\u{1F4B0} ESTIMATED MONTHLY COST: $${totalMonthlyCost.toFixed(2)}`);
+    cli.output(`${"=".repeat(60)}`);
+    cli.output(`
+\u{1F4DD} Notes:`);
+    cli.output(`   - Costs based on Cloud Monitoring metrics from the last 30 days`);
+    cli.output(`   - Free tier: 1 GiB storage, 50K reads, 20K writes, 20K deletes per day`);
+    cli.output(`   - Free tier not deducted from estimates above`);
+    cli.output(`   - PITR adds ~30% to storage costs when enabled`);
+    cli.output(`   - Multi-region locations (nam5, eur3) cost more than regional`);
+    const summary = {
+      entity_type: "gcp-firestore",
+      database_id: dbId,
+      project: this.projectId,
+      location,
+      estimated_monthly_cost: totalMonthlyCost.toFixed(2),
+      currency: "USD",
+      usage_metrics: {
+        storage_gib: storageGib,
+        document_reads: metrics.documentReads,
+        document_writes: metrics.documentWrites,
+        document_deletes: metrics.documentDeletes,
+        network_egress_bytes: metrics.networkEgressBytes
+      },
+      cost_breakdown: {
+        storage: storageCost.toFixed(2),
+        reads: readsCost.toFixed(2),
+        writes: writesCost.toFixed(2),
+        deletes: deletesCost.toFixed(2),
+        network_egress: egressCost.toFixed(2)
+      },
+      pricing_rates: {
+        source: pricing.source,
+        currency: "USD",
+        storage_per_gib_month: pricing.storagePerGibMonth,
+        read_per_100k: pricing.readPer100K,
+        write_per_100k: pricing.writePer100K,
+        delete_per_100k: pricing.deletePer100K,
+        network_egress_per_gb: pricing.networkEgressPerGb
+      },
+      disclaimer: "Costs based on Cloud Monitoring metrics. Free tier not deducted."
+    };
+    cli.output(`
+\u{1F4CB} JSON Summary:`);
+    cli.output(JSON.stringify(summary, null, 2));
+  }
+  /**
+   * Get Cloud Monitoring metrics for Firestore (last 30 days).
+   * Returns document reads, writes, deletes, storage usage, and network egress.
+   */
+  getFirestoreMetrics() {
+    const defaultMetrics = {
+      documentReads: 0,
+      documentWrites: 0,
+      documentDeletes: 0,
+      storageSizeBytes: 0,
+      networkEgressBytes: 0
+    };
+    try {
+      const monitoringApiUrl = "https://monitoring.googleapis.com/v3";
+      const now = /* @__PURE__ */ new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+      const endTime = now.toISOString();
+      const startTime = thirtyDaysAgo.toISOString();
+      const results = {};
+      const metricTypes = [
+        { type: "firestore.googleapis.com/document/read_count", key: "reads" },
+        { type: "firestore.googleapis.com/document/write_count", key: "writes" },
+        { type: "firestore.googleapis.com/document/delete_count", key: "deletes" },
+        { type: "firestore.googleapis.com/storage/size", key: "storage" },
+        { type: "firestore.googleapis.com/network/sent_bytes_count", key: "egress" }
+      ];
+      for (const metric of metricTypes) {
+        try {
+          const filter = encodeURIComponent(`metric.type="${metric.type}"`);
+          const aligner = metric.key === "storage" ? "ALIGN_MEAN" : "ALIGN_SUM";
+          const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?filter=${filter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=${aligner}`;
+          const response = this.get(url);
+          if (response.timeSeries && response.timeSeries.length > 0) {
+            let total = 0;
+            for (const series of response.timeSeries) {
+              for (const point of series.points || []) {
+                const value = parseFloat(
+                  point.value?.int64Value || point.value?.doubleValue || "0"
+                );
+                total += value;
+              }
+            }
+            results[metric.key] = total;
+          }
+        } catch {
+        }
+      }
+      return {
+        documentReads: results["reads"] || 0,
+        documentWrites: results["writes"] || 0,
+        documentDeletes: results["deletes"] || 0,
+        storageSizeBytes: results["storage"] || 0,
+        networkEgressBytes: results["egress"] || 0
+      };
+    } catch {
+      return defaultMetrics;
+    }
+  }
+  costs() {
+    try {
+      const pricing = this.fetchFirestorePricing();
+      const metrics = this.getFirestoreMetrics();
+      let totalMonthlyCost = 0;
+      const storageGib = metrics.storageSizeBytes / (1024 * 1024 * 1024);
+      totalMonthlyCost += storageGib * pricing.storagePerGibMonth;
+      totalMonthlyCost += metrics.documentReads / 1e5 * pricing.readPer100K;
+      totalMonthlyCost += metrics.documentWrites / 1e5 * pricing.writePer100K;
+      totalMonthlyCost += metrics.documentDeletes / 1e5 * pricing.deletePer100K;
+      if (metrics.networkEgressBytes > 0 && pricing.networkEgressPerGb > 0) {
+        const egressGb = metrics.networkEgressBytes / (1024 * 1024 * 1024);
+        totalMonthlyCost += egressGb * pricing.networkEgressPerGb;
+      }
+      const result = {
+        type: "gcp-firestore",
+        costs: {
+          month: {
+            amount: totalMonthlyCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
+        type: "gcp-firestore",
+        costs: {
+          month: {
+            amount: "0",
+            currency: "USD",
+            error: error.message
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    }
   }
   getBackupInfo(_args) {
     cli.output(`==================================================`);
@@ -583,6 +869,8 @@ __decorateElement(_init, 1, "listIndexes", _listIndexes_dec, _Firestore);
 __decorateElement(_init, 1, "listFields", _listFields_dec, _Firestore);
 __decorateElement(_init, 1, "exportDocuments", _exportDocuments_dec, _Firestore);
 __decorateElement(_init, 1, "importDocuments", _importDocuments_dec, _Firestore);
+__decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _Firestore);
+__decorateElement(_init, 1, "costs", _costs_dec, _Firestore);
 __decorateElement(_init, 1, "getBackupInfo", _getBackupInfo_dec, _Firestore);
 __decorateElement(_init, 1, "listBackups", _listBackups_dec, _Firestore);
 __decorateElement(_init, 1, "describeBackup", _describeBackup_dec, _Firestore);

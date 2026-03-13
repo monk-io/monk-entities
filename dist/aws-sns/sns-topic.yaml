@@ -22,7 +22,7 @@ sns-topic:
       - `aws-sqs/queue` - Subscribe queues for fanout message distribution
       - `aws-lambda/function` - Invoke functions on message publish
       - `aws-sns/subscription` - Add email, HTTP, or other endpoint subscriptions
-    version-hash: 19c30697f8af
+    version-hash: 077107ca8f80
   schema:
     region:
       type: string
@@ -81,6 +81,8 @@ sns-topic:
     publish: ''
     add-permission: ''
     remove-permission: ''
+    get-cost-estimate: ''
+    costs: ''
   checks:
     readiness:
       period: 5
@@ -92,4 +94,5 @@ sns-topic:
     - aws-sns/sns-base
     - monkec/base
     - cli
+    - cloud/aws
     - aws-sns/common
