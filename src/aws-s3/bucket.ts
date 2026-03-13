@@ -896,7 +896,8 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
      * Get S3 pricing rates for the current region.
      * Fetches real-time pricing from AWS Price List API.
      * 
-     * Prices are in USD per GB per month for storage, and per 1000 requests.
+     * Prices are in USD per GB per month for storage, and per 1,000 requests
+     * (normalized from whatever bulk unit the AWS Price List API returns).
      * 
      * @throws Error if pricing cannot be fetched from AWS API
      */
@@ -1092,6 +1093,13 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
 
     /**
      * Parse request pricing from AWS Price List API response.
+     * 
+     * Returns prices normalized to USD per 1,000 requests, matching the unit assumed
+     * by callers: `(requestCount / 1000) * price`.
+     * 
+     * The unit field from the pricing dimension is inspected to determine the bulk
+     * quantity the API used, and a corrective multiplier is applied so the returned
+     * value is always "per 1,000 requests" regardless of what the API returns.
      */
     private parseRequestPricingResponse(responseBody: string): { put: number; get: number } | null {
         let putPrice: number | null = null;
@@ -1141,10 +1149,27 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
                         const dimension = priceDimensions[dimKey];
                         const pricePerUnit = dimension.pricePerUnit;
                         if (pricePerUnit && pricePerUnit.USD) {
-                            const price = parseFloat(pricePerUnit.USD);
-                            if (price > 0) {
-                                if (isPut && putPrice === null) putPrice = price;
-                                if (isGet && getPrice === null) getPrice = price;
+                            const rawPrice = parseFloat(pricePerUnit.USD);
+                            if (rawPrice > 0) {
+                                // Normalize to "per 1,000 requests" so callers can use
+                                // (count / 1000) * price regardless of the API's bulk unit.
+                                const unit = (dimension.unit || '').toLowerCase();
+                                let per1000Price: number;
+                                if (unit.includes('million') || unit.includes('1,000,000') || unit.includes('1000000')) {
+                                    // API returned price per million → convert to per 1,000
+                                    per1000Price = rawPrice / 1000;
+                                } else if (unit.includes('10,000') || unit.includes('10000')) {
+                                    // API returned price per 10,000 → convert to per 1,000
+                                    per1000Price = rawPrice / 10;
+                                } else if (unit.includes('1,000') || unit.includes('1000') || unit.includes('requests')) {
+                                    // API returned price per 1,000 (expected S3 unit) — use as-is
+                                    per1000Price = rawPrice;
+                                } else {
+                                    // Unknown unit — assume per-request and scale up to per 1,000
+                                    per1000Price = rawPrice * 1000;
+                                }
+                                if (isPut && putPrice === null) putPrice = per1000Price;
+                                if (isGet && getPrice === null) getPrice = per1000Price;
                             }
                         }
                     }
