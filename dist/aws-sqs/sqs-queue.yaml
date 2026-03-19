@@ -22,7 +22,7 @@ sqs-queue:
       - `aws-lambda/function` - Trigger Lambda functions from queue messages
       - `aws-sns/topic` - Subscribe queue to SNS topic for fanout patterns
       - `aws-iam/role` - Grant queue access to other services
-    version-hash: b9f7d1a4e944
+    version-hash: 33b2a7968a99
   schema:
     region:
       type: string

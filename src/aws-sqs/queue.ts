@@ -427,13 +427,17 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
     }
 
     /**
-     * Parse pricing response from AWS Price List API
+     * Parse pricing response from AWS Price List API.
+     * Returns the first non-zero USD price together with its unit string.
+     * The unit is used by callers to detect whether the API already expresses
+     * the price per-bulk-quantity (e.g. "per 1 million requests") so they can
+     * avoid applying a redundant multiplier.
      */
-    private parsePricingResponse(responseBody: string): number {
+    private parsePricingResponse(responseBody: string): { price: number; unit: string } {
         try {
             const data = JSON.parse(responseBody);
             if (!data.PriceList || data.PriceList.length === 0) {
-                return 0;
+                return { price: 0, unit: '' };
             }
 
             for (const priceItem of data.PriceList) {
@@ -444,9 +448,10 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
                 for (const termKey of Object.keys(terms)) {
                     const priceDimensions = terms[termKey].priceDimensions;
                     for (const dimKey of Object.keys(priceDimensions)) {
-                        const pricePerUnit = parseFloat(priceDimensions[dimKey].pricePerUnit?.USD || '0');
-                        if (pricePerUnit > 0) {
-                            return pricePerUnit;
+                        const dim = priceDimensions[dimKey];
+                        const price = parseFloat(dim.pricePerUnit?.USD || '0');
+                        if (price > 0) {
+                            return { price, unit: (dim.unit || '').toLowerCase() };
                         }
                     }
                 }
@@ -454,7 +459,30 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
         } catch (error) {
             cli.output(`Warning: Failed to parse pricing: ${(error as Error).message}`);
         }
-        return 0;
+        return { price: 0, unit: '' };
+    }
+
+    /**
+     * Normalize a price to "per 1 million requests" using the unit string
+     * from the pricing dimension.  If the API already returns a per-million
+     * price, use it as-is; otherwise scale up from per-request.
+     */
+    private normalizePriceToPerMillion(price: number, unit: string): number {
+        if (unit.includes('million') || unit.includes('1,000,000') || unit.includes('1000000')) {
+            // API already returned price per million — use as-is
+            return price;
+        }
+        if (unit.includes('100,000') || unit.includes('100000')) {
+            return price * 10;
+        }
+        if (unit.includes('10,000') || unit.includes('10000')) {
+            return price * 100;
+        }
+        if (unit.includes('1,000') || unit.includes('1000')) {
+            return price * 1000;
+        }
+        // Assume per-request — scale up to per million
+        return price * 1_000_000;
     }
 
     /**
@@ -550,26 +578,26 @@ export class SQSQueue extends AWSSQSEntity<SQSQueueDefinition, SQSQueueState> {
             })
         });
 
-        // SQS pricing is per request; convert to per million
+        // Parse pricing and normalise to per-million using the unit guard
         if (standardResponse.statusCode !== 200) {
             throw new Error(`AWS Pricing API returned status ${standardResponse.statusCode} for SQS standard queue pricing`);
         }
-        const standardPerRequest = this.parsePricingResponse(standardResponse.body);
-        if (standardPerRequest <= 0) {
+        const { price: standardPrice, unit: standardUnit } = this.parsePricingResponse(standardResponse.body);
+        if (standardPrice <= 0) {
             throw new Error('Could not parse SQS standard queue pricing from AWS Price List API response');
         }
 
         if (fifoResponse.statusCode !== 200) {
             throw new Error(`AWS Pricing API returned status ${fifoResponse.statusCode} for SQS FIFO queue pricing`);
         }
-        const fifoPerRequest = this.parsePricingResponse(fifoResponse.body);
-        if (fifoPerRequest <= 0) {
+        const { price: fifoPrice, unit: fifoUnit } = this.parsePricingResponse(fifoResponse.body);
+        if (fifoPrice <= 0) {
             throw new Error('Could not parse SQS FIFO queue pricing from AWS Price List API response');
         }
 
         return {
-            standardPerMillion: standardPerRequest * 1000000,
-            fifoPerMillion: fifoPerRequest * 1000000,
+            standardPerMillion: this.normalizePriceToPerMillion(standardPrice, standardUnit),
+            fifoPerMillion: this.normalizePriceToPerMillion(fifoPrice, fifoUnit),
             source: 'AWS Price List API'
         };
     }

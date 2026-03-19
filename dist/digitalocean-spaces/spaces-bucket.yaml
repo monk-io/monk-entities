@@ -18,7 +18,7 @@ spaces-bucket:
 
       ## Composing with Other Entities
       Works with `digitalocean-spaces/spaces-keys` to create access credentials for bucket operations.
-    version-hash: ea2e886a4768
+    version-hash: 3e5a34e7e68d
   schema:
     region:
       type: string

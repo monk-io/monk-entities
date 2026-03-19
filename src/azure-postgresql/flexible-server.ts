@@ -1842,8 +1842,9 @@ export class FlexibleServer extends AzurePostgreSQLEntity<FlexibleServerDefiniti
             computeCost = skuSpecs.vCores * pricing.computePerVCoreHour * 730;
         }
         
-        // Double compute cost for Zone Redundant HA
-        if (haMode === 'ZoneRedundant') {
+        // Double compute cost for HA (both ZoneRedundant and SameZone
+        // provision a standby replica with the same SKU)
+        if (haMode !== 'Disabled') {
             computeCost *= 2;
         }
 

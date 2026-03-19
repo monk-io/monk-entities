@@ -1100,21 +1100,38 @@ Restoring from Backup ID: ${backupId}`);
         "cloudsql.googleapis.com/database/network/connections"
       ];
       const results = {};
+      const deltaMetrics = /* @__PURE__ */ new Set([
+        "cloudsql.googleapis.com/database/disk/read_ops_count",
+        "cloudsql.googleapis.com/database/disk/write_ops_count",
+        "cloudsql.googleapis.com/database/network/sent_bytes_count",
+        "cloudsql.googleapis.com/database/network/received_bytes_count"
+      ]);
       for (const metricType of metricTypes) {
         try {
+          const isDelta = deltaMetrics.has(metricType);
+          const aligner = isDelta ? "ALIGN_SUM" : "ALIGN_MEAN";
           const filter = `metric.type="${metricType}" AND resource.labels.database_id="${this.projectId}:${this.definition.name}"`;
           const encodedFilter = encodeURIComponent(filter);
-          const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?filter=${encodedFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_MEAN`;
+          const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?filter=${encodedFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=${aligner}`;
           const response = this.get(url);
           if (response.timeSeries && response.timeSeries.length > 0) {
             const points = response.timeSeries[0].points || [];
             if (points.length > 0) {
-              let sum = 0;
-              for (const point of points) {
-                const value = point.value?.doubleValue || point.value?.int64Value || point.value?.distributionValue?.mean || 0;
-                sum += parseFloat(value.toString());
+              if (isDelta) {
+                let total = 0;
+                for (const point of points) {
+                  const value = point.value?.doubleValue || point.value?.int64Value || point.value?.distributionValue?.mean || 0;
+                  total += parseFloat(value.toString());
+                }
+                results[metricType] = total;
+              } else {
+                let sum = 0;
+                for (const point of points) {
+                  const value = point.value?.doubleValue || point.value?.int64Value || point.value?.distributionValue?.mean || 0;
+                  sum += parseFloat(value.toString());
+                }
+                results[metricType] = sum / points.length;
               }
-              results[metricType] = sum / points.length;
             }
           }
         } catch (metricError) {
@@ -1126,9 +1143,8 @@ Restoring from Backup ID: ${backupId}`);
         memoryUtilization: (results["cloudsql.googleapis.com/database/memory/utilization"] || 0) * 100,
         diskReadOps: results["cloudsql.googleapis.com/database/disk/read_ops_count"] || 0,
         diskWriteOps: results["cloudsql.googleapis.com/database/disk/write_ops_count"] || 0,
-        networkEgressBytes: (results["cloudsql.googleapis.com/database/network/sent_bytes_count"] || 0) * 30 * 24 * 3600,
-        // Convert rate to total
-        networkIngressBytes: (results["cloudsql.googleapis.com/database/network/received_bytes_count"] || 0) * 30 * 24 * 3600,
+        networkEgressBytes: results["cloudsql.googleapis.com/database/network/sent_bytes_count"] || 0,
+        networkIngressBytes: results["cloudsql.googleapis.com/database/network/received_bytes_count"] || 0,
         connections: results["cloudsql.googleapis.com/database/network/connections"] || 0
       };
     } catch (error) {

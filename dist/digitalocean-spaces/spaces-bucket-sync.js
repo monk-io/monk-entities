@@ -260,17 +260,16 @@ ${"=".repeat(60)}`);
       const pricing = this.getSpacesPricing();
       const usage = this.getBucketStorageUsage();
       const storageSizeGb = usage.totalSizeBytes / (1024 * 1024 * 1024);
-      let totalMonthlyCost = pricing.baseMonthly;
       const additionalStorageGb = Math.max(0, storageSizeGb - pricing.includedStorageGb);
-      if (additionalStorageGb > 0) {
-        totalMonthlyCost += additionalStorageGb * pricing.additionalStoragePerGb;
-      }
+      const overageCost = additionalStorageGb > 0 ? additionalStorageGb * pricing.additionalStoragePerGb : 0;
       const result = {
         type: "digitalocean-spaces-bucket",
         costs: {
           month: {
-            amount: totalMonthlyCost.toFixed(2),
-            currency: "USD"
+            amount: overageCost.toFixed(2),
+            currency: "USD",
+            account_base_monthly: pricing.baseMonthly.toFixed(2),
+            note: "Base cost is per-account; only storage overage is per-bucket"
           }
         }
       };
