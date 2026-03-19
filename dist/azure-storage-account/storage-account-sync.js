@@ -631,7 +631,7 @@ Please check that the Azure Retail Prices API is accessible.`);
   costs(_args) {
     const account = this.checkResourceExists(this.definition.account_name);
     if (!account) {
-      const result2 = {
+      const result = {
         type: "azure-storage-account",
         costs: {
           month: {
@@ -640,58 +640,72 @@ Please check that the Azure Retail Prices API is accessible.`);
           }
         }
       };
-      cli.output(JSON.stringify(result2));
+      cli.output(JSON.stringify(result));
       return;
     }
-    const properties = account.properties;
-    const sku = account.sku;
-    const skuName = sku?.name || this.definition.sku.name;
-    const accessTier = properties?.accessTier || this.definition.access_tier || "Hot";
-    const location = account.location || this.definition.location;
-    const storageStats = this.getStorageStatistics();
-    const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
-    if (!pricing) {
-      const errorResult = {
+    try {
+      const properties = account.properties;
+      const sku = account.sku;
+      const skuName = sku?.name || this.definition.sku.name;
+      const accessTier = properties?.accessTier || this.definition.access_tier || "Hot";
+      const location = account.location || this.definition.location;
+      const storageStats = this.getStorageStatistics();
+      const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
+      if (!pricing) {
+        const errorResult = {
+          type: "azure-storage-account",
+          costs: {
+            month: {
+              amount: "0",
+              currency: "USD",
+              error: "Could not fetch pricing from Azure Retail Prices API"
+            }
+          }
+        };
+        cli.output(JSON.stringify(errorResult));
+        return;
+      }
+      const metrics = this.getAzureMonitorMetrics();
+      const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
+      const storageCost = storageGb * pricing.storagePerGb;
+      const writeOps = metrics.writeOperations;
+      const readOps = metrics.readOperations;
+      const listOps = metrics.listOperations;
+      const writeOpsCost = writeOps / 1e4 * pricing.writeOperationsPer10k;
+      const readOpsCost = readOps / 1e4 * pricing.readOperationsPer10k;
+      const listOpsCost = listOps / 1e4 * pricing.listOperationsPer10k;
+      const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
+      const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
+      const networkCost = this.calculateEgressCost(egressGb);
+      let retrievalCost = 0;
+      if (accessTier === "Cool" || accessTier === "Archive") {
+        const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
+        retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
+      }
+      const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
+      const result = {
+        type: "azure-storage-account",
+        costs: {
+          month: {
+            amount: totalCost.toFixed(2),
+            currency: "USD"
+          }
+        }
+      };
+      cli.output(JSON.stringify(result));
+    } catch (error) {
+      const result = {
         type: "azure-storage-account",
         costs: {
           month: {
             amount: "0",
             currency: "USD",
-            error: "Could not fetch pricing from Azure Retail Prices API"
+            error: error.message
           }
         }
       };
-      cli.output(JSON.stringify(errorResult));
-      return;
+      cli.output(JSON.stringify(result));
     }
-    const metrics = this.getAzureMonitorMetrics();
-    const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
-    const storageCost = storageGb * pricing.storagePerGb;
-    const writeOps = metrics.writeOperations;
-    const readOps = metrics.readOperations;
-    const listOps = metrics.listOperations;
-    const writeOpsCost = writeOps / 1e4 * pricing.writeOperationsPer10k;
-    const readOpsCost = readOps / 1e4 * pricing.readOperationsPer10k;
-    const listOpsCost = listOps / 1e4 * pricing.listOperationsPer10k;
-    const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
-    const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
-    const networkCost = this.calculateEgressCost(egressGb);
-    let retrievalCost = 0;
-    if (accessTier === "Cool" || accessTier === "Archive") {
-      const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
-      retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
-    }
-    const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
-    const result = {
-      type: "azure-storage-account",
-      costs: {
-        month: {
-          amount: totalCost.toFixed(2),
-          currency: "USD"
-        }
-      }
-    };
-    cli.output(JSON.stringify(result));
   }
   /**
    * Get storage statistics by listing containers and blobs
