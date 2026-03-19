@@ -3,5 +3,5 @@ namespace: digitalocean-spaces
 do-s3-base:
   defines: module
   metadata:
-    version-hash: ea2e886a4768
+    version-hash: 3e5a34e7e68d
   source: <<< do-s3-base.js

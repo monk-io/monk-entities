@@ -1650,32 +1650,56 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
 
             const results: Record<string, number> = {};
 
+            // Delta counters (bytes, ops) need ALIGN_SUM to get accurate totals.
+            // Ratio/gauge metrics (utilization, connections) need ALIGN_MEAN.
+            const deltaMetrics = new Set([
+                'cloudsql.googleapis.com/database/disk/read_ops_count',
+                'cloudsql.googleapis.com/database/disk/write_ops_count',
+                'cloudsql.googleapis.com/database/network/sent_bytes_count',
+                'cloudsql.googleapis.com/database/network/received_bytes_count'
+            ]);
+
             for (const metricType of metricTypes) {
                 try {
+                    const isDelta = deltaMetrics.has(metricType);
+                    const aligner = isDelta ? 'ALIGN_SUM' : 'ALIGN_MEAN';
+
                     const filter = `metric.type="${metricType}" AND resource.labels.database_id="${this.projectId}:${this.definition.name}"`;
                     const encodedFilter = encodeURIComponent(filter);
-                    
+
                     const url = `${monitoringApiUrl}/projects/${this.projectId}/timeSeries?` +
                         `filter=${encodedFilter}&` +
                         `interval.startTime=${startTime}&` +
                         `interval.endTime=${endTime}&` +
                         `aggregation.alignmentPeriod=86400s&` +
-                        `aggregation.perSeriesAligner=ALIGN_MEAN`;
+                        `aggregation.perSeriesAligner=${aligner}`;
 
                     const response = this.get(url);
-                    
+
                     if (response.timeSeries && response.timeSeries.length > 0) {
                         const points = response.timeSeries[0].points || [];
                         if (points.length > 0) {
-                            // Calculate average across all points
-                            let sum = 0;
-                            for (const point of points) {
-                                const value = point.value?.doubleValue || 
-                                             point.value?.int64Value || 
-                                             point.value?.distributionValue?.mean || 0;
-                                sum += parseFloat(value.toString());
+                            if (isDelta) {
+                                // Sum all daily totals to get the 30-day total
+                                let total = 0;
+                                for (const point of points) {
+                                    const value = point.value?.doubleValue ||
+                                                 point.value?.int64Value ||
+                                                 point.value?.distributionValue?.mean || 0;
+                                    total += parseFloat(value.toString());
+                                }
+                                results[metricType] = total;
+                            } else {
+                                // Average across all points for gauge/ratio metrics
+                                let sum = 0;
+                                for (const point of points) {
+                                    const value = point.value?.doubleValue ||
+                                                 point.value?.int64Value ||
+                                                 point.value?.distributionValue?.mean || 0;
+                                    sum += parseFloat(value.toString());
+                                }
+                                results[metricType] = sum / points.length;
                             }
-                            results[metricType] = sum / points.length;
                         }
                     }
                 } catch (metricError) {
@@ -1689,8 +1713,8 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
                 memoryUtilization: (results['cloudsql.googleapis.com/database/memory/utilization'] || 0) * 100,
                 diskReadOps: results['cloudsql.googleapis.com/database/disk/read_ops_count'] || 0,
                 diskWriteOps: results['cloudsql.googleapis.com/database/disk/write_ops_count'] || 0,
-                networkEgressBytes: (results['cloudsql.googleapis.com/database/network/sent_bytes_count'] || 0) * 30 * 24 * 3600, // Convert rate to total
-                networkIngressBytes: (results['cloudsql.googleapis.com/database/network/received_bytes_count'] || 0) * 30 * 24 * 3600,
+                networkEgressBytes: results['cloudsql.googleapis.com/database/network/sent_bytes_count'] || 0,
+                networkIngressBytes: results['cloudsql.googleapis.com/database/network/received_bytes_count'] || 0,
                 connections: results['cloudsql.googleapis.com/database/network/connections'] || 0
             };
         } catch (error) {

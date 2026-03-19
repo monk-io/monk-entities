@@ -290,6 +290,11 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
 
     /**
      * Returns cost information in standardized format for Monk's billing system.
+     *
+     * Spaces pricing is per-account ($5/month base), not per-bucket.  To avoid
+     * N× overbilling when multiple buckets exist, each bucket only reports its
+     * own additional-storage overage.  The per-account base cost is reported
+     * separately so the billing system can de-duplicate it.
      */
     @action("costs")
     costs(): void {
@@ -298,18 +303,22 @@ export class SpacesBucket extends DOSpacesS3Entity<SpacesBucketDefinition, Space
             const usage = this.getBucketStorageUsage();
             const storageSizeGb = usage.totalSizeBytes / (1024 * 1024 * 1024);
 
-            let totalMonthlyCost = pricing.baseMonthly;
+            // Only report this bucket's overage — the $5 base is per-account,
+            // not per-bucket, and is surfaced via account_base_monthly so the
+            // billing system can de-duplicate across buckets.
             const additionalStorageGb = Math.max(0, storageSizeGb - pricing.includedStorageGb);
-            if (additionalStorageGb > 0) {
-                totalMonthlyCost += additionalStorageGb * pricing.additionalStoragePerGb;
-            }
+            const overageCost = additionalStorageGb > 0
+                ? additionalStorageGb * pricing.additionalStoragePerGb
+                : 0;
 
             const result = {
                 type: "digitalocean-spaces-bucket",
                 costs: {
                     month: {
-                        amount: totalMonthlyCost.toFixed(2),
-                        currency: "USD"
+                        amount: overageCost.toFixed(2),
+                        currency: "USD",
+                        account_base_monthly: pricing.baseMonthly.toFixed(2),
+                        note: "Base cost is per-account; only storage overage is per-bucket"
                     }
                 }
             };
