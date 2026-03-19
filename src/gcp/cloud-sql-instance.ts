@@ -1120,8 +1120,8 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
         cli.output(`\n📈 Cloud Monitoring Metrics (last 30 days):`);
         cli.output(`   CPU Utilization (avg): ${metrics.cpuUtilization.toFixed(2)}%`);
         cli.output(`   Memory Utilization (avg): ${metrics.memoryUtilization.toFixed(2)}%`);
-        cli.output(`   Disk Read IOPS (avg): ${metrics.diskReadOps.toFixed(0)}`);
-        cli.output(`   Disk Write IOPS (avg): ${metrics.diskWriteOps.toFixed(0)}`);
+        cli.output(`   Disk Read Ops (30-day total): ${metrics.diskReadOps.toFixed(0)}`);
+        cli.output(`   Disk Write Ops (30-day total): ${metrics.diskWriteOps.toFixed(0)}`);
         cli.output(`   Network Egress: ${(metrics.networkEgressBytes / (1024 * 1024)).toFixed(2)} MB`);
         cli.output(`   Network Ingress: ${(metrics.networkIngressBytes / (1024 * 1024)).toFixed(2)} MB`);
         cli.output(`   Database Connections (avg): ${metrics.connections.toFixed(0)}`);
@@ -1160,8 +1160,8 @@ export class CloudSqlInstance extends GcpEntity<CloudSqlInstanceDefinition, Clou
                 period_days: 30,
                 cpu_utilization_percent: parseFloat(metrics.cpuUtilization.toFixed(2)),
                 memory_utilization_percent: parseFloat(metrics.memoryUtilization.toFixed(2)),
-                disk_read_ops: parseFloat(metrics.diskReadOps.toFixed(0)),
-                disk_write_ops: parseFloat(metrics.diskWriteOps.toFixed(0)),
+                disk_read_ops_total: parseFloat(metrics.diskReadOps.toFixed(0)),
+                disk_write_ops_total: parseFloat(metrics.diskWriteOps.toFixed(0)),
                 network_egress_bytes: metrics.networkEgressBytes,
                 network_ingress_bytes: metrics.networkIngressBytes,
                 connections_avg: parseFloat(metrics.connections.toFixed(0))
