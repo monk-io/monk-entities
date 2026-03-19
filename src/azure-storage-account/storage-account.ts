@@ -1098,76 +1098,90 @@ export class StorageAccount extends AzureStorageEntity<StorageAccountDefinition,
             return;
         }
 
-        const properties = account.properties as Record<string, unknown> | undefined;
-        const sku = account.sku as Record<string, unknown> | undefined;
-        const skuName = (sku?.name as string) || this.definition.sku.name;
-        const accessTier = (properties?.accessTier as string) || this.definition.access_tier || 'Hot';
-        const location = (account.location as string) || this.definition.location;
+        try {
+            const properties = account.properties as Record<string, unknown> | undefined;
+            const sku = account.sku as Record<string, unknown> | undefined;
+            const skuName = (sku?.name as string) || this.definition.sku.name;
+            const accessTier = (properties?.accessTier as string) || this.definition.access_tier || 'Hot';
+            const location = (account.location as string) || this.definition.location;
 
-        // Get storage statistics
-        const storageStats = this.getStorageStatistics();
+            // Get storage statistics
+            const storageStats = this.getStorageStatistics();
 
-        // Get pricing from Azure Retail Prices API
-        const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
+            // Get pricing from Azure Retail Prices API
+            // This throws if operation pricing is incomplete (partial API response).
+            const pricing = this.getAzureStoragePricing(location, skuName, accessTier);
 
-        if (!pricing) {
-            // Return error result if pricing is unavailable
-            const errorResult = {
+            if (!pricing) {
+                const errorResult = {
+                    type: "azure-storage-account",
+                    costs: {
+                        month: {
+                            amount: "0",
+                            currency: "USD",
+                            error: "Could not fetch pricing from Azure Retail Prices API"
+                        }
+                    }
+                };
+                cli.output(JSON.stringify(errorResult));
+                return;
+            }
+
+            // Get Azure Monitor metrics for operations and egress
+            const metrics = this.getAzureMonitorMetrics();
+
+            // Calculate storage costs
+            const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
+            const storageCost = storageGb * pricing.storagePerGb;
+
+            // Calculate operations costs
+            const writeOps = metrics.writeOperations;
+            const readOps = metrics.readOperations;
+            const listOps = metrics.listOperations;
+            const writeOpsCost = (writeOps / 10000) * pricing.writeOperationsPer10k;
+            const readOpsCost = (readOps / 10000) * pricing.readOperationsPer10k;
+            const listOpsCost = (listOps / 10000) * pricing.listOperationsPer10k;
+            const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
+
+            // Calculate data transfer costs (egress)
+            const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
+            const networkCost = this.calculateEgressCost(egressGb);
+
+            // Calculate data retrieval costs (for Cool/Archive tiers)
+            let retrievalCost = 0;
+            if (accessTier === 'Cool' || accessTier === 'Archive') {
+                const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
+                retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
+            }
+
+            // Total cost
+            const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
+
+            // Return in the format expected by Monk billing system
+            const result = {
+                type: "azure-storage-account",
+                costs: {
+                    month: {
+                        amount: totalCost.toFixed(2),
+                        currency: "USD"
+                    }
+                }
+            };
+
+            cli.output(JSON.stringify(result));
+        } catch (error) {
+            const result = {
                 type: "azure-storage-account",
                 costs: {
                     month: {
                         amount: "0",
                         currency: "USD",
-                        error: "Could not fetch pricing from Azure Retail Prices API"
+                        error: (error as Error).message
                     }
                 }
             };
-            cli.output(JSON.stringify(errorResult));
-            return;
+            cli.output(JSON.stringify(result));
         }
-
-        // Get Azure Monitor metrics for operations and egress
-        const metrics = this.getAzureMonitorMetrics();
-
-        // Calculate storage costs
-        const storageGb = storageStats.totalBytes / (1024 * 1024 * 1024);
-        const storageCost = storageGb * pricing.storagePerGb;
-
-        // Calculate operations costs
-        const writeOps = metrics.writeOperations;
-        const readOps = metrics.readOperations;
-        const listOps = metrics.listOperations;
-        const writeOpsCost = (writeOps / 10000) * pricing.writeOperationsPer10k;
-        const readOpsCost = (readOps / 10000) * pricing.readOperationsPer10k;
-        const listOpsCost = (listOps / 10000) * pricing.listOperationsPer10k;
-        const operationsCost = writeOpsCost + readOpsCost + listOpsCost;
-
-        // Calculate data transfer costs (egress)
-        const egressGb = metrics.egressBytes / (1024 * 1024 * 1024);
-        const networkCost = this.calculateEgressCost(egressGb);
-
-        // Calculate data retrieval costs (for Cool/Archive tiers)
-        let retrievalCost = 0;
-        if (accessTier === 'Cool' || accessTier === 'Archive') {
-            const retrievalGb = metrics.retrievalBytes / (1024 * 1024 * 1024);
-            retrievalCost = retrievalGb * pricing.dataRetrievalPerGb;
-        }
-
-        // Total cost
-        const totalCost = storageCost + operationsCost + networkCost + retrievalCost;
-
-        // Return in the format expected by Monk billing system
-        const result = {
-            type: "azure-storage-account",
-            costs: {
-                month: {
-                    amount: totalCost.toFixed(2),
-                    currency: "USD"
-                }
-            }
-        };
-
-        cli.output(JSON.stringify(result));
     }
 
     /**
