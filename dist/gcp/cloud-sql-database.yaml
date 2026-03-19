@@ -22,7 +22,7 @@ cloud-sql-database:
 
       ## Definition Fields from Other Entities
       - `instance` - Get from `gcp/cloud-sql-instance` entity's `definition.name`
-    version-hash: 9ee461fe9a22
+    version-hash: a02740aac5ee
   schema:
     project:
       type: string

@@ -1067,7 +1067,7 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
                 }
 
                 // Network egress - extract full tiered rates
-                if (desc.includes('download') && desc.includes('worldwide') || 
+                if ((desc.includes('download') && desc.includes('worldwide')) ||
                     (desc.includes('egress') && desc.includes('internet'))) {
                     networkEgressRate = price;
                     // Extract tiered rates from the SKU for accurate tiered pricing
