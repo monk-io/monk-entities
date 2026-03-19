@@ -39,7 +39,7 @@ cloud-sql-user:
       - Database: from `gcp/cloud-sql-database` `state.name`
       - Username: from this entity's `state.name`
       - Password: from Monk secret specified in `password_secret`
-    version-hash: 9ee461fe9a22
+    version-hash: a02740aac5ee
   schema:
     project:
       type: string
