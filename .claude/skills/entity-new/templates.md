@@ -271,6 +271,8 @@ tests:
   - name: "Create resource"
     action: run
     target: <package>-test/test-resource
+    args:
+      tag: "local"
     expect: { exitCode: 0 }
   - name: "Wait for readiness"
     action: wait
