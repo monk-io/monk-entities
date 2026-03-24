@@ -89,8 +89,6 @@ Address PR review comments
 - <summary of fix 1>
 - <summary of fix 2>
 - <summary of fix 3>
-
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 EOF
 )"
 
