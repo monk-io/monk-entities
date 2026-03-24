@@ -17,7 +17,7 @@ $ARGUMENTS
 
 ## Existing Integrations
 
-!`ls -1 /home/ivan/Work/monk-entities/src/`
+!`ls -1 src/`
 
 ---
 
