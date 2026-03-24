@@ -15,6 +15,7 @@ Derived from real implementation sessions (AWS Glue/Neptune, Azure PostgreSQL, A
 9. **Use `cli.output()` for user-facing messages** — not console.log
 10. **MANIFEST REPO line must be just the package name** — e.g., `REPO aws-route53`, NOT `REPO https://github.com/...`. A full URL causes broken entity paths.
 11. **Implement `get-cost-estimate` and `costs` actions on every billable entity** — `get-cost-estimate` is human-readable, `costs` is standardized JSON for Monk's billing system. See the "Cost estimation" section below.
+12. **Document required permissions in README.md** — every entity README must list the exact IAM permissions / roles / scopes needed to manage the resource. Derive from all API calls in the entity source. Include cost estimation permissions (e.g., `pricing:GetProducts`, `cloudwatch:GetMetricStatistics` for AWS).
 
 ## MUST NOT DO
 

@@ -213,6 +213,45 @@ TAGS <package>, cloud, <relevant-tags>
 
 **IMPORTANT**: The REPO line MUST be just the package name (e.g., `aws-route53`), NOT a full URL. Using a URL causes entity paths like `https://github.com/.../entity-name` instead of `<package>/entity-name`.
 
+## README.md
+
+The README MUST include a "Required Permissions" section listing all permissions needed to manage the entities. This is critical for users to configure their cloud accounts before using the entities.
+
+```markdown
+# <Package>
+
+Monk entities for managing <Provider> <resource type> resources.
+
+## Entities
+
+| Entity | Description |
+|--------|-------------|
+| `<package>/<entity>` | <description> |
+
+## Prerequisites
+
+- <Provider> credentials configured via `monk cluster providers` (or secret_ref for SaaS)
+
+## Required Permissions
+
+<For AWS: IAM policy JSON listing all required actions>
+<For Azure: required Microsoft.* actions or roles>
+<For GCP: required IAM roles>
+<For SaaS: required API scopes>
+
+## <Entity> Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+## Actions
+
+| Action | Description |
+|--------|-------------|
+```
+
+Derive the permissions list from ALL API calls in the entity source code — every `.get()`, `.post()`, `.put()`, `.delete()` call maps to a provider permission. Include permissions for cost estimation (`pricing:GetProducts`, `cloudwatch:GetMetricStatistics` for AWS, etc.).
+
 ## example.yaml
 
 ```yaml

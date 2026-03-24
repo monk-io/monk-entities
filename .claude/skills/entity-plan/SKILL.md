@@ -85,6 +85,7 @@ Output a structured plan in this format. Save it to `src/<package>/PLAN.md` so `
 - **State fields**: `id`, `status`, etc.
 - **Readiness**: poll `GET /path/{id}`, check `status === "active"`
 - **Custom actions**: `get-info`, `list-items`, etc.
+- **Required permissions**: IAM policies / roles / scopes needed to manage the resource (list every API action used in CRUD + custom actions + cost estimation). Group into a single policy block.
 - **Cost estimation**: pricing API and usage metrics source for `get-cost-estimate` and `costs` actions (every billable entity needs both). See `doc/cost-estimation.md` for existing patterns per provider.
 - **Notes**: any quirks, async patterns, reserved name conflicts
 
@@ -95,6 +96,31 @@ Output a structured plan in this format. Save it to `src/<package>/PLAN.md` so `
 1. `common.ts` + `<package>-base.ts`
 2. Simplest entity first (e.g., Project)
 3. Dependent entities next (e.g., Database depends on Project)
+
+## Required Permissions
+
+List ALL permissions needed to manage the entities in this package. Include permissions for CRUD, custom actions, cost estimation, and monitoring. Format as a ready-to-use policy block.
+
+**For AWS:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "<service>:<Action1>",
+      "<service>:<Action2>",
+      "pricing:GetProducts",
+      "cloudwatch:GetMetricStatistics"
+    ],
+    "Resource": "*"
+  }]
+}
+```
+
+**For Azure:** list required `Microsoft.<Provider>/<operation>` actions and roles.
+**For GCP:** list required IAM roles (e.g., `roles/dns.admin`, `roles/monitoring.viewer`).
+**For SaaS:** list required API scopes or permission levels.
 
 ## Risks and Gotchas
 - List any reserved property name conflicts (`description`, `type`, etc.)
