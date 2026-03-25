@@ -34,6 +34,9 @@ sudo monk describe <namespace>/<entity>
 sudo monk cluster providers    # verify cloud credentials
 ```
 
+> On Linux, `sudo` is typically required (daemon socket is root-owned). On macOS, `sudo` is usually not needed. `monk run` needs `-l` for local execution; without it, monk prompts interactively for tag selection.
+```
+
 ## Entity development skills
 
 Use these skills for the full integration development pipeline:
@@ -52,7 +55,7 @@ Use these skills for the full integration development pipeline:
 - **MANIFEST REPO line**: must be just the package name (e.g., `REPO aws-route53`), not a URL
 - **Reserved property names**: never use `description` or `type` in Definition/State interfaces
 - **Cloud builtins** (aws/azure/gcp): use `aws.get()`/`.post()`/etc., NOT `.do()` — `.do()` throws on errors losing the response body
-- **All monk commands need `sudo`** and `monk run` needs `-l` flag
+- **Monk commands need `sudo` on Linux**; `monk run` needs `-l` flag
 - **Integration tests**: use `run` action with `args: tag: "local"` (not `run` on groups)
 - **Entity dependencies**: wire with `connection-target("name") entity-state get-member("field")` + `service: default`
 - **Cost actions**: every billable entity needs `get-cost-estimate` (human-readable) and `costs` (JSON for billing)
