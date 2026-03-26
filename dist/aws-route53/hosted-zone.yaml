@@ -3,7 +3,7 @@ hosted-zone:
   defines: entity
   metadata:
     name: HostedZone
-    version-hash: 8b14719eb8a2
+    version-hash: b5d2ec198b3a
   schema:
     region:
       type: string
