@@ -217,25 +217,38 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
     listRecords(_args?: Args): void {
         if (!this.state.zone_id) throw new Error("Zone not created yet");
 
-        const response = this.route53Request(
-            "ListResourceRecordSets",
-            `/hostedzone/${this.state.zone_id}/rrset`
-        );
-
-        const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
-
         cli.output(`=== DNS Records in ${this.state.zone_name} ===`);
-        for (const block of recordBlocks) {
-            const name = extractXMLValue(block, "Name") || "unknown";
-            const recordType = extractXMLValue(block, "Type") || "unknown";
-            const ttl = extractXMLValue(block, "TTL") || "N/A";
-            const values = extractXMLValues(block, "Value");
-            const aliasTarget = extractXMLValue(block, "DNSName");
 
-            if (aliasTarget) {
-                cli.output(`  ${name} ${recordType} ALIAS -> ${aliasTarget}`);
-            } else {
-                cli.output(`  ${name} ${recordType} TTL=${ttl} ${values.join(", ")}`);
+        let hasMore = true;
+        let nextName: string | undefined;
+        let nextType: string | undefined;
+
+        while (hasMore) {
+            let path = `/hostedzone/${this.state.zone_id}/rrset`;
+            if (nextName && nextType) {
+                path += `?name=${encodeURIComponent(nextName)}&type=${encodeURIComponent(nextType)}`;
+            }
+
+            const response = this.route53Request("ListResourceRecordSets", path);
+
+            const isTruncated = extractXMLValue(response.body, "IsTruncated") === "true";
+            nextName = extractXMLValue(response.body, "NextRecordName");
+            nextType = extractXMLValue(response.body, "NextRecordType");
+            hasMore = isTruncated && !!nextName && !!nextType;
+
+            const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
+            for (const block of recordBlocks) {
+                const name = extractXMLValue(block, "Name") || "unknown";
+                const recordType = extractXMLValue(block, "Type") || "unknown";
+                const ttl = extractXMLValue(block, "TTL") || "N/A";
+                const values = extractXMLValues(block, "Value");
+                const aliasTarget = extractXMLValue(block, "DNSName");
+
+                if (aliasTarget) {
+                    cli.output(`  ${name} ${recordType} ALIAS -> ${aliasTarget}`);
+                } else {
+                    cli.output(`  ${name} ${recordType} TTL=${ttl} ${values.join(", ")}`);
+                }
             }
         }
     }
