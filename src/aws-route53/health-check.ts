@@ -267,7 +267,7 @@ export class HealthCheck extends AWSRoute53Entity<HealthCheckDefinition, HealthC
         }
 
         try {
-            let monthlyCost = 0.75; // Default to non-AWS endpoint
+            let monthlyCost = this.isPrivateIp(this.definition.ip_address) ? 0.50 : 0.75;
 
             if (this.definition.check_type === "HTTPS" || this.definition.check_type === "HTTPS_STR_MATCH") {
                 monthlyCost += 1.00;

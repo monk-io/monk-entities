@@ -216,7 +216,7 @@ var _HealthCheck = class _HealthCheck extends (_a = AWSRoute53Entity, _getStatus
       return;
     }
     try {
-      let monthlyCost = 0.75;
+      let monthlyCost = this.isPrivateIp(this.definition.ip_address) ? 0.5 : 0.75;
       if (this.definition.check_type === "HTTPS" || this.definition.check_type === "HTTPS_STR_MATCH") {
         monthlyCost += 1;
       }

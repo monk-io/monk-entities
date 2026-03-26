@@ -1,5 +1,5 @@
 REPO aws-route53
-VERSION_HASH 79b1ffe2aa76
+VERSION_HASH 8b14719eb8a2
 FILES route53-base.yaml common.yaml hosted-zone.yaml record.yaml health-check.yaml
 LOAD health-check.yaml record.yaml hosted-zone.yaml common.yaml route53-base.yaml
 RESOURCES common.js hosted-zone-sync.js health-check-sync.js route53-base.js record-sync.js
