@@ -446,7 +446,7 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
                 xml
             );
 
-            const changeId = this.extractFromBody(changeResponse.body, "Id");
+            const changeId = extractXMLValue(changeResponse.body, "Id");
             if (changeId) {
                 this.waitForChange(changeId);
             }
