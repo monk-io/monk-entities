@@ -906,7 +906,7 @@ export class Database extends DOProviderEntity<
         this.state.created_at = database.created_at;
         this.state.tags = database.tags;
         this.state.semantic_version = database.semantic_version;
-        if (database.storage_size_mib) {
+        if (database.storage_size_mib != null) {
             this.state.storage_size_mib = database.storage_size_mib;
         }
 
