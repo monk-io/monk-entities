@@ -102,11 +102,18 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
       this.create();
       return;
     }
-    cli.output(`Updating record: ${this.state.record_name} ${this.state.record_type}`);
+    const newName = ensureTrailingDot(this.definition.record_name);
+    const newType = this.definition.record_type;
+    const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType;
+    if (identityChanged && this.state.record_name && this.state.record_type) {
+      cli.output(`Record identity changed, deleting old record: ${this.state.record_name} ${this.state.record_type}`);
+      this.deleteRecordFromState();
+    }
+    cli.output(`Upserting record: ${newName} ${newType}`);
     this.upsertRecord(this.definition.zone_id);
     this.state.zone_id = this.definition.zone_id;
-    this.state.record_name = ensureTrailingDot(this.definition.record_name);
-    this.state.record_type = this.definition.record_type;
+    this.state.record_name = newName;
+    this.state.record_type = newType;
     this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : void 0;
     this.state.ttl = this.definition.ttl;
     this.state.is_alias = !!this.definition.alias_dns_name;
@@ -119,28 +126,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
       return;
     }
     cli.output(`Deleting record: ${this.state.record_name} ${this.state.record_type}`);
-    const recordSetXml = this.buildRecordSetXml();
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
-  <ChangeBatch>
-    <Changes>
-      <Change>
-        <Action>DELETE</Action>
-        ${recordSetXml}
-      </Change>
-    </Changes>
-  </ChangeBatch>
-</ChangeResourceRecordSetsRequest>`;
-    const response = this.route53Request(
-      "ChangeResourceRecordSets",
-      `/hostedzone/${this.state.zone_id}/rrset`,
-      "POST",
-      xml
-    );
-    const changeId = this.extractFromBody(response.body, "Id");
-    if (changeId) {
-      this.waitForChange(changeId);
-    }
+    this.deleteRecordFromState();
     cli.output(`Record deleted: ${this.state.record_name}`);
   }
   checkReadiness() {
@@ -199,6 +185,58 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
       type: "aws-route53-record",
       costs: { month: { amount: "0.00", currency: "USD" } }
     }));
+  }
+  deleteRecordFromState() {
+    if (!this.state.zone_id || !this.state.record_name || !this.state.record_type) return;
+    const record = this.findRecord(this.state.zone_id, this.state.record_name, this.state.record_type);
+    if (!record) {
+      cli.output(`Record not found in zone, may already be deleted`);
+      return;
+    }
+    let recordSetXml = `<ResourceRecordSet>
+          <Name>${escapeXml(this.state.record_name)}</Name>
+          <Type>${escapeXml(this.state.record_type)}</Type>`;
+    if (record.isAlias && record.aliasTarget) {
+      recordSetXml += `
+          <AliasTarget>
+            <HostedZoneId>${escapeXml(record.aliasHostedZoneId || "")}</HostedZoneId>
+            <DNSName>${escapeXml(record.aliasTarget)}</DNSName>
+            <EvaluateTargetHealth>false</EvaluateTargetHealth>
+          </AliasTarget>`;
+    } else {
+      recordSetXml += `
+          <TTL>${record.ttl}</TTL>
+          <ResourceRecords>`;
+      for (const value of record.values) {
+        recordSetXml += `
+            <ResourceRecord><Value>${escapeXml(value)}</Value></ResourceRecord>`;
+      }
+      recordSetXml += `
+          </ResourceRecords>`;
+    }
+    recordSetXml += `
+        </ResourceRecordSet>`;
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
+  <ChangeBatch>
+    <Changes>
+      <Change>
+        <Action>DELETE</Action>
+        ${recordSetXml}
+      </Change>
+    </Changes>
+  </ChangeBatch>
+</ChangeResourceRecordSetsRequest>`;
+    const response = this.route53Request(
+      "ChangeResourceRecordSets",
+      `/hostedzone/${this.state.zone_id}/rrset`,
+      "POST",
+      xml
+    );
+    const changeId = this.extractFromBody(response.body, "Id");
+    if (changeId) {
+      this.waitForChange(changeId);
+    }
   }
   upsertRecord(zoneId) {
     const recordSetXml = this.buildRecordSetXml();
@@ -292,12 +330,14 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
         const rType = extractXMLValue(block, "Type");
         if (name === fqdn && rType === recordType) {
           const aliasTarget = extractXMLValue(block, "DNSName");
+          const aliasHostedZoneId = extractXMLValue(block, "HostedZoneId");
           const isAlias = block.includes("<AliasTarget>");
           return {
             values: extractXMLValues(block, "Value"),
             ttl: parseInt(extractXMLValue(block, "TTL") || "0", 10),
             isAlias,
-            aliasTarget
+            aliasTarget,
+            aliasHostedZoneId
           };
         }
       }

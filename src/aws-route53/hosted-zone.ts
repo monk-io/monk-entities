@@ -331,20 +331,25 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
                 `/hostedzonesbyname?dnsname=${encodeURIComponent(fqdn)}&maxitems=1`
             );
 
+            const wantPrivate = this.definition.is_private ?? false;
             const zoneBlocks = extractXMLBlocks(response.body, "HostedZone");
             for (const block of zoneBlocks) {
                 const name = extractXMLValue(block, "Name");
-                if (name === fqdn) {
-                    const rawId = extractXMLValue(block, "Id");
-                    const zoneId = rawId ? stripZoneIdPrefix(rawId) : "";
-                    const recordSetCount = parseInt(extractXMLValue(block, "ResourceRecordSetCount") || "0", 10);
+                if (name !== fqdn) continue;
 
-                    // Get name servers
-                    const nsResponse = this.route53Request("GetHostedZone", `/hostedzone/${zoneId}`);
-                    const nameServers = extractXMLValues(nsResponse.body, "NameServer");
+                // Check public vs private to avoid adopting the wrong zone in split-view setups
+                const privateZone = extractXMLValue(block, "PrivateZone") === "true";
+                if (privateZone !== wantPrivate) continue;
 
-                    return { zoneId, zoneName: fqdn, nameServers, recordSetCount };
-                }
+                const rawId = extractXMLValue(block, "Id");
+                const zoneId = rawId ? stripZoneIdPrefix(rawId) : "";
+                const recordSetCount = parseInt(extractXMLValue(block, "ResourceRecordSetCount") || "0", 10);
+
+                // Get name servers
+                const nsResponse = this.route53Request("GetHostedZone", `/hostedzone/${zoneId}`);
+                const nameServers = extractXMLValues(nsResponse.body, "NameServer");
+
+                return { zoneId, zoneName: fqdn, nameServers, recordSetCount };
             }
         } catch {
             // Zone not found
