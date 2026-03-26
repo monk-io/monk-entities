@@ -288,7 +288,7 @@ var _HostedZone = class _HostedZone extends (_a = AWSRoute53Entity, _getZoneInfo
       const fqdn = ensureTrailingDot(zoneName);
       const response = this.route53Request(
         "ListHostedZonesByName",
-        `/hostedzonesbyname?dnsname=${encodeURIComponent(fqdn)}&maxitems=1`
+        `/hostedzonesbyname?dnsname=${encodeURIComponent(fqdn)}&maxitems=2`
       );
       const wantPrivate = this.definition.is_private ?? false;
       const zoneBlocks = extractXMLBlocks(response.body, "HostedZone");

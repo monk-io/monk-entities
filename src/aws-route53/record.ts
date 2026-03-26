@@ -123,9 +123,9 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
 
         const newName = ensureTrailingDot(this.definition.record_name);
         const newType = this.definition.record_type;
-        const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType;
+        const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id;
 
-        // If record identity changed, delete the old record first
+        // If record identity or zone changed, delete the old record first
         if (identityChanged && this.state.record_name && this.state.record_type) {
             cli.output(`Record identity changed, deleting old record: ${this.state.record_name} ${this.state.record_type}`);
             this.deleteRecordFromState();
