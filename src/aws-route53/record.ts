@@ -124,6 +124,9 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
         cli.output(`Updating record: ${this.state.record_name} ${this.state.record_type}`);
         this.upsertRecord(this.definition.zone_id);
 
+        this.state.zone_id = this.definition.zone_id;
+        this.state.record_name = ensureTrailingDot(this.definition.record_name);
+        this.state.record_type = this.definition.record_type;
         this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : undefined;
         this.state.ttl = this.definition.ttl;
         this.state.is_alias = !!this.definition.alias_dns_name;

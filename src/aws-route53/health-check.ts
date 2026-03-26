@@ -278,6 +278,9 @@ export class HealthCheck extends AWSRoute53Entity<HealthCheckDefinition, HealthC
             if (this.definition.request_interval === 10) {
                 monthlyCost += 1.00;
             }
+            if (this.definition.measure_latency) {
+                monthlyCost += 1.00;
+            }
 
             cli.output(JSON.stringify({
                 type: "aws-route53-health-check",
