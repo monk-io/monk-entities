@@ -647,10 +647,17 @@ Cluster ID: ${this.state.id}
       this.state.private_connection_uri = database.private_connection.uri;
       this.state.private_connection_host = database.private_connection.host;
       this.state.private_connection_port = database.private_connection.port;
+    } else {
+      this.state.private_connection_uri = void 0;
+      this.state.private_connection_host = void 0;
+      this.state.private_connection_port = void 0;
     }
     if (database.standby_connection) {
       this.state.standby_connection_host = database.standby_connection.host;
       this.state.standby_connection_port = database.standby_connection.port;
+    } else {
+      this.state.standby_connection_host = void 0;
+      this.state.standby_connection_port = void 0;
     }
   }
   getDatabasePricing() {

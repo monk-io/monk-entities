@@ -930,12 +930,19 @@ export class Database extends DOProviderEntity<
             this.state.private_connection_uri = database.private_connection.uri;
             this.state.private_connection_host = database.private_connection.host;
             this.state.private_connection_port = database.private_connection.port;
+        } else {
+            this.state.private_connection_uri = undefined;
+            this.state.private_connection_host = undefined;
+            this.state.private_connection_port = undefined;
         }
 
         // Standby connection (multi-node clusters)
         if (database.standby_connection) {
             this.state.standby_connection_host = database.standby_connection.host;
             this.state.standby_connection_port = database.standby_connection.port;
+        } else {
+            this.state.standby_connection_host = undefined;
+            this.state.standby_connection_port = undefined;
         }
     }
 
