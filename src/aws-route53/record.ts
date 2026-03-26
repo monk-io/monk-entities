@@ -230,38 +230,13 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
     private deleteRecordFromState(): void {
         if (!this.state.zone_id || !this.state.record_name || !this.state.record_type) return;
 
-        // Fetch the current record from API to get exact values for DELETE
-        const record = this.findRecord(this.state.zone_id, this.state.record_name, this.state.record_type);
-        if (!record) {
+        // Fetch the raw XML block from API — Route 53 DELETE requires an exact match
+        // including all routing policy fields (SetIdentifier, Weight, Failover, etc.)
+        const rawBlock = this.findRecordRawXml(this.state.zone_id, this.state.record_name, this.state.record_type);
+        if (!rawBlock) {
             cli.output(`Record not found in zone, may already be deleted`);
             return;
         }
-
-        let recordSetXml = `<ResourceRecordSet>
-          <Name>${escapeXml(this.state.record_name)}</Name>
-          <Type>${escapeXml(this.state.record_type)}</Type>`;
-
-        if (record.isAlias && record.aliasTarget) {
-            recordSetXml += `
-          <AliasTarget>
-            <HostedZoneId>${escapeXml(record.aliasHostedZoneId || "")}</HostedZoneId>
-            <DNSName>${escapeXml(record.aliasTarget)}</DNSName>
-            <EvaluateTargetHealth>false</EvaluateTargetHealth>
-          </AliasTarget>`;
-        } else {
-            recordSetXml += `
-          <TTL>${record.ttl}</TTL>
-          <ResourceRecords>`;
-            for (const value of record.values) {
-                recordSetXml += `
-            <ResourceRecord><Value>${escapeXml(value)}</Value></ResourceRecord>`;
-            }
-            recordSetXml += `
-          </ResourceRecords>`;
-        }
-
-        recordSetXml += `
-        </ResourceRecordSet>`;
 
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
@@ -269,7 +244,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
     <Changes>
       <Change>
         <Action>DELETE</Action>
-        ${recordSetXml}
+        ${rawBlock}
       </Change>
     </Changes>
   </ChangeBatch>
@@ -282,7 +257,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
             xml
         );
 
-        const changeId = this.extractFromBody(response.body, "Id");
+        const changeId = extractXMLValue(response.body, "Id");
         if (changeId) {
             this.waitForChange(changeId);
         }
@@ -310,7 +285,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
             xml
         );
 
-        const changeId = this.extractFromBody(response.body, "Id");
+        const changeId = extractXMLValue(response.body, "Id");
         if (changeId) {
             this.waitForChange(changeId);
         }
@@ -427,6 +402,28 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
             // Record not found
         }
 
+        return null;
+    }
+
+    private findRecordRawXml(zoneId: string, recordName: string, recordType: string): string | null {
+        try {
+            const fqdn = ensureTrailingDot(recordName);
+            const response = this.route53Request(
+                "ListResourceRecordSets",
+                `/hostedzone/${zoneId}/rrset?name=${encodeURIComponent(fqdn)}&type=${encodeURIComponent(recordType)}&maxitems=1`
+            );
+
+            const blocks = extractXMLBlocks(response.body, "ResourceRecordSet");
+            for (const block of blocks) {
+                const name = extractXMLValue(block, "Name");
+                const rType = extractXMLValue(block, "Type");
+                if (name === fqdn && rType === recordType) {
+                    return block;
+                }
+            }
+        } catch {
+            // Record not found
+        }
         return null;
     }
 }

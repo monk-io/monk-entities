@@ -55,6 +55,11 @@ function parseRoute53Error(response) {
   }
   return `HTTP ${response.statusCode}: ${response.status || "Unknown error"}`;
 }
+function extractXMLValue(xml, tagName) {
+  const regex = new RegExp(`<${tagName}>([^<]*)</${tagName}>`, "i");
+  const match = xml.match(regex);
+  return match ? match[1] : void 0;
+}
 var ROUTE53_API_BASE = "https://route53.amazonaws.com";
 var ROUTE53_API_VERSION = "2013-04-01";
 
@@ -113,7 +118,7 @@ var AWSRoute53Entity = class extends import_base.MonkEntity {
     import_cli.default.output(`Waiting for change ${cleanId} to propagate...`);
     for (let i = 0; i < maxAttempts; i++) {
       const response = this.route53Request("GetChange", `/change/${cleanId}`);
-      const status = this.extractFromBody(response.body, "Status");
+      const status = extractXMLValue(response.body, "Status");
       if (status === "INSYNC") {
         import_cli.default.output(`Change ${cleanId} propagated successfully`);
         return;
@@ -122,14 +127,6 @@ var AWSRoute53Entity = class extends import_base.MonkEntity {
       sleep(intervalMs);
     }
     import_cli.default.output(`Warning: Change ${cleanId} still PENDING after ${maxAttempts} attempts`);
-  }
-  /**
-   * Simple XML value extraction from response body
-   */
-  extractFromBody(body, tagName) {
-    const regex = new RegExp(`<${tagName}>([^<]*)</${tagName}>`, "i");
-    const match = body.match(regex);
-    return match ? match[1] : void 0;
   }
   /**
    * Make a CloudWatch request to get metric statistics

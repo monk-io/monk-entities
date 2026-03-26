@@ -1,7 +1,7 @@
 import { MonkEntity } from "monkec/base";
 import aws from "cloud/aws";
 import cli from "cli";
-import { parseRoute53Error, ROUTE53_API_BASE, ROUTE53_API_VERSION } from "./common.ts";
+import { parseRoute53Error, extractXMLValue, ROUTE53_API_BASE, ROUTE53_API_VERSION } from "./common.ts";
 
 export interface AWSRoute53Definition {
     /** @description AWS region (used for signing; Route 53 is a global service) */
@@ -80,7 +80,7 @@ export abstract class AWSRoute53Entity<
 
         for (let i = 0; i < maxAttempts; i++) {
             const response = this.route53Request("GetChange", `/change/${cleanId}`);
-            const status = this.extractFromBody(response.body, "Status");
+            const status = extractXMLValue(response.body, "Status");
 
             if (status === "INSYNC") {
                 cli.output(`Change ${cleanId} propagated successfully`);
@@ -94,14 +94,6 @@ export abstract class AWSRoute53Entity<
         cli.output(`Warning: Change ${cleanId} still PENDING after ${maxAttempts} attempts`);
     }
 
-    /**
-     * Simple XML value extraction from response body
-     */
-    protected extractFromBody(body: string, tagName: string): string | undefined {
-        const regex = new RegExp(`<${tagName}>([^<]*)</${tagName}>`, "i");
-        const match = body.match(regex);
-        return match ? match[1] : undefined;
-    }
 
     /**
      * Make a CloudWatch request to get metric statistics

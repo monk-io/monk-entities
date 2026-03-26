@@ -377,7 +377,7 @@ var _HostedZone = class _HostedZone extends (_a = AWSRoute53Entity, _getZoneInfo
         "POST",
         xml
       );
-      const changeId = this.extractFromBody(changeResponse.body, "Id");
+      const changeId = extractXMLValue(changeResponse.body, "Id");
       if (changeId) {
         this.waitForChange(changeId);
       }

@@ -3,5 +3,5 @@ namespace: aws-route53
 common:
   defines: module
   metadata:
-    version-hash: 52ff37d78a4b
+    version-hash: abb94e820842
   source: <<< common.js
