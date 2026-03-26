@@ -1,0 +1,132 @@
+name: "AWS Route 53 Integration Test"
+description: "Full lifecycle test for Route 53 hosted zones, records, and health checks"
+timeout: 300000
+
+setup:
+  - name: "Load compiled entity"
+    action: load
+    target: dist/input/aws-route53/MANIFEST
+    expect: { exitCode: 0 }
+  - name: "Load test template"
+    action: load
+    target: stack-template.yaml
+    expect: { exitCode: 0 }
+
+tests:
+  # Hosted Zone lifecycle
+  - name: "Create hosted zone"
+    action: run
+    target: aws-route53-test/test-zone
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+
+  - name: "Wait for hosted zone readiness"
+    action: wait
+    target: aws-route53-test/test-zone
+    waitFor: { condition: ready, timeout: 60000 }
+
+  - name: "Get zone info"
+    action: do
+    target: aws-route53-test/test-zone/get-zone-info
+    expect: { exitCode: 0 }
+
+  - name: "List records in zone"
+    action: do
+    target: aws-route53-test/test-zone/list-records
+    expect: { exitCode: 0 }
+
+  - name: "Get zone cost estimate"
+    action: do
+    target: aws-route53-test/test-zone/get-cost-estimate
+    expect: { exitCode: 0 }
+
+  - name: "Get zone costs JSON"
+    action: do
+    target: aws-route53-test/test-zone/costs
+    expect: { exitCode: 0 }
+
+  # Record lifecycle
+  - name: "Create A record"
+    action: run
+    target: aws-route53-test/test-record
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+
+  - name: "Wait for A record readiness"
+    action: wait
+    target: aws-route53-test/test-record
+    waitFor: { condition: ready, timeout: 60000 }
+
+  - name: "Get A record info"
+    action: do
+    target: aws-route53-test/test-record/get-record-info
+    expect: { exitCode: 0 }
+
+  - name: "Create TXT record"
+    action: run
+    target: aws-route53-test/test-txt-record
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+
+  - name: "Wait for TXT record readiness"
+    action: wait
+    target: aws-route53-test/test-txt-record
+    waitFor: { condition: ready, timeout: 60000 }
+
+  # Health Check lifecycle
+  - name: "Create health check"
+    action: run
+    target: aws-route53-test/test-health-check
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+
+  - name: "Wait for health check readiness"
+    action: wait
+    target: aws-route53-test/test-health-check
+    waitFor: { condition: ready, timeout: 120000 }
+
+  - name: "Get health check status"
+    action: do
+    target: aws-route53-test/test-health-check/get-status
+    expect: { exitCode: 0 }
+
+  - name: "Get health check cost estimate"
+    action: do
+    target: aws-route53-test/test-health-check/get-cost-estimate
+    expect: { exitCode: 0 }
+
+  - name: "Get health check costs JSON"
+    action: do
+    target: aws-route53-test/test-health-check/costs
+    expect: { exitCode: 0 }
+
+  # Verify zone list-records shows the created records
+  - name: "List records after creation"
+    action: do
+    target: aws-route53-test/test-zone/list-records
+    expect: { exitCode: 0 }
+
+cleanup:
+  - name: "Delete health check"
+    action: delete
+    target: aws-route53-test/test-health-check
+    expect: { exitCode: 0 }
+
+  - name: "Delete TXT record"
+    action: delete
+    target: aws-route53-test/test-txt-record
+    expect: { exitCode: 0 }
+
+  - name: "Delete A record"
+    action: delete
+    target: aws-route53-test/test-record
+    expect: { exitCode: 0 }
+
+  - name: "Delete hosted zone"
+    action: delete
+    target: aws-route53-test/test-zone
+    expect: { exitCode: 0 }

@@ -1,0 +1,90 @@
+namespace: aws-route53
+health-check:
+  defines: entity
+  metadata:
+    name: HealthCheck
+    version-hash: 32f30f843f4c
+  schema:
+    region:
+      type: string
+      description: AWS region (used for signing; Route 53 is a global service)
+    check_type:
+      type: string
+      description: 'Health check protocol type (HTTP, HTTPS, TCP, HTTP_STR_MATCH, HTTPS_STR_MATCH)'
+    ip_address:
+      type: string
+      description: IP address to check
+    fqdn:
+      type: string
+      description: Fully qualified domain name to check
+    port:
+      type: number
+      description: 'Port number (default: 80 for HTTP, 443 for HTTPS)'
+    resource_path:
+      type: string
+      description: URL path for HTTP/HTTPS checks
+    search_string:
+      type: string
+      description: Search string for STR_MATCH check types
+    request_interval:
+      type: number
+      description: 'Request interval in seconds (10 or 30, default: 30)'
+    failure_threshold:
+      type: number
+      description: 'Failure threshold (1-10, default: 3)'
+    enable_sni:
+      type: boolean
+      description: 'Whether to enable SNI for HTTPS (default: true)'
+    measure_latency:
+      type: boolean
+      description: Whether to measure latency
+    check_regions:
+      type: array
+      items:
+        type: string
+      description: Regions to check from
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+      - check_type
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    health_check_id:
+      type: string
+      description: Route 53 health check ID
+    check_type:
+      type: string
+      description: Health check type
+    target:
+      type: string
+      description: Target being checked
+    health_status:
+      type: string
+      description: Current health status
+    required:
+      - existing
+  lifecycle:
+    sync: <<< health-check-sync.js
+    get-status: ''
+    get-last-failure-reason: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - aws-route53/route53-base
+    - cli
+    - aws-route53/common
