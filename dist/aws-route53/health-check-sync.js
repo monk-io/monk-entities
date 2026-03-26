@@ -226,6 +226,9 @@ var _HealthCheck = class _HealthCheck extends (_a = AWSRoute53Entity, _getStatus
       if (this.definition.request_interval === 10) {
         monthlyCost += 1;
       }
+      if (this.definition.measure_latency) {
+        monthlyCost += 1;
+      }
       cli.output(JSON.stringify({
         type: "aws-route53-health-check",
         costs: { month: { amount: monthlyCost.toFixed(2), currency: "USD" } }
