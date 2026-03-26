@@ -1,0 +1,149 @@
+name: "DigitalOcean Database Integration Test"
+description: "Full lifecycle test for DigitalOcean managed database entity"
+timeout: 1800000  # 30 minutes — DO databases take ~5min to provision
+
+setup:
+  - name: "Load DigitalOcean Database entity manifest"
+    action: "load"
+    target: "dist/input/digitalocean-database/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: "load"
+    target: "stack-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  # === Deployment ===
+  - name: "Deploy PostgreSQL database cluster"
+    action: "run"
+    target: "digitalocean-database-test/test-postgres-db"
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  # === Readiness ===
+  - name: "Wait for PostgreSQL database readiness"
+    action: "wait"
+    target: "digitalocean-database-test/test-postgres-db"
+    waitFor:
+      condition: "ready"
+      timeout: 900000  # 15 minutes for DO database provisioning
+
+  # === State verification ===
+  - name: "Verify PostgreSQL database status"
+    action: "describe"
+    target: "digitalocean-database-test/test-postgres-db"
+    expect:
+      exitCode: 0
+
+  - name: "Verify all entities running"
+    action: "ps"
+    expect:
+      exitCode: 0
+
+  # === Action testing: info actions ===
+  - name: "Test get-database action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/get-database"
+    expect:
+      exitCode: 0
+
+  - name: "Test get-connection-info action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/get-connection-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-databases action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/list-databases"
+    expect:
+      exitCode: 0
+
+  # === Action testing: database CRUD ===
+  - name: "Test create-database action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/create-database"
+    args:
+      db_name: "integration_test_db"
+    expect:
+      exitCode: 0
+
+  - name: "Test delete-database action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/delete-database"
+    args:
+      db_name: "integration_test_db"
+    expect:
+      exitCode: 0
+
+  # === Action testing: backup actions ===
+  - name: "Test get-backup-info action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/get-backup-info"
+    expect:
+      exitCode: 0
+
+  - name: "Test list-backups action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/list-backups"
+    expect:
+      exitCode: 0
+
+  # === Action testing: validation (expected failures) ===
+  - name: "Test describe-backup requires timestamp"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/describe-backup"
+    expect:
+      exitCode: 1
+
+  - name: "Test restore requires parameters"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/restore"
+    args:
+      new_cluster_name: "test-validation-only"
+    expect:
+      exitCode: 1
+
+  - name: "Test get-restore-status requires cluster_id"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/get-restore-status"
+    expect:
+      exitCode: 1
+
+  - name: "Test resize-cluster (no-op without args)"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/resize-cluster"
+    expect:
+      exitCode: 0
+
+  # === Cost estimation ===
+  - name: "Test get-cost-estimate action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/get-cost-estimate"
+    expect:
+      exitCode: 0
+
+  - name: "Test costs action"
+    action: "do"
+    target: "digitalocean-database-test/test-postgres-db/costs"
+    expect:
+      exitCode: 0
+
+  # === Update cycle ===
+  - name: "Test update (no-op)"
+    action: "update"
+    target: "digitalocean-database-test/test-postgres-db"
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete PostgreSQL database cluster"
+    action: "delete"
+    target: "digitalocean-database-test/test-postgres-db"
+    expect:
+      exitCode: 0

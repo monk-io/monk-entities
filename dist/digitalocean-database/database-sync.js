@@ -42,6 +42,7 @@ var __decorateElement = (array, flags, name, decorators, target, extra) => {
   }
   return k || __decoratorMetadata(array, target), desc && __defProp(target, name, desc), p ? k ^ 4 ? extra : desc : target;
 };
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
 var __privateIn = (member, obj) => Object(obj) !== obj ? __typeError('Cannot use the "in" operator on this value') : member.has(obj);
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
@@ -88,7 +89,8 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
       num_nodes: this.definition.num_nodes,
       tags: this.definition.tags || [],
       private_network_uuid: this.definition.private_network_uuid,
-      db_config: this.definition.db_config || {}
+      storage_size_mib: this.definition.storage_size_mib,
+      project_id: this.definition.project_id
     };
     Object.keys(createRequest).forEach((key) => {
       if (createRequest[key] === void 0) {
@@ -113,29 +115,28 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
     }
     cli.output(`\u{1F504} Checking for DigitalOcean database cluster updates: ${this.state.id}`);
     let hasUpdates = false;
-    if (this.definition.size !== this.state.size) {
-      cli.output(`\u{1F4CF} Resizing database cluster to: ${this.definition.size}`);
+    const sizeChanged = this.definition.size !== this.state.size;
+    const nodesChanged = this.definition.num_nodes !== this.state.num_nodes;
+    const storageChanged = this.definition.storage_size_mib !== void 0 && this.definition.storage_size_mib !== this.state.storage_size_mib;
+    if (sizeChanged || nodesChanged || storageChanged) {
+      const resizeReq = {
+        size: validateDatabaseSize(this.definition.size),
+        num_nodes: this.definition.num_nodes
+      };
+      if (this.definition.storage_size_mib !== void 0) {
+        resizeReq.storage_size_mib = this.definition.storage_size_mib;
+      }
+      const changes = [];
+      if (sizeChanged) changes.push(`size \u2192 ${this.definition.size}`);
+      if (nodesChanged) changes.push(`nodes \u2192 ${this.definition.num_nodes}`);
+      if (storageChanged) changes.push(`storage \u2192 ${this.definition.storage_size_mib} MiB`);
+      cli.output(`\u{1F4CF} Resizing database cluster: ${changes.join(", ")}`);
       try {
-        this.makeRequest("PUT", `/databases/${this.state.id}/resize`, {
-          size: validateDatabaseSize(this.definition.size),
-          num_nodes: this.definition.num_nodes
-        });
+        this.makeRequest("PUT", `/databases/${this.state.id}/resize`, resizeReq);
         cli.output(`\u2705 Database cluster resize initiated`);
         hasUpdates = true;
       } catch (error) {
         throw new Error(`Failed to resize database cluster: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
-    } else if (this.definition.num_nodes !== this.state.num_nodes) {
-      cli.output(`\u{1F522} Changing node count to: ${this.definition.num_nodes}`);
-      try {
-        this.makeRequest("PUT", `/databases/${this.state.id}/resize`, {
-          size: this.state.size,
-          num_nodes: this.definition.num_nodes
-        });
-        cli.output(`\u2705 Database cluster node count change initiated`);
-        hasUpdates = true;
-      } catch (error) {
-        throw new Error(`Failed to change node count: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
     if (JSON.stringify(this.definition.tags || []) !== JSON.stringify(this.state.tags || [])) {
@@ -173,6 +174,13 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
     this.state.connection_user = void 0;
     this.state.connection_database = void 0;
     this.state.connection_ssl = void 0;
+    this.state.private_connection_uri = void 0;
+    this.state.private_connection_host = void 0;
+    this.state.private_connection_port = void 0;
+    this.state.standby_connection_host = void 0;
+    this.state.standby_connection_port = void 0;
+    this.state.storage_size_mib = void 0;
+    this.state.semantic_version = void 0;
   }
   checkReadiness() {
     if (!this.state.id) {
@@ -207,15 +215,19 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
       const response = this.makeRequest("GET", `/databases/${this.state.id}`);
       if (response.database) {
         this.updateStateFromDatabase(response.database);
+        const db = response.database;
         cli.output(`\u{1F4CA} Database Information:`);
-        cli.output(`   ID: ${response.database.id}`);
-        cli.output(`   Name: ${response.database.name}`);
-        cli.output(`   Engine: ${response.database.engine} v${response.database.version}`);
-        cli.output(`   Status: ${response.database.status}`);
-        cli.output(`   Region: ${response.database.region}`);
-        cli.output(`   Size: ${response.database.size}`);
-        cli.output(`   Nodes: ${response.database.num_nodes}`);
-        cli.output(`   Created: ${response.database.created_at}`);
+        cli.output(`   ID: ${db.id}`);
+        cli.output(`   Name: ${db.name}`);
+        cli.output(`   Engine: ${db.engine} v${db.semantic_version || db.version}`);
+        cli.output(`   Status: ${db.status}`);
+        cli.output(`   Region: ${db.region}`);
+        cli.output(`   Size: ${db.size}`);
+        cli.output(`   Nodes: ${db.num_nodes}`);
+        if (db.storage_size_mib) {
+          cli.output(`   Storage: ${db.storage_size_mib} MiB`);
+        }
+        cli.output(`   Created: ${db.created_at}`);
         if (this.state.connection_host) {
           cli.output(`
 \u{1F517} Connection Details:`);
@@ -223,6 +235,18 @@ var _Database = class _Database extends (_a = DOProviderEntity, _getDatabase_dec
           cli.output(`   Port: ${this.state.connection_port}`);
           cli.output(`   User: ${this.state.connection_user}`);
           cli.output(`   SSL: ${this.state.connection_ssl ? "enabled" : "disabled"}`);
+        }
+        if (this.state.private_connection_host) {
+          cli.output(`
+\u{1F512} Private Connection:`);
+          cli.output(`   Host: ${this.state.private_connection_host}`);
+          cli.output(`   Port: ${this.state.private_connection_port}`);
+        }
+        if (this.state.standby_connection_host) {
+          cli.output(`
+\u{1F504} Standby Connection:`);
+          cli.output(`   Host: ${this.state.standby_connection_host}`);
+          cli.output(`   Port: ${this.state.standby_connection_port}`);
         }
       } else {
         throw new Error("Database not found");
@@ -328,17 +352,24 @@ Cluster ID: ${this.state.id}
     }
     const newSize = args.size;
     const newNodeCount = args.num_nodes;
-    if (!newSize && !newNodeCount) {
-      throw new Error("Either size or num_nodes parameter is required (use --size=db-s-2vcpu-4gb or --num_nodes=3)");
+    const newStorage = args.storage_size_mib;
+    if (!newSize && !newNodeCount && !newStorage) {
+      throw new Error("At least one parameter required: --size=db-s-2vcpu-4gb, --num_nodes=3, or --storage_size_mib=61440");
     }
     const resizeRequest = {
       size: newSize || this.state.size,
       num_nodes: newNodeCount ? parseInt(newNodeCount) : this.state.num_nodes
     };
+    if (newStorage) {
+      resizeRequest.storage_size_mib = parseInt(newStorage);
+    }
     try {
       cli.output(`\u{1F4CF} Resizing database cluster...`);
       cli.output(`   Current: ${this.state.size} with ${this.state.num_nodes} nodes`);
       cli.output(`   New: ${resizeRequest.size} with ${resizeRequest.num_nodes} nodes`);
+      if (resizeRequest.storage_size_mib) {
+        cli.output(`   Storage: ${resizeRequest.storage_size_mib} MiB`);
+      }
       this.makeRequest("PUT", `/databases/${this.state.id}/resize`, resizeRequest);
       cli.output(`\u2705 Database cluster resize initiated`);
       cli.output(`\u23F3 This operation may take several minutes to complete`);
@@ -595,58 +626,46 @@ Cluster ID: ${this.state.id}
     this.state.size = database.size;
     this.state.created_at = database.created_at;
     this.state.tags = database.tags;
-    if (!this.state.connection_uri) {
-      this.state.connection_uri = database.connection.uri;
+    this.state.semantic_version = database.semantic_version;
+    if (database.storage_size_mib) {
+      this.state.storage_size_mib = database.storage_size_mib;
     }
-    if (!this.state.connection_password) {
-      this.state.connection_password = database.connection.password;
+    if (database.connection) {
+      if (!this.state.connection_uri) {
+        this.state.connection_uri = database.connection.uri;
+      }
+      if (!this.state.connection_password) {
+        this.state.connection_password = database.connection.password;
+      }
+      this.state.connection_host = database.connection.host;
+      this.state.connection_port = database.connection.port;
+      this.state.connection_user = database.connection.user;
+      this.state.connection_database = database.connection.database;
+      this.state.connection_ssl = database.connection.ssl;
     }
-    this.state.connection_host = database.connection.host;
-    this.state.connection_port = database.connection.port;
-    this.state.connection_user = database.connection.user;
-    this.state.connection_database = database.connection.database;
-    this.state.connection_ssl = database.connection.ssl;
+    if (database.private_connection) {
+      this.state.private_connection_uri = database.private_connection.uri;
+      this.state.private_connection_host = database.private_connection.host;
+      this.state.private_connection_port = database.private_connection.port;
+    }
+    if (database.standby_connection) {
+      this.state.standby_connection_host = database.standby_connection.host;
+      this.state.standby_connection_port = database.standby_connection.port;
+    }
   }
-  // ==================== COST ESTIMATION ACTIONS ====================
-  /**
-   * DigitalOcean Database pricing by size slug (monthly USD)
-   * Prices are fixed per size and engine type
-   * Source: https://www.digitalocean.com/pricing/managed-databases
-   */
   getDatabasePricing() {
     const size = this.state.size || this.definition.size;
-    const engine = this.state.engine || this.definition.engine;
-    try {
-      const response = this.makeRequest("GET", `/databases/options`);
-      const options = response.options;
-      if (!options || !options.layouts) {
-        cli.output(`\u26A0\uFE0F Could not parse database options response`);
-        return null;
-      }
-      const engineLayout = options.layouts.find((layout) => layout.slug === engine);
-      if (!engineLayout || !engineLayout.sizes) {
-        cli.output(`\u26A0\uFE0F No layout found for engine: ${engine}`);
-        return null;
-      }
-      const sizeInfo = engineLayout.sizes.find((s) => s.slug === size);
-      if (!sizeInfo) {
-        cli.output(`\u26A0\uFE0F Unknown database size: ${size} for engine: ${engine}`);
-        return null;
-      }
-      const pricePerNode = parseFloat(sizeInfo.price_monthly || "0");
-      if (pricePerNode <= 0) {
-        cli.output(`\u26A0\uFE0F Could not determine price for size: ${size}`);
-        return null;
-      }
-      return {
-        basePrice: pricePerNode,
-        pricePerNode,
-        storageIncludedGb: sizeInfo.disk || 0,
-        source: "DigitalOcean Database Options API"
-      };
-    } catch (error) {
-      throw new Error(`Failed to fetch pricing from DigitalOcean API: ${error.message}`);
+    const sizeInfo = _Database.DATABASE_PRICING[size];
+    if (!sizeInfo) {
+      cli.output(`\u26A0\uFE0F Unknown database size: ${size} \u2014 pricing not available`);
+      return null;
     }
+    return {
+      basePrice: sizeInfo.price_monthly,
+      pricePerNode: sizeInfo.price_monthly,
+      storageIncludedGb: sizeInfo.disk,
+      source: "DigitalOcean published pricing (hardcoded)"
+    };
   }
   getCostEstimate() {
     cli.output(`
@@ -710,7 +729,7 @@ ${"=".repeat(60)}`);
     cli.output(`${"=".repeat(60)}`);
     cli.output(`
 \u{1F4DD} Notes:`);
-    cli.output(`   - Prices are estimates based on DigitalOcean's /v2/databases/options API`);
+    cli.output(`   - Prices are estimates based on DigitalOcean's published pricing`);
     cli.output(`   - DigitalOcean database pricing is uniform across regions`);
     cli.output(`   - Additional storage and network transfer are usage-based and NOT included in the total`);
     cli.output(`   - Network transfer: First 1TB outbound free, then $0.01/GB (published rate, not API-sourced)`);
@@ -779,6 +798,35 @@ __decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _Database);
 __decorateElement(_init, 1, "costs", _costs_dec, _Database);
 __decoratorMetadata(_init, _Database);
 __name(_Database, "Database");
+// ==================== COST ESTIMATION ACTIONS ====================
+/**
+ * DigitalOcean Database pricing by size slug (monthly USD)
+ * Prices are fixed per size and engine type
+ * Source: https://www.digitalocean.com/pricing/managed-databases
+ */
+// DigitalOcean does not expose database pricing via API (only droplet pricing).
+// This table is based on https://www.digitalocean.com/pricing/managed-databases
+__publicField(_Database, "DATABASE_PRICING", {
+  "db-s-1vcpu-1gb": { price_monthly: 15, disk: 10 },
+  "db-s-1vcpu-2gb": { price_monthly: 25, disk: 25 },
+  "db-s-2vcpu-4gb": { price_monthly: 50, disk: 38 },
+  "db-s-4vcpu-8gb": { price_monthly: 100, disk: 115 },
+  "db-s-6vcpu-16gb": { price_monthly: 200, disk: 270 },
+  "db-s-8vcpu-32gb": { price_monthly: 395, disk: 580 },
+  "db-s-16vcpu-64gb": { price_monthly: 790, disk: 1120 },
+  "gd-2vcpu-8gb": { price_monthly: 65, disk: 25 },
+  "gd-4vcpu-16gb": { price_monthly: 130, disk: 60 },
+  "gd-8vcpu-32gb": { price_monthly: 260, disk: 145 },
+  "gd-16vcpu-64gb": { price_monthly: 520, disk: 325 },
+  "gd-32vcpu-128gb": { price_monthly: 1040, disk: 695 },
+  "gd-40vcpu-160gb": { price_monthly: 1300, disk: 875 },
+  "so1_5-2vcpu-16gb": { price_monthly: 130, disk: 390 },
+  "so1_5-4vcpu-32gb": { price_monthly: 260, disk: 790 },
+  "so1_5-8vcpu-64gb": { price_monthly: 520, disk: 1580 },
+  "so1_5-16vcpu-128gb": { price_monthly: 1040, disk: 3160 },
+  "so1_5-24vcpu-192gb": { price_monthly: 1560, disk: 4740 },
+  "so1_5-32vcpu-256gb": { price_monthly: 2080, disk: 6320 }
+});
 var Database = _Database;
 
 
