@@ -20,19 +20,14 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // input/aws-route53/common.ts
 var common_exports = {};
 __export(common_exports, {
-  DNS_RECORD_TYPES: () => DNS_RECORD_TYPES,
-  HEALTH_CHECK_TYPES: () => HEALTH_CHECK_TYPES,
-  REGION_LOCATION_MAP: () => REGION_LOCATION_MAP,
   ROUTE53_API_BASE: () => ROUTE53_API_BASE,
   ROUTE53_API_VERSION: () => ROUTE53_API_VERSION,
   ensureTrailingDot: () => ensureTrailingDot,
   escapeXml: () => escapeXml,
-  extractXMLBlock: () => extractXMLBlock,
   extractXMLBlocks: () => extractXMLBlocks,
   extractXMLValue: () => extractXMLValue,
   extractXMLValues: () => extractXMLValues,
   parseRoute53Error: () => parseRoute53Error,
-  stripChangeIdPrefix: () => stripChangeIdPrefix,
   stripZoneIdPrefix: () => stripZoneIdPrefix,
   validateDomainName: () => validateDomainName
 });
@@ -68,11 +63,6 @@ function extractXMLValues(xml, tagName) {
   }
   return matches;
 }
-function extractXMLBlock(xml, tagName) {
-  const regex = new RegExp(`<${tagName}>[\\s\\S]*?</${tagName}>`, "i");
-  const match = xml.match(regex);
-  return match ? match[0] : void 0;
-}
 function extractXMLBlocks(xml, tagName) {
   const regex = new RegExp(`<${tagName}>[\\s\\S]*?</${tagName}>`, "gi");
   const matches = [];
@@ -95,68 +85,18 @@ function ensureTrailingDot(domain) {
 function stripZoneIdPrefix(zoneId) {
   return zoneId.replace(/^\/hostedzone\//, "");
 }
-function stripChangeIdPrefix(changeId) {
-  return changeId.replace(/^\/change\//, "");
-}
 var ROUTE53_API_BASE = "https://route53.amazonaws.com";
 var ROUTE53_API_VERSION = "2013-04-01";
-var DNS_RECORD_TYPES = [
-  "A",
-  "AAAA",
-  "CNAME",
-  "MX",
-  "NS",
-  "PTR",
-  "SOA",
-  "SPF",
-  "SRV",
-  "TXT",
-  "CAA",
-  "DS",
-  "NAPTR"
-];
-var HEALTH_CHECK_TYPES = [
-  "HTTP",
-  "HTTPS",
-  "HTTP_STR_MATCH",
-  "HTTPS_STR_MATCH",
-  "TCP",
-  "CALCULATED",
-  "CLOUDWATCH_METRIC"
-];
-var REGION_LOCATION_MAP = {
-  "us-east-1": "US East (N. Virginia)",
-  "us-east-2": "US East (Ohio)",
-  "us-west-1": "US West (N. California)",
-  "us-west-2": "US West (Oregon)",
-  "eu-west-1": "EU (Ireland)",
-  "eu-west-2": "EU (London)",
-  "eu-west-3": "EU (Paris)",
-  "eu-central-1": "EU (Frankfurt)",
-  "eu-north-1": "EU (Stockholm)",
-  "ap-southeast-1": "Asia Pacific (Singapore)",
-  "ap-southeast-2": "Asia Pacific (Sydney)",
-  "ap-northeast-1": "Asia Pacific (Tokyo)",
-  "ap-northeast-2": "Asia Pacific (Seoul)",
-  "ap-south-1": "Asia Pacific (Mumbai)",
-  "sa-east-1": "South America (Sao Paulo)",
-  "ca-central-1": "Canada (Central)"
-};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  DNS_RECORD_TYPES,
-  HEALTH_CHECK_TYPES,
-  REGION_LOCATION_MAP,
   ROUTE53_API_BASE,
   ROUTE53_API_VERSION,
   ensureTrailingDot,
   escapeXml,
-  extractXMLBlock,
   extractXMLBlocks,
   extractXMLValue,
   extractXMLValues,
   parseRoute53Error,
-  stripChangeIdPrefix,
   stripZoneIdPrefix,
   validateDomainName
 });
