@@ -1,0 +1,65 @@
+namespace: aws-route53-test
+
+test-zone:
+  defines: aws-route53/hosted-zone
+  region: us-east-1
+  zone_name: monk-test-route53.io
+  zone_comment: "Monk integration test zone"
+  tags:
+    Environment: test
+    Purpose: integration-testing
+    ManagedBy: monk
+  services:
+    data:
+      protocol: custom
+
+test-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-test/test-zone
+      timeout: 120
+  connections:
+    test-zone:
+      runnable: aws-route53-test/test-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("test-zone") entity-state get-member("zone_id")
+  record_name: www.monk-test-route53.io
+  record_type: A
+  ttl: 300
+  record_values:
+    - "203.0.113.10"
+
+test-txt-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-test/test-zone
+      timeout: 120
+  connections:
+    test-zone:
+      runnable: aws-route53-test/test-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("test-zone") entity-state get-member("zone_id")
+  record_name: monk-test-route53.io
+  record_type: TXT
+  ttl: 300
+  record_values:
+    - "\"v=spf1 -all\""
+
+test-health-check:
+  defines: aws-route53/health-check
+  region: us-east-1
+  check_type: HTTP
+  fqdn: www.example.com
+  port: 80
+  resource_path: /
+  request_interval: 30
+  failure_threshold: 3
+  tags:
+    Environment: test
+    Purpose: integration-testing

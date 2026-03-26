@@ -1,0 +1,117 @@
+namespace: aws-route53-example
+
+# Public hosted zone
+my-zone:
+  defines: aws-route53/hosted-zone
+  region: us-east-1
+  zone_name: my-domain.com
+  zone_comment: "Managed by Monk"
+  tags:
+    Environment: production
+    Owner: platform-team
+  services:
+    data:
+      protocol: custom
+
+# A record pointing to an IP
+web-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-example/my-zone
+      timeout: 120
+  connections:
+    my-zone:
+      runnable: aws-route53-example/my-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("my-zone") entity-state get-member("zone_id")
+  record_name: www.my-domain.com
+  record_type: A
+  ttl: 300
+  record_values:
+    - "203.0.113.10"
+
+# MX record for email
+mail-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-example/my-zone
+      timeout: 120
+  connections:
+    my-zone:
+      runnable: aws-route53-example/my-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("my-zone") entity-state get-member("zone_id")
+  record_name: my-domain.com
+  record_type: MX
+  ttl: 3600
+  record_values:
+    - "10 mail.my-domain.com"
+    - "20 mail2.my-domain.com"
+
+# TXT record for SPF
+spf-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-example/my-zone
+      timeout: 120
+  connections:
+    my-zone:
+      runnable: aws-route53-example/my-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("my-zone") entity-state get-member("zone_id")
+  record_name: my-domain.com
+  record_type: TXT
+  ttl: 3600
+  record_values:
+    - "\"v=spf1 include:_spf.google.com ~all\""
+
+# CNAME record
+api-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - aws-route53-example/my-zone
+      timeout: 120
+  connections:
+    my-zone:
+      runnable: aws-route53-example/my-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("my-zone") entity-state get-member("zone_id")
+  record_name: api.my-domain.com
+  record_type: CNAME
+  ttl: 300
+  record_values:
+    - "my-api.us-east-1.elb.amazonaws.com"
+
+# Health check for the web server
+web-health-check:
+  defines: aws-route53/health-check
+  region: us-east-1
+  check_type: HTTPS
+  fqdn: www.my-domain.com
+  port: 443
+  resource_path: /health
+  request_interval: 30
+  failure_threshold: 3
+  tags:
+    Environment: production
+
+# Private hosted zone for internal DNS
+internal-zone:
+  defines: aws-route53/hosted-zone
+  region: us-east-1
+  zone_name: internal.my-domain.com
+  is_private: true
+  vpc_id: vpc-0123456789abcdef0
+  zone_comment: "Internal DNS for VPC"

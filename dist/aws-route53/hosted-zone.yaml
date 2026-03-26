@@ -1,0 +1,72 @@
+namespace: aws-route53
+hosted-zone:
+  defines: entity
+  metadata:
+    name: HostedZone
+    version-hash: 32f30f843f4c
+  schema:
+    region:
+      type: string
+      description: AWS region (used for signing; Route 53 is a global service)
+    zone_name:
+      type: string
+      description: 'Domain name for the hosted zone (e.g., example.com)'
+    is_private:
+      type: boolean
+      description: Whether this is a private hosted zone
+    vpc_id:
+      type: string
+      description: VPC ID for private hosted zones
+    vpc_region:
+      type: string
+      description: VPC region for private hosted zones (defaults to entity region)
+    zone_comment:
+      type: string
+      description: Comment for the hosted zone
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+      - zone_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    zone_id:
+      type: string
+      description: Route 53 hosted zone ID (without /hostedzone/ prefix)
+    zone_name:
+      type: string
+      description: Fully qualified zone name
+    name_servers:
+      type: array
+      items:
+        type: string
+      description: Assigned name servers
+    record_set_count:
+      type: number
+      description: Number of record sets in the zone
+    required:
+      - existing
+  lifecycle:
+    sync: <<< hosted-zone-sync.js
+    get-zone-info: ''
+    list-records: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - aws-route53/route53-base
+    - cli
+    - aws-route53/common
