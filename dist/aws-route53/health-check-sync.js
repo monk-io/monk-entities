@@ -183,7 +183,7 @@ var _HealthCheck = class _HealthCheck extends (_a = AWSRoute53Entity, _getStatus
     cli.output(`Target: ${this.definition.fqdn || this.definition.ip_address}`);
     cli.output(``);
     let monthlyCost = 0;
-    const isAwsEndpoint = this.definition.ip_address?.startsWith("10.") || this.definition.ip_address?.startsWith("172.") || this.definition.ip_address?.startsWith("192.168.");
+    const isAwsEndpoint = this.isPrivateIp(this.definition.ip_address);
     const baseCost = isAwsEndpoint ? 0.5 : 0.75;
     monthlyCost += baseCost;
     cli.output(`Pricing:`);
@@ -349,6 +349,16 @@ var _HealthCheck = class _HealthCheck extends (_a = AWSRoute53Entity, _getStatus
 </ChangeTagsForResourceRequest>`;
     this.route53Request("ChangeTagsForResource", `/tags/healthcheck/${healthCheckId}`, "POST", xml);
     cli.output(`Applied ${Object.keys(tags).length} tag(s) to health check`);
+  }
+  isPrivateIp(ip) {
+    if (!ip) return false;
+    if (ip.startsWith("10.")) return true;
+    if (ip.startsWith("192.168.")) return true;
+    if (ip.startsWith("172.")) {
+      const secondOctet = parseInt(ip.split(".")[1], 10);
+      return secondOctet >= 16 && secondOctet <= 31;
+    }
+    return false;
   }
 };
 _init = __decoratorStart(_a);

@@ -127,13 +127,9 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
         }
 
         // Wait for change to propagate
-        const changeId = extractXMLValue(response.body, "Id");
-        if (changeId && changeId.includes("/change/")) {
-            // The response contains ChangeInfo with its own Id
-            const changeInfoId = response.body.match(/<ChangeInfo>[\s\S]*?<Id>([^<]+)<\/Id>/);
-            if (changeInfoId) {
-                this.waitForChange(changeInfoId[1]);
-            }
+        const changeInfoMatch = response.body.match(/<ChangeInfo>[\s\S]*?<Id>([^<]+)<\/Id>/);
+        if (changeInfoMatch) {
+            this.waitForChange(changeInfoMatch[1]);
         }
 
         cli.output(`Hosted zone created: ${zoneId}`);
@@ -386,10 +382,13 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
         const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
         const changeBatchItems: string[] = [];
 
+        const zoneName = this.state.zone_name || ensureTrailingDot(this.definition.zone_name);
         for (const block of recordBlocks) {
             const recordType = extractXMLValue(block, "Type");
-            // Skip default SOA and NS records
-            if (recordType === "SOA" || recordType === "NS") continue;
+            const recordName = extractXMLValue(block, "Name");
+            // Skip default SOA record and apex NS record (but delete subdomain NS delegations)
+            if (recordType === "SOA") continue;
+            if (recordType === "NS" && recordName === zoneName) continue;
 
             changeBatchItems.push(`
       <Change>

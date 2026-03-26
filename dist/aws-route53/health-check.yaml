@@ -3,7 +3,7 @@ health-check:
   defines: entity
   metadata:
     name: HealthCheck
-    version-hash: 32f30f843f4c
+    version-hash: ce12dccad912
   schema:
     region:
       type: string
