@@ -81,6 +81,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
       this.state.zone_id = zoneId;
       this.state.record_name = recordName;
       this.state.record_type = recordType;
+      this.state.set_identifier = this.definition.set_identifier;
       this.state.record_values = [...existing.values];
       this.state.ttl = existing.ttl;
       this.state.is_alias = existing.isAlias;
@@ -92,6 +93,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
     this.state.zone_id = zoneId;
     this.state.record_name = recordName;
     this.state.record_type = recordType;
+    this.state.set_identifier = this.definition.set_identifier;
     this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : void 0;
     this.state.ttl = this.definition.ttl;
     this.state.is_alias = !!this.definition.alias_dns_name;
@@ -104,7 +106,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
     }
     const newName = ensureTrailingDot(this.definition.record_name);
     const newType = this.definition.record_type;
-    const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id;
+    const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id || this.state.set_identifier !== (this.definition.set_identifier || void 0);
     if (identityChanged && this.state.record_name && this.state.record_type) {
       cli.output(`Record identity changed, deleting old record: ${this.state.record_name} ${this.state.record_type}`);
       this.deleteRecordFromState();
@@ -114,6 +116,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
     this.state.zone_id = this.definition.zone_id;
     this.state.record_name = newName;
     this.state.record_type = newType;
+    this.state.set_identifier = this.definition.set_identifier;
     this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : void 0;
     this.state.ttl = this.definition.ttl;
     this.state.is_alias = !!this.definition.alias_dns_name;

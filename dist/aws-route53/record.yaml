@@ -3,7 +3,7 @@ record:
   defines: entity
   metadata:
     name: Record
-    version-hash: 7144e39a3dc1
+    version-hash: 23661c8a808c
   schema:
     region:
       type: string
@@ -75,6 +75,9 @@ record:
       items:
         type: string
       description: Current record values
+    set_identifier:
+      type: string
+      description: Set identifier for routing policies
     ttl:
       type: number
       description: Current TTL

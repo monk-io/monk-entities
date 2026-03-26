@@ -66,6 +66,9 @@ export interface RecordState extends AWSRoute53State {
     /** @description Current record values */
     record_values?: string[];
 
+    /** @description Set identifier for routing policies */
+    set_identifier?: string;
+
     /** @description Current TTL */
     ttl?: number;
 
@@ -94,6 +97,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
             this.state.zone_id = zoneId;
             this.state.record_name = recordName;
             this.state.record_type = recordType;
+            this.state.set_identifier = this.definition.set_identifier;
             this.state.record_values = [...existing.values];
             this.state.ttl = existing.ttl;
             this.state.is_alias = existing.isAlias;
@@ -108,6 +112,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
         this.state.zone_id = zoneId;
         this.state.record_name = recordName;
         this.state.record_type = recordType;
+        this.state.set_identifier = this.definition.set_identifier;
         this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : undefined;
         this.state.ttl = this.definition.ttl;
         this.state.is_alias = !!this.definition.alias_dns_name;
@@ -123,7 +128,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
 
         const newName = ensureTrailingDot(this.definition.record_name);
         const newType = this.definition.record_type;
-        const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id;
+        const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id || this.state.set_identifier !== (this.definition.set_identifier || undefined);
 
         // If record identity or zone changed, delete the old record first
         if (identityChanged && this.state.record_name && this.state.record_type) {
@@ -137,6 +142,7 @@ export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
         this.state.zone_id = this.definition.zone_id;
         this.state.record_name = newName;
         this.state.record_type = newType;
+        this.state.set_identifier = this.definition.set_identifier;
         this.state.record_values = this.definition.record_values ? [...this.definition.record_values] : undefined;
         this.state.ttl = this.definition.ttl;
         this.state.is_alias = !!this.definition.alias_dns_name;
