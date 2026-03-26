@@ -46,15 +46,6 @@ export function extractXMLValues(xml: string, tagName: string): string[] {
 }
 
 /**
- * Extract a named XML block (with nested content)
- */
-export function extractXMLBlock(xml: string, tagName: string): string | undefined {
-    const regex = new RegExp(`<${tagName}>[\\s\\S]*?</${tagName}>`, "i");
-    const match = xml.match(regex);
-    return match ? match[0] : undefined;
-}
-
-/**
  * Extract all named XML blocks
  */
 export function extractXMLBlocks(xml: string, tagName: string): string[] {
@@ -102,51 +93,7 @@ export function stripZoneIdPrefix(zoneId: string): string {
 }
 
 /**
- * Strip the /change/ prefix from a change ID
- */
-export function stripChangeIdPrefix(changeId: string): string {
-    return changeId.replace(/^\/change\//, "");
-}
-
-/**
  * Route 53 API base URL
  */
 export const ROUTE53_API_BASE = "https://route53.amazonaws.com";
 export const ROUTE53_API_VERSION = "2013-04-01";
-
-/**
- * Supported DNS record types
- */
-export const DNS_RECORD_TYPES = [
-    "A", "AAAA", "CNAME", "MX", "NS", "PTR", "SOA",
-    "SPF", "SRV", "TXT", "CAA", "DS", "NAPTR"
-] as const;
-
-/**
- * Health check protocol types
- */
-export const HEALTH_CHECK_TYPES = [
-    "HTTP", "HTTPS", "HTTP_STR_MATCH", "HTTPS_STR_MATCH", "TCP", "CALCULATED", "CLOUDWATCH_METRIC"
-] as const;
-
-/**
- * Region mapping for AWS pricing API
- */
-export const REGION_LOCATION_MAP: Record<string, string> = {
-    "us-east-1": "US East (N. Virginia)",
-    "us-east-2": "US East (Ohio)",
-    "us-west-1": "US West (N. California)",
-    "us-west-2": "US West (Oregon)",
-    "eu-west-1": "EU (Ireland)",
-    "eu-west-2": "EU (London)",
-    "eu-west-3": "EU (Paris)",
-    "eu-central-1": "EU (Frankfurt)",
-    "eu-north-1": "EU (Stockholm)",
-    "ap-southeast-1": "Asia Pacific (Singapore)",
-    "ap-southeast-2": "Asia Pacific (Sydney)",
-    "ap-northeast-1": "Asia Pacific (Tokyo)",
-    "ap-northeast-2": "Asia Pacific (Seoul)",
-    "ap-south-1": "Asia Pacific (Mumbai)",
-    "sa-east-1": "South America (Sao Paulo)",
-    "ca-central-1": "Canada (Central)",
-};

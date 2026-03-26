@@ -3,7 +3,7 @@ record:
   defines: entity
   metadata:
     name: Record
-    version-hash: 7d9e7be8608b
+    version-hash: 7144e39a3dc1
   schema:
     region:
       type: string

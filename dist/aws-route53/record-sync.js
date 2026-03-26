@@ -295,47 +295,37 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
     return xml;
   }
   findRecord(zoneId, recordName, recordType) {
-    try {
-      const fqdn = ensureTrailingDot(recordName);
-      const response = this.route53Request(
-        "ListResourceRecordSets",
-        `/hostedzone/${zoneId}/rrset?name=${encodeURIComponent(fqdn)}&type=${encodeURIComponent(recordType)}&maxitems=1`
-      );
-      const blocks = extractXMLBlocks(response.body, "ResourceRecordSet");
-      for (const block of blocks) {
-        const name = extractXMLValue(block, "Name");
-        const rType = extractXMLValue(block, "Type");
-        if (name === fqdn && rType === recordType) {
-          const aliasTarget = extractXMLValue(block, "DNSName");
-          const aliasHostedZoneId = extractXMLValue(block, "HostedZoneId");
-          const isAlias = block.includes("<AliasTarget>");
-          return {
-            values: extractXMLValues(block, "Value"),
-            ttl: parseInt(extractXMLValue(block, "TTL") || "0", 10),
-            isAlias,
-            aliasTarget,
-            aliasHostedZoneId
-          };
-        }
-      }
-    } catch {
-    }
-    return null;
+    const block = this.findRecordRawXml(zoneId, recordName, recordType);
+    if (!block) return null;
+    const aliasTarget = extractXMLValue(block, "DNSName");
+    const aliasHostedZoneId = extractXMLValue(block, "HostedZoneId");
+    const isAlias = block.includes("<AliasTarget>");
+    return {
+      values: extractXMLValues(block, "Value"),
+      ttl: parseInt(extractXMLValue(block, "TTL") || "0", 10),
+      isAlias,
+      aliasTarget,
+      aliasHostedZoneId
+    };
   }
   findRecordRawXml(zoneId, recordName, recordType) {
     try {
       const fqdn = ensureTrailingDot(recordName);
       const response = this.route53Request(
         "ListResourceRecordSets",
-        `/hostedzone/${zoneId}/rrset?name=${encodeURIComponent(fqdn)}&type=${encodeURIComponent(recordType)}&maxitems=1`
+        `/hostedzone/${zoneId}/rrset?name=${encodeURIComponent(fqdn)}&type=${encodeURIComponent(recordType)}&maxitems=10`
       );
+      const setId = this.definition.set_identifier;
       const blocks = extractXMLBlocks(response.body, "ResourceRecordSet");
       for (const block of blocks) {
         const name = extractXMLValue(block, "Name");
         const rType = extractXMLValue(block, "Type");
-        if (name === fqdn && rType === recordType) {
-          return block;
+        if (name !== fqdn || rType !== recordType) continue;
+        if (setId) {
+          const blockSetId = extractXMLValue(block, "SetIdentifier");
+          if (blockSetId !== setId) continue;
         }
+        return block;
       }
     } catch {
     }
