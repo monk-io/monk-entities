@@ -374,34 +374,46 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
     private deleteNonDefaultRecords(): void {
         if (!this.state.zone_id) return;
 
-        const response = this.route53Request(
-            "ListResourceRecordSets",
-            `/hostedzone/${this.state.zone_id}/rrset`
-        );
-
-        const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
-        const changeBatchItems: string[] = [];
-
         const zoneName = this.state.zone_name || ensureTrailingDot(this.definition.zone_name);
-        for (const block of recordBlocks) {
-            const recordType = extractXMLValue(block, "Type");
-            const recordName = extractXMLValue(block, "Name");
-            // Skip default SOA record and apex NS record (but delete subdomain NS delegations)
-            if (recordType === "SOA") continue;
-            if (recordType === "NS" && recordName === zoneName) continue;
+        let hasMore = true;
+        let nextName: string | undefined;
+        let nextType: string | undefined;
 
-            changeBatchItems.push(`
+        while (hasMore) {
+            let path = `/hostedzone/${this.state.zone_id}/rrset`;
+            if (nextName && nextType) {
+                path += `?name=${encodeURIComponent(nextName)}&type=${encodeURIComponent(nextType)}`;
+            }
+
+            const response = this.route53Request("ListResourceRecordSets", path);
+
+            const isTruncated = extractXMLValue(response.body, "IsTruncated") === "true";
+            nextName = extractXMLValue(response.body, "NextRecordName");
+            nextType = extractXMLValue(response.body, "NextRecordType");
+            hasMore = isTruncated && !!nextName && !!nextType;
+
+            const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
+            const changeBatchItems: string[] = [];
+
+            for (const block of recordBlocks) {
+                const recordType = extractXMLValue(block, "Type");
+                const recordName = extractXMLValue(block, "Name");
+                // Skip default SOA record and apex NS record (but delete subdomain NS delegations)
+                if (recordType === "SOA") continue;
+                if (recordType === "NS" && recordName === zoneName) continue;
+
+                changeBatchItems.push(`
       <Change>
         <Action>DELETE</Action>
         ${block}
       </Change>`);
-        }
+            }
 
-        if (changeBatchItems.length === 0) return;
+            if (changeBatchItems.length === 0) continue;
 
-        cli.output(`Deleting ${changeBatchItems.length} non-default record(s)...`);
+            cli.output(`Deleting ${changeBatchItems.length} non-default record(s)...`);
 
-        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+            const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
   <ChangeBatch>
     <Changes>${changeBatchItems.join("")}
@@ -409,16 +421,17 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
   </ChangeBatch>
 </ChangeResourceRecordSetsRequest>`;
 
-        const changeResponse = this.route53Request(
-            "ChangeResourceRecordSets",
-            `/hostedzone/${this.state.zone_id}/rrset`,
-            "POST",
-            xml
-        );
+            const changeResponse = this.route53Request(
+                "ChangeResourceRecordSets",
+                `/hostedzone/${this.state.zone_id}/rrset`,
+                "POST",
+                xml
+            );
 
-        const changeId = this.extractFromBody(changeResponse.body, "Id");
-        if (changeId) {
-            this.waitForChange(changeId);
+            const changeId = this.extractFromBody(changeResponse.body, "Id");
+            if (changeId) {
+                this.waitForChange(changeId);
+            }
         }
     }
 }
