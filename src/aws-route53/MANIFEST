@@ -1,2 +1,2 @@
 REPO aws-route53
-FILES base.yaml common.yaml hosted-zone.yaml record.yaml health-check.yaml
+FILES route53-base.yaml common.yaml hosted-zone.yaml record.yaml health-check.yaml

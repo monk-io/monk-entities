@@ -222,9 +222,7 @@ export class HealthCheck extends AWSRoute53Entity<HealthCheckDefinition, HealthC
         let monthlyCost = 0;
 
         // Base health check cost
-        const isAwsEndpoint = this.definition.ip_address?.startsWith("10.") ||
-            this.definition.ip_address?.startsWith("172.") ||
-            this.definition.ip_address?.startsWith("192.168.");
+        const isAwsEndpoint = this.isPrivateIp(this.definition.ip_address);
         const baseCost = isAwsEndpoint ? 0.50 : 0.75;
         monthlyCost += baseCost;
         cli.output(`Pricing:`);
@@ -433,5 +431,17 @@ export class HealthCheck extends AWSRoute53Entity<HealthCheckDefinition, HealthC
 
         this.route53Request("ChangeTagsForResource", `/tags/healthcheck/${healthCheckId}`, "POST", xml);
         cli.output(`Applied ${Object.keys(tags).length} tag(s) to health check`);
+    }
+
+    private isPrivateIp(ip: string | undefined): boolean {
+        if (!ip) return false;
+        if (ip.startsWith("10.")) return true;
+        if (ip.startsWith("192.168.")) return true;
+        // RFC 1918: 172.16.0.0 - 172.31.255.255
+        if (ip.startsWith("172.")) {
+            const secondOctet = parseInt(ip.split(".")[1], 10);
+            return secondOctet >= 16 && secondOctet <= 31;
+        }
+        return false;
     }
 }

@@ -130,12 +130,9 @@ var _HostedZone = class _HostedZone extends (_a = AWSRoute53Entity, _getZoneInfo
     if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
       this.applyTags(zoneId, this.definition.tags);
     }
-    const changeId = extractXMLValue(response.body, "Id");
-    if (changeId && changeId.includes("/change/")) {
-      const changeInfoId = response.body.match(/<ChangeInfo>[\s\S]*?<Id>([^<]+)<\/Id>/);
-      if (changeInfoId) {
-        this.waitForChange(changeInfoId[1]);
-      }
+    const changeInfoMatch = response.body.match(/<ChangeInfo>[\s\S]*?<Id>([^<]+)<\/Id>/);
+    if (changeInfoMatch) {
+      this.waitForChange(changeInfoMatch[1]);
     }
     cli.output(`Hosted zone created: ${zoneId}`);
     cli.output(`Name servers: ${nameServers.join(", ")}`);
@@ -332,9 +329,12 @@ var _HostedZone = class _HostedZone extends (_a = AWSRoute53Entity, _getZoneInfo
     );
     const recordBlocks = extractXMLBlocks(response.body, "ResourceRecordSet");
     const changeBatchItems = [];
+    const zoneName = this.state.zone_name || ensureTrailingDot(this.definition.zone_name);
     for (const block of recordBlocks) {
       const recordType = extractXMLValue(block, "Type");
-      if (recordType === "SOA" || recordType === "NS") continue;
+      const recordName = extractXMLValue(block, "Name");
+      if (recordType === "SOA") continue;
+      if (recordType === "NS" && recordName === zoneName) continue;
       changeBatchItems.push(`
       <Change>
         <Action>DELETE</Action>
