@@ -104,7 +104,7 @@ var _Record = class _Record extends (_a = AWSRoute53Entity, _getRecordInfo_dec =
     }
     const newName = ensureTrailingDot(this.definition.record_name);
     const newType = this.definition.record_type;
-    const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType;
+    const identityChanged = this.state.record_name !== newName || this.state.record_type !== newType || this.state.zone_id !== this.definition.zone_id;
     if (identityChanged && this.state.record_name && this.state.record_type) {
       cli.output(`Record identity changed, deleting old record: ${this.state.record_name} ${this.state.record_type}`);
       this.deleteRecordFromState();

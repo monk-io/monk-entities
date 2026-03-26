@@ -328,7 +328,7 @@ export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZon
             const fqdn = ensureTrailingDot(zoneName);
             const response = this.route53Request(
                 "ListHostedZonesByName",
-                `/hostedzonesbyname?dnsname=${encodeURIComponent(fqdn)}&maxitems=1`
+                `/hostedzonesbyname?dnsname=${encodeURIComponent(fqdn)}&maxitems=2`
             );
 
             const wantPrivate = this.definition.is_private ?? false;
