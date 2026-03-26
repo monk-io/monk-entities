@@ -13,7 +13,7 @@ my-postgres-db:
     - environment:production
     - application:my-app
 
-# MySQL database cluster with multiple nodes
+# MySQL database cluster with additional storage
 my-mysql-cluster:
   defines: digitalocean-database/database
   name: my-mysql-cluster
@@ -22,12 +22,10 @@ my-mysql-cluster:
   num_nodes: 3
   region: sfo3
   size: db-s-2vcpu-4gb
+  storage_size_mib: 61440
   tags:
     - environment:production
     - application:ecommerce
-  db_config:
-    sql_mode: "STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO"
-    default_time_zone: "UTC"
 
 # Valkey cache cluster (redis is mapped to valkey for backwards compatibility)
 my-valkey-cache:
@@ -41,8 +39,6 @@ my-valkey-cache:
   tags:
     - environment:production
     - application:cache
-  db_config:
-    redis_maxmemory_policy: "allkeys-lru"
 
 # MongoDB cluster
 my-mongodb:

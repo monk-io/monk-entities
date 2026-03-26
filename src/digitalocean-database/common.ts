@@ -22,18 +22,17 @@ export function getApiToken(secretRef: string): string {
 export type DatabaseEngine = "mysql" | "pg" | "mongodb" | "kafka" | "opensearch" | "valkey";
 
 /**
- * Database region codes supported by DigitalOcean
+ * Database region — not restricted to a fixed set since DO may add regions.
+ * Validated at runtime via the API, not at compile time.
  */
-export type DatabaseRegion = 
-    | "ams3" | "blr1" | "fra1" | "lon1" | "nyc1" | "nyc3" 
-    | "sfo3" | "sgp1" | "tor1" | "syd1";
+export type DatabaseRegion = string;
 
 /**
- * Database size slugs for DigitalOcean databases
+ * Database size slug — not restricted to a fixed set since DO offers
+ * multiple slug families (db-s-*, gd-*, so1_5-*) and may add more.
+ * Validated at runtime via the API, not at compile time.
  */
-export type DatabaseSize = 
-    | "db-s-1vcpu-1gb" | "db-s-1vcpu-2gb" | "db-s-2vcpu-4gb" 
-    | "db-s-4vcpu-8gb" | "db-s-6vcpu-16gb" | "db-s-8vcpu-32gb";
+export type DatabaseSize = string;
 
 /**
  * Common response interface for DigitalOcean API
@@ -66,15 +65,15 @@ export interface DigitalOceanApiError {
 export type DatabaseStatus = "creating" | "online" | "forking" | "migrating" | "resizing";
 
 /**
- * Validate database engine
- * Note: "redis" is accepted for backwards compatibility but maps to "valkey"
+ * Validate database engine.
+ * "redis" is accepted for backwards compatibility but maps to "valkey".
+ * Caching (redis) cluster creates are no longer supported as of 2025-04-30.
  */
 export function validateDatabaseEngine(engine: string): DatabaseEngine {
-    // Map redis to valkey for backwards compatibility
     if (engine === "redis") {
         engine = "valkey";
     }
-    
+
     const validEngines: DatabaseEngine[] = ["mysql", "pg", "mongodb", "kafka", "opensearch", "valkey"];
     if (!validEngines.includes(engine as DatabaseEngine)) {
         throw new Error(`Invalid database engine: ${engine}. Valid engines: ${validEngines.join(", ")}`);
@@ -83,29 +82,24 @@ export function validateDatabaseEngine(engine: string): DatabaseEngine {
 }
 
 /**
- * Validate database region
+ * Validate database region — basic format check only.
+ * The API itself will reject invalid regions with a clear error.
  */
 export function validateDatabaseRegion(region: string): DatabaseRegion {
-    const validRegions: DatabaseRegion[] = [
-        "ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", 
-        "sfo3", "sgp1", "tor1", "syd1"
-    ];
-    if (!validRegions.includes(region as DatabaseRegion)) {
-        throw new Error(`Invalid database region: ${region}. Valid regions: ${validRegions.join(", ")}`);
+    if (!region || region.length < 3) {
+        throw new Error(`Invalid database region: ${region}. Expected a DigitalOcean region slug (e.g., nyc1, sfo3, fra1).`);
     }
-    return region as DatabaseRegion;
+    return region;
 }
 
 /**
- * Validate database size
+ * Validate database size — basic format check only.
+ * DO offers multiple slug families (db-s-*, gd-*, so1_5-*) and may add more.
+ * The API itself will reject invalid sizes with a clear error.
  */
 export function validateDatabaseSize(size: string): DatabaseSize {
-    const validSizes: DatabaseSize[] = [
-        "db-s-1vcpu-1gb", "db-s-1vcpu-2gb", "db-s-2vcpu-4gb", 
-        "db-s-4vcpu-8gb", "db-s-6vcpu-16gb", "db-s-8vcpu-32gb"
-    ];
-    if (!validSizes.includes(size as DatabaseSize)) {
-        throw new Error(`Invalid database size: ${size}. Valid sizes: ${validSizes.join(", ")}`);
+    if (!size || size.length < 3) {
+        throw new Error(`Invalid database size: ${size}. Expected a DigitalOcean size slug (e.g., db-s-1vcpu-1gb, gd-2vcpu-8gb).`);
     }
-    return size as DatabaseSize;
+    return size;
 }

@@ -22,7 +22,7 @@ database:
       Works with:
       - `digitalocean/database-user` - Create additional database users
       - `digitalocean/database-db` - Create databases within the cluster
-    version-hash: fd2bd03b2810
+    version-hash: 2c4f8884e172
   schema:
     name:
       type: string
@@ -47,27 +47,9 @@ database:
       description: 'Number of nodes for the database cluster (1 for single node, 2+ for cluster)'
     region:
       type: string
-      enum:
-        - ams3
-        - blr1
-        - fra1
-        - lon1
-        - nyc1
-        - nyc3
-        - sfo3
-        - sgp1
-        - tor1
-        - syd1
       description: The DigitalOcean region where the database will be created
     size:
       type: string
-      enum:
-        - db-s-1vcpu-1gb
-        - db-s-1vcpu-2gb
-        - db-s-2vcpu-4gb
-        - db-s-4vcpu-8gb
-        - db-s-6vcpu-16gb
-        - db-s-8vcpu-32gb
       description: The size/performance tier of the database cluster
     tags:
       type: array
@@ -77,11 +59,12 @@ database:
     private_network_uuid:
       type: string
       description: VPC UUID for private networking (optional)
-    db_config:
-      type: object
-      additionalProperties:
-        description: Engine-specific configuration settings
-      description: Engine-specific configuration settings
+    storage_size_mib:
+      type: number
+      description: 'Additional storage added to the cluster, in MiB. If not set, no additional storage is added beyond the base amount from the size.'
+    project_id:
+      type: string
+      description: 'The ID of the project that the database cluster is assigned to. If excluded, it will be assigned to your default project.'
     required:
       - name
       - engine
@@ -113,6 +96,8 @@ database:
       type: string
     size:
       type: string
+    storage_size_mib:
+      type: number
     connection_uri:
       type: string
     connection_password:
@@ -127,7 +112,19 @@ database:
       type: string
     connection_ssl:
       type: boolean
+    private_connection_uri:
+      type: string
+    private_connection_host:
+      type: string
+    private_connection_port:
+      type: number
+    standby_connection_host:
+      type: string
+    standby_connection_port:
+      type: number
     created_at:
+      type: string
+    semantic_version:
       type: string
     tags:
       type: array

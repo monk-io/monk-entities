@@ -57,34 +57,14 @@ function validateDatabaseEngine(engine) {
   return engine;
 }
 function validateDatabaseRegion(region) {
-  const validRegions = [
-    "ams3",
-    "blr1",
-    "fra1",
-    "lon1",
-    "nyc1",
-    "nyc3",
-    "sfo3",
-    "sgp1",
-    "tor1",
-    "syd1"
-  ];
-  if (!validRegions.includes(region)) {
-    throw new Error(`Invalid database region: ${region}. Valid regions: ${validRegions.join(", ")}`);
+  if (!region || region.length < 3) {
+    throw new Error(`Invalid database region: ${region}. Expected a DigitalOcean region slug (e.g., nyc1, sfo3, fra1).`);
   }
   return region;
 }
 function validateDatabaseSize(size) {
-  const validSizes = [
-    "db-s-1vcpu-1gb",
-    "db-s-1vcpu-2gb",
-    "db-s-2vcpu-4gb",
-    "db-s-4vcpu-8gb",
-    "db-s-6vcpu-16gb",
-    "db-s-8vcpu-32gb"
-  ];
-  if (!validSizes.includes(size)) {
-    throw new Error(`Invalid database size: ${size}. Valid sizes: ${validSizes.join(", ")}`);
+  if (!size || size.length < 3) {
+    throw new Error(`Invalid database size: ${size}. Expected a DigitalOcean size slug (e.g., db-s-1vcpu-1gb, gd-2vcpu-8gb).`);
   }
   return size;
 }

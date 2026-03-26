@@ -1,0 +1,20 @@
+namespace: digitalocean-database-test
+
+# PostgreSQL database cluster — primary test instance
+test-postgres-db:
+  defines: digitalocean-database/database
+  name: monkec-test-pg-cluster
+  engine: pg
+  version: "16"
+  num_nodes: 1
+  region: nyc1
+  size: db-s-1vcpu-1gb
+  tags:
+    - Environment:test
+    - Owner:integration-test
+
+# Group for deploying everything at once
+stack:
+  defines: group
+  members:
+    - digitalocean-database-test/test-postgres-db
