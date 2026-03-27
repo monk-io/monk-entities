@@ -22,7 +22,7 @@ database:
       Works with:
       - `digitalocean/database-user` - Create additional database users
       - `digitalocean/database-db` - Create databases within the cluster
-    version-hash: d153f16dfe7d
+    version-hash: 2ddf4d9ca479
   schema:
     name:
       type: string
@@ -47,9 +47,40 @@ database:
       description: 'Number of nodes for the database cluster (1 for single node, 2+ for cluster)'
     region:
       type: string
+      enum:
+        - ams3
+        - blr1
+        - fra1
+        - lon1
+        - nyc1
+        - nyc3
+        - sfo3
+        - sgp1
+        - tor1
+        - syd1
       description: The DigitalOcean region where the database will be created
     size:
       type: string
+      enum:
+        - db-s-1vcpu-1gb
+        - db-s-1vcpu-2gb
+        - db-s-2vcpu-4gb
+        - db-s-4vcpu-8gb
+        - db-s-6vcpu-16gb
+        - db-s-8vcpu-32gb
+        - db-s-16vcpu-64gb
+        - gd-2vcpu-8gb
+        - gd-4vcpu-16gb
+        - gd-8vcpu-32gb
+        - gd-16vcpu-64gb
+        - gd-32vcpu-128gb
+        - gd-40vcpu-160gb
+        - so1_5-2vcpu-16gb
+        - so1_5-4vcpu-32gb
+        - so1_5-8vcpu-64gb
+        - so1_5-16vcpu-128gb
+        - so1_5-24vcpu-192gb
+        - so1_5-32vcpu-256gb
       description: The size/performance tier of the database cluster
     tags:
       type: array

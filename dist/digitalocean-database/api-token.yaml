@@ -17,7 +17,7 @@ api-token:
 
       ## Composing with Other Entities
       API tokens are used for authentication with other DigitalOcean entities.
-    version-hash: d153f16dfe7d
+    version-hash: 2ddf4d9ca479
   schema:
     name:
       type: string

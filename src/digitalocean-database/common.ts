@@ -22,17 +22,28 @@ export function getApiToken(secretRef: string): string {
 export type DatabaseEngine = "mysql" | "pg" | "mongodb" | "kafka" | "opensearch" | "valkey";
 
 /**
- * Database region — not restricted to a fixed set since DO may add regions.
- * Validated at runtime via the API, not at compile time.
+ * Database regions available on DigitalOcean.
+ * Listed as enum for schema generation (helps agents pick valid values).
+ * Runtime validators accept any string — the API is the final authority.
  */
-export type DatabaseRegion = string;
+export type DatabaseRegion =
+    | "ams3" | "blr1" | "fra1" | "lon1" | "nyc1" | "nyc3"
+    | "sfo3" | "sgp1" | "tor1" | "syd1";
 
 /**
- * Database size slug — not restricted to a fixed set since DO offers
- * multiple slug families (db-s-*, gd-*, so1_5-*) and may add more.
- * Validated at runtime via the API, not at compile time.
+ * Database size slugs available on DigitalOcean.
+ * Includes basic (db-s-*), general purpose (gd-*), and storage-optimized (so1_5-*) families.
+ * Listed as enum for schema generation (helps agents pick valid values).
+ * Runtime validators accept any string — the API is the final authority.
  */
-export type DatabaseSize = string;
+export type DatabaseSize =
+    | "db-s-1vcpu-1gb" | "db-s-1vcpu-2gb" | "db-s-2vcpu-4gb"
+    | "db-s-4vcpu-8gb" | "db-s-6vcpu-16gb" | "db-s-8vcpu-32gb"
+    | "db-s-16vcpu-64gb"
+    | "gd-2vcpu-8gb" | "gd-4vcpu-16gb" | "gd-8vcpu-32gb"
+    | "gd-16vcpu-64gb" | "gd-32vcpu-128gb" | "gd-40vcpu-160gb"
+    | "so1_5-2vcpu-16gb" | "so1_5-4vcpu-32gb" | "so1_5-8vcpu-64gb"
+    | "so1_5-16vcpu-128gb" | "so1_5-24vcpu-192gb" | "so1_5-32vcpu-256gb";
 
 /**
  * Common response interface for DigitalOcean API
@@ -89,7 +100,7 @@ export function validateDatabaseRegion(region: string): DatabaseRegion {
     if (!region || region.length < 3) {
         throw new Error(`Invalid database region: ${region}. Expected a DigitalOcean region slug (e.g., nyc1, sfo3, fra1).`);
     }
-    return region;
+    return region as DatabaseRegion;
 }
 
 /**
@@ -101,5 +112,5 @@ export function validateDatabaseSize(size: string): DatabaseSize {
     if (!size || size.length < 3) {
         throw new Error(`Invalid database size: ${size}. Expected a DigitalOcean size slug (e.g., db-s-1vcpu-1gb, gd-2vcpu-8gb).`);
     }
-    return size;
+    return size as DatabaseSize;
 }
