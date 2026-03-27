@@ -59,6 +59,34 @@ export interface HealthCheckState extends AWSRoute53State {
     health_status?: string;
 }
 
+/**
+ * @description AWS Route 53 Health Check entity.
+ * Creates and manages endpoint health checks for DNS failover routing.
+ * Supports HTTP, HTTPS, TCP, and string-match check types with configurable
+ * intervals, failure thresholds, and regional check locations.
+ *
+ * ## Required Permissions
+ * - `route53:CreateHealthCheck` — create health checks
+ * - `route53:GetHealthCheck` — read health check configuration
+ * - `route53:UpdateHealthCheck` — update check parameters
+ * - `route53:DeleteHealthCheck` — delete health checks
+ * - `route53:GetHealthCheckStatus` — get current health status from all regions
+ * - `route53:GetHealthCheckLastFailureReason` — get last failure details
+ * - `route53:ChangeTagsForResource` — manage health check tags
+ *
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ *
+ * ## State Fields for Composition
+ * - `state.health_check_id` - Health check ID, used by `aws-route53/record` for failover routing
+ * - `state.check_type` - Health check protocol type
+ * - `state.target` - FQDN or IP being monitored
+ *
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-route53/record` - Associate via health_check_id for failover/weighted routing
+ */
 export class HealthCheck extends AWSRoute53Entity<HealthCheckDefinition, HealthCheckState> {
 
     static readonly readiness = { period: 15, initialDelay: 5, attempts: 20 };

@@ -50,3 +50,4 @@ tags
 .env
 .idea
 .DS_Store
+.claude/

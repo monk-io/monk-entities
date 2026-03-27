@@ -3,7 +3,33 @@ record:
   defines: entity
   metadata:
     name: Record
-    version-hash: 23661c8a808c
+    description: |-
+      AWS Route 53 DNS Record entity.
+      Creates and manages DNS record sets within a hosted zone. Supports all standard
+      record types (A, AAAA, CNAME, MX, TXT, etc.), alias records, and routing policies
+      (weighted, latency, failover, geolocation, multi-value answer).
+
+      ## Required Permissions
+      - `route53:ChangeResourceRecordSets` — create, update (UPSERT), and delete records
+      - `route53:ListResourceRecordSets` — check if record exists, fetch for delete
+      - `route53:GetChange` — poll change propagation status
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.zone_id` - Hosted zone ID containing this record
+      - `state.record_name` - FQDN with trailing dot
+      - `state.record_type` - Record type (A, CNAME, etc.)
+      - `state.record_values` - Current record values
+      - `state.set_identifier` - Set identifier for routing policies
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-route53/hosted-zone` - Parent zone (wire zone_id via connection-target)
+      - `aws-route53/health-check` - Associate health check for failover routing
+    version-hash: d7df84da8f83
   schema:
     region:
       type: string

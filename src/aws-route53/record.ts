@@ -76,6 +76,33 @@ export interface RecordState extends AWSRoute53State {
     is_alias?: boolean;
 }
 
+/**
+ * @description AWS Route 53 DNS Record entity.
+ * Creates and manages DNS record sets within a hosted zone. Supports all standard
+ * record types (A, AAAA, CNAME, MX, TXT, etc.), alias records, and routing policies
+ * (weighted, latency, failover, geolocation, multi-value answer).
+ *
+ * ## Required Permissions
+ * - `route53:ChangeResourceRecordSets` — create, update (UPSERT), and delete records
+ * - `route53:ListResourceRecordSets` — check if record exists, fetch for delete
+ * - `route53:GetChange` — poll change propagation status
+ *
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ *
+ * ## State Fields for Composition
+ * - `state.zone_id` - Hosted zone ID containing this record
+ * - `state.record_name` - FQDN with trailing dot
+ * - `state.record_type` - Record type (A, CNAME, etc.)
+ * - `state.record_values` - Current record values
+ * - `state.set_identifier` - Set identifier for routing policies
+ *
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-route53/hosted-zone` - Parent zone (wire zone_id via connection-target)
+ * - `aws-route53/health-check` - Associate health check for failover routing
+ */
 export class Record extends AWSRoute53Entity<RecordDefinition, RecordState> {
 
     static readonly readiness = { period: 10, initialDelay: 2, attempts: 15 };
