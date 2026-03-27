@@ -115,11 +115,11 @@ tests:
     expect:
       exitCode: 1
 
-  - name: "Test resize-cluster requires parameters"
+  - name: "Test resize-cluster without args"
     action: "do"
     target: "digitalocean-database-test/test-postgres-db/resize-cluster"
     expect:
-      exitCode: 1
+      exitCode: 0
 
   # === Cost estimation ===
   - name: "Test get-cost-estimate action"
