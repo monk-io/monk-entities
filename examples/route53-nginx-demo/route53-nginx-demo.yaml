@@ -1,0 +1,101 @@
+# Route53 Nginx Demo
+# Demonstrates wiring Route53 DNS to an nginx container behind monk ingress.
+# Flow: DNS (www.example-app.com) -> ingress (traefik) -> nginx
+#
+# Prerequisites: monk plugins enable ingress
+
+namespace: route53-nginx-demo
+
+# === Application ===
+
+# Nginx serving a hello world page, routed via ingress
+nginx:
+  defines: runnable
+  containers:
+    web:
+      image: nginx:alpine
+  files:
+    index:
+      container: web
+      path: /usr/share/nginx/html/index.html
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Route53 Nginx Demo</title>
+          </head>
+          <body>
+            <h1>Hello from Monk!</h1>
+            <p>This page is served by nginx and accessible via Route53 DNS.</p>
+          </body>
+        </html>
+  services:
+    http:
+      container: web
+      port: 80
+      protocol: tcp
+      ingress-routes:
+        web:
+          host: www.example-app.com
+
+# === DNS Infrastructure ===
+
+# Public hosted zone for the domain
+dns-zone:
+  defines: aws-route53/hosted-zone
+  region: us-east-1
+  zone_name: example-app.com
+  zone_comment: "Route53 Nginx Demo - managed by Monk"
+  tags:
+    Environment: example
+    Owner: monk-example
+  services:
+    data:
+      protocol: custom
+
+# A record pointing to the ingress (traefik) public IP
+web-record:
+  defines: aws-route53/record
+  depends:
+    wait-for:
+      runnables:
+        - route53-nginx-demo/dns-zone
+      timeout: 120
+  connections:
+    dns-zone:
+      runnable: route53-nginx-demo/dns-zone
+      service: data
+  region: us-east-1
+  zone_id: <- connection-target("dns-zone") entity-state get-member("zone_id")
+  record_name: www.example-app.com
+  record_type: A
+  ttl: 300
+  record_values:
+    - <- service-public-ip("system/traefik", "web")
+
+# Health check for the web endpoint
+web-health-check:
+  defines: aws-route53/health-check
+  region: us-east-1
+  check_type: HTTP
+  fqdn: www.example-app.com
+  port: 80
+  resource_path: /
+  request_interval: 30
+  failure_threshold: 3
+  tags:
+    Environment: example
+    Owner: monk-example
+
+# === Deploy Everything ===
+
+# Deploy: monk load route53-nginx-demo.yaml && monk run -l route53-nginx-demo/stack
+stack:
+  defines: group
+  members:
+    - route53-nginx-demo/nginx
+    - route53-nginx-demo/dns-zone
+    - route53-nginx-demo/web-record
+    - route53-nginx-demo/web-health-check
