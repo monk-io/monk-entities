@@ -45,6 +45,39 @@ export interface HostedZoneState extends AWSRoute53State {
     record_set_count?: number;
 }
 
+/**
+ * @description AWS Route 53 Hosted Zone entity.
+ * Creates and manages DNS hosted zones (public and private) with tagging support.
+ * Supports split-view DNS (same domain, public + private zones) and automatic
+ * cleanup of non-default records before zone deletion.
+ *
+ * ## Required Permissions
+ * - `route53:CreateHostedZone` — create new hosted zones
+ * - `route53:GetHostedZone` — read zone details and name servers
+ * - `route53:ListHostedZonesByName` — find existing zones for adoption
+ * - `route53:UpdateHostedZoneComment` — update zone comments
+ * - `route53:DeleteHostedZone` — delete hosted zones
+ * - `route53:ListResourceRecordSets` — list records (for cleanup and list-records action)
+ * - `route53:ChangeResourceRecordSets` — delete non-default records before zone removal
+ * - `route53:GetChange` — poll change propagation status
+ * - `route53:ChangeTagsForResource` — manage zone tags
+ * - `cloudwatch:GetMetricStatistics` — DNS query metrics for cost estimation
+ *
+ * ## Secrets
+ * - Reads: none (authenticated via AWS provider)
+ * - Writes: none
+ *
+ * ## State Fields for Composition
+ * - `state.zone_id` - Hosted zone ID (e.g., Z0308686QVIR0FTS2ODJ), used by `aws-route53/record`
+ * - `state.zone_name` - FQDN with trailing dot (e.g., example.com.)
+ * - `state.name_servers` - Array of assigned NS records
+ * - `state.record_set_count` - Number of records in the zone
+ *
+ * ## Composing with Other Entities
+ * Works with:
+ * - `aws-route53/record` - DNS records within this zone (wire zone_id via connection-target)
+ * - `aws-route53/health-check` - Health checks referenced by failover records
+ */
 export class HostedZone extends AWSRoute53Entity<HostedZoneDefinition, HostedZoneState> {
 
     static readonly readiness = { period: 10, initialDelay: 2, attempts: 12 };
