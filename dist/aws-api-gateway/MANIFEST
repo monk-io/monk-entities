@@ -3,5 +3,5 @@ VERSION_HASH 31c7a22b803e
 DESCRIPTION API management for building and securing APIs.
 HOSTING managed
 TAGS aws,api,gateway
-LOAD api-gateway-base.yaml base.yaml api-gateway.yaml
-RESOURCES api-gateway-base.js base.js api-gateway-sync.js
+LOAD api-gateway.yaml api-gateway-base.yaml base.yaml
+RESOURCES base.js api-gateway-sync.js api-gateway-base.js

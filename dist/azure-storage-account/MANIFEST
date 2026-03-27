@@ -5,4 +5,4 @@ AUTHOR monk
 VERSION 1.0.0
 TAGS azure,storage,blob,cloud
 LOAD blob-container.yaml azure-storage-account-base.yaml storage-account.yaml
-RESOURCES azure-storage-account-base.js blob-container-sync.js storage-account-sync.js
+RESOURCES blob-container-sync.js azure-storage-account-base.js storage-account-sync.js

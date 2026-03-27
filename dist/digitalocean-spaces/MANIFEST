@@ -5,4 +5,4 @@ HOSTING managed
 TAGS digitalocean,storage,spaces,object-storage
  
 LOAD spaces-keys.yaml do-s3-base.yaml spaces-bucket.yaml
-RESOURCES do-s3-base.js spaces-keys-sync.js spaces-bucket-sync.js
+RESOURCES spaces-bucket-sync.js do-s3-base.js spaces-keys-sync.js
