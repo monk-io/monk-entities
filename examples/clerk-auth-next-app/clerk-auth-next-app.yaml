@@ -1,0 +1,88 @@
+# Clerk Auth Next.js App
+# Next.js application with Clerk authentication — sign-in, sign-up, and protected pages.
+# Flow: User -> Next.js app -> Clerk API (auth) -> Protected content
+
+namespace: clerk-auth-next-app
+
+# === Clerk Credentials ===
+
+# Validates the Clerk API key and exposes publishable key + secret ref for the app
+clerk-creds:
+  defines: clerk/credentials
+  secret_ref: clerk-secret-key
+  publishable_key: "pk_test_your-publishable-key-here" # Replace with your Clerk publishable key
+  permitted-secrets:
+    clerk-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+# === Next.js Application ===
+
+# Next.js app with Clerk authentication
+nextjs-app:
+  defines: runnable
+  permitted-secrets:
+    clerk-secret-key: true
+  connections:
+    clerk:
+      runnable: clerk-auth-next-app/clerk-creds
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - clerk-auth-next-app/clerk-creds
+      timeout: 120
+  variables:
+    # Clerk publishable key for client-side SDK
+    clerk_secret_ref:
+      value: <- connection-target("clerk") entity get-member("secret_ref")
+      type: string
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+      env: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+      value: <- connection-target("clerk") entity-state get-member("publishable_key")
+      type: string
+    # Clerk secret key for server-side operations
+    CLERK_SECRET_KEY:
+      env: CLERK_SECRET_KEY
+      value: <- secret($clerk_secret_ref)
+      type: string
+    # Sign-in/up routing
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL:
+      env: NEXT_PUBLIC_CLERK_SIGN_IN_URL
+      value: "/sign-in"
+      type: string
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL:
+      env: NEXT_PUBLIC_CLERK_SIGN_UP_URL
+      value: "/sign-up"
+      type: string
+    NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL:
+      env: NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL
+      value: "/protected"
+      type: string
+    NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:
+      env: NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL
+      value: "/protected"
+      type: string
+    NODE_ENV:
+      env: NODE_ENV
+      value: "production"
+      type: string
+    PORT:
+      env: PORT
+      value: "3000"
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/clerk-auth-next-app:latest
+      ports:
+        - "3000:3000"
+
+# === Deploy Everything ===
+
+# Deploy: monk load dist/clerk/MANIFEST && monk load examples/clerk-auth-next-app/clerk-auth-next-app.yaml && monk run -t TAG clerk-auth-next-app/stack
+stack:
+  defines: group
+  members:
+    - clerk-auth-next-app/clerk-creds
+    - clerk-auth-next-app/nextjs-app
