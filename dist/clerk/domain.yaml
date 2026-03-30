@@ -20,7 +20,7 @@ domain:
       ## Composing with Other Entities
       Works with:
       - `clerk/credentials` - Shares API credentials
-    version-hash: 80c62971cc9f
+    version-hash: e0d4d7e68911
   schema:
     secret_ref:
       type: string
