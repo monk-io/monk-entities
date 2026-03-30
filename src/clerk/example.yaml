@@ -14,6 +14,7 @@ org:
   defines: clerk/organization
   secret_ref: clerk-secret-key
   name: example-org
+  created_by: user_xxxxxxxxxxxxx
   slug: example-org
   max_allowed_memberships: 100
   permitted-secrets:

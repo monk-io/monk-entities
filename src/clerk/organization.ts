@@ -13,6 +13,10 @@ export interface ClerkOrganizationDefinition extends ClerkEntityDefinition {
      */
     organization_id?: string;
     /**
+     * @description User ID of the organization creator/admin (required by Clerk API)
+     */
+    created_by: string;
+    /**
      * @description Optional slug for the organization URL
      */
     slug?: string;
@@ -109,7 +113,10 @@ export class Organization extends ClerkEntity<ClerkOrganizationDefinition, Clerk
             return;
         }
 
-        const body: Record<string, any> = { name: this.definition.name };
+        const body: Record<string, any> = {
+            name: this.definition.name,
+            created_by: this.definition.created_by,
+        };
         if (this.definition.slug) body["slug"] = this.definition.slug;
         if (this.definition.max_allowed_memberships !== undefined) body["max_allowed_memberships"] = this.definition.max_allowed_memberships;
         if (this.definition.public_metadata) body["public_metadata"] = this.definition.public_metadata;

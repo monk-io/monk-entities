@@ -94,7 +94,10 @@ var _Organization = class _Organization extends (_a = ClerkEntity, _getInfo_dec 
       cli.output(`Reusing existing Clerk organization ${found.id}`);
       return;
     }
-    const body = { name: this.definition.name };
+    const body = {
+      name: this.definition.name,
+      created_by: this.definition.created_by
+    };
     if (this.definition.slug) body["slug"] = this.definition.slug;
     if (this.definition.max_allowed_memberships !== void 0) body["max_allowed_memberships"] = this.definition.max_allowed_memberships;
     if (this.definition.public_metadata) body["public_metadata"] = this.definition.public_metadata;

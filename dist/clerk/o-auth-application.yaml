@@ -43,7 +43,7 @@ o-auth-application:
       ## Composing with Other Entities
       Works with:
       - `clerk/credentials` - Shares API credentials
-    version-hash: ca791b4661d4
+    version-hash: 80c62971cc9f
   schema:
     secret_ref:
       type: string

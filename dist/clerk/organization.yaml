@@ -21,7 +21,7 @@ organization:
       ## Composing with Other Entities
       Works with:
       - `clerk/credentials` - Shares API credentials
-    version-hash: ca791b4661d4
+    version-hash: 80c62971cc9f
   schema:
     secret_ref:
       type: string
@@ -36,6 +36,9 @@ organization:
     organization_id:
       type: string
       description: 'Optional: adopt existing organization by ID'
+    created_by:
+      type: string
+      description: User ID of the organization creator/admin (required by Clerk API)
     slug:
       type: string
       description: Optional slug for the organization URL
@@ -55,6 +58,7 @@ organization:
     required:
       - secret_ref
       - name
+      - created_by
   state-schema:
     existing:
       type: boolean
