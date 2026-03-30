@@ -1,0 +1,81 @@
+name: Clerk Integration Test
+description: Validate credentials, JWT template, domain, OAuth application, and env wiring
+
+secrets:
+  global:
+    clerk-secret-key: "$CLERK_SECRET_KEY"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/clerk/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load test stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Run stack
+    action: run
+    target: clerk-test/stack
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Describe JWT template
+    action: describe
+    target: clerk-test/jwt
+    expect:
+      exitCode: 0
+      output:
+        - "template_id"
+
+  - name: Describe domain
+    action: describe
+    target: clerk-test/domain
+    expect:
+      exitCode: 0
+      output:
+        - "domain_id"
+
+  - name: Describe OAuth application
+    action: describe
+    target: clerk-test/oauth
+    expect:
+      exitCode: 0
+      output:
+        - "oauth_application_id"
+
+  - name: Get OAuth application info
+    action: do
+    target: clerk-test/oauth/get-info
+    expect:
+      exitCode: 0
+
+  - name: Wait for consumer to exit
+    action: wait
+    target: clerk-test/consumer
+    waitFor:
+      condition: exited
+      timeout: 60000
+
+  - name: Check consumer logs
+    action: logs
+    target: clerk-test/consumer
+    expect:
+      output:
+        - "Clerk oauth resolved"
+        - "Clerk envs resolved"
+      exitCode: 0
+
+cleanup:
+  - name: Delete stack
+    action: delete
+    target: clerk-test/stack
+    expect:
+      exitCode: 0

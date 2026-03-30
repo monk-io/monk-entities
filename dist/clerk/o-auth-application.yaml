@@ -1,0 +1,106 @@
+namespace: clerk
+o-auth-application:
+  defines: entity
+  metadata:
+    name: OAuthApplication
+    description: |-
+      Clerk OAuth Application entity.
+      Creates and manages OAuth applications for third-party authentication flows.
+      OAuth applications allow external services to authenticate using your Clerk instance.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Clerk secret API key
+      - Writes: OAuth client secret to `client_secret_ref` (default: `clerk-oauth-client-secret`)
+
+      ## State Fields for Composition
+      - `state.oauth_application_id` - OAuth application ID
+      - `state.client_id` - OAuth client ID
+      - `state.name` - Application name
+      - `state.client_secret_secret` - Secret name where client secret is stored
+
+      ## Consuming OAuth Application in Runnables
+      ```yaml
+      app:
+        defines: runnable
+        connections:
+          oauth:
+            target: my-namespace/clerk-oauth
+            service: data
+        variables:
+          oauth_secret_ref:
+            type: string
+            value: <- connection-target("oauth") entity-state get-member("client_secret_secret")
+          CLERK_OAUTH_CLIENT_ID:
+            env: CLERK_OAUTH_CLIENT_ID
+            type: string
+            value: <- connection-target("oauth") entity-state get-member("client_id")
+          CLERK_OAUTH_CLIENT_SECRET:
+            env: CLERK_OAUTH_CLIENT_SECRET
+            type: string
+            value: <- secret($oauth_secret_ref)
+      ```
+
+      ## Composing with Other Entities
+      Works with:
+      - `clerk/credentials` - Shares API credentials
+    version-hash: ca791b4661d4
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Clerk secret API key (sk_test_... or sk_live_...)
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: OAuth application name
+    oauth_application_id:
+      type: string
+      description: 'Optional: adopt existing OAuth application by ID'
+    callback_url:
+      type: string
+      minLength: 1
+      description: OAuth callback URL
+    public_client:
+      type: boolean
+      description: Whether the application uses PKCE (public clients)
+    scopes:
+      type: string
+      description: Scopes for the OAuth application (space-separated)
+    client_secret_ref:
+      type: string
+      description: 'Secret name to store the client secret (default: clerk-oauth-client-secret)'
+    required:
+      - secret_ref
+      - name
+      - callback_url
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    oauth_application_id:
+      type: string
+      description: OAuth application ID
+    client_id:
+      type: string
+      description: OAuth client ID for use in OAuth flows
+    name:
+      type: string
+      description: Application name
+    client_secret_secret:
+      type: string
+      description: Secret name where the client secret is stored
+  lifecycle:
+    sync: <<< o-auth-application-sync.js
+    get-info: ''
+    rotate-secret: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - clerk/clerk-base
+    - secret
+    - cli
