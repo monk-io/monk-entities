@@ -35,7 +35,7 @@ Clerk is an authentication and user management platform. This integration provid
 - [x] Tests — 10 test steps covering full lifecycle
 - [x] Manual testing — 4 entities pass create/ready/actions/delete (org requires feature flag)
 - [x] Integration tests — 10/10 passed (55s)
-- [ ] PR
+- [x] PR — #178, Bugbot passed, 3 issues fixed
 - [ ] Merged
 
 ## Issues Found
