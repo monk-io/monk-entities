@@ -3,5 +3,5 @@ namespace: clerk
 clerk-base:
   defines: module
   metadata:
-    version-hash: ca791b4661d4
+    version-hash: 80c62971cc9f
   source: <<< clerk-base.js
