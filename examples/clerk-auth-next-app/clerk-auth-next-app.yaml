@@ -10,9 +10,10 @@ namespace: clerk-auth-next-app
 clerk-creds:
   defines: clerk/credentials
   secret_ref: clerk-secret-key
-  publishable_key: "pk_test_your-publishable-key-here" # Replace with your Clerk publishable key
+  publishable_key: <- secret("clerk-publishable-key")
   permitted-secrets:
     clerk-secret-key: true
+    clerk-publishable-key: true
   services:
     data:
       protocol: custom

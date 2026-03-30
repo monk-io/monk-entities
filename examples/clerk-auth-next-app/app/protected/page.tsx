@@ -1,7 +1,7 @@
+import { UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 
 export default async function ProtectedPage() {
   const user = await currentUser();
