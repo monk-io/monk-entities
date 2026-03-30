@@ -48,6 +48,13 @@ export default async function ProtectedPage() {
             secret key are wired from the <code>clerk/credentials</code> entity
             into this application via environment variables.
           </p>
+          {process.env.CLERK_OAUTH_CLIENT_ID && (
+            <p>
+              OAuth Client ID: <code>{process.env.CLERK_OAUTH_CLIENT_ID}</code>
+              <br />
+              <small>Provisioned by the <code>clerk/o-auth-application</code> entity</small>
+            </p>
+          )}
         </div>
       </div>
     </>
