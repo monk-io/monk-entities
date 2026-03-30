@@ -1,5 +1,6 @@
 # Clerk Auth Next.js App
 # Next.js application with Clerk authentication — sign-in, sign-up, and protected pages.
+# Includes an OAuth application for third-party auth flows.
 # Flow: User -> Next.js app -> Clerk API (auth) -> Protected content
 
 namespace: clerk-auth-next-app
@@ -18,21 +19,42 @@ clerk-creds:
     data:
       protocol: custom
 
+# === Clerk OAuth Application ===
+
+# Creates an OAuth application for third-party integrations to authenticate via Clerk
+clerk-oauth:
+  defines: clerk/o-auth-application
+  secret_ref: clerk-secret-key
+  name: nextjs-app-oauth
+  callback_url: http://localhost:3000/api/oauth/callback
+  client_secret_ref: clerk-oauth-client-secret
+  permitted-secrets:
+    clerk-secret-key: true
+    clerk-oauth-client-secret: true
+  services:
+    data:
+      protocol: custom
+
 # === Next.js Application ===
 
-# Next.js app with Clerk authentication
+# Next.js app with Clerk authentication and OAuth client credentials
 nextjs-app:
   defines: runnable
   permitted-secrets:
     clerk-secret-key: true
+    clerk-oauth-client-secret: true
   connections:
     clerk:
       runnable: clerk-auth-next-app/clerk-creds
+      service: data
+    oauth:
+      runnable: clerk-auth-next-app/clerk-oauth
       service: data
   depends:
     wait-for:
       runnables:
         - clerk-auth-next-app/clerk-creds
+        - clerk-auth-next-app/clerk-oauth
       timeout: 120
   variables:
     # Clerk publishable key for client-side SDK
@@ -47,6 +69,18 @@ nextjs-app:
     clerk_secret_key:
       env: CLERK_SECRET_KEY
       value: <- secret($clerk_secret_ref)
+      type: string
+    # OAuth application credentials wired from entity state
+    oauth_secret_ref:
+      value: <- connection-target("oauth") entity-state get-member("client_secret_secret")
+      type: string
+    clerk_oauth_client_id:
+      env: CLERK_OAUTH_CLIENT_ID
+      value: <- connection-target("oauth") entity-state get-member("client_id")
+      type: string
+    clerk_oauth_client_secret:
+      env: CLERK_OAUTH_CLIENT_SECRET
+      value: <- secret($oauth_secret_ref)
       type: string
     # Sign-in/up routing
     next_public_clerk_sign_in_url:
@@ -86,4 +120,5 @@ stack:
   defines: group
   members:
     - clerk-auth-next-app/clerk-creds
+    - clerk-auth-next-app/clerk-oauth
     - clerk-auth-next-app/nextjs-app
