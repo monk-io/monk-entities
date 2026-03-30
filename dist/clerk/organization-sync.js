@@ -164,14 +164,13 @@ var _Organization = class _Organization extends (_a = ClerkEntity, _getInfo_dec 
    */
   costs() {
     cli.output(JSON.stringify({
-      provider: "clerk",
-      resource: "organization",
-      pricing_model: "per_mau",
-      base_cost_monthly_usd: 0,
-      free_tier_mau: 5e4,
-      pro_base_monthly_usd: 25,
-      per_additional_mau_usd: 0.02,
-      pricing_url: "https://clerk.com/pricing"
+      type: "clerk-organization",
+      costs: {
+        month: {
+          amount: "0.00",
+          currency: "USD"
+        }
+      }
     }));
   }
 };
