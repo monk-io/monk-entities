@@ -1,0 +1,7 @@
+REPO clerk
+VERSION_HASH ca791b4661d4
+DESCRIPTION Organizations, domains, JWT templates, and OAuth applications.
+HOSTING managed
+TAGS clerk,authentication,identity
+LOAD jwt-template.yaml clerk-base.yaml o-auth-application.yaml domain.yaml credentials.yaml organization.yaml
+RESOURCES o-auth-application-sync.js jwt-template-sync.js credentials-sync.js organization-sync.js clerk-base.js domain-sync.js

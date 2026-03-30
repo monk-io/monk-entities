@@ -1,0 +1,112 @@
+namespace: clerk-test
+
+creds:
+  defines: clerk/credentials
+  secret_ref: clerk-secret-key
+  permitted-secrets:
+    clerk-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+jwt:
+  defines: clerk/jwt-template
+  secret_ref: clerk-secret-key
+  name: monk-test-jwt
+  claims:
+    monk_test: "true"
+  lifetime: 3600
+  permitted-secrets:
+    clerk-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+domain:
+  defines: clerk/domain
+  secret_ref: clerk-secret-key
+  name: monk-test.example.com
+  is_satellite: true
+  permitted-secrets:
+    clerk-secret-key: true
+  services:
+    data:
+      protocol: custom
+
+oauth:
+  defines: clerk/o-auth-application
+  secret_ref: clerk-secret-key
+  name: monk-test-oauth
+  callback_url: https://example.com/oauth/callback
+  client_secret_ref: clerk-oauth-client-secret
+  permitted-secrets:
+    clerk-secret-key: true
+    clerk-oauth-client-secret: true
+  services:
+    data:
+      protocol: custom
+
+consumer:
+  defines: runnable
+  permitted-secrets:
+    clerk-secret-key: true
+    clerk-oauth-client-secret: true
+  connections:
+    creds:
+      runnable: clerk-test/creds
+      service: data
+    oauth:
+      runnable: clerk-test/oauth
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - clerk-test/creds
+        - clerk-test/jwt
+        - clerk-test/domain
+        - clerk-test/oauth
+      timeout: 120
+  variables:
+    clerk_secret_ref:
+      value: <- connection-target("creds") entity get-member("secret_ref")
+      type: string
+    oauth_secret_ref:
+      value: <- connection-target("oauth") entity-state get-member("client_secret_secret")
+      type: string
+    CLERK_SECRET_KEY:
+      env: CLERK_SECRET_KEY
+      type: string
+      value: <- secret($clerk_secret_ref)
+    CLERK_MODE:
+      env: CLERK_MODE
+      type: string
+      value: <- connection-target("creds") entity-state get-member("mode")
+    CLERK_OAUTH_CLIENT_ID:
+      env: CLERK_OAUTH_CLIENT_ID
+      type: string
+      value: <- connection-target("oauth") entity-state get-member("client_id")
+    CLERK_OAUTH_CLIENT_SECRET:
+      env: CLERK_OAUTH_CLIENT_SECRET
+      type: string
+      value: <- secret($oauth_secret_ref)
+  containers:
+    validate:
+      image: curlimages/curl:8.10.1
+      restart: no
+      bash: |
+        echo "MODE=$CLERK_MODE"
+        test -n "$CLERK_SECRET_KEY" || (echo "missing secret key" && exit 1)
+        test -n "$CLERK_MODE" || (echo "missing mode" && exit 1)
+        test -n "$CLERK_OAUTH_CLIENT_ID" || (echo "missing oauth client id" && exit 1)
+        test -n "$CLERK_OAUTH_CLIENT_SECRET" || (echo "missing oauth client secret" && exit 1)
+        echo "Clerk oauth resolved"
+        echo "Clerk envs resolved"
+
+stack:
+  defines: group
+  members:
+    - clerk-test/creds
+    - clerk-test/jwt
+    - clerk-test/domain
+    - clerk-test/oauth
+    - clerk-test/consumer

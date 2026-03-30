@@ -1,0 +1,86 @@
+namespace: clerk
+organization:
+  defines: entity
+  metadata:
+    name: Organization
+    description: |-
+      Clerk Organization entity.
+      Creates and manages Clerk organizations for multi-tenant applications.
+      Organizations group users and manage roles and permissions.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Clerk secret API key
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.organization_id` - Clerk organization ID (org_...)
+      - `state.name` - Organization name
+      - `state.slug` - Organization slug
+      - `state.members_count` - Number of members
+
+      ## Composing with Other Entities
+      Works with:
+      - `clerk/credentials` - Shares API credentials
+    version-hash: ca791b4661d4
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Clerk secret API key (sk_test_... or sk_live_...)
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: Organization name
+    organization_id:
+      type: string
+      description: 'Optional: adopt existing organization by ID'
+    slug:
+      type: string
+      description: Optional slug for the organization URL
+    max_allowed_memberships:
+      type: number
+      description: Maximum number of members allowed (0 for unlimited)
+    public_metadata:
+      type: object
+      additionalProperties:
+        description: Optional public metadata (visible to frontend)
+      description: Optional public metadata (visible to frontend)
+    private_metadata:
+      type: object
+      additionalProperties:
+        description: Optional private metadata (server-side only)
+      description: Optional private metadata (server-side only)
+    required:
+      - secret_ref
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    organization_id:
+      type: string
+      description: Clerk organization ID (org_...)
+    name:
+      type: string
+      description: Organization name
+    slug:
+      type: string
+      description: Organization slug
+    members_count:
+      type: number
+      description: Number of current members
+  lifecycle:
+    sync: <<< organization-sync.js
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - clerk/clerk-base
+    - cli
