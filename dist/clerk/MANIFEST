@@ -1,5 +1,5 @@
 REPO clerk
-VERSION_HASH ca791b4661d4
+VERSION_HASH 0588cf9af345
 DESCRIPTION Organizations, domains, JWT templates, and OAuth applications.
 HOSTING managed
 TAGS clerk,authentication,identity

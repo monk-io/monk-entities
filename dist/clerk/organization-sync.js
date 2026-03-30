@@ -80,7 +80,7 @@ var _Organization = class _Organization extends (_a = ClerkEntity, _getInfo_dec 
       const query = this.definition.slug || this.definition.name;
       const list = this.makeRequest("GET", `/organizations?limit=100&query=${encodeURIComponent(query)}`);
       const items = Array.isArray(list?.data) ? list.data : [];
-      found = items.find((it) => it.name === this.definition.name || it.slug === this.definition.slug);
+      found = items.find((it) => it.name === this.definition.name || this.definition.slug && it.slug === this.definition.slug);
     } catch {
     }
     if (found) {
