@@ -1,5 +1,5 @@
 REPO workos
-VERSION_HASH 1da4a36dc78f
+VERSION_HASH d70c2ec79f32
 DESCRIPTION Organizations, SSO connections, roles, and users.
 HOSTING managed
 TAGS workos,authentication,identity,sso,rbac
