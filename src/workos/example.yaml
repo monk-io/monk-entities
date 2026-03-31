@@ -1,0 +1,130 @@
+namespace: workos-example
+
+creds:
+  defines: workos/credentials
+  permitted-secrets:
+    workos-api-key: true
+  secret_ref: workos-api-key
+  client_id: "client_xxxxxxxxxxxxx"
+  services:
+    data:
+      protocol: custom
+
+org:
+  defines: workos/organization
+  secret_ref: workos-api-key
+  name: example-org
+  allow_profiles_outside_organization: false
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+sso:
+  defines: workos/connection
+  secret_ref: workos-api-key
+  name: my-sso-connection
+  connection_id: conn_xxxxxxxxxxxxx
+  organization_id: <- connection-target("org") entity-state get-member("organization_id")
+  permitted-secrets:
+    workos-api-key: true
+  connections:
+    org:
+      runnable: workos-example/org
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - workos-example/org
+      timeout: 120
+  services:
+    data:
+      protocol: custom
+
+role:
+  defines: workos/role
+  secret_ref: workos-api-key
+  name: Example Admin
+  slug: example-admin
+  role_description: "Full administrator access"
+  permissions:
+    - "users:manage"
+    - "billing:read"
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+user:
+  defines: workos/user
+  secret_ref: workos-api-key
+  email: admin@example.com
+  first_name: Admin
+  last_name: User
+  email_verified: true
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+consumer:
+  defines: runnable
+  permitted-secrets:
+    workos-api-key: true
+  connections:
+    creds:
+      runnable: workos-example/creds
+      service: data
+    org:
+      runnable: workos-example/org
+      service: data
+    sso:
+      runnable: workos-example/sso
+      service: data
+    user:
+      runnable: workos-example/user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - workos-example/creds
+        - workos-example/org
+        - workos-example/sso
+        - workos-example/role
+        - workos-example/user
+      timeout: 120
+  variables:
+    workos_secret_ref:
+      value: <- connection-target("creds") entity get-member("secret_ref")
+      type: string
+    WORKOS_API_KEY:
+      env: WORKOS_API_KEY
+      type: string
+      value: <- secret($workos_secret_ref)
+    WORKOS_CLIENT_ID:
+      env: WORKOS_CLIENT_ID
+      type: string
+      value: <- connection-target("creds") entity-state get-member("client_id")
+    WORKOS_MODE:
+      env: WORKOS_MODE
+      type: string
+      value: <- connection-target("creds") entity-state get-member("mode")
+    WORKOS_ORG_ID:
+      env: WORKOS_ORG_ID
+      type: string
+      value: <- connection-target("org") entity-state get-member("organization_id")
+    WORKOS_CONNECTION_ID:
+      env: WORKOS_CONNECTION_ID
+      type: string
+      value: <- connection-target("sso") entity-state get-member("connection_id")
+    WORKOS_USER_ID:
+      env: WORKOS_USER_ID
+      type: string
+      value: <- connection-target("user") entity-state get-member("user_id")
+  containers:
+    app:
+      image: curlimages/curl:8.10.1
+      entrypoint: sleep 36000

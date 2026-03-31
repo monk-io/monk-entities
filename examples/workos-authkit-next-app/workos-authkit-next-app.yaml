@@ -1,0 +1,130 @@
+# WorkOS AuthKit Next.js App
+# Next.js application with WorkOS AuthKit authentication — sign-in, sign-up, and protected pages.
+# Includes organization provisioning for B2B multi-tenant apps.
+# Flow: User -> Next.js app -> WorkOS AuthKit (auth) -> Protected content
+
+namespace: workos-authkit-next-app
+
+# === WorkOS Credentials ===
+
+# Validates the WorkOS API key and exposes client ID + secret ref for the app
+workos-creds:
+  defines: workos/credentials
+  secret_ref: workos-api-key
+  client_id: <- secret("workos-client-id")
+  permitted-secrets:
+    workos-api-key: true
+    workos-client-id: true
+  services:
+    data:
+      protocol: custom
+
+# === WorkOS Organization ===
+
+# Creates a B2B organization for multi-tenant SSO and user management
+workos-org:
+  defines: workos/organization
+  secret_ref: workos-api-key
+  name: authkit-demo-org
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+# === WorkOS Redirect URI ===
+
+# Registers the callback URL so AuthKit accepts redirects back to the app
+workos-redirect:
+  defines: workos/redirect-uri
+  secret_ref: workos-api-key
+  uri: "http://localhost:3000/callback"
+  permitted-secrets:
+    workos-api-key: true
+  depends:
+    wait-for:
+      runnables:
+        - workos-authkit-next-app/workos-creds
+      timeout: 60
+
+# === Next.js Application ===
+
+# Next.js app with WorkOS AuthKit authentication and organization context
+nextjs-app:
+  defines: runnable
+  permitted-secrets:
+    workos-api-key: true
+    workos-client-id: true
+    workos-cookie-password: true
+  connections:
+    workos:
+      runnable: workos-authkit-next-app/workos-creds
+      service: data
+    org:
+      runnable: workos-authkit-next-app/workos-org
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - workos-authkit-next-app/workos-creds
+        - workos-authkit-next-app/workos-org
+        - workos-authkit-next-app/workos-redirect
+      timeout: 120
+  variables:
+    # WorkOS API key for server-side SDK
+    workos_secret_ref:
+      value: <- connection-target("workos") entity get-member("secret_ref")
+      type: string
+    workos_api_key:
+      env: WORKOS_API_KEY
+      value: <- secret($workos_secret_ref)
+      type: string
+    # WorkOS Client ID for AuthKit authorization flow
+    workos_client_id:
+      env: WORKOS_CLIENT_ID
+      value: <- connection-target("workos") entity-state get-member("client_id")
+      type: string
+    # Cookie encryption password (must be 32+ characters)
+    workos_cookie_password:
+      env: WORKOS_COOKIE_PASSWORD
+      value: <- secret("workos-cookie-password")
+      type: string
+    # Redirect URI for AuthKit callback
+    workos_redirect_uri:
+      env: WORKOS_REDIRECT_URI
+      value: "http://localhost:3000/callback"
+      type: string
+    # Organization ID from provisioned org
+    workos_org_id:
+      env: WORKOS_DEFAULT_ORG_ID
+      value: <- connection-target("org") entity-state get-member("organization_id")
+      type: string
+    # Environment mode (test or production)
+    workos_mode:
+      env: WORKOS_MODE
+      value: <- connection-target("workos") entity-state get-member("mode")
+      type: string
+    node_env:
+      env: NODE_ENV
+      value: "production"
+      type: string
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/workos-authkit-next-app:latest
+      ports:
+        - "3000:3000"
+
+# === Deploy Everything ===
+
+# Deploy: monk load dist/workos/MANIFEST && monk load examples/workos-authkit-next-app/workos-authkit-next-app.yaml && monk run -t TAG workos-authkit-next-app/stack
+stack:
+  defines: group
+  members:
+    - workos-authkit-next-app/workos-creds
+    - workos-authkit-next-app/workos-org
+    - workos-authkit-next-app/workos-redirect
+    - workos-authkit-next-app/nextjs-app

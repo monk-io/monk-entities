@@ -1,0 +1,7 @@
+REPO workos
+VERSION_HASH 1da4a36dc78f
+DESCRIPTION Organizations, SSO connections, roles, and users.
+HOSTING managed
+TAGS workos,authentication,identity,sso,rbac
+LOAD workos-base.yaml credentials.yaml organization.yaml connection.yaml role.yaml user.yaml redirect-uri.yaml
+RESOURCES user-sync.js redirect-uri-sync.js connection-sync.js role-sync.js credentials-sync.js organization-sync.js workos-base.js
