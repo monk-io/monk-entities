@@ -123,7 +123,7 @@ export class Connection extends WorkOSEntity<WorkOSConnectionDefinition, WorkOSC
     }
 
     override delete(): void {
-        if (!this.state?.connection_id) return;
+        if (!this.state?.connection_id || this.state.existing) return;
         try {
             this.makeRequest("DELETE", `/connections/${this.state.connection_id}`);
             cli.output(`Deleted WorkOS connection ${this.state.connection_id}`);

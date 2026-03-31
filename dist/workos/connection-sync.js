@@ -114,7 +114,7 @@ var _Connection = class _Connection extends (_a = WorkOSEntity, _getInfo_dec = [
     cli.output(`Refreshed WorkOS connection ${this.state.connection_id}`);
   }
   delete() {
-    if (!this.state?.connection_id) return;
+    if (!this.state?.connection_id || this.state.existing) return;
     try {
       this.makeRequest("DELETE", `/connections/${this.state.connection_id}`);
       cli.output(`Deleted WorkOS connection ${this.state.connection_id}`);
