@@ -1,0 +1,7 @@
+namespace: workos
+
+workos-base:
+  defines: module
+  metadata:
+    version-hash: 1da4a36dc78f
+  source: <<< workos-base.js

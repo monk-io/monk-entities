@@ -1,0 +1,102 @@
+namespace: workos-test
+
+creds:
+  defines: workos/credentials
+  permitted-secrets:
+    workos-api-key: true
+  secret_ref: workos-api-key
+  services:
+    data:
+      protocol: custom
+
+org:
+  defines: workos/organization
+  secret_ref: workos-api-key
+  name: monk-test-workos-org
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+role:
+  defines: workos/role
+  secret_ref: workos-api-key
+  name: Monk Test Admin
+  slug: monk-test-admin
+  role_description: "Test admin role"
+  permissions:
+    - "users:manage"
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+user:
+  defines: workos/user
+  secret_ref: workos-api-key
+  email: monk-test@workos-test.dev
+  first_name: Monk
+  last_name: Test
+  email_verified: true
+  permitted-secrets:
+    workos-api-key: true
+  services:
+    data:
+      protocol: custom
+
+consumer:
+  defines: runnable
+  permitted-secrets:
+    workos-api-key: true
+  connections:
+    creds:
+      runnable: workos-test/creds
+      service: data
+    org:
+      runnable: workos-test/org
+      service: data
+    user:
+      runnable: workos-test/user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - workos-test/creds
+        - workos-test/org
+        - workos-test/role
+        - workos-test/user
+      timeout: 120
+  variables:
+    workos_secret_ref:
+      value: <- connection-target("creds") entity get-member("secret_ref")
+      type: string
+    WORKOS_API_KEY:
+      env: WORKOS_API_KEY
+      type: string
+      value: <- secret($workos_secret_ref)
+    WORKOS_MODE:
+      env: WORKOS_MODE
+      type: string
+      value: <- connection-target("creds") entity-state get-member("mode")
+    WORKOS_ORG_ID:
+      env: WORKOS_ORG_ID
+      type: string
+      value: <- connection-target("org") entity-state get-member("organization_id")
+    WORKOS_USER_ID:
+      env: WORKOS_USER_ID
+      type: string
+      value: <- connection-target("user") entity-state get-member("user_id")
+  containers:
+    app:
+      image: curlimages/curl:8.10.1
+      entrypoint: >-
+        sh -c '
+        echo "WorkOS envs resolved";
+        echo "MODE=$WORKOS_MODE";
+        echo "ORG=$WORKOS_ORG_ID";
+        echo "USER=$WORKOS_USER_ID";
+        test -n "$WORKOS_API_KEY" && echo "API key present" || echo "API key missing";
+        sleep 5;
+        '

@@ -1,0 +1,107 @@
+name: "WorkOS Integration Test"
+description: "Full lifecycle test for WorkOS entities"
+timeout: 300000
+
+secrets:
+  global:
+    workos-api-key: "$WORKOS_API_KEY"
+
+setup:
+  - name: "Load compiled entities"
+    action: load
+    target: dist/input/workos/MANIFEST
+    expect: { exitCode: 0 }
+  - name: "Load test stack"
+    action: load
+    target: stack-template.yaml
+    expect: { exitCode: 0 }
+
+tests:
+  # Credentials
+  - name: "Run credentials"
+    action: run
+    target: workos-test/creds
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+  - name: "Wait for credentials ready"
+    action: wait
+    target: workos-test/creds
+    waitFor: { condition: ready, timeout: 60000 }
+
+  # Organization
+  - name: "Run organization"
+    action: run
+    target: workos-test/org
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+  - name: "Wait for organization ready"
+    action: wait
+    target: workos-test/org
+    waitFor: { condition: ready, timeout: 60000 }
+  - name: "Get organization info"
+    action: do
+    target: workos-test/org/get-info
+    expect: { exitCode: 0 }
+  - name: "Get organization cost estimate"
+    action: do
+    target: workos-test/org/get-cost-estimate
+    expect: { exitCode: 0 }
+  - name: "Get organization costs"
+    action: do
+    target: workos-test/org/costs
+    expect:
+      exitCode: 0
+      output:
+        - "workos-organization"
+
+  # Role
+  - name: "Run role"
+    action: run
+    target: workos-test/role
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+  - name: "Wait for role ready"
+    action: wait
+    target: workos-test/role
+    waitFor: { condition: ready, timeout: 60000 }
+  - name: "Get role info"
+    action: do
+    target: workos-test/role/get-info
+    expect: { exitCode: 0 }
+
+  # User
+  - name: "Run user"
+    action: run
+    target: workos-test/user
+    args:
+      tag: "local"
+    expect: { exitCode: 0 }
+  - name: "Wait for user ready"
+    action: wait
+    target: workos-test/user
+    waitFor: { condition: ready, timeout: 60000 }
+  - name: "Get user info"
+    action: do
+    target: workos-test/user/get-info
+    expect: { exitCode: 0 }
+
+cleanup:
+  - name: "Delete user"
+    action: delete
+    target: workos-test/user
+    expect: { exitCode: 0 }
+  - name: "Delete role"
+    action: delete
+    target: workos-test/role
+    expect: { exitCode: 0 }
+  - name: "Delete organization"
+    action: delete
+    target: workos-test/org
+    expect: { exitCode: 0 }
+  - name: "Delete credentials"
+    action: delete
+    target: workos-test/creds
+    expect: { exitCode: 0 }
