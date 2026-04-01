@@ -15,6 +15,8 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-storage-hmac-keys` | Cloud Storage HMAC keys for S3-compatible access |
 | `gcp/firestore` | Firestore databases with PITR and backup support |
 | `gcp/memorystore-redis` | Memorystore for Redis instances with export/import support |
+| `gcp/pubsub-topic` | Pub/Sub topics for asynchronous messaging |
+| `gcp/pubsub-subscription` | Pub/Sub subscriptions (pull or push delivery) |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -369,6 +371,86 @@ my-redis:
 
 **Required API:**
 - `redis.googleapis.com` via `gcp/service-usage` 
+
+### pubsub-topic
+
+Create and manage Pub/Sub topics for asynchronous messaging.
+
+```yaml
+my-topic:
+  defines: gcp/pubsub-topic
+  name: my-notifications                # Required: topic name
+  labels:                               # Optional
+    environment: production
+  message_retention_duration: "604800s"  # Optional: 7 days retention
+  kms_key_name: ""                      # Optional: KMS encryption key
+  schema_name: ""                       # Optional: schema for validation
+  schema_encoding: JSON                 # Optional: JSON or BINARY
+  services:
+    data:
+      protocol: custom
+```
+
+**Actions:**
+- `get-info`: Get topic details
+- `publish`: Publish a message (args: message, attributes, ordering_key)
+- `list-subscriptions`: List all subscriptions attached to this topic
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `pubsub.topics.create`, `pubsub.topics.get`, `pubsub.topics.update`, `pubsub.topics.delete`
+- `pubsub.topics.publish` (for publish action)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `pubsub.googleapis.com` via `gcp/service-usage`
+
+### pubsub-subscription
+
+Create and manage Pub/Sub subscriptions for consuming messages.
+
+```yaml
+my-subscription:
+  defines: gcp/pubsub-subscription
+  name: my-worker                       # Required: subscription name
+  topic_name: <- connection-target("topic") entity-state get-member("topic_name")
+  ack_deadline_seconds: 60              # Optional: 10-600 seconds
+  message_retention_duration: "604800s"  # Optional: message retention
+  retain_acked_messages: false           # Optional
+  filter: ""                            # Optional: message filter
+  enable_exactly_once_delivery: false   # Optional
+  push_endpoint: ""                     # Optional: push URL (pull if empty)
+  dead_letter_topic: ""                 # Optional: DLQ topic resource name
+  max_delivery_attempts: 5              # Optional: 5-100
+  min_retry_delay: "10s"                # Optional
+  max_retry_delay: "600s"              # Optional
+  labels:                               # Optional
+    environment: production
+  connections:
+    topic:
+      runnable: my-namespace/my-topic
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - my-namespace/my-topic
+      timeout: 120
+```
+
+**Actions:**
+- `get-info`: Get subscription details
+- `pull-messages`: Pull and acknowledge messages (args: max_messages)
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `pubsub.subscriptions.create`, `pubsub.subscriptions.get`, `pubsub.subscriptions.update`, `pubsub.subscriptions.delete`
+- `pubsub.subscriptions.consume` (for pull-messages action)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `pubsub.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 

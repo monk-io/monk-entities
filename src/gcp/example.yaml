@@ -207,6 +207,48 @@ storage-hmac-keys:
       timeout: 60
 
 # =============================================================================
+# Step 8: Create Pub/Sub Topic and Subscription
+# =============================================================================
+# Asynchronous messaging between microservices.
+
+notifications-topic:
+  defines: gcp/pubsub-topic
+  name: app-notifications
+  labels:
+    environment: production
+    team: backend
+  message_retention_duration: "604800s"  # 7 days
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/enable-apis
+      timeout: 300
+
+notifications-subscription:
+  defines: gcp/pubsub-subscription
+  name: notifications-worker
+  topic_name: <- connection-target("topic") entity-state get-member("topic_name")
+  ack_deadline_seconds: 60
+  message_retention_duration: "604800s"
+  min_retry_delay: "10s"
+  max_retry_delay: "600s"
+  labels:
+    environment: production
+    team: backend
+  connections:
+    topic:
+      runnable: gcp-example/notifications-topic
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/notifications-topic
+      timeout: 120
+
+# =============================================================================
 # Example: Minimal Cloud SQL Setup
 # =============================================================================
 # A simpler example with just a database instance.

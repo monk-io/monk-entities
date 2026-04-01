@@ -30,6 +30,7 @@ __export(common_exports, {
   GCP_API_CATALOG: () => GCP_API_CATALOG,
   IAM_API_URL: () => IAM_API_URL,
   MEMORYSTORE_REDIS_API_URL: () => MEMORYSTORE_REDIS_API_URL,
+  PUBSUB_API_URL: () => PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL: () => SERVICE_USAGE_API_URL,
   getDefaultPort: () => getDefaultPort,
@@ -49,6 +50,7 @@ var CLOUD_RUN_API_URL = "https://run.googleapis.com/v2";
 var MEMORYSTORE_REDIS_API_URL = "https://redis.googleapis.com/v1";
 var FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
 var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
+var PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
 var GCP_API_CATALOG = {
   cloud_sql: {
     service: "sqladmin.googleapis.com",
@@ -93,6 +95,10 @@ var GCP_API_CATALOG = {
   memorystore_redis: {
     service: "redis.googleapis.com",
     base_url: MEMORYSTORE_REDIS_API_URL
+  },
+  pubsub: {
+    service: "pubsub.googleapis.com",
+    base_url: PUBSUB_API_URL
   }
 };
 function getDefaultPort(databaseVersion) {
@@ -159,6 +165,7 @@ function isOperationFailed(operation) {
   GCP_API_CATALOG,
   IAM_API_URL,
   MEMORYSTORE_REDIS_API_URL,
+  PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL,
   getDefaultPort,
