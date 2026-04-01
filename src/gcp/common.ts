@@ -905,3 +905,133 @@ export interface IamPolicy {
         };
     }>;
 }
+
+// =============================================================================
+// Base64 Helpers (UTF-8 safe, for Goja runtime which lacks btoa/atob)
+// =============================================================================
+
+/**
+ * Encode a string to UTF-8 bytes
+ */
+function utf8Encode(str: string): number[] {
+    const bytes: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+        let code = str.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff && i + 1 < str.length) {
+            const next = str.charCodeAt(i + 1);
+            if (next >= 0xdc00 && next <= 0xdfff) {
+                code = ((code - 0xd800) << 10) + (next - 0xdc00) + 0x10000;
+                i++;
+            }
+        }
+        if (code < 0x80) {
+            bytes.push(code);
+        } else if (code < 0x800) {
+            bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+        } else if (code < 0x10000) {
+            bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+        } else {
+            bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+        }
+    }
+    return bytes;
+}
+
+/**
+ * Decode UTF-8 bytes to a string
+ */
+function utf8Decode(bytes: number[]): string {
+    let result = '';
+    let i = 0;
+    while (i < bytes.length) {
+        const b = bytes[i++];
+        if (b < 0x80) {
+            result += String.fromCharCode(b);
+        } else if ((b & 0xe0) === 0xc0) {
+            result += String.fromCharCode(((b & 0x1f) << 6) | (bytes[i++] & 0x3f));
+        } else if ((b & 0xf0) === 0xe0) {
+            result += String.fromCharCode(((b & 0x0f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f));
+        } else if ((b & 0xf8) === 0xf0) {
+            const code = ((b & 0x07) << 18) | ((bytes[i++] & 0x3f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f);
+            result += String.fromCharCode(0xd800 + ((code - 0x10000) >> 10), 0xdc00 + ((code - 0x10000) & 0x3ff));
+        }
+    }
+    return result;
+}
+
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Base64 encode a string (UTF-8 safe)
+ */
+export function base64Encode(str: string): string {
+    const bytes = utf8Encode(str);
+    let result = '';
+    let i = 0;
+    while (i < bytes.length) {
+        const remaining = bytes.length - i;
+        const a = bytes[i++];
+        const b = remaining > 1 ? bytes[i++] : 0;
+        const c = remaining > 2 ? bytes[i++] : 0;
+        const triplet = (a << 16) | (b << 8) | c;
+
+        result += B64_CHARS[(triplet >> 18) & 0x3f];
+        result += B64_CHARS[(triplet >> 12) & 0x3f];
+        result += remaining > 1 ? B64_CHARS[(triplet >> 6) & 0x3f] : '=';
+        result += remaining > 2 ? B64_CHARS[triplet & 0x3f] : '=';
+    }
+    return result;
+}
+
+/**
+ * Base64 decode a string (UTF-8 safe)
+ */
+export function base64Decode(str: string): string {
+    const input = str.replace(/=+$/, '');
+    const bytes: number[] = [];
+    let i = 0;
+    while (i < input.length) {
+        const remaining = input.length - i;
+        const a = B64_CHARS.indexOf(input[i++]);
+        const b = remaining > 1 ? B64_CHARS.indexOf(input[i++]) : 0;
+        const c = remaining > 2 ? B64_CHARS.indexOf(input[i++]) : 0;
+        const d = remaining > 3 ? B64_CHARS.indexOf(input[i++]) : 0;
+
+        const triplet = (a << 18) | (b << 12) | (c << 6) | d;
+
+        bytes.push((triplet >> 16) & 0xff);
+        if (remaining > 2) bytes.push((triplet >> 8) & 0xff);
+        if (remaining > 3) bytes.push(triplet & 0xff);
+    }
+    return utf8Decode(bytes);
+}
+
+/**
+ * Extract price from a GCP Billing SKU's tiered rates
+ */
+export function extractPriceFromSku(sku: any): number {
+    try {
+        const pricingInfo = sku.pricingInfo;
+        if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+            return 0;
+        }
+        const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+        if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+            return 0;
+        }
+        for (const rate of tieredRates) {
+            const unitPrice = rate.unitPrice;
+            if (unitPrice) {
+                const units = parseInt(unitPrice.units || '0', 10);
+                const nanos = parseInt(unitPrice.nanos || '0', 10);
+                const price = units + (nanos / 1e9);
+                if (price > 0) {
+                    return price;
+                }
+            }
+        }
+    } catch {
+        // Return 0 on any parsing error
+    }
+    return 0;
+}

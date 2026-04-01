@@ -9,7 +9,7 @@
 import { action, Args } from "monkec/base";
 import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
 import cli from "cli";
-import { PUBSUB_API_URL } from "./common.ts";
+import { PUBSUB_API_URL, base64Decode, extractPriceFromSku } from "./common.ts";
 
 /**
  * Definition for a Pub/Sub Subscription entity
@@ -366,7 +366,7 @@ export class PubsubSubscription extends GcpEntity<PubsubSubscriptionDefinition, 
 
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
-            const data = msg.message?.data ? this.base64Decode(msg.message.data) : '(empty)';
+            const data = msg.message?.data ? base64Decode(msg.message.data) : '(empty)';
             cli.output(`\n  Message ${i + 1}:`);
             cli.output(`    ID: ${msg.message?.messageId || 'unknown'}`);
             cli.output(`    Data: ${data}`);
@@ -393,36 +393,6 @@ export class PubsubSubscription extends GcpEntity<PubsubSubscriptionDefinition, 
     // =========================================================================
     // Cost Estimation
     // =========================================================================
-
-    /**
-     * Extract price from a GCP Billing SKU
-     */
-    private extractPriceFromSku(sku: any): number {
-        try {
-            const pricingInfo = sku.pricingInfo;
-            if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
-                return 0;
-            }
-            const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
-            if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
-                return 0;
-            }
-            for (const rate of tieredRates) {
-                const unitPrice = rate.unitPrice;
-                if (unitPrice) {
-                    const units = parseInt(unitPrice.units || '0', 10);
-                    const nanos = parseInt(unitPrice.nanos || '0', 10);
-                    const price = units + (nanos / 1e9);
-                    if (price > 0) {
-                        return price;
-                    }
-                }
-            }
-        } catch {
-            // Return 0 on any parsing error
-        }
-        return 0;
-    }
 
     /**
      * Fetch Pub/Sub pricing from GCP Cloud Billing Catalog API
@@ -460,7 +430,7 @@ export class PubsubSubscription extends GcpEntity<PubsubSubscriptionDefinition, 
             if (response.skus && Array.isArray(response.skus)) {
                 for (const sku of response.skus) {
                     const desc = (sku.description || '').toLowerCase();
-                    const price = this.extractPriceFromSku(sku);
+                    const price = extractPriceFromSku(sku);
                     if (price <= 0) continue;
 
                     if (desc.includes('message delivery') && !desc.includes('storage') && !desc.includes('seek')) {
@@ -661,32 +631,4 @@ export class PubsubSubscription extends GcpEntity<PubsubSubscriptionDefinition, 
         }
     }
 
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    /**
-     * Base64 decode a string (simple implementation for Goja runtime)
-     */
-    private base64Decode(str: string): string {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        let result = '';
-        let i = 0;
-        const input = str.replace(/=+$/, '');
-
-        while (i < input.length) {
-            const remaining = input.length - i;
-            const a = chars.indexOf(input[i++]);
-            const b = remaining > 1 ? chars.indexOf(input[i++]) : 0;
-            const c = remaining > 2 ? chars.indexOf(input[i++]) : 0;
-            const d = remaining > 3 ? chars.indexOf(input[i++]) : 0;
-
-            const triplet = (a << 18) | (b << 12) | (c << 6) | d;
-
-            result += String.fromCharCode((triplet >> 16) & 0xff);
-            if (remaining > 2) result += String.fromCharCode((triplet >> 8) & 0xff);
-            if (remaining > 3) result += String.fromCharCode(triplet & 0xff);
-        }
-        return result;
-    }
 }
