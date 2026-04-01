@@ -120,16 +120,18 @@ var _PubsubTopic = class _PubsubTopic extends (_a = GcpEntity, _getInfo_dec = [a
       this.create();
       return;
     }
+    const topicBody = this.buildTopicBody();
+    topicBody.name = this.getTopicResourceName();
     const body = {
-      topic: this.buildTopicBody()
+      topic: topicBody
     };
     const updateMaskPaths = [];
     if (this.definition.labels) {
-      body.topic.labels = this.definition.labels;
+      topicBody.labels = this.definition.labels;
       updateMaskPaths.push("labels");
     }
     if (this.definition.message_retention_duration) {
-      body.topic.messageRetentionDuration = this.definition.message_retention_duration;
+      topicBody.messageRetentionDuration = this.definition.message_retention_duration;
       updateMaskPaths.push("messageRetentionDuration");
     }
     if (updateMaskPaths.length === 0) {
@@ -446,14 +448,15 @@ Notes:`);
     let result = "";
     let i = 0;
     while (i < str.length) {
+      const remaining = str.length - i;
       const a = str.charCodeAt(i++);
-      const b = i < str.length ? str.charCodeAt(i++) : 0;
-      const c = i < str.length ? str.charCodeAt(i++) : 0;
+      const b = remaining > 1 ? str.charCodeAt(i++) : 0;
+      const c = remaining > 2 ? str.charCodeAt(i++) : 0;
       const triplet = a << 16 | b << 8 | c;
       result += chars[triplet >> 18 & 63];
       result += chars[triplet >> 12 & 63];
-      result += i - 2 < str.length ? chars[triplet >> 6 & 63] : "=";
-      result += i - 1 < str.length ? chars[triplet & 63] : "=";
+      result += remaining > 1 ? chars[triplet >> 6 & 63] : "=";
+      result += remaining > 2 ? chars[triplet & 63] : "=";
     }
     return result;
   }
