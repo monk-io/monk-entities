@@ -20,7 +20,7 @@ organization:
       Works with:
       - `workos/credentials` - Shares API credentials
       - `workos/connection` - SSO connections belong to organizations
-    version-hash: 1da4a36dc78f
+    version-hash: 989ef547a790
   schema:
     secret_ref:
       type: string

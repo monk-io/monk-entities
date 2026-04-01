@@ -23,7 +23,7 @@ role:
       - `workos/credentials` - Shares API credentials
       - `workos/organization` - Roles are used within organizations
       - `workos/user` - Users are assigned roles via organization memberships
-    version-hash: 1da4a36dc78f
+    version-hash: 989ef547a790
   schema:
     secret_ref:
       type: string

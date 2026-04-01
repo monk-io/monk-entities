@@ -115,6 +115,16 @@ var _RedirectUri = class _RedirectUri extends (_a = WorkOSEntity, _getInfo_dec =
       cli.output("Redirect URI not created yet");
       return;
     }
+    try {
+      const list = this.makeRequest("GET", `/user_management/redirect_uris?limit=100`);
+      const items = Array.isArray(list?.data) ? list.data : [];
+      const found = items.find((it) => it.id === this.state.redirect_uri_id);
+      if (found) {
+        cli.output(JSON.stringify(found, null, 2));
+        return;
+      }
+    } catch {
+    }
     cli.output(JSON.stringify({
       id: this.state.redirect_uri_id,
       uri: this.state.uri

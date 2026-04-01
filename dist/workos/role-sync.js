@@ -94,7 +94,7 @@ var _Role = class _Role extends (_a = WorkOSEntity, _getInfo_dec = [action("get-
     };
     if (this.definition.permissions && this.definition.permissions.length > 0) {
       try {
-        this.makeRequest("PUT", `/authorization/roles/${this.definition.slug}/permissions`, {
+        this.makeRequest("PUT", `/authorization/roles/${created?.slug || this.definition.slug}/permissions`, {
           permissions: this.definition.permissions
         });
       } catch {

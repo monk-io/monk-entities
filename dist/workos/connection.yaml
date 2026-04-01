@@ -24,7 +24,7 @@ connection:
       Works with:
       - `workos/credentials` - Shares API credentials
       - `workos/organization` - Connections belong to organizations
-    version-hash: 1da4a36dc78f
+    version-hash: 989ef547a790
   schema:
     secret_ref:
       type: string

@@ -100,7 +100,7 @@ export class Role extends WorkOSEntity<WorkOSRoleDefinition, WorkOSRoleState> {
         // Set permissions separately if provided
         if (this.definition.permissions && this.definition.permissions.length > 0) {
             try {
-                this.makeRequest("PUT", `/authorization/roles/${this.definition.slug}/permissions`, {
+                this.makeRequest("PUT", `/authorization/roles/${created?.slug || this.definition.slug}/permissions`, {
                     permissions: this.definition.permissions,
                 });
             } catch { /* permissions may not exist yet */ }
