@@ -57,6 +57,8 @@ const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
 const common = require("gcp/common");
 const PUBSUB_API_URL = common.PUBSUB_API_URL;
+const base64Decode = common.base64Decode;
+const extractPriceFromSku = common.extractPriceFromSku;
 var _costs_dec, _getCostEstimate_dec, _pullMessages_dec, _getInfo_dec, _a, _init;
 var _PubsubSubscription = class _PubsubSubscription extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _pullMessages_dec = [action("pull-messages")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
@@ -248,7 +250,7 @@ Pub/Sub Subscription: ${this.definition.name}`);
 Pulled ${messages.length} message(s) from ${this.definition.name}:`);
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      const data = msg.message?.data ? this.base64Decode(msg.message.data) : "(empty)";
+      const data = msg.message?.data ? base64Decode(msg.message.data) : "(empty)";
       cli.output(`
   Message ${i + 1}:`);
       cli.output(`    ID: ${msg.message?.messageId || "unknown"}`);
@@ -274,34 +276,6 @@ Acknowledged ${ackIds.length} message(s)`);
   // =========================================================================
   // Cost Estimation
   // =========================================================================
-  /**
-   * Extract price from a GCP Billing SKU
-   */
-  extractPriceFromSku(sku) {
-    try {
-      const pricingInfo = sku.pricingInfo;
-      if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
-        return 0;
-      }
-      const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
-      if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
-        return 0;
-      }
-      for (const rate of tieredRates) {
-        const unitPrice = rate.unitPrice;
-        if (unitPrice) {
-          const units = parseInt(unitPrice.units || "0", 10);
-          const nanos = parseInt(unitPrice.nanos || "0", 10);
-          const price = units + nanos / 1e9;
-          if (price > 0) {
-            return price;
-          }
-        }
-      }
-    } catch {
-    }
-    return 0;
-  }
   /**
    * Fetch Pub/Sub pricing from GCP Cloud Billing Catalog API
    */
@@ -329,7 +303,7 @@ Acknowledged ${ackIds.length} message(s)`);
       if (response.skus && Array.isArray(response.skus)) {
         for (const sku of response.skus) {
           const desc = (sku.description || "").toLowerCase();
-          const price = this.extractPriceFromSku(sku);
+          const price = extractPriceFromSku(sku);
           if (price <= 0) continue;
           if (desc.includes("message delivery") && !desc.includes("storage") && !desc.includes("seek")) {
             if (deliveryRate === 0) deliveryRate = price;
@@ -487,30 +461,6 @@ Notes:`);
         costs: { month: { amount: "0", currency: "USD", error: error.message } }
       }));
     }
-  }
-  // =========================================================================
-  // Helpers
-  // =========================================================================
-  /**
-   * Base64 decode a string (simple implementation for Goja runtime)
-   */
-  base64Decode(str) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let result = "";
-    let i = 0;
-    const input = str.replace(/=+$/, "");
-    while (i < input.length) {
-      const remaining = input.length - i;
-      const a = chars.indexOf(input[i++]);
-      const b = remaining > 1 ? chars.indexOf(input[i++]) : 0;
-      const c = remaining > 2 ? chars.indexOf(input[i++]) : 0;
-      const d = remaining > 3 ? chars.indexOf(input[i++]) : 0;
-      const triplet = a << 18 | b << 12 | c << 6 | d;
-      result += String.fromCharCode(triplet >> 16 & 255);
-      if (remaining > 2) result += String.fromCharCode(triplet >> 8 & 255);
-      if (remaining > 3) result += String.fromCharCode(triplet & 255);
-    }
-    return result;
   }
 };
 _init = __decoratorStart(_a);

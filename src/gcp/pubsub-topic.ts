@@ -9,7 +9,7 @@
 import { action, Args } from "monkec/base";
 import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
 import cli from "cli";
-import { PUBSUB_API_URL } from "./common.ts";
+import { PUBSUB_API_URL, base64Encode, extractPriceFromSku } from "./common.ts";
 
 /**
  * Schema encoding for messages validated against a schema
@@ -250,7 +250,7 @@ export class PubsubTopic extends GcpEntity<PubsubTopicDefinition, PubsubTopicSta
         if (!args || !args.message) throw new Error("Required argument: message");
 
         const message: Record<string, unknown> = {
-            data: this.base64Encode(String(args.message)),
+            data: base64Encode(String(args.message)),
         };
 
         if (args.attributes) {
@@ -301,36 +301,6 @@ export class PubsubTopic extends GcpEntity<PubsubTopicDefinition, PubsubTopicSta
     // =========================================================================
 
     /**
-     * Extract price from a GCP Billing SKU
-     */
-    private extractPriceFromSku(sku: any): number {
-        try {
-            const pricingInfo = sku.pricingInfo;
-            if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
-                return 0;
-            }
-            const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
-            if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
-                return 0;
-            }
-            for (const rate of tieredRates) {
-                const unitPrice = rate.unitPrice;
-                if (unitPrice) {
-                    const units = parseInt(unitPrice.units || '0', 10);
-                    const nanos = parseInt(unitPrice.nanos || '0', 10);
-                    const price = units + (nanos / 1e9);
-                    if (price > 0) {
-                        return price;
-                    }
-                }
-            }
-        } catch {
-            // Return 0 on any parsing error
-        }
-        return 0;
-    }
-
-    /**
      * Fetch Pub/Sub pricing from GCP Cloud Billing Catalog API
      */
     private fetchPubsubPricing(): {
@@ -368,7 +338,7 @@ export class PubsubTopic extends GcpEntity<PubsubTopicDefinition, PubsubTopicSta
             if (response.skus && Array.isArray(response.skus)) {
                 for (const sku of response.skus) {
                     const desc = (sku.description || '').toLowerCase();
-                    const price = this.extractPriceFromSku(sku);
+                    const price = extractPriceFromSku(sku);
                     if (price <= 0) continue;
 
                     if (desc.includes('message delivery') && !desc.includes('storage') && !desc.includes('seek')) {
@@ -581,29 +551,4 @@ export class PubsubTopic extends GcpEntity<PubsubTopicDefinition, PubsubTopicSta
         }
     }
 
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    /**
-     * Base64 encode a string (simple implementation for Goja runtime)
-     */
-    private base64Encode(str: string): string {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        let result = '';
-        let i = 0;
-        while (i < str.length) {
-            const remaining = str.length - i;
-            const a = str.charCodeAt(i++);
-            const b = remaining > 1 ? str.charCodeAt(i++) : 0;
-            const c = remaining > 2 ? str.charCodeAt(i++) : 0;
-            const triplet = (a << 16) | (b << 8) | c;
-
-            result += chars[(triplet >> 18) & 0x3f];
-            result += chars[(triplet >> 12) & 0x3f];
-            result += remaining > 1 ? chars[(triplet >> 6) & 0x3f] : '=';
-            result += remaining > 2 ? chars[triplet & 0x3f] : '=';
-        }
-        return result;
-    }
 }

@@ -33,6 +33,9 @@ __export(common_exports, {
   PUBSUB_API_URL: () => PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL: () => SERVICE_USAGE_API_URL,
+  base64Decode: () => base64Decode,
+  base64Encode: () => base64Encode,
+  extractPriceFromSku: () => extractPriceFromSku,
   getDefaultPort: () => getDefaultPort,
   isOperationDone: () => isOperationDone,
   isOperationFailed: () => isOperationFailed,
@@ -153,6 +156,107 @@ function isOperationFailed(operation) {
   }
   return operation === "FAILED" || operation === "failed" || operation === "error";
 }
+function utf8Encode(str) {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    let code = str.charCodeAt(i);
+    if (code >= 55296 && code <= 56319 && i + 1 < str.length) {
+      const next = str.charCodeAt(i + 1);
+      if (next >= 56320 && next <= 57343) {
+        code = (code - 55296 << 10) + (next - 56320) + 65536;
+        i++;
+      }
+    }
+    if (code < 128) {
+      bytes.push(code);
+    } else if (code < 2048) {
+      bytes.push(192 | code >> 6, 128 | code & 63);
+    } else if (code < 65536) {
+      bytes.push(224 | code >> 12, 128 | code >> 6 & 63, 128 | code & 63);
+    } else {
+      bytes.push(240 | code >> 18, 128 | code >> 12 & 63, 128 | code >> 6 & 63, 128 | code & 63);
+    }
+  }
+  return bytes;
+}
+function utf8Decode(bytes) {
+  let result = "";
+  let i = 0;
+  while (i < bytes.length) {
+    const b = bytes[i++];
+    if (b < 128) {
+      result += String.fromCharCode(b);
+    } else if ((b & 224) === 192) {
+      result += String.fromCharCode((b & 31) << 6 | bytes[i++] & 63);
+    } else if ((b & 240) === 224) {
+      result += String.fromCharCode((b & 15) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63);
+    } else if ((b & 248) === 240) {
+      const code = (b & 7) << 18 | (bytes[i++] & 63) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
+      result += String.fromCharCode(55296 + (code - 65536 >> 10), 56320 + (code - 65536 & 1023));
+    }
+  }
+  return result;
+}
+var B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function base64Encode(str) {
+  const bytes = utf8Encode(str);
+  let result = "";
+  let i = 0;
+  while (i < bytes.length) {
+    const remaining = bytes.length - i;
+    const a = bytes[i++];
+    const b = remaining > 1 ? bytes[i++] : 0;
+    const c = remaining > 2 ? bytes[i++] : 0;
+    const triplet = a << 16 | b << 8 | c;
+    result += B64_CHARS[triplet >> 18 & 63];
+    result += B64_CHARS[triplet >> 12 & 63];
+    result += remaining > 1 ? B64_CHARS[triplet >> 6 & 63] : "=";
+    result += remaining > 2 ? B64_CHARS[triplet & 63] : "=";
+  }
+  return result;
+}
+function base64Decode(str) {
+  const input = str.replace(/=+$/, "");
+  const bytes = [];
+  let i = 0;
+  while (i < input.length) {
+    const remaining = input.length - i;
+    const a = B64_CHARS.indexOf(input[i++]);
+    const b = remaining > 1 ? B64_CHARS.indexOf(input[i++]) : 0;
+    const c = remaining > 2 ? B64_CHARS.indexOf(input[i++]) : 0;
+    const d = remaining > 3 ? B64_CHARS.indexOf(input[i++]) : 0;
+    const triplet = a << 18 | b << 12 | c << 6 | d;
+    bytes.push(triplet >> 16 & 255);
+    if (remaining > 2) bytes.push(triplet >> 8 & 255);
+    if (remaining > 3) bytes.push(triplet & 255);
+  }
+  return utf8Decode(bytes);
+}
+function extractPriceFromSku(sku) {
+  try {
+    const pricingInfo = sku.pricingInfo;
+    if (!pricingInfo || !Array.isArray(pricingInfo) || pricingInfo.length === 0) {
+      return 0;
+    }
+    const tieredRates = pricingInfo[0].pricingExpression?.tieredRates;
+    if (!tieredRates || !Array.isArray(tieredRates) || tieredRates.length === 0) {
+      return 0;
+    }
+    for (const rate of tieredRates) {
+      const unitPrice = rate.unitPrice;
+      if (unitPrice) {
+        const units = parseInt(unitPrice.units || "0", 10);
+        const nanos = parseInt(unitPrice.nanos || "0", 10);
+        const price = units + nanos / 1e9;
+        if (price > 0) {
+          return price;
+        }
+      }
+    }
+  } catch {
+  }
+  return 0;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BIGQUERY_API_URL,
@@ -168,6 +272,9 @@ function isOperationFailed(operation) {
   PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL,
   SERVICE_USAGE_API_URL,
+  base64Decode,
+  base64Encode,
+  extractPriceFromSku,
   getDefaultPort,
   isOperationDone,
   isOperationFailed,
