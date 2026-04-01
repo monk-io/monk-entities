@@ -102,6 +102,15 @@ export class RedirectUri extends WorkOSEntity<WorkOSRedirectUriDefinition, WorkO
             cli.output("Redirect URI not created yet");
             return;
         }
+        try {
+            const list = this.makeRequest("GET", `/user_management/redirect_uris?limit=100`);
+            const items = Array.isArray(list?.data) ? list.data : [];
+            const found = items.find((it: any) => it.id === this.state.redirect_uri_id);
+            if (found) {
+                cli.output(JSON.stringify(found, null, 2));
+                return;
+            }
+        } catch { /* fallback to cached state */ }
         cli.output(JSON.stringify({
             id: this.state.redirect_uri_id,
             uri: this.state.uri,

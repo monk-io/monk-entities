@@ -20,7 +20,7 @@ redirect-uri:
       ## Composing with Other Entities
       Works with:
       - `workos/credentials` - Shares API credentials
-    version-hash: 1da4a36dc78f
+    version-hash: 989ef547a790
   schema:
     secret_ref:
       type: string

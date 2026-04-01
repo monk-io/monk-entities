@@ -3,5 +3,5 @@ namespace: workos
 workos-base:
   defines: module
   metadata:
-    version-hash: 1da4a36dc78f
+    version-hash: 989ef547a790
   source: <<< workos-base.js
