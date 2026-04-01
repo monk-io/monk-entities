@@ -43,6 +43,92 @@ tests:
       timeout: 120000
 
   # =========================================================================
+  # Pub/Sub Tests (fast, run early)
+  # =========================================================================
+  - name: Create Pub/Sub topic
+    action: run
+    target: gcp-test/test-pubsub-topic
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Pub/Sub topic to be ready
+    action: wait
+    target: gcp-test/test-pubsub-topic
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test Pub/Sub topic get-info action
+    action: action
+    target: gcp-test/test-pubsub-topic
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Create Pub/Sub subscription
+    action: run
+    target: gcp-test/test-pubsub-subscription
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Pub/Sub subscription to be ready
+    action: wait
+    target: gcp-test/test-pubsub-subscription
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test Pub/Sub subscription get-info action
+    action: action
+    target: gcp-test/test-pubsub-subscription
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test Pub/Sub publish action
+    action: action
+    target: gcp-test/test-pubsub-topic
+    actionName: publish
+    args:
+      message: "Hello from MonkEC integration test"
+    expect:
+      exitCode: 0
+
+  - name: Test Pub/Sub pull-messages action
+    action: action
+    target: gcp-test/test-pubsub-subscription
+    actionName: pull-messages
+    args:
+      max_messages: "5"
+    expect:
+      exitCode: 0
+
+  - name: Test Pub/Sub topic list-subscriptions action
+    action: action
+    target: gcp-test/test-pubsub-topic
+    actionName: list-subscriptions
+    expect:
+      exitCode: 0
+
+  - name: Test Pub/Sub topic costs action
+    action: action
+    target: gcp-test/test-pubsub-topic
+    actionName: costs
+    expect:
+      exitCode: 0
+
+  - name: Test Pub/Sub subscription costs action
+    action: action
+    target: gcp-test/test-pubsub-subscription
+    actionName: costs
+    expect:
+      exitCode: 0
+
+  # =========================================================================
   # BigQuery Tests (fast, run first)
   # =========================================================================
   - name: Create BigQuery dataset
@@ -236,6 +322,18 @@ tests:
 
 cleanup:
   # Delete in reverse dependency order
+  - name: Delete Pub/Sub subscription
+    action: delete
+    target: gcp-test/test-pubsub-subscription
+    expect:
+      exitCode: 0
+
+  - name: Delete Pub/Sub topic
+    action: delete
+    target: gcp-test/test-pubsub-topic
+    expect:
+      exitCode: 0
+
   - name: Delete Memorystore instance
     action: delete
     target: gcp-test/test-memorystore

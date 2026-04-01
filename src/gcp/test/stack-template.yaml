@@ -17,6 +17,7 @@ test-enable-apis:
     - storage.googleapis.com
     - iam.googleapis.com
     - redis.googleapis.com
+    - pubsub.googleapis.com
   services:
     data:
       protocol: custom
@@ -212,3 +213,44 @@ test-storage-hmac-keys:
         - gcp-test/test-service-account
         - gcp-test/test-enable-apis
       timeout: 60
+
+# =============================================================================
+# Pub/Sub Topic
+# =============================================================================
+
+test-pubsub-topic:
+  defines: gcp/pubsub-topic
+  name: test-monkec-topic
+  labels:
+    environment: test
+  message_retention_duration: "600s"
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Pub/Sub Subscription
+# =============================================================================
+
+test-pubsub-subscription:
+  defines: gcp/pubsub-subscription
+  name: test-monkec-subscription
+  topic_name: <- connection-target("topic") entity-state get-member("topic_name")
+  ack_deadline_seconds: 30
+  message_retention_duration: "600s"
+  labels:
+    environment: test
+  connections:
+    topic:
+      runnable: gcp-test/test-pubsub-topic
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-pubsub-topic
+      timeout: 120

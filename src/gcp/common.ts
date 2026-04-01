@@ -41,6 +41,9 @@ export const FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/
 /** Firestore API base URL */
 export const FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 
+/** Pub/Sub API base URL */
+export const PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.
@@ -90,6 +93,10 @@ export const GCP_API_CATALOG = {
         service: "redis.googleapis.com",
         base_url: MEMORYSTORE_REDIS_API_URL,
     },
+    pubsub: {
+        service: "pubsub.googleapis.com",
+        base_url: PUBSUB_API_URL,
+    },
 } as const;
 
 /**
@@ -107,7 +114,8 @@ export type GcpApiBaseUrl =
     | "https://run.googleapis.com/v2"
     | "https://firebasehosting.googleapis.com/v1beta1"
     | "https://firestore.googleapis.com/v1"
-    | "https://redis.googleapis.com/v1";
+    | "https://redis.googleapis.com/v1"
+    | "https://pubsub.googleapis.com/v1";
 
 /**
  * Service IDs for common GCP APIs.
