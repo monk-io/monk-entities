@@ -675,16 +675,17 @@ export class PubsubSubscription extends GcpEntity<PubsubSubscriptionDefinition, 
         const input = str.replace(/=+$/, '');
 
         while (i < input.length) {
+            const remaining = input.length - i;
             const a = chars.indexOf(input[i++]);
-            const b = i < input.length ? chars.indexOf(input[i++]) : 0;
-            const c = i < input.length ? chars.indexOf(input[i++]) : 0;
-            const d = i < input.length ? chars.indexOf(input[i++]) : 0;
+            const b = remaining > 1 ? chars.indexOf(input[i++]) : 0;
+            const c = remaining > 2 ? chars.indexOf(input[i++]) : 0;
+            const d = remaining > 3 ? chars.indexOf(input[i++]) : 0;
 
             const triplet = (a << 18) | (b << 12) | (c << 6) | d;
 
             result += String.fromCharCode((triplet >> 16) & 0xff);
-            if (i - 2 < input.length) result += String.fromCharCode((triplet >> 8) & 0xff);
-            if (i - 1 < input.length) result += String.fromCharCode(triplet & 0xff);
+            if (remaining > 2) result += String.fromCharCode((triplet >> 8) & 0xff);
+            if (remaining > 3) result += String.fromCharCode(triplet & 0xff);
         }
         return result;
     }
