@@ -1,0 +1,335 @@
+# GCP Pub/Sub Worker Example
+#
+# Demonstrates asynchronous messaging with Pub/Sub: a topic receives messages,
+# a subscription delivers them, and a worker app publishes + consumes in a loop.
+#
+# Flow: Worker publishes → Topic → Subscription → Worker pulls & processes
+#
+# Prerequisites:
+# - GCP provider configured: monk cluster provider add -p gcp
+# - pubsub.googleapis.com API enabled (or use gcp/service-usage)
+# - Service account with roles/pubsub.admin (or publisher+subscriber)
+
+namespace: gcp-pubsub-demo
+
+# =============================================================================
+# Deploy Everything
+# =============================================================================
+
+pubsub-app:
+  defines: group
+  members:
+    - enable-apis
+    - notifications-topic
+    - worker-subscription
+    - pubsub-sa
+    - pubsub-key
+    - pubsub-worker
+
+# =============================================================================
+# Step 1: Enable Required APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - pubsub.googleapis.com
+    - iam.googleapis.com
+  services:
+    apis-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Create Pub/Sub Topic
+# =============================================================================
+# The topic acts as the message bus — publishers send messages here,
+# and subscriptions fan them out to consumers.
+
+notifications-topic:
+  defines: gcp/pubsub-topic
+  name: demo-notifications
+  labels:
+    environment: demo
+    purpose: example
+  # Retain published messages for 1 hour (for replay / debugging)
+  message_retention_duration: "3600s"
+
+  services:
+    data:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-pubsub-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Pub/Sub Subscription
+# =============================================================================
+# Pull subscription — the worker app pulls messages on its own schedule.
+# Wired to the topic via connection-target to get the full topic resource name.
+
+worker-subscription:
+  defines: gcp/pubsub-subscription
+  name: demo-worker-sub
+  topic_name: <- connection-target("topic") entity-state get-member("topic_name")
+  ack_deadline_seconds: 60
+  message_retention_duration: "3600s"
+  # Retry with exponential backoff on nack
+  min_retry_delay: "10s"
+  max_retry_delay: "300s"
+  labels:
+    environment: demo
+    consumer: worker
+
+  services:
+    data:
+      protocol: custom
+
+  connections:
+    topic:
+      runnable: gcp-pubsub-demo/notifications-topic
+      service: data
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-pubsub-demo/notifications-topic
+      timeout: 120
+
+# =============================================================================
+# Step 4: Create Service Account for Application Access
+# =============================================================================
+# The worker needs a service account key to authenticate with the Pub/Sub API.
+# In production, prefer Workload Identity instead of exported keys.
+
+pubsub-sa:
+  defines: gcp/service-account
+  name: pubsub-demo-worker
+  display_name: Pub/Sub Demo Worker
+  description: Service account for Pub/Sub demo application
+  roles:
+    - roles/pubsub.publisher
+    - roles/pubsub.subscriber
+
+  services:
+    service-account:
+      protocol: custom
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-pubsub-demo/enable-apis
+      timeout: 300
+
+pubsub-key:
+  defines: gcp/service-account-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  secret: pubsub-sa-key
+
+  permitted-secrets:
+    pubsub-sa-key: true
+
+  services:
+    key:
+      protocol: custom
+
+  connections:
+    sa:
+      runnable: gcp-pubsub-demo/pubsub-sa
+      service: service-account
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-pubsub-demo/pubsub-sa
+      timeout: 300
+
+# =============================================================================
+# Step 5: Worker Application
+# =============================================================================
+# Node.js app that:
+#   1. Publishes 5 demo messages to the topic
+#   2. Waits a few seconds for delivery
+#   3. Pulls messages from the subscription and processes them
+#
+# Entity state is wired to env vars via connection-target:
+#   - PUBSUB_TOPIC: full topic resource name (projects/.../topics/...)
+#   - PUBSUB_SUBSCRIPTION: full subscription resource name
+
+pubsub-worker:
+  defines: runnable
+
+  permitted-secrets:
+    pubsub-sa-key: true
+
+  connections:
+    topic:
+      runnable: gcp-pubsub-demo/notifications-topic
+      service: data
+    subscription:
+      runnable: gcp-pubsub-demo/worker-subscription
+      service: data
+    key:
+      runnable: gcp-pubsub-demo/pubsub-key
+      service: key
+
+  depends:
+    wait-for:
+      runnables:
+        - gcp-pubsub-demo/notifications-topic
+        - gcp-pubsub-demo/worker-subscription
+        - gcp-pubsub-demo/pubsub-key
+      timeout: 600
+
+  variables:
+    gcp_project:
+      env: GCP_PROJECT
+      value: <- provider("gcp") get-member("project")
+      type: string
+    pubsub_topic:
+      env: PUBSUB_TOPIC
+      value: <- connection-target("topic") entity-state get-member("topic_name")
+      type: string
+    pubsub_subscription:
+      env: PUBSUB_SUBSCRIPTION
+      value: <- connection-target("subscription") entity-state get-member("subscription_name")
+      type: string
+    sa_key:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("pubsub-sa-key")
+      type: string
+
+  containers:
+    worker:
+      image: node:20-slim
+      bash: |
+        # Write credentials to file (printenv handles special chars safely)
+        printenv GOOGLE_APPLICATION_CREDENTIALS_JSON > /tmp/sa-key.json
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+
+        # Extract project ID from SA key if GCP_PROJECT is empty
+        if [ -z "$GCP_PROJECT" ]; then
+          export GCP_PROJECT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/sa-key.json','utf8')).project_id)")
+        fi
+
+        echo "========================================"
+        echo "  GCP Pub/Sub Worker Demo"
+        echo "========================================"
+        echo "Project:      $GCP_PROJECT"
+        echo "Topic:        $PUBSUB_TOPIC"
+        echo "Subscription: $PUBSUB_SUBSCRIPTION"
+        echo ""
+
+        # Create Node.js application
+        mkdir -p /app && cd /app
+
+        cat > package.json << 'EOF'
+        {
+          "name": "pubsub-worker",
+          "version": "1.0.0",
+          "type": "module",
+          "dependencies": {
+            "@google-cloud/pubsub": "^4.0.0"
+          }
+        }
+        EOF
+
+        echo "Installing dependencies..."
+        npm install --silent 2>&1
+
+        cat > worker.js << 'JSEOF'
+        import { PubSub } from '@google-cloud/pubsub';
+
+        const projectId = process.env.GCP_PROJECT;
+        const topicName = process.env.PUBSUB_TOPIC;
+        const subscriptionName = process.env.PUBSUB_SUBSCRIPTION;
+
+        console.log(`Connecting to Pub/Sub in project: ${projectId}\n`);
+
+        const pubsub = new PubSub({ projectId });
+        const topic = pubsub.topic(topicName);
+        const subscription = pubsub.subscription(subscriptionName);
+
+        // ── Phase 1: Publish messages ──────────────────────────────
+        async function publishMessages() {
+          console.log('--- PUBLISHING MESSAGES ---');
+          const messages = [
+            { type: 'order.created', payload: { orderId: 'ORD-001', amount: 49.99 } },
+            { type: 'user.registered', payload: { userId: 'USR-042', email: 'alice@example.com' } },
+            { type: 'payment.processed', payload: { orderId: 'ORD-001', status: 'success' } },
+            { type: 'order.shipped', payload: { orderId: 'ORD-001', carrier: 'FedEx' } },
+            { type: 'inventory.low', payload: { sku: 'WIDGET-A', remaining: 3 } },
+          ];
+
+          for (const msg of messages) {
+            const data = Buffer.from(JSON.stringify(msg));
+            const attributes = { eventType: msg.type, source: 'pubsub-demo' };
+            const messageId = await topic.publishMessage({ data, attributes });
+            console.log(`  Published [${msg.type}] -> ID: ${messageId}`);
+          }
+
+          console.log(`\nPublished ${messages.length} messages to topic.`);
+        }
+
+        // ── Phase 2: Consume messages via streaming pull ───────────
+        function consumeMessages() {
+          return new Promise((resolve) => {
+            console.log('\n--- CONSUMING MESSAGES ---');
+            console.log('Listening for messages (10s window)...\n');
+
+            let received = 0;
+
+            subscription.on('message', (message) => {
+              received++;
+              const body = JSON.parse(message.data.toString());
+              const attrs = message.attributes || {};
+
+              console.log(`  Message #${received}:`);
+              console.log(`    ID:    ${message.id}`);
+              console.log(`    Type:  ${attrs.eventType || 'unknown'}`);
+              console.log(`    Data:  ${JSON.stringify(body.payload)}`);
+              console.log('');
+
+              message.ack();
+            });
+
+            subscription.on('error', (error) => {
+              console.error('Subscription error:', error.message);
+            });
+
+            // Listen for 10 seconds then wrap up
+            setTimeout(() => {
+              subscription.close();
+              console.log(`--- SUMMARY ---`);
+              console.log(`  Messages published:     5`);
+              console.log(`  Messages received:      ${received}`);
+              resolve();
+            }, 10000);
+          });
+        }
+
+        // ── Main ───────────────────────────────────────────────────
+        async function main() {
+          try {
+            await publishMessages();
+            await consumeMessages();
+            console.log('\nPub/Sub demo completed successfully!');
+            process.exit(0);
+          } catch (error) {
+            console.error('Error:', error.message);
+            process.exit(1);
+          }
+        }
+
+        main();
+        JSEOF
+
+        echo ""
+        echo "Running Pub/Sub worker..."
+        echo ""
+        node worker.js
+
+        # Cleanup credentials
+        rm -f /tmp/sa-key.json
