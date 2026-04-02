@@ -669,6 +669,32 @@ export type CloudFunctionTriggerType =
     | "google.cloud.scheduler.job.v1.executed";
 
 // =============================================================================
+// Cloud Run Enums
+// =============================================================================
+
+/**
+ * Cloud Run ingress traffic settings
+ * @see https://cloud.google.com/run/docs/reference/rest/v2/projects.locations.services#IngressTraffic
+ */
+export type CloudRunIngress =
+    /** All inbound traffic allowed */
+    | "INGRESS_TRAFFIC_ALL"
+    /** Only internal (VPC) traffic allowed */
+    | "INGRESS_TRAFFIC_INTERNAL_ONLY"
+    /** Internal traffic and traffic from Google Cloud Load Balancer */
+    | "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER";
+
+/**
+ * Cloud Run execution environment
+ * @see https://cloud.google.com/run/docs/reference/rest/v2/ExecutionEnvironment
+ */
+export type CloudRunExecutionEnvironment =
+    /** First generation execution environment */
+    | "EXECUTION_ENVIRONMENT_GEN1"
+    /** Second generation execution environment */
+    | "EXECUTION_ENVIRONMENT_GEN2";
+
+// =============================================================================
 // Memorystore for Redis Enums
 // =============================================================================
 

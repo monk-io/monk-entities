@@ -1,0 +1,131 @@
+# Cloud Run Integration Test Suite
+#
+# Tests Cloud Run Service and Job entity lifecycle.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-file test/cloud-run-integration.test.yaml
+
+name: Cloud Run Integration Test
+description: Full lifecycle test for Cloud Run Service and Job entities
+timeout: 600000 # 10 minutes
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Cloud Run test template
+    action: load
+    target: test/cloud-run-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Cloud Run Service Tests
+  # =========================================================================
+  - name: Create Cloud Run service
+    action: run
+    target: gcp-cloud-run-test/test-service
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud Run service to be ready
+    action: wait
+    target: gcp-cloud-run-test/test-service
+    waitFor:
+      condition: ready
+      timeout: 180000
+
+  - name: Get service info
+    action: do
+    target: gcp-cloud-run-test/test-service/get-info
+    expect:
+      exitCode: 0
+
+  - name: Get service revisions
+    action: do
+    target: gcp-cloud-run-test/test-service/get-revisions
+    expect:
+      exitCode: 0
+
+  - name: Get service cost estimate
+    action: do
+    target: gcp-cloud-run-test/test-service/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Get service costs JSON
+    action: do
+    target: gcp-cloud-run-test/test-service/costs
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Cloud Run Job Tests
+  # =========================================================================
+  - name: Create Cloud Run job
+    action: run
+    target: gcp-cloud-run-test/test-job
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud Run job to be ready
+    action: wait
+    target: gcp-cloud-run-test/test-job
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Get job info
+    action: do
+    target: gcp-cloud-run-test/test-job/get-info
+    expect:
+      exitCode: 0
+
+  - name: Execute job
+    action: do
+    target: gcp-cloud-run-test/test-job/execute
+    expect:
+      exitCode: 0
+
+  - name: Get job executions
+    action: do
+    target: gcp-cloud-run-test/test-job/get-executions
+    expect:
+      exitCode: 0
+
+  - name: Get job cost estimate
+    action: do
+    target: gcp-cloud-run-test/test-job/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Get job costs JSON
+    action: do
+    target: gcp-cloud-run-test/test-job/costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  # =========================================================================
+  # Cleanup — delete in reverse order
+  # =========================================================================
+  - name: Delete Cloud Run job
+    action: delete
+    target: gcp-cloud-run-test/test-job
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud Run service
+    action: delete
+    target: gcp-cloud-run-test/test-service
+    expect:
+      exitCode: 0

@@ -1,0 +1,38 @@
+# Cloud Run Integration Test Template
+# Tests Cloud Run Service and Job entities
+
+namespace: gcp-cloud-run-test
+
+# Cloud Run Service — deploys a simple hello container
+test-service:
+  defines: gcp/cloud-run-service
+  name: monk-test-cr-service
+  location: us-central1
+  image: us-docker.pkg.dev/cloudrun/container/hello
+  port: 8080
+  cpu: "1"
+  memory: 512Mi
+  min_instances: 0
+  max_instances: 3
+  concurrency: 80
+  timeout_seconds: 300
+  allow_unauthenticated: true
+  labels:
+    monk-test: cloud-run
+  services:
+    data:
+      protocol: custom
+
+# Cloud Run Job — runs a simple container to completion
+test-job:
+  defines: gcp/cloud-run-job
+  name: monk-test-cr-job
+  location: us-central1
+  image: us-docker.pkg.dev/cloudrun/container/hello
+  cpu: "1"
+  memory: 512Mi
+  task_count: 1
+  timeout_seconds: 120
+  max_retries: 1
+  labels:
+    monk-test: cloud-run
