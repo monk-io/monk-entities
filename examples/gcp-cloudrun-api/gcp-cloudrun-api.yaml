@@ -1,0 +1,152 @@
+# Cloud Run API with Cloud SQL PostgreSQL Backend
+#
+# Deploys a REST API on Cloud Run backed by a Cloud SQL PostgreSQL instance.
+# Demonstrates entity composition: service-usage -> cloud-sql-instance -> database -> user -> cloud-run-service
+#
+# Prerequisites:
+# - GCP provider configured: monk cluster provider add -p gcp
+# - Entity package loaded: monk load dist/gcp/MANIFEST
+
+namespace: gcp-cloudrun-api
+
+# =============================================================================
+# Step 1: Enable Required GCP APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - run.googleapis.com
+  services:
+    api-ready:
+      protocol: custom
+
+# =============================================================================
+# Step 2: Cloud SQL PostgreSQL Instance
+# =============================================================================
+
+postgres:
+  defines: gcp/cloud-sql-instance
+  name: cloudrun-demo-db
+  database_version: POSTGRES_15
+  tier: db-f1-micro
+  region: us-central1
+  storage_size_gb: 10
+  allow_all: true
+  deletion_protection: false
+  availability_type: ZONAL
+  services:
+    instance:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-api/enable-apis
+      timeout: 300
+
+# =============================================================================
+# Step 3: Create Database
+# =============================================================================
+
+app-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: appdb
+  charset: UTF8
+  services:
+    database:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-cloudrun-api/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-api/postgres
+      timeout: 900
+
+# =============================================================================
+# Step 4: Create Database User
+# =============================================================================
+
+app-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: apiuser
+  password_secret: cloudrun-demo-db-password
+  permitted-secrets:
+    cloudrun-demo-db-password: true
+  services:
+    user:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-cloudrun-api/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-api/postgres
+        - gcp-cloudrun-api/app-database
+      timeout: 900
+
+# =============================================================================
+# Step 5: Cloud Run Service — REST API
+# =============================================================================
+# Deploys a containerized Express API that connects to Cloud SQL.
+# Environment variables are wired from Cloud SQL entity state.
+
+api-service:
+  defines: gcp/cloud-run-service
+  name: cloudrun-demo-api
+  location: us-central1
+  image: gcr.io/monk-tests/gcp-cloudrun-api:latest  # Replace with your GCR/Artifact Registry image
+  port: 8080
+  cpu: "1"
+  memory: 512Mi
+  min_instances: 0
+  max_instances: 5
+  concurrency: 80
+  timeout_seconds: 60
+  allow_unauthenticated: true
+  labels:
+    app: cloudrun-demo
+    component: api
+  env_vars:
+    DB_HOST: <- connection-target("db-instance") entity-state get-member("address")
+    DB_PORT: "5432"
+    DB_NAME: appdb
+    DB_USER: apiuser
+    DB_PASSWORD: <- secret("cloudrun-demo-db-password")
+    DB_SSL: "true"
+  permitted-secrets:
+    cloudrun-demo-db-password: true
+  connections:
+    db-instance:
+      runnable: gcp-cloudrun-api/postgres
+      service: instance
+    db-user:
+      runnable: gcp-cloudrun-api/app-user
+      service: user
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-api/postgres
+        - gcp-cloudrun-api/app-database
+        - gcp-cloudrun-api/app-user
+      timeout: 900
+
+# =============================================================================
+# Deploy Everything
+# =============================================================================
+
+example-stack:
+  defines: group
+  members:
+    - gcp-cloudrun-api/enable-apis
+    - gcp-cloudrun-api/postgres
+    - gcp-cloudrun-api/app-database
+    - gcp-cloudrun-api/app-user
+    - gcp-cloudrun-api/api-service
