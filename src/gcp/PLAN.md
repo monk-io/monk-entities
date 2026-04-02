@@ -83,7 +83,7 @@
 - [x] Tests — 14 test steps covering full lifecycle + all actions
 - [x] Manual testing — all entities pass create → ready → actions → delete
 - [x] Integration tests — 17/17 passed (102s)
-- [ ] PR
+- [x] PR — #181, Linear ENG-167
 - [ ] Merged
 
 ## Files Created/Modified
