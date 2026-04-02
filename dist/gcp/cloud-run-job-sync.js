@@ -290,7 +290,10 @@ var _CloudRunJob = class _CloudRunJob extends (_a = GcpEntity, _getInfo_dec = [a
     for (const exec of executions) {
       const name = exec.name?.split("/").pop() || "unknown";
       const createTime = exec.createTime || "unknown";
-      const completionStatus = exec.completionStatus || "UNKNOWN";
+      let completionStatus = "RUNNING";
+      if (exec.completionTime) {
+        completionStatus = (exec.failedCount || 0) > 0 ? "FAILED" : "SUCCEEDED";
+      }
       const tasks = `${exec.succeededCount || 0}/${exec.taskCount || 0} tasks succeeded`;
       cli.output(`${name} | ${createTime} | ${completionStatus} | ${tasks}`);
     }

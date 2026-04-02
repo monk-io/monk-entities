@@ -690,8 +690,9 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
             totalMonthlyCost = cpuCost + memoryCost + requestCost;
         }
 
-        // Min instances always-on cost
-        if (minInstances > 0) {
+        // Min instances always-on cost — only when no metrics available
+        // (billable_instance_time already includes idle min-instance time)
+        if (minInstances > 0 && (!metrics || metrics.containerInstanceSeconds <= 0)) {
             const hoursPerMonth = 730;
             const secondsPerMonth = hoursPerMonth * 3600;
             const idleCpuCost = minInstances * cpu * secondsPerMonth * pricing.cpuPerSecond;
@@ -740,11 +741,13 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
             cli.output(`\nNo usage metrics available from Cloud Monitoring`);
         }
 
-        if (minInstances > 0) {
+        if (minInstances > 0 && (!metrics || metrics.containerInstanceSeconds <= 0)) {
             const memoryGb = parseMemoryMb(memory) / 1024;
             const secondsPerMonth = 730 * 3600;
             const idleCost = minInstances * (parseFloat(cpu) * pricing.cpuPerSecond + memoryGb * pricing.memoryGbPerSecond) * secondsPerMonth;
-            cli.output(`\nMin Instances Cost (${minInstances} always-on): $${idleCost.toFixed(2)}/month`);
+            cli.output(`\nMin Instances Estimated Cost (${minInstances} always-on, no metrics): $${idleCost.toFixed(2)}/month`);
+        } else if (minInstances > 0) {
+            cli.output(`\nMin Instances: ${minInstances} (idle cost included in billable instance time above)`);
         }
 
         cli.output(`\n${'='.repeat(60)}`);

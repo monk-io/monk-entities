@@ -459,7 +459,7 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
       const requestCost = metrics.requestCount / 1e6 * pricing.requestPer1M;
       totalMonthlyCost = cpuCost + memoryCost + requestCost;
     }
-    if (minInstances > 0) {
+    if (minInstances > 0 && (!metrics || metrics.containerInstanceSeconds <= 0)) {
       const hoursPerMonth = 730;
       const secondsPerMonth = hoursPerMonth * 3600;
       const idleCpuCost = minInstances * cpu * secondsPerMonth * pricing.cpuPerSecond;
@@ -503,12 +503,15 @@ Usage (Last 30 Days from Cloud Monitoring):`);
       cli.output(`
 No usage metrics available from Cloud Monitoring`);
     }
-    if (minInstances > 0) {
+    if (minInstances > 0 && (!metrics || metrics.containerInstanceSeconds <= 0)) {
       const memoryGb = parseMemoryMb(memory) / 1024;
       const secondsPerMonth = 730 * 3600;
       const idleCost = minInstances * (parseFloat(cpu) * pricing.cpuPerSecond + memoryGb * pricing.memoryGbPerSecond) * secondsPerMonth;
       cli.output(`
-Min Instances Cost (${minInstances} always-on): $${idleCost.toFixed(2)}/month`);
+Min Instances Estimated Cost (${minInstances} always-on, no metrics): $${idleCost.toFixed(2)}/month`);
+    } else if (minInstances > 0) {
+      cli.output(`
+Min Instances: ${minInstances} (idle cost included in billable instance time above)`);
     }
     cli.output(`
 ${"=".repeat(60)}`);
