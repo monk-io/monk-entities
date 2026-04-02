@@ -348,21 +348,7 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
   fetchCloudRunPricing() {
     try {
       const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
-      const servicesUrl = `${billingApiUrl}/services`;
-      const servicesResp = this.get(servicesUrl);
-      let cloudRunServiceId = "";
-      if (servicesResp.services && Array.isArray(servicesResp.services)) {
-        for (const svc of servicesResp.services) {
-          const name = (svc.displayName || "").toLowerCase();
-          if (name === "cloud run") {
-            cloudRunServiceId = svc.serviceId;
-            break;
-          }
-        }
-      }
-      if (!cloudRunServiceId) {
-        throw new Error("Cloud Run service not found in Billing Catalog");
-      }
+      const cloudRunServiceId = "152E-C115-5142";
       const skusUrl = `${billingApiUrl}/services/${cloudRunServiceId}/skus?currencyCode=USD`;
       const response = this.get(skusUrl);
       if (response.skus && Array.isArray(response.skus)) {

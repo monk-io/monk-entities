@@ -550,25 +550,8 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
     } {
         try {
             const billingApiUrl = 'https://cloudbilling.googleapis.com/v1';
-            // List services to find Cloud Run service ID
-            const servicesUrl = `${billingApiUrl}/services`;
-            const servicesResp = this.get(servicesUrl);
-            let cloudRunServiceId = '';
-
-            if (servicesResp.services && Array.isArray(servicesResp.services)) {
-                for (const svc of servicesResp.services) {
-                    const name = (svc.displayName || '').toLowerCase();
-                    if (name === 'cloud run') {
-                        cloudRunServiceId = svc.serviceId;
-                        break;
-                    }
-                }
-            }
-
-            if (!cloudRunServiceId) {
-                throw new Error('Cloud Run service not found in Billing Catalog');
-            }
-
+            // Cloud Run service ID in GCP Billing Catalog
+            const cloudRunServiceId = '152E-C115-5142';
             const skusUrl = `${billingApiUrl}/services/${cloudRunServiceId}/skus?currencyCode=USD`;
             const response = this.get(skusUrl);
 
