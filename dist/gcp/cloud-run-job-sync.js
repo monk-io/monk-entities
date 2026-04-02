@@ -58,6 +58,7 @@ const cli = require("cli");
 const common = require("gcp/common");
 const CLOUD_RUN_API_URL = common.CLOUD_RUN_API_URL;
 const extractPriceFromSku = common.extractPriceFromSku;
+const parseMemoryMb = common.parseMemoryMb;
 var _costs_dec, _getCostEstimate_dec, _getExecutions_dec, _executeJob_dec, _getInfo_dec, _a, _init;
 var _CloudRunJob = class _CloudRunJob extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _executeJob_dec = [action("execute")], _getExecutions_dec = [action("get-executions")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
@@ -295,15 +296,6 @@ var _CloudRunJob = class _CloudRunJob extends (_a = GcpEntity, _getInfo_dec = [a
     }
   }
   // ==================== COST ESTIMATION ====================
-  parseMemoryMb(memStr) {
-    if (memStr.endsWith("Gi")) {
-      return parseFloat(memStr.replace("Gi", "")) * 1024;
-    }
-    if (memStr.endsWith("Mi")) {
-      return parseFloat(memStr.replace("Mi", ""));
-    }
-    return 512;
-  }
   fetchCloudRunPricing() {
     try {
       const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
@@ -364,7 +356,7 @@ var _CloudRunJob = class _CloudRunJob extends (_a = GcpEntity, _getInfo_dec = [a
       const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString();
       const jobName = this.definition.name;
       const timeFilter = encodeURIComponent(
-        `metric.type="run.googleapis.com/container/billable_instance_time" AND resource.labels.service_name="${jobName}"`
+        `metric.type="run.googleapis.com/job/billable_task_time" AND resource.labels.job_name="${jobName}"`
       );
       const timeUrl = `https://monitoring.googleapis.com/v3/projects/${this.projectId}/timeSeries?filter=${timeFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
       let executionSeconds = 0;
@@ -385,7 +377,7 @@ var _CloudRunJob = class _CloudRunJob extends (_a = GcpEntity, _getInfo_dec = [a
     const pricing = this.fetchCloudRunPricing();
     const metrics = this.getJobMetrics();
     const cpu = parseFloat(this.definition.cpu || "1");
-    const memoryGb = this.parseMemoryMb(this.definition.memory || "512Mi") / 1024;
+    const memoryGb = parseMemoryMb(this.definition.memory || "512Mi") / 1024;
     let totalMonthlyCost = 0;
     if (metrics && metrics.executionSeconds > 0) {
       totalMonthlyCost += metrics.executionSeconds * cpu * pricing.cpuPerSecond;

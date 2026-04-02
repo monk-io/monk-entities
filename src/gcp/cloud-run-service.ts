@@ -16,6 +16,7 @@ import {
     CloudRunIngress,
     CloudRunExecutionEnvironment,
     extractPriceFromSku,
+    parseMemoryMb,
 } from "./common.ts";
 
 /**
@@ -455,16 +456,27 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
                 // No existing policy
             }
 
-            // Remove any existing allUsers invoker binding to avoid duplicates
-            const filtered = existingBindings.filter(
-                (b: any) => !(b.role === "roles/run.invoker" && b.members?.includes("allUsers"))
-            );
-            filtered.push({
-                role: "roles/run.invoker",
-                members: ["allUsers"],
+            // Merge allUsers into existing invoker binding, preserving other members
+            let hasInvokerBinding = false;
+            const merged = existingBindings.map((b: any) => {
+                if (b.role === "roles/run.invoker") {
+                    hasInvokerBinding = true;
+                    const members = b.members || [];
+                    if (!members.includes("allUsers")) {
+                        members.push("allUsers");
+                    }
+                    return { ...b, members };
+                }
+                return b;
             });
+            if (!hasInvokerBinding) {
+                merged.push({
+                    role: "roles/run.invoker",
+                    members: ["allUsers"],
+                });
+            }
 
-            this.post(url, { policy: { bindings: filtered } });
+            this.post(url, { policy: { bindings: merged } });
             cli.output("Set service to allow unauthenticated access");
         } else {
             // Get existing policy and remove allUsers
@@ -529,16 +541,6 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
     }
 
     // ==================== COST ESTIMATION ====================
-
-    private parseMemoryMb(memStr: string): number {
-        if (memStr.endsWith('Gi')) {
-            return parseFloat(memStr.replace('Gi', '')) * 1024;
-        }
-        if (memStr.endsWith('Mi')) {
-            return parseFloat(memStr.replace('Mi', ''));
-        }
-        return 512;
-    }
 
     private fetchCloudRunPricing(): {
         cpuPerSecond: number;
@@ -677,7 +679,7 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
         const metrics = this.getCloudRunMetrics();
 
         const cpu = parseFloat(this.definition.cpu || '1');
-        const memoryGb = this.parseMemoryMb(this.definition.memory || '512Mi') / 1024;
+        const memoryGb = parseMemoryMb(this.definition.memory || '512Mi') / 1024;
         const minInstances = this.definition.min_instances ?? 0;
         let totalMonthlyCost = 0;
 
@@ -739,7 +741,7 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
         }
 
         if (minInstances > 0) {
-            const memoryGb = this.parseMemoryMb(memory) / 1024;
+            const memoryGb = parseMemoryMb(memory) / 1024;
             const secondsPerMonth = 730 * 3600;
             const idleCost = minInstances * (parseFloat(cpu) * pricing.cpuPerSecond + memoryGb * pricing.memoryGbPerSecond) * secondsPerMonth;
             cli.output(`\nMin Instances Cost (${minInstances} always-on): $${idleCost.toFixed(2)}/month`);

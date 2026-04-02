@@ -15,6 +15,7 @@ import {
     GcpRegion,
     CloudRunExecutionEnvironment,
     extractPriceFromSku,
+    parseMemoryMb,
 } from "./common.ts";
 
 /**
@@ -443,16 +444,6 @@ export class CloudRunJob extends GcpEntity<CloudRunJobDefinition, CloudRunJobSta
 
     // ==================== COST ESTIMATION ====================
 
-    private parseMemoryMb(memStr: string): number {
-        if (memStr.endsWith('Gi')) {
-            return parseFloat(memStr.replace('Gi', '')) * 1024;
-        }
-        if (memStr.endsWith('Mi')) {
-            return parseFloat(memStr.replace('Mi', ''));
-        }
-        return 512;
-    }
-
     private fetchCloudRunPricing(): {
         cpuPerSecond: number;
         memoryGbPerSecond: number;
@@ -529,7 +520,7 @@ export class CloudRunJob extends GcpEntity<CloudRunJobDefinition, CloudRunJobSta
             const jobName = this.definition.name;
 
             const timeFilter = encodeURIComponent(
-                `metric.type="run.googleapis.com/container/billable_instance_time" AND resource.labels.service_name="${jobName}"`
+                `metric.type="run.googleapis.com/job/billable_task_time" AND resource.labels.job_name="${jobName}"`
             );
             const timeUrl = `https://monitoring.googleapis.com/v3/projects/${this.projectId}/timeSeries?filter=${timeFilter}&interval.startTime=${startTime}&interval.endTime=${endTime}&aggregation.alignmentPeriod=2592000s&aggregation.perSeriesAligner=ALIGN_SUM`;
 
@@ -554,7 +545,7 @@ export class CloudRunJob extends GcpEntity<CloudRunJobDefinition, CloudRunJobSta
         const metrics = this.getJobMetrics();
 
         const cpu = parseFloat(this.definition.cpu || '1');
-        const memoryGb = this.parseMemoryMb(this.definition.memory || '512Mi') / 1024;
+        const memoryGb = parseMemoryMb(this.definition.memory || '512Mi') / 1024;
         let totalMonthlyCost = 0;
 
         if (metrics && metrics.executionSeconds > 0) {

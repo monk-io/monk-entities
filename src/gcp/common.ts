@@ -1033,6 +1033,20 @@ export function base64Decode(str: string): string {
 }
 
 /**
+ * Parse a memory string (e.g., "256Mi", "1Gi") to megabytes.
+ * Returns the given default if the format is unrecognized.
+ */
+export function parseMemoryMb(memStr: string, defaultMb: number = 512): number {
+    if (memStr.endsWith('Gi')) {
+        return parseFloat(memStr.replace('Gi', '')) * 1024;
+    }
+    if (memStr.endsWith('Mi')) {
+        return parseFloat(memStr.replace('Mi', ''));
+    }
+    return defaultMb;
+}
+
+/**
  * Extract price from a GCP Billing SKU's tiered rates
  */
 export function extractPriceFromSku(sku: any): number {

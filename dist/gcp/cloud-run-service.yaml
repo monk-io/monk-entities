@@ -30,7 +30,7 @@ cloud-run-service:
       Works with:
       - `gcp/service-usage` — enable run.googleapis.com API
       - `gcp/service-account` — custom service account for the service
-    version-hash: 6494f162842c
+    version-hash: 9900900db85c
   schema:
     project:
       type: string
