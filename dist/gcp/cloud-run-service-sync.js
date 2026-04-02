@@ -58,6 +58,7 @@ const cli = require("cli");
 const common = require("gcp/common");
 const CLOUD_RUN_API_URL = common.CLOUD_RUN_API_URL;
 const extractPriceFromSku = common.extractPriceFromSku;
+const parseMemoryMb = common.parseMemoryMb;
 var _costs_dec, _getCostEstimate_dec, _denyUnauthenticated_dec, _allowUnauthenticated_dec, _getRevisions_dec, _getInfo_dec, _a, _init;
 var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _getRevisions_dec = [action("get-revisions")], _allowUnauthenticated_dec = [action("allow-unauthenticated")], _denyUnauthenticated_dec = [action("deny-unauthenticated")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
@@ -274,14 +275,25 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
         existingBindings = existing.bindings || [];
       } catch {
       }
-      const filtered = existingBindings.filter(
-        (b) => !(b.role === "roles/run.invoker" && b.members?.includes("allUsers"))
-      );
-      filtered.push({
-        role: "roles/run.invoker",
-        members: ["allUsers"]
+      let hasInvokerBinding = false;
+      const merged = existingBindings.map((b) => {
+        if (b.role === "roles/run.invoker") {
+          hasInvokerBinding = true;
+          const members = b.members || [];
+          if (!members.includes("allUsers")) {
+            members.push("allUsers");
+          }
+          return { ...b, members };
+        }
+        return b;
       });
-      this.post(url, { policy: { bindings: filtered } });
+      if (!hasInvokerBinding) {
+        merged.push({
+          role: "roles/run.invoker",
+          members: ["allUsers"]
+        });
+      }
+      this.post(url, { policy: { bindings: merged } });
       cli.output("Set service to allow unauthenticated access");
     } else {
       try {
@@ -333,15 +345,6 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     this.setPublicAccess(false);
   }
   // ==================== COST ESTIMATION ====================
-  parseMemoryMb(memStr) {
-    if (memStr.endsWith("Gi")) {
-      return parseFloat(memStr.replace("Gi", "")) * 1024;
-    }
-    if (memStr.endsWith("Mi")) {
-      return parseFloat(memStr.replace("Mi", ""));
-    }
-    return 512;
-  }
   fetchCloudRunPricing() {
     try {
       const billingApiUrl = "https://cloudbilling.googleapis.com/v1";
@@ -447,7 +450,7 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     const pricing = this.fetchCloudRunPricing();
     const metrics = this.getCloudRunMetrics();
     const cpu = parseFloat(this.definition.cpu || "1");
-    const memoryGb = this.parseMemoryMb(this.definition.memory || "512Mi") / 1024;
+    const memoryGb = parseMemoryMb(this.definition.memory || "512Mi") / 1024;
     const minInstances = this.definition.min_instances ?? 0;
     let totalMonthlyCost = 0;
     if (metrics && metrics.containerInstanceSeconds > 0) {
@@ -501,7 +504,7 @@ Usage (Last 30 Days from Cloud Monitoring):`);
 No usage metrics available from Cloud Monitoring`);
     }
     if (minInstances > 0) {
-      const memoryGb = this.parseMemoryMb(memory) / 1024;
+      const memoryGb = parseMemoryMb(memory) / 1024;
       const secondsPerMonth = 730 * 3600;
       const idleCost = minInstances * (parseFloat(cpu) * pricing.cpuPerSecond + memoryGb * pricing.memoryGbPerSecond) * secondsPerMonth;
       cli.output(`

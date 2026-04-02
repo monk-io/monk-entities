@@ -39,7 +39,8 @@ __export(common_exports, {
   getDefaultPort: () => getDefaultPort,
   isOperationDone: () => isOperationDone,
   isOperationFailed: () => isOperationFailed,
-  parseGcpError: () => parseGcpError
+  parseGcpError: () => parseGcpError,
+  parseMemoryMb: () => parseMemoryMb
 });
 module.exports = __toCommonJS(common_exports);
 var CLOUD_SQL_API_URL = "https://sqladmin.googleapis.com/sql/v1beta4";
@@ -232,6 +233,15 @@ function base64Decode(str) {
   }
   return utf8Decode(bytes);
 }
+function parseMemoryMb(memStr, defaultMb = 512) {
+  if (memStr.endsWith("Gi")) {
+    return parseFloat(memStr.replace("Gi", "")) * 1024;
+  }
+  if (memStr.endsWith("Mi")) {
+    return parseFloat(memStr.replace("Mi", ""));
+  }
+  return defaultMb;
+}
 function extractPriceFromSku(sku) {
   try {
     const pricingInfo = sku.pricingInfo;
@@ -278,5 +288,6 @@ function extractPriceFromSku(sku) {
   getDefaultPort,
   isOperationDone,
   isOperationFailed,
-  parseGcpError
+  parseGcpError,
+  parseMemoryMb
 });
