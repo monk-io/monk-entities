@@ -15,6 +15,8 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-storage-hmac-keys` | Cloud Storage HMAC keys for S3-compatible access |
 | `gcp/firestore` | Firestore databases with PITR and backup support |
 | `gcp/memorystore-redis` | Memorystore for Redis instances with export/import support |
+| `gcp/cloud-run-service` | Cloud Run services for serverless container deployment |
+| `gcp/cloud-run-job` | Cloud Run jobs for batch container execution |
 | `gcp/pubsub-topic` | Pub/Sub topics for asynchronous messaging |
 | `gcp/pubsub-subscription` | Pub/Sub subscriptions (pull or push delivery) |
 | `gcp/service-account` | Service accounts with IAM role bindings |
@@ -451,6 +453,97 @@ my-subscription:
 
 **Required API:**
 - `pubsub.googleapis.com` via `gcp/service-usage`
+
+### cloud-run-service
+
+Deploy and manage serverless containers on Cloud Run.
+
+```yaml
+my-service:
+  defines: gcp/cloud-run-service
+  name: my-api                          # Required: service name
+  location: us-central1                 # Required: GCP region
+  image: gcr.io/my-project/my-image:v1  # Required: container image
+  port: 8080                            # Default: 8080
+  cpu: "1"                              # Default: "1"
+  memory: 512Mi                         # Default: 512Mi
+  timeout_seconds: 300                  # Default: 300
+  concurrency: 80                       # Default: 80
+  min_instances: 0                      # Default: 0
+  max_instances: 100                    # Default: 100
+  cpu_idle: true                        # Default: true (request-based billing)
+  startup_cpu_boost: false              # Optional: extra CPU during startup
+  ingress: INGRESS_TRAFFIC_ALL          # Default: INGRESS_TRAFFIC_ALL
+  allow_unauthenticated: true           # Optional: set allUsers as invoker
+  service_account: my-sa@project.iam.gserviceaccount.com  # Optional
+  env_vars:                             # Optional
+    DB_HOST: 10.0.0.1
+    ENV: production
+  labels:                               # Optional
+    environment: production
+  services:
+    data:
+      protocol: custom
+```
+
+**Actions:**
+- `get-info`: Get service details (JSON)
+- `get-revisions`: List service revisions
+- `allow-unauthenticated`: Set IAM policy for public access
+- `deny-unauthenticated`: Remove public access
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `run.services.create`, `run.services.get`, `run.services.update`, `run.services.delete`
+- `run.services.getIamPolicy`, `run.services.setIamPolicy` (for IAM actions)
+- `run.operations.get` (for LRO polling)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `run.googleapis.com` via `gcp/service-usage`
+
+### cloud-run-job
+
+Create and manage batch container workloads on Cloud Run Jobs.
+
+```yaml
+my-job:
+  defines: gcp/cloud-run-job
+  name: data-processor                  # Required: job name
+  location: us-central1                 # Required: GCP region
+  image: gcr.io/my-project/processor:v1 # Required: container image
+  cpu: "2"                              # Default: "1"
+  memory: 1Gi                           # Default: 512Mi
+  timeout_seconds: 600                  # Default: 600
+  max_retries: 3                        # Default: 3
+  task_count: 10                        # Default: 1
+  parallelism: 5                        # Default: 0 (auto)
+  service_account: my-sa@project.iam.gserviceaccount.com  # Optional
+  command: ["python"]                   # Optional: entrypoint override
+  container_args: ["process.py"]        # Optional: arguments
+  env_vars:                             # Optional
+    BATCH_SIZE: "1000"
+  labels:                               # Optional
+    team: data
+```
+
+**Actions:**
+- `get-info`: Get job details (JSON)
+- `execute`: Trigger a new execution (args: task_count, timeout, env)
+- `get-executions`: List recent executions
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `run.jobs.create`, `run.jobs.get`, `run.jobs.update`, `run.jobs.delete`
+- `run.jobs.run` (for execute action)
+- `run.executions.get`, `run.executions.list` (for execution tracking)
+- `run.operations.get` (for LRO polling)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `run.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 

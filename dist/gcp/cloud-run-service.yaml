@@ -1,0 +1,216 @@
+namespace: gcp
+cloud-run-service:
+  defines: entity
+  metadata:
+    name: CloudRunService
+    description: |-
+      Deploys and manages serverless containers on Google Cloud Run.
+      Supports container images, auto-scaling, traffic management, IAM, and cost estimation.
+
+      ## Required Permissions
+      - `run.services.create` — create services
+      - `run.services.get` — check service status
+      - `run.services.update` — update services
+      - `run.services.delete` — delete services
+      - `run.services.getIamPolicy` — read IAM policy
+      - `run.services.setIamPolicy` — set public access
+      - `run.operations.get` — poll long-running operations
+      - `monitoring.timeSeries.list` — cost estimation metrics
+
+      ## Secrets
+      - Reads: none (authenticated via gcp provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.url` - HTTPS endpoint URL for the service
+      - `state.name` - Service name
+      - `state.latest_revision` - Latest ready revision name
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/service-usage` — enable run.googleapis.com API
+      - `gcp/service-account` — custom service account for the service
+    version-hash: 6494f162842c
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: |-
+        Service name (must be unique within project/region).
+        1-49 characters, lowercase letters, numbers, and hyphens.
+    location:
+      type: string
+      enum:
+        - africa-south1
+        - asia-east1
+        - asia-east2
+        - asia-northeast1
+        - asia-northeast2
+        - asia-northeast3
+        - asia-south1
+        - asia-south2
+        - asia-southeast1
+        - asia-southeast2
+        - australia-southeast1
+        - australia-southeast2
+        - europe-central2
+        - europe-north1
+        - europe-southwest1
+        - europe-west1
+        - europe-west2
+        - europe-west3
+        - europe-west4
+        - europe-west6
+        - europe-west8
+        - europe-west9
+        - europe-west10
+        - europe-west12
+        - me-central1
+        - me-central2
+        - me-west1
+        - northamerica-northeast1
+        - northamerica-northeast2
+        - northamerica-south1
+        - us-central1
+        - us-south1
+        - us-east1
+        - us-east4
+        - us-east5
+        - us-west1
+        - us-west2
+        - us-west3
+        - us-west4
+        - southamerica-east1
+        - southamerica-west1
+      description: GCP region for the service
+    image:
+      type: string
+      description: 'Container image URI (e.g., gcr.io/project/image:tag or us-docker.pkg.dev/project/repo/image:tag)'
+    port:
+      type: number
+      description: Container port (default 8080)
+      default: 8080
+    env_vars:
+      type: object
+      additionalProperties:
+        type: string
+        description: Environment variables as key-value pairs
+      description: Environment variables as key-value pairs
+    command:
+      type: array
+      items:
+        type: string
+      description: Container entrypoint command override
+    container_args:
+      type: array
+      items:
+        type: string
+      description: Container command arguments
+    cpu:
+      type: string
+      description: 'CPU limit (e.g., "1", "2", "4")'
+      default: '1'
+    memory:
+      type: string
+      description: 'Memory limit (e.g., "512Mi", "1Gi", "2Gi")'
+      default: 512Mi
+    timeout_seconds:
+      type: number
+      description: Maximum request timeout in seconds (1-3600)
+      default: 300
+    concurrency:
+      type: number
+      description: Maximum concurrent requests per instance
+      default: 80
+    min_instances:
+      type: number
+      description: Minimum number of instances (reduces cold starts)
+      default: 0
+    max_instances:
+      type: number
+      description: Maximum number of instances
+      default: 100
+    service_account:
+      type: string
+      description: IAM service account email for the service
+    ingress:
+      type: string
+      enum:
+        - INGRESS_TRAFFIC_ALL
+        - INGRESS_TRAFFIC_INTERNAL_ONLY
+        - INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER
+      description: Ingress traffic restriction
+      default: INGRESS_TRAFFIC_ALL
+    cpu_idle:
+      type: boolean
+      description: Throttle CPU when idle (request-based billing when true)
+      default: true
+    startup_cpu_boost:
+      type: boolean
+      description: Boost CPU allocation during container startup
+    execution_environment:
+      type: string
+      enum:
+        - EXECUTION_ENVIRONMENT_GEN1
+        - EXECUTION_ENVIRONMENT_GEN2
+      description: Execution environment generation
+    allow_unauthenticated:
+      type: boolean
+      description: Allow unauthenticated (public) access by setting allUsers as invoker
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource labels as key-value pairs
+      description: Resource labels as key-value pairs
+    service_description:
+      type: string
+      description: Description of the service (maps to API description field)
+    required:
+      - name
+      - location
+      - image
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Service name
+    url:
+      type: string
+      description: Service HTTPS endpoint URL (*.run.app)
+    latest_revision:
+      type: string
+      description: Latest ready revision name
+    latest_created_revision:
+      type: string
+      description: Latest created revision name
+    reconciling:
+      type: boolean
+      description: Whether the service is currently reconciling
+  lifecycle:
+    sync: <<< cloud-run-service-sync.js
+    get-info: ''
+    get-revisions: ''
+    allow-unauthenticated: ''
+    deny-unauthenticated: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common
