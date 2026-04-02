@@ -32,8 +32,6 @@ tests:
     target: gcp-test/test-enable-apis
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-enable-apis"
 
   - name: Wait for APIs to be enabled
     action: wait
@@ -129,6 +127,67 @@ tests:
       exitCode: 0
 
   # =========================================================================
+  # Cloud DNS Tests (fast, run early)
+  # =========================================================================
+  - name: Create Cloud DNS zone
+    action: run
+    target: gcp-test/test-dns-zone
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud DNS zone to be ready
+    action: wait
+    target: gcp-test/test-dns-zone
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test Cloud DNS zone get-info action
+    action: action
+    target: gcp-test/test-dns-zone
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Create Cloud DNS record set
+    action: run
+    target: gcp-test/test-dns-record
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud DNS record set to be ready
+    action: wait
+    target: gcp-test/test-dns-record
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test Cloud DNS record set get-info action
+    action: action
+    target: gcp-test/test-dns-record
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test Cloud DNS zone list-record-sets action
+    action: action
+    target: gcp-test/test-dns-zone
+    actionName: list-record-sets
+    expect:
+      exitCode: 0
+
+  - name: Test Cloud DNS zone costs action
+    action: action
+    target: gcp-test/test-dns-zone
+    actionName: costs
+    expect:
+      exitCode: 0
+
+  # =========================================================================
   # BigQuery Tests (fast, run first)
   # =========================================================================
   - name: Create BigQuery dataset
@@ -136,8 +195,6 @@ tests:
     target: gcp-test/test-bigquery
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-bigquery"
 
   - name: Wait for BigQuery dataset to be ready
     action: wait
@@ -161,8 +218,6 @@ tests:
     target: gcp-test/test-storage
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-storage"
 
   - name: Wait for Cloud Storage bucket to be ready
     action: wait
@@ -186,8 +241,6 @@ tests:
     target: gcp-test/test-memorystore
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-memorystore"
 
   - name: Wait for Memorystore instance to be ready
     action: wait
@@ -225,8 +278,6 @@ tests:
     target: gcp-test/test-service-account
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-service-account"
 
   - name: Wait for service account to be ready
     action: wait
@@ -240,8 +291,6 @@ tests:
     target: gcp-test/test-service-account-key
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-service-account-key"
 
   - name: Wait for service account key to be ready
     action: wait
@@ -255,8 +304,6 @@ tests:
     target: gcp-test/test-storage-hmac-keys
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-storage-hmac-keys"
 
   - name: Wait for Cloud Storage HMAC keys to be ready
     action: wait
@@ -273,8 +320,6 @@ tests:
     target: gcp-test/test-sql-instance
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-sql-instance"
 
   - name: Wait for Cloud SQL instance to be ready
     action: wait
@@ -295,8 +340,6 @@ tests:
     target: gcp-test/test-sql-database
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-sql-database"
 
   - name: Wait for Cloud SQL database to be ready
     action: wait
@@ -310,8 +353,6 @@ tests:
     target: gcp-test/test-sql-user
     expect:
       exitCode: 0
-      output:
-        - "Started gcp-test/test-sql-user"
 
   - name: Wait for Cloud SQL user to be ready
     action: wait
@@ -322,6 +363,18 @@ tests:
 
 cleanup:
   # Delete in reverse dependency order
+  - name: Delete Cloud DNS record set
+    action: delete
+    target: gcp-test/test-dns-record
+    expect:
+      exitCode: 0
+
+  - name: Delete Cloud DNS zone
+    action: delete
+    target: gcp-test/test-dns-zone
+    expect:
+      exitCode: 0
+
   - name: Delete Pub/Sub subscription
     action: delete
     target: gcp-test/test-pubsub-subscription

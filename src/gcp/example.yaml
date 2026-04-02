@@ -18,6 +18,7 @@ enable-apis:
     - storage.googleapis.com
     - iam.googleapis.com
     - redis.googleapis.com
+    - dns.googleapis.com
 
 # =============================================================================
 # Step 2: Create Service Account (optional)
@@ -301,6 +302,57 @@ data-processor:
       runnables:
         - gcp-example/enable-apis
       timeout: 300
+
+# =============================================================================
+# Step 11: Create Cloud DNS Zone and Records
+# =============================================================================
+# DNS hosting for your domain.
+
+app-dns-zone:
+  defines: gcp/cloud-dns-zone
+  name: app-example-zone
+  dns_name: "app.example.com."
+  zone_description: "DNS zone for the application"
+  visibility: public
+  labels:
+    environment: production
+    team: platform
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/enable-apis
+      timeout: 300
+
+app-dns-record-a:
+  defines: gcp/cloud-dns-record-set
+  zone_name: app-example-zone
+  record_name: "www.app.example.com."
+  record_type: A
+  ttl: 300
+  rrdatas:
+    - "203.0.113.10"
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/app-dns-zone
+      timeout: 120
+
+app-dns-record-cname:
+  defines: gcp/cloud-dns-record-set
+  zone_name: app-example-zone
+  record_name: "api.app.example.com."
+  record_type: CNAME
+  ttl: 300
+  rrdatas:
+    - "www.app.example.com."
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/app-dns-zone
+      timeout: 120
 
 # =============================================================================
 # Example: Minimal Cloud SQL Setup
