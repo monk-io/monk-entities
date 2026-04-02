@@ -59,6 +59,7 @@ const http = require("http");
 const blobs = require("blobs");
 const common = require("gcp/common");
 const CLOUD_FUNCTIONS_API_URL = common.CLOUD_FUNCTIONS_API_URL;
+const parseMemoryMb = common.parseMemoryMb;
 var _costs_dec, _getCostEstimate_dec, _invokeFunction_dec, _testIamPermissions_dec, _setIamPolicy_dec, _getIamPolicy_dec, _getInfo_dec, _a, _init;
 var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec = [action("get")], _getIamPolicy_dec = [action("get-iam-policy")], _setIamPolicy_dec = [action("set-iam-policy")], _testIamPermissions_dec = [action("test-iam-permissions")], _invokeFunction_dec = [action("invoke")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
@@ -395,13 +396,7 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
    * Parse memory string to MB (e.g., "256Mi" -> 256, "1Gi" -> 1024)
    */
   parseMemoryMb(memStr) {
-    if (memStr.endsWith("Gi")) {
-      return parseFloat(memStr.replace("Gi", "")) * 1024;
-    }
-    if (memStr.endsWith("Mi")) {
-      return parseFloat(memStr.replace("Mi", ""));
-    }
-    return 256;
+    return parseMemoryMb(memStr, 256);
   }
   /**
    * Get Cloud Function pricing from GCP Cloud Billing Catalog API

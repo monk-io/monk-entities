@@ -21,6 +21,7 @@ import {
     CloudFunctionIngress,
     CloudFunctionVpcEgress,
     CloudFunctionTriggerType,
+    parseMemoryMb,
 } from "./common.ts";
 
 /**
@@ -815,13 +816,7 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
      * Parse memory string to MB (e.g., "256Mi" -> 256, "1Gi" -> 1024)
      */
     private parseMemoryMb(memStr: string): number {
-        if (memStr.endsWith('Gi')) {
-            return parseFloat(memStr.replace('Gi', '')) * 1024;
-        }
-        if (memStr.endsWith('Mi')) {
-            return parseFloat(memStr.replace('Mi', ''));
-        }
-        return 256; // default
+        return parseMemoryMb(memStr, 256);
     }
 
     /**
