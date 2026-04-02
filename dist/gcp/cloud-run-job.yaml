@@ -31,7 +31,7 @@ cloud-run-job:
       Works with:
       - `gcp/service-usage` — enable run.googleapis.com API
       - `gcp/service-account` — custom service account for the job
-    version-hash: 3e93e45f0173
+    version-hash: a07404e2a201
   schema:
     project:
       type: string
