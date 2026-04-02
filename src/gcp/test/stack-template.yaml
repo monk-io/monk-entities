@@ -18,6 +18,7 @@ test-enable-apis:
     - iam.googleapis.com
     - redis.googleapis.com
     - pubsub.googleapis.com
+    - dns.googleapis.com
   services:
     data:
       protocol: custom
@@ -213,6 +214,45 @@ test-storage-hmac-keys:
         - gcp-test/test-service-account
         - gcp-test/test-enable-apis
       timeout: 60
+
+# =============================================================================
+# Cloud DNS Zone
+# =============================================================================
+
+test-dns-zone:
+  defines: gcp/cloud-dns-zone
+  name: test-monkec-dns-zone
+  dns_name: "test-monkec-dns.example.com."
+  zone_description: "MonkEC integration test zone"
+  visibility: public
+  labels:
+    environment: test
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
+
+# =============================================================================
+# Cloud DNS Record Set
+# =============================================================================
+
+test-dns-record:
+  defines: gcp/cloud-dns-record-set
+  zone_name: test-monkec-dns-zone
+  record_name: "www.test-monkec-dns.example.com."
+  record_type: A
+  ttl: 300
+  rrdatas:
+    - "203.0.113.10"
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-dns-zone
+      timeout: 120
 
 # =============================================================================
 # Pub/Sub Topic

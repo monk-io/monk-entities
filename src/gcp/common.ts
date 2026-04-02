@@ -44,6 +44,9 @@ export const FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 /** Pub/Sub API base URL */
 export const PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
 
+/** Cloud DNS API base URL */
+export const CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.

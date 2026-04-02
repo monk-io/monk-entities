@@ -19,6 +19,8 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-run-job` | Cloud Run jobs for batch container execution |
 | `gcp/pubsub-topic` | Pub/Sub topics for asynchronous messaging |
 | `gcp/pubsub-subscription` | Pub/Sub subscriptions (pull or push delivery) |
+| `gcp/cloud-dns-zone` | Cloud DNS managed zones (public/private) |
+| `gcp/cloud-dns-record-set` | DNS record sets (A, AAAA, CNAME, MX, TXT, etc.) |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -544,6 +546,73 @@ my-job:
 
 **Required API:**
 - `run.googleapis.com` via `gcp/service-usage`
+
+### cloud-dns-zone
+
+Create and manage Cloud DNS managed zones for DNS hosting.
+
+```yaml
+my-zone:
+  defines: gcp/cloud-dns-zone
+  name: my-app-zone                     # Required: zone name (1-63 chars)
+  dns_name: "myapp.example.com."        # Required: DNS name with trailing dot
+  zone_description: "My app DNS zone"   # Optional
+  visibility: public                    # Optional: "public" or "private"
+  dnssec_enabled: false                 # Optional: enable DNSSEC
+  logging_enabled: false                # Optional: query logging
+  labels:                               # Optional
+    environment: production
+  networks:                             # Optional: VPC networks (for private zones)
+    - projects/my-project/global/networks/my-vpc
+  services:
+    data:
+      protocol: custom
+```
+
+**Actions:**
+- `get-info`: Get zone details and nameservers
+- `list-record-sets`: List all DNS records in the zone
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `dns.managedZones.create`, `dns.managedZones.get`, `dns.managedZones.update`, `dns.managedZones.delete`
+- `dns.resourceRecordSets.list` (for list-record-sets action)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `dns.googleapis.com` via `gcp/service-usage`
+
+### cloud-dns-record-set
+
+Create and manage DNS record sets within a Cloud DNS managed zone.
+
+```yaml
+my-record:
+  defines: gcp/cloud-dns-record-set
+  zone_name: my-app-zone                # Required: zone name
+  record_name: "www.myapp.example.com." # Required: DNS name with trailing dot
+  record_type: A                        # Required: record type
+  ttl: 300                              # Optional: TTL in seconds (default: 300)
+  rrdatas:                              # Required: record data values
+    - "203.0.113.10"
+  depends:
+    wait-for:
+      runnables:
+        - my-namespace/my-zone
+      timeout: 120
+```
+
+**Supported Record Types:** A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA, PTR
+
+**Actions:**
+- `get-info`: Get record details
+
+**Required Permissions:**
+- `dns.resourceRecordSets.create`, `dns.resourceRecordSets.get`, `dns.resourceRecordSets.update`, `dns.resourceRecordSets.delete`
+
+**Required API:**
+- `dns.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 

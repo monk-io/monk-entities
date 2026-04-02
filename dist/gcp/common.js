@@ -21,6 +21,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var common_exports = {};
 __export(common_exports, {
   BIGQUERY_API_URL: () => BIGQUERY_API_URL,
+  CLOUD_DNS_API_URL: () => CLOUD_DNS_API_URL,
   CLOUD_FUNCTIONS_API_URL: () => CLOUD_FUNCTIONS_API_URL,
   CLOUD_RUN_API_URL: () => CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL: () => CLOUD_SQL_API_URL,
@@ -55,6 +56,7 @@ var MEMORYSTORE_REDIS_API_URL = "https://redis.googleapis.com/v1";
 var FIREBASE_HOSTING_API_URL = "https://firebasehosting.googleapis.com/v1beta1";
 var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 var PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
+var CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
 var GCP_API_CATALOG = {
   cloud_sql: {
     service: "sqladmin.googleapis.com",
@@ -270,6 +272,7 @@ function extractPriceFromSku(sku) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BIGQUERY_API_URL,
+  CLOUD_DNS_API_URL,
   CLOUD_FUNCTIONS_API_URL,
   CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL,
