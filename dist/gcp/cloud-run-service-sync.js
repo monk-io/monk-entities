@@ -548,7 +548,7 @@ Cost Estimate for Cloud Run Service: ${serviceName}`);
     cli.output(`
 Configuration:`);
     cli.output(`  Name: ${serviceName}`);
-    cli.output(`  Image: ${this.definition.image}`);
+    cli.output(`  Image: ${this.definition.image || `blob:${this.definition.blob_name}`}`);
     cli.output(`  CPU: ${cpu} vCPU`);
     cli.output(`  Memory: ${memory}`);
     cli.output(`  Min Instances: ${minInstances}`);
