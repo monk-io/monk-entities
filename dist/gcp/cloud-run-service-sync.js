@@ -55,6 +55,9 @@ const action = base.action;
 const gcpBase = require("gcp/gcp-base");
 const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
+const gcp = require("cloud/gcp");
+const http = require("http");
+const blobs = require("blobs");
 const common = require("gcp/common");
 const CLOUD_RUN_API_URL = common.CLOUD_RUN_API_URL;
 const extractPriceFromSku = common.extractPriceFromSku;
@@ -84,9 +87,78 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     this.state.latest_created_revision = service.latestCreatedRevision?.split("/").pop() || void 0;
     this.state.reconciling = service.reconciling ?? false;
   }
+  /**
+   * Upload blob source code to GCS for source-based deployment.
+   * Returns { bucket, object } for use in sourceCode.cloudStorageSource.
+   */
+  uploadBlobSource() {
+    const blobName = this.definition.blob_name;
+    const blobMeta = blobs.get(blobName);
+    if (!blobMeta) {
+      throw new Error(`Blob not found: ${blobName}`);
+    }
+    const tgzContent = blobs.tgz(blobName);
+    if (!tgzContent) {
+      throw new Error(`Failed to create tar.gz from blob: ${blobName}`);
+    }
+    const bucketName = `run-sources-${this.projectId}-${this.definition.location}`;
+    const objectName = `${this.definition.name}/${Date.now()}.tar.gz`;
+    cli.output(`Uploading source from blob "${blobName}" to gs://${bucketName}/${objectName}...`);
+    this.ensureGcsBucket(bucketName);
+    const initUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucketName}/o?uploadType=resumable&name=${encodeURIComponent(objectName)}`;
+    const initResponse = gcp.post(initUrl, {
+      headers: { "Content-Type": "application/json", "X-Upload-Content-Type": "application/gzip" },
+      body: JSON.stringify({ name: objectName, contentType: "application/gzip" })
+    });
+    if (initResponse.error || initResponse.statusCode >= 400) {
+      throw new Error(`Failed to initiate upload (${initResponse.statusCode}): ${initResponse.error || initResponse.body}`);
+    }
+    const sessionUri = initResponse.headers["location"] || initResponse.headers["Location"];
+    if (!sessionUri) {
+      throw new Error("GCS resumable upload did not return a session URI");
+    }
+    const uploadResponse = http.put(sessionUri, {
+      headers: { "Content-Type": "application/gzip" },
+      body: tgzContent
+    });
+    if (uploadResponse.error || uploadResponse.statusCode >= 400) {
+      throw new Error(`Failed to upload source code (${uploadResponse.statusCode}): ${uploadResponse.error || uploadResponse.body}`);
+    }
+    cli.output("Source code uploaded successfully");
+    return { bucket: bucketName, object: objectName };
+  }
+  /**
+   * Ensure a GCS bucket exists, creating it if needed.
+   */
+  ensureGcsBucket(bucketName) {
+    const checkUrl = `https://storage.googleapis.com/storage/v1/b/${bucketName}`;
+    const checkResp = gcp.get(checkUrl);
+    if (checkResp.statusCode === 200) return;
+    cli.output(`Creating GCS bucket: ${bucketName}`);
+    const createResp = gcp.post(`https://storage.googleapis.com/storage/v1/b?project=${this.projectId}`, {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: bucketName,
+        location: this.definition.location
+      })
+    });
+    if (createResp.error || createResp.statusCode >= 400 && createResp.statusCode !== 409) {
+      throw new Error(`Failed to create GCS bucket ${bucketName}: ${createResp.error || createResp.body}`);
+    }
+  }
   buildServiceBody() {
+    if (!this.definition.image && !this.definition.blob_name) {
+      throw new Error("Either 'image' or 'blob_name' must be set");
+    }
+    if (this.definition.image && this.definition.blob_name) {
+      throw new Error("Cannot set both 'image' and 'blob_name' \u2014 use one or the other");
+    }
+    let sourceRef = null;
+    if (this.definition.blob_name) {
+      sourceRef = this.uploadBlobSource();
+    }
     const container = {
-      image: this.definition.image,
+      image: this.definition.image || "scratch",
       ports: [{ containerPort: this.definition.port ?? 8080 }],
       resources: {
         limits: {
@@ -110,6 +182,15 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     }
     if (this.definition.container_args) {
       container.args = this.definition.container_args;
+    }
+    if (sourceRef) {
+      container.sourceCode = {
+        cloudStorageSource: {
+          bucket: sourceRef.bucket,
+          object: sourceRef.object
+        }
+      };
+      container.baseImageUri = this.definition.base_image || `${this.definition.location}-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22`;
     }
     const template = {
       containers: [container],

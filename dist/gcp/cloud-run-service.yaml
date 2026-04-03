@@ -5,7 +5,8 @@ cloud-run-service:
     name: CloudRunService
     description: |-
       Deploys and manages serverless containers on Google Cloud Run.
-      Supports container images, auto-scaling, traffic management, IAM, and cost estimation.
+      Supports container images or source-based deployment (via blob_name),
+      auto-scaling, traffic management, IAM, and cost estimation.
 
       ## Required Permissions
       - `run.services.create` — create services
@@ -30,7 +31,7 @@ cloud-run-service:
       Works with:
       - `gcp/service-usage` — enable run.googleapis.com API
       - `gcp/service-account` — custom service account for the service
-    version-hash: a07404e2a201
+    version-hash: 1bc549fd5750
   schema:
     project:
       type: string
@@ -87,7 +88,20 @@ cloud-run-service:
       description: GCP region for the service
     image:
       type: string
-      description: 'Container image URI (e.g., gcr.io/project/image:tag or us-docker.pkg.dev/project/repo/image:tag)'
+      description: |-
+        Container image URI (e.g., gcr.io/project/image:tag).
+        Required when blob_name is not set.
+    blob_name:
+      type: string
+      description: |-
+        Name of the blob containing source code to deploy.
+        When set, the source is zipped, uploaded to GCS, and Cloud Run builds the image automatically.
+        Cannot be used together with image.
+    base_image:
+      type: string
+      description: |-
+        Base image for source-based deployment (e.g., us-central1-docker.pkg.dev/serverless-runtimes/google-24-full/runtimes/nodejs22).
+        Only used when blob_name is set. If omitted, Cloud Run auto-detects the runtime.
     port:
       type: number
       description: Container port (default 8080)
@@ -171,7 +185,6 @@ cloud-run-service:
     required:
       - name
       - location
-      - image
   state-schema:
     existing:
       type: boolean
@@ -213,4 +226,7 @@ cloud-run-service:
     - monkec/base
     - gcp/gcp-base
     - cli
+    - cloud/gcp
+    - http
+    - blobs
     - gcp/common

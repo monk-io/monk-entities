@@ -1,0 +1,3 @@
+REPO gcp-cloudrun-source-test
+LOAD stack.yaml
+BLOBS helloworld:helloworld/

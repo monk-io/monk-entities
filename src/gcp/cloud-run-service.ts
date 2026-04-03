@@ -10,6 +10,9 @@
 import { action, Args } from "monkec/base";
 import { GcpEntity, GcpEntityDefinition, GcpEntityState } from "./gcp-base.ts";
 import cli from "cli";
+import gcp from "cloud/gcp";
+import http from "http";
+import blobs from "blobs";
 import {
     CLOUD_RUN_API_URL,
     GcpRegion,
@@ -35,9 +38,23 @@ export interface CloudRunServiceDefinition extends GcpEntityDefinition {
     location: GcpRegion;
 
     /**
-     * @description Container image URI (e.g., gcr.io/project/image:tag or us-docker.pkg.dev/project/repo/image:tag)
+     * @description Container image URI (e.g., gcr.io/project/image:tag).
+     * Required when blob_name is not set.
      */
-    image: string;
+    image?: string;
+
+    /**
+     * @description Name of the blob containing source code to deploy.
+     * When set, the source is zipped, uploaded to GCS, and Cloud Run builds the image automatically.
+     * Cannot be used together with image.
+     */
+    blob_name?: string;
+
+    /**
+     * @description Base image for source-based deployment (e.g., us-central1-docker.pkg.dev/serverless-runtimes/google-24-full/runtimes/nodejs22).
+     * Only used when blob_name is set. If omitted, Cloud Run auto-detects the runtime.
+     */
+    base_image?: string;
 
     /**
      * @description Container port (default 8080)
@@ -171,7 +188,8 @@ export interface CloudRunServiceState extends GcpEntityState {
 
 /**
  * @description Deploys and manages serverless containers on Google Cloud Run.
- * Supports container images, auto-scaling, traffic management, IAM, and cost estimation.
+ * Supports container images or source-based deployment (via blob_name),
+ * auto-scaling, traffic management, IAM, and cost estimation.
  *
  * ## Required Permissions
  * - `run.services.create` — create services
@@ -225,9 +243,99 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
         this.state.reconciling = service.reconciling ?? false;
     }
 
+    /**
+     * Upload blob source code to GCS for source-based deployment.
+     * Returns { bucket, object } for use in sourceCode.cloudStorageSource.
+     */
+    private uploadBlobSource(): { bucket: string; object: string } {
+        const blobName = this.definition.blob_name!;
+        const blobMeta = blobs.get(blobName);
+        if (!blobMeta) {
+            throw new Error(`Blob not found: ${blobName}`);
+        }
+
+        const tgzContent = (blobs as any).tgz(blobName);
+        if (!tgzContent) {
+            throw new Error(`Failed to create tar.gz from blob: ${blobName}`);
+        }
+
+        const bucketName = `run-sources-${this.projectId}-${this.definition.location}`;
+        const objectName = `${this.definition.name}/${Date.now()}.tar.gz`;
+
+        cli.output(`Uploading source from blob "${blobName}" to gs://${bucketName}/${objectName}...`);
+
+        // Ensure GCS bucket exists
+        this.ensureGcsBucket(bucketName);
+
+        // Step 1: Initiate resumable upload (GCP auth via builtin)
+        const initUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucketName}/o?uploadType=resumable&name=${encodeURIComponent(objectName)}`;
+        const initResponse = gcp.post(initUrl, {
+            headers: { "Content-Type": "application/json", "X-Upload-Content-Type": "application/gzip" },
+            body: JSON.stringify({ name: objectName, contentType: "application/gzip" }),
+        });
+
+        if (initResponse.error || initResponse.statusCode >= 400) {
+            throw new Error(`Failed to initiate upload (${initResponse.statusCode}): ${initResponse.error || initResponse.body}`);
+        }
+
+        // Extract the signed session URI from Location header
+        const sessionUri = initResponse.headers["location"] || initResponse.headers["Location"];
+        if (!sessionUri) {
+            throw new Error("GCS resumable upload did not return a session URI");
+        }
+
+        // Step 2: Upload binary content via http.put (handles base64 → binary)
+        const uploadResponse = http.put(sessionUri, {
+            headers: { "Content-Type": "application/gzip" },
+            body: tgzContent,
+        });
+
+        if (uploadResponse.error || uploadResponse.statusCode >= 400) {
+            throw new Error(`Failed to upload source code (${uploadResponse.statusCode}): ${uploadResponse.error || uploadResponse.body}`);
+        }
+
+        cli.output("Source code uploaded successfully");
+        return { bucket: bucketName, object: objectName };
+    }
+
+    /**
+     * Ensure a GCS bucket exists, creating it if needed.
+     */
+    private ensureGcsBucket(bucketName: string): void {
+        const checkUrl = `https://storage.googleapis.com/storage/v1/b/${bucketName}`;
+        const checkResp = gcp.get(checkUrl);
+        if (checkResp.statusCode === 200) return;
+
+        cli.output(`Creating GCS bucket: ${bucketName}`);
+        const createResp = gcp.post(`https://storage.googleapis.com/storage/v1/b?project=${this.projectId}`, {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: bucketName,
+                location: this.definition.location,
+            }),
+        });
+        if (createResp.error || (createResp.statusCode >= 400 && createResp.statusCode !== 409)) {
+            throw new Error(`Failed to create GCS bucket ${bucketName}: ${createResp.error || createResp.body}`);
+        }
+    }
+
     private buildServiceBody(): any {
+        // Validate: either image or blob_name must be set
+        if (!this.definition.image && !this.definition.blob_name) {
+            throw new Error("Either 'image' or 'blob_name' must be set");
+        }
+        if (this.definition.image && this.definition.blob_name) {
+            throw new Error("Cannot set both 'image' and 'blob_name' — use one or the other");
+        }
+
+        // Upload source and get GCS reference if blob-based deploy
+        let sourceRef: { bucket: string; object: string } | null = null;
+        if (this.definition.blob_name) {
+            sourceRef = this.uploadBlobSource();
+        }
+
         const container: any = {
-            image: this.definition.image,
+            image: this.definition.image || "scratch",
             ports: [{ containerPort: this.definition.port ?? 8080 }],
             resources: {
                 limits: {
@@ -255,6 +363,19 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
 
         if (this.definition.container_args) {
             container.args = this.definition.container_args;
+        }
+
+        // Source-based deployment: set sourceCode and baseImageUri
+        if (sourceRef) {
+            container.sourceCode = {
+                cloudStorageSource: {
+                    bucket: sourceRef.bucket,
+                    object: sourceRef.object,
+                },
+            };
+            // baseImageUri is required for source deployment
+            container.baseImageUri = this.definition.base_image ||
+                `${this.definition.location}-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22`;
         }
 
         const template: any = {
