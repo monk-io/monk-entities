@@ -31,11 +31,25 @@ declare module "blobs" {
     get(name: string): BlobMetadata;
 
     /**
-     * Converts a blob's tar archive to a zip archive
+     * Converts a blob's tar archive to a zip archive (base64-encoded)
      * @param name - Blob name to convert
-     * @returns The ZIP archive content as a string
+     * @returns The ZIP archive content as a base64-encoded string
      */
     zip(name: string): string;
+
+    /**
+     * Returns a blob's raw tar archive content (base64-encoded)
+     * @param name - Blob name
+     * @returns The tar archive content as a base64-encoded string
+     */
+    tar(name: string): string;
+
+    /**
+     * Returns a blob's tar archive gzip-compressed (base64-encoded)
+     * @param name - Blob name
+     * @returns The tar.gz archive content as a base64-encoded string
+     */
+    tgz(name: string): string;
   }
 
   const blobs: BlobsModule;

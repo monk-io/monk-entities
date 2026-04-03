@@ -1,0 +1,22 @@
+# Cloud Run Source Deploy Example
+#
+# Deploys a Node.js hello world app from source code using blob_name.
+# Cloud Run builds the container automatically using Google Cloud buildpacks.
+
+namespace: gcp-cloudrun-source-test
+
+hello-service:
+  defines: gcp/cloud-run-service
+  name: monk-test-source-deploy
+  location: us-central1
+  blob_name: helloworld
+  command: ["node", "index.js"]
+  port: 8080
+  cpu: "1"
+  memory: 512Mi
+  min_instances: 0
+  max_instances: 3
+  env_vars:
+    NAME: "Monk"
+  labels:
+    monk-test: source-deploy
