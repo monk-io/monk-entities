@@ -165,7 +165,31 @@ var _CloudDnsZone = class _CloudDnsZone extends (_a = GcpEntity, _getInfo_dec = 
   }
   delete() {
     if (!this.state.zone_id) return;
-    this.deleteResource(this.getZoneUrl(), `Cloud DNS zone ${this.definition.name}`);
+    if (this.state.existing) {
+      cli.output(`Cloud DNS zone ${this.definition.name} wasn't created by this entity, skipping delete`);
+      return;
+    }
+    try {
+      const url = `${this.getZoneUrl()}/rrsets`;
+      const result = this.get(url);
+      const rrsets = result.rrsets || [];
+      for (const rr of rrsets) {
+        if (rr.type === "NS" || rr.type === "SOA") continue;
+        try {
+          const recordUrl = `${url}/${rr.name}/${rr.type}`;
+          this.httpDelete(recordUrl);
+          cli.output(`Deleted record ${rr.name} ${rr.type} before zone removal`);
+        } catch {
+        }
+      }
+    } catch {
+    }
+    try {
+      this.httpDelete(this.getZoneUrl());
+      cli.output(`Successfully deleted Cloud DNS zone ${this.definition.name}`);
+    } catch (error) {
+      throw new Error(`Failed to delete Cloud DNS zone ${this.definition.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
   checkReadiness() {
     if (!this.state.zone_id) return false;
