@@ -1,0 +1,129 @@
+# GCP Cloud DNS Nginx Demo
+# Demonstrates wiring Cloud DNS records to an nginx container behind monk ingress.
+# Flow: DNS (www.example-app.com) -> ingress (traefik) -> nginx
+#
+# Prerequisites: monk plugins enable ingress
+
+namespace: gcp-cloud-dns-nginx
+
+# === Application ===
+
+# Nginx serving a hello world page, routed via ingress
+nginx:
+  defines: runnable
+  containers:
+    web:
+      image: nginx:alpine
+  files:
+    index:
+      container: web
+      path: /usr/share/nginx/html/index.html
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Cloud DNS Nginx Demo</title>
+          </head>
+          <body>
+            <h1>Hello from Monk!</h1>
+            <p>This page is served by nginx and accessible via GCP Cloud DNS.</p>
+          </body>
+        </html>
+  services:
+    http:
+      container: web
+      port: 80
+      protocol: tcp
+      ingress-routes:
+        web:
+          host: www.example-app.com
+
+# === DNS Infrastructure ===
+
+# Enable the Cloud DNS API
+enable-dns-api:
+  defines: gcp/service-usage
+  apis:
+    - dns.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# Public managed zone for the domain
+dns-zone:
+  defines: gcp/cloud-dns-zone
+  name: example-app-zone
+  dns_name: "example-app.com."
+  zone_description: "Cloud DNS Nginx Demo - managed by Monk"
+  visibility: public
+  labels:
+    environment: example
+    owner: monk-example
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-dns-nginx/enable-dns-api
+      timeout: 120
+
+# A record pointing to the ingress (traefik) public IP
+web-record:
+  defines: gcp/cloud-dns-record-set
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-dns-nginx/dns-zone
+      timeout: 120
+  zone_name: example-app-zone
+  record_name: "www.example-app.com."
+  record_type: A
+  ttl: 300
+  rrdatas:
+    - <- service-public-ip("system/traefik", "web")
+
+# MX record for email (example configuration)
+mail-record:
+  defines: gcp/cloud-dns-record-set
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-dns-nginx/dns-zone
+      timeout: 120
+  zone_name: example-app-zone
+  record_name: "example-app.com."
+  record_type: MX
+  ttl: 3600
+  rrdatas:
+    - "10 mail.example-app.com."
+
+# TXT record for domain verification (SPF example)
+txt-record:
+  defines: gcp/cloud-dns-record-set
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-dns-nginx/dns-zone
+      timeout: 120
+  zone_name: example-app-zone
+  record_name: "example-app.com."
+  record_type: TXT
+  ttl: 3600
+  rrdatas:
+    - "\"v=spf1 include:_spf.google.com ~all\""
+
+# === Deploy Everything ===
+
+# Deploy: monk load gcp-cloud-dns-nginx.yaml && monk run -t TAG gcp-cloud-dns-nginx/stack
+stack:
+  defines: group
+  members:
+    - gcp-cloud-dns-nginx/nginx
+    - gcp-cloud-dns-nginx/enable-dns-api
+    - gcp-cloud-dns-nginx/dns-zone
+    - gcp-cloud-dns-nginx/web-record
+    - gcp-cloud-dns-nginx/mail-record
+    - gcp-cloud-dns-nginx/txt-record

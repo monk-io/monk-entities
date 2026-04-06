@@ -155,6 +155,13 @@ export class CloudDnsRecordSet extends GcpEntity<CloudDnsRecordSetDefinition, Cl
             return;
         }
 
+        // Check if record (or zone) still exists before attempting delete
+        const existing = this.checkResourceExists(this.getRecordUrl());
+        if (!existing) {
+            cli.output(`DNS record ${this.definition.record_name} ${this.definition.record_type} already deleted`);
+            return;
+        }
+
         try {
             this.httpDelete(this.getRecordUrl());
             cli.output(`Successfully deleted DNS record: ${this.definition.record_name} ${this.definition.record_type}`);

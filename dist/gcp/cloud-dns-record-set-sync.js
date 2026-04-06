@@ -121,6 +121,11 @@ var _CloudDnsRecordSet = class _CloudDnsRecordSet extends (_a = GcpEntity, _getI
       cli.output(`DNS record ${this.definition.record_name} wasn't created by this entity, skipping delete`);
       return;
     }
+    const existing = this.checkResourceExists(this.getRecordUrl());
+    if (!existing) {
+      cli.output(`DNS record ${this.definition.record_name} ${this.definition.record_type} already deleted`);
+      return;
+    }
     try {
       this.httpDelete(this.getRecordUrl());
       cli.output(`Successfully deleted DNS record: ${this.definition.record_name} ${this.definition.record_type}`);
