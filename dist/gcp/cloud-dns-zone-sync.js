@@ -252,15 +252,22 @@ Total: ${rrsets.length} record sets`);
       const response = this.get(skusUrl);
       let zoneRate = 0;
       let queryRate = 0;
+      let foundFromApi = false;
       if (response.skus && Array.isArray(response.skus)) {
         for (const sku of response.skus) {
           const desc = (sku.description || "").toLowerCase();
           const price = extractPriceFromSku(sku);
           if (price <= 0) continue;
           if (desc.includes("managed zone") && !desc.includes("query")) {
-            if (zoneRate === 0) zoneRate = price;
+            if (zoneRate === 0) {
+              zoneRate = price;
+              foundFromApi = true;
+            }
           } else if (desc.includes("queries") || desc.includes("query")) {
-            if (queryRate === 0) queryRate = price;
+            if (queryRate === 0) {
+              queryRate = price;
+              foundFromApi = true;
+            }
           }
         }
       }
@@ -269,7 +276,7 @@ Total: ${rrsets.length} record sets`);
       return {
         zonePerMonth: zoneRate,
         queriesPerMillion: queryRate,
-        source: zoneRate === 0.2 ? "Fallback pricing" : "GCP Cloud Billing Catalog API"
+        source: foundFromApi ? "GCP Cloud Billing Catalog API" : "Fallback pricing"
       };
     } catch {
       return {
