@@ -202,7 +202,7 @@ export class ArtifactRegistryRepository extends GcpEntity<
             body.mode = this.definition.mode;
         }
 
-        if (this.definition.repo_description) {
+        if (this.definition.repo_description !== undefined) {
             body.description = this.definition.repo_description;
         }
 
