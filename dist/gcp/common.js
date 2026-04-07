@@ -27,6 +27,7 @@ __export(common_exports, {
   CLOUD_RUN_API_URL: () => CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL: () => CLOUD_SQL_API_URL,
   CLOUD_STORAGE_API_URL: () => CLOUD_STORAGE_API_URL,
+  COMPUTE_API_URL: () => COMPUTE_API_URL,
   FIREBASE_HOSTING_API_URL: () => FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL: () => FIRESTORE_API_URL,
   GCP_API_CATALOG: () => GCP_API_CATALOG,
@@ -59,6 +60,7 @@ var FIRESTORE_API_URL = "https://firestore.googleapis.com/v1";
 var PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
 var CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
 var ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.com/v1";
+var COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
 var GCP_API_CATALOG = {
   cloud_sql: {
     service: "sqladmin.googleapis.com",
@@ -107,6 +109,10 @@ var GCP_API_CATALOG = {
   pubsub: {
     service: "pubsub.googleapis.com",
     base_url: PUBSUB_API_URL
+  },
+  compute: {
+    service: "compute.googleapis.com",
+    base_url: COMPUTE_API_URL
   }
 };
 function getDefaultPort(databaseVersion) {
@@ -280,6 +286,7 @@ function extractPriceFromSku(sku) {
   CLOUD_RUN_API_URL,
   CLOUD_SQL_API_URL,
   CLOUD_STORAGE_API_URL,
+  COMPUTE_API_URL,
   FIREBASE_HOSTING_API_URL,
   FIRESTORE_API_URL,
   GCP_API_CATALOG,

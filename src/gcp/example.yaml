@@ -380,6 +380,47 @@ docker-repo:
       timeout: 300
 
 # =============================================================================
+# Step 13: Cloud CDN Backend Bucket
+# =============================================================================
+# Serve static content from a GCS bucket through Cloud CDN.
+
+cdn-static-assets:
+  defines: gcp/cloud-cdn-backend-bucket
+  name: my-app-static-cdn
+  bucket_name: my-app-storage-bucket-unique-name
+  enable_cdn: true
+  cache_mode: CACHE_ALL_STATIC
+  default_ttl: 3600
+  max_ttl: 86400
+  compression_mode: AUTOMATIC
+  custom_response_headers:
+    - "X-Cache-Status:{cdn_cache_status}"
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/app-bucket
+      timeout: 300
+
+# =============================================================================
+# Step 14: Cloud CDN Backend Service
+# =============================================================================
+# CDN-enabled backend service for dynamic content with caching.
+
+# cdn-api-service:
+#   defines: gcp/cloud-cdn-backend-service
+#   name: my-app-api-cdn
+#   backends:
+#     - group: https://compute.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/networkEndpointGroups/my-neg
+#       balancing_mode: RATE
+#       max_rate_per_instance: 100
+#   enable_cdn: true
+#   cache_mode: USE_ORIGIN_HEADERS
+#   protocol: HTTPS
+#   timeout_sec: 30
+#   labels:
+#     environment: production
+
+# =============================================================================
 # Example: Minimal Cloud SQL Setup
 # =============================================================================
 # A simpler example with just a database instance.
