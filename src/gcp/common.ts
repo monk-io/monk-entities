@@ -47,6 +47,9 @@ export const PUBSUB_API_URL = "https://pubsub.googleapis.com/v1";
 /** Cloud DNS API base URL */
 export const CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
 
+/** Artifact Registry API base URL */
+export const ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.com/v1";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.
@@ -159,7 +162,8 @@ export type GcpApiServiceName =
     | "ml.googleapis.com"
     | "vision.googleapis.com"
     | "language.googleapis.com"
-    | "cloudbuild.googleapis.com";
+    | "cloudbuild.googleapis.com"
+    | "artifactregistry.googleapis.com";
 
 // =============================================================================
 // Common Enums

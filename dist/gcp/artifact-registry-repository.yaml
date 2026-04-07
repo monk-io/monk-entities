@@ -1,0 +1,137 @@
+namespace: gcp
+artifact-registry-repository:
+  defines: entity
+  metadata:
+    name: ArtifactRegistryRepository
+    description: |-
+      GCP Artifact Registry Repository entity. Creates and manages
+      repositories for storing container images, language packages, and OS packages.
+
+      ## Required Permissions
+      - `artifactregistry.repositories.create` — create repositories
+      - `artifactregistry.repositories.get` — check existence and readiness
+      - `artifactregistry.repositories.update` — update repository configuration
+      - `artifactregistry.repositories.delete` — delete repositories
+      - `artifactregistry.packages.list` — list packages (list-packages action)
+      - `monitoring.timeSeries.list` — cost estimation metrics
+      - `cloudbilling.services.list` — cost estimation pricing
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.resource_name` — full resource name for API references
+      - `state.registry_uri` — registry URI for pushing/pulling artifacts
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/service-usage` — enable `artifactregistry.googleapis.com` API
+      - `gcp/service-account` — create service accounts with Artifact Registry roles
+    version-hash: 6776789f3ae8
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: 'Repository ID (lowercase letters, digits, hyphens; 1-63 characters)'
+    location:
+      type: string
+      description: 'GCP region for the repository (e.g., "us-central1", "us", "europe")'
+    repo_format:
+      type: string
+      enum:
+        - DOCKER
+        - MAVEN
+        - NPM
+        - PYTHON
+        - APT
+        - YUM
+        - GO
+        - GENERIC
+      description: 'Package format: DOCKER, MAVEN, NPM, PYTHON, APT, YUM, GO, or GENERIC'
+    mode:
+      type: string
+      enum:
+        - STANDARD_REPOSITORY
+        - VIRTUAL_REPOSITORY
+        - REMOTE_REPOSITORY
+      description: 'Repository mode: STANDARD_REPOSITORY, VIRTUAL_REPOSITORY, or REMOTE_REPOSITORY. Default: STANDARD_REPOSITORY'
+    repo_description:
+      type: string
+      description: Human-readable description of the repository
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Labels to apply to the repository
+      description: Labels to apply to the repository
+    kms_key_name:
+      type: string
+      description: Cloud KMS key for customer-managed encryption (full resource name)
+    cleanup_policy_dry_run:
+      type: boolean
+      description: Enable dry-run mode for cleanup policies (log but don't delete)
+    docker_immutable_tags:
+      type: boolean
+      description: 'Docker-specific: make tags immutable once pushed'
+    maven_version_policy:
+      type: string
+      enum:
+        - VERSION_POLICY_UNSPECIFIED
+        - RELEASE
+        - SNAPSHOT
+      description: 'Maven-specific: version policy (RELEASE or SNAPSHOT)'
+    maven_allow_snapshot_overwrites:
+      type: boolean
+      description: 'Maven-specific: allow overwriting snapshot versions'
+    remote_upstream:
+      type: string
+      enum:
+        - DOCKER_HUB
+        - MAVEN_CENTRAL
+        - NPMJS
+        - PYPI
+      description: 'Remote mode: public upstream repository (DOCKER_HUB, MAVEN_CENTRAL, NPMJS, PYPI)'
+    required:
+      - name
+      - location
+      - repo_format
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: 'Full resource name (projects/{project}/locations/{location}/repositories/{repo})'
+    registry_uri:
+      type: string
+      description: 'Registry URI for pushing/pulling artifacts (e.g., us-docker.pkg.dev/proj/repo)'
+    size_bytes:
+      type: string
+      description: Total storage size in bytes
+    create_time:
+      type: string
+      description: Creation timestamp
+  lifecycle:
+    sync: <<< artifact-registry-repository-sync.js
+    get-info: ''
+    list-packages: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 3
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common
