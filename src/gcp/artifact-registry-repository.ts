@@ -238,9 +238,10 @@ export class ArtifactRegistryRepository extends GcpEntity<
             body.mavenConfig = mavenConfig;
         }
 
-        // Remote repository config
+        // Remote repository config (only for formats with known public upstreams)
         if (this.definition.mode === "REMOTE_REPOSITORY" && this.definition.remote_upstream) {
             const remoteConfig: Record<string, unknown> = {};
+            let hasUpstream = true;
             switch (this.definition.repo_format) {
                 case "DOCKER":
                     remoteConfig.dockerRepository = { publicRepository: this.definition.remote_upstream };
@@ -254,8 +255,14 @@ export class ArtifactRegistryRepository extends GcpEntity<
                 case "PYTHON":
                     remoteConfig.pythonRepository = { publicRepository: this.definition.remote_upstream };
                     break;
+                default:
+                    hasUpstream = false;
+                    cli.output(`Warning: remote_upstream is not supported for ${this.definition.repo_format} format, ignoring`);
+                    break;
             }
-            body.remoteRepositoryConfig = remoteConfig;
+            if (hasUpstream) {
+                body.remoteRepositoryConfig = remoteConfig;
+            }
         }
 
         return body;
