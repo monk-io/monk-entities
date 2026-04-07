@@ -92,12 +92,12 @@ var _CloudCdnBackendService = class _CloudCdnBackendService extends (_a = GcpEnt
       if (this.definition.default_ttl !== void 0) {
         policy.defaultTtl = this.definition.default_ttl;
       }
+      if (this.definition.client_ttl !== void 0) {
+        policy.clientTtl = this.definition.client_ttl;
+      }
       if (cacheMode === "CACHE_ALL_STATIC") {
         if (this.definition.max_ttl !== void 0) {
           policy.maxTtl = this.definition.max_ttl;
-        }
-        if (this.definition.client_ttl !== void 0) {
-          policy.clientTtl = this.definition.client_ttl;
         }
       }
     }
@@ -290,7 +290,7 @@ var _CloudCdnBackendService = class _CloudCdnBackendService extends (_a = GcpEnt
       return false;
     }
     this.populateState(resource);
-    cli.output(`Backend service ${this.definition.name} is ready (CDN: ${resource.enableCdn ? "enabled" : "disabled"})`);
+    cli.output(`Backend service ${this.definition.name} is ready (CDN: ${resource.enableCDN ? "enabled" : "disabled"})`);
     return true;
   }
   checkLiveness() {

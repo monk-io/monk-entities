@@ -309,18 +309,18 @@ export class CloudCdnBackendService extends GcpEntity<CloudCdnBackendServiceDefi
         const cacheMode = this.definition.cache_mode || "CACHE_ALL_STATIC";
         policy.cacheMode = cacheMode;
 
-        // TTL fields: defaultTtl allowed for CACHE_ALL_STATIC and FORCE_CACHE_ALL
-        // maxTtl and clientTtl only allowed for CACHE_ALL_STATIC
+        // TTL fields: defaultTtl and clientTtl allowed for CACHE_ALL_STATIC and FORCE_CACHE_ALL
+        // maxTtl only allowed for CACHE_ALL_STATIC
         if (cacheMode !== "USE_ORIGIN_HEADERS") {
             if (this.definition.default_ttl !== undefined) {
                 policy.defaultTtl = this.definition.default_ttl;
             }
+            if (this.definition.client_ttl !== undefined) {
+                policy.clientTtl = this.definition.client_ttl;
+            }
             if (cacheMode === "CACHE_ALL_STATIC") {
                 if (this.definition.max_ttl !== undefined) {
                     policy.maxTtl = this.definition.max_ttl;
-                }
-                if (this.definition.client_ttl !== undefined) {
-                    policy.clientTtl = this.definition.client_ttl;
                 }
             }
         }
@@ -566,7 +566,7 @@ export class CloudCdnBackendService extends GcpEntity<CloudCdnBackendServiceDefi
         }
 
         this.populateState(resource);
-        cli.output(`Backend service ${this.definition.name} is ready (CDN: ${resource.enableCdn ? 'enabled' : 'disabled'})`);
+        cli.output(`Backend service ${this.definition.name} is ready (CDN: ${resource.enableCDN ? 'enabled' : 'disabled'})`);
         return true;
     }
 

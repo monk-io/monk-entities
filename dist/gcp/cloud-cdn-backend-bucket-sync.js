@@ -91,12 +91,12 @@ var _CloudCdnBackendBucket = class _CloudCdnBackendBucket extends (_a = GcpEntit
       if (this.definition.default_ttl !== void 0) {
         policy.defaultTtl = this.definition.default_ttl;
       }
+      if (this.definition.client_ttl !== void 0) {
+        policy.clientTtl = this.definition.client_ttl;
+      }
       if (cacheMode === "CACHE_ALL_STATIC") {
         if (this.definition.max_ttl !== void 0) {
           policy.maxTtl = this.definition.max_ttl;
-        }
-        if (this.definition.client_ttl !== void 0) {
-          policy.clientTtl = this.definition.client_ttl;
         }
       }
     }
