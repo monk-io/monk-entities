@@ -1,0 +1,79 @@
+# GCP Artifact Registry — Docker + npm Repository Example
+# Provisions a standard Docker repository for container images and a remote npm
+# repository that mirrors npmjs.org. Demonstrates entity wiring, dependency
+# ordering, and multi-format repository management.
+#
+# Prerequisites:
+#   monk cluster provider add -p gcp
+#   Service account needs: roles/artifactregistry.admin, roles/serviceusage.serviceUsageAdmin
+
+namespace: gcp-artifact-registry
+
+# === Enable Required APIs ===
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - artifactregistry.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# === Standard Docker Repository ===
+# Private Docker registry for your application container images.
+# After creation, push images to: <registry_uri>/<image>:<tag>
+#   docker tag myapp:latest <registry_uri>/myapp:latest
+#   docker push <registry_uri>/myapp:latest
+
+docker-repo:
+  defines: gcp/artifact-registry-repository
+  name: app-docker
+  location: us-central1
+  repo_format: DOCKER
+  repo_description: "Application container images"
+  docker_immutable_tags: false
+  labels:
+    environment: example
+    team: platform
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-artifact-registry/enable-apis
+      timeout: 300
+
+# === Remote npm Repository (npmjs.org mirror) ===
+# Caches npm packages from the public registry, reducing external
+# dependencies and improving build reliability. Configure your
+# .npmrc to point here instead of registry.npmjs.org.
+
+npm-mirror:
+  defines: gcp/artifact-registry-repository
+  name: npm-mirror
+  location: us-central1
+  repo_format: NPM
+  mode: REMOTE_REPOSITORY
+  remote_upstream: NPMJS
+  repo_description: "npm registry mirror (proxies npmjs.org)"
+  labels:
+    environment: example
+    team: platform
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-artifact-registry/enable-apis
+      timeout: 300
+
+# === Deploy Everything ===
+
+stack:
+  defines: group
+  members:
+    - gcp-artifact-registry/enable-apis
+    - gcp-artifact-registry/docker-repo
+    - gcp-artifact-registry/npm-mirror
