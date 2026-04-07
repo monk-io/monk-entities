@@ -1,0 +1,137 @@
+# Cloud CDN Integration Test Suite
+#
+# Tests Cloud CDN Backend Bucket and Backend Service entity lifecycle.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-file test/cloud-cdn-integration.test.yaml
+
+name: Cloud CDN Integration Test
+description: Full lifecycle test for Cloud CDN Backend Bucket and Backend Service entities
+timeout: 600000 # 10 minutes
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Cloud CDN test template
+    action: load
+    target: test/cloud-cdn-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Cloud Storage (origin bucket for CDN)
+  # =========================================================================
+  - name: Create GCS origin bucket
+    action: run
+    target: gcp-cloud-cdn-test/test-storage
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for GCS origin bucket to be ready
+    action: wait
+    target: gcp-cloud-cdn-test/test-storage
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  # =========================================================================
+  # Cloud CDN Backend Bucket Tests
+  # =========================================================================
+  - name: Create CDN backend bucket
+    action: run
+    target: gcp-cloud-cdn-test/test-backend-bucket
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for CDN backend bucket to be ready
+    action: wait
+    target: gcp-cloud-cdn-test/test-backend-bucket
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Get backend bucket info
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-bucket/get-info
+    expect:
+      exitCode: 0
+
+  - name: Get backend bucket cost estimate
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-bucket/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Get backend bucket costs JSON
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-bucket/costs
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Cloud CDN Backend Service Tests
+  # =========================================================================
+  - name: Create CDN backend service
+    action: run
+    target: gcp-cloud-cdn-test/test-backend-service
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for CDN backend service to be ready
+    action: wait
+    target: gcp-cloud-cdn-test/test-backend-service
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Get backend service info
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-service/get-info
+    expect:
+      exitCode: 0
+
+  - name: Get backend service cost estimate
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-service/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Get backend service costs JSON
+    action: do
+    target: gcp-cloud-cdn-test/test-backend-service/costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  # =========================================================================
+  # Cleanup — delete in reverse dependency order
+  # =========================================================================
+  - name: Delete CDN backend bucket
+    action: delete
+    target: gcp-cloud-cdn-test/test-backend-bucket
+    expect:
+      exitCode: 0
+
+  - name: Delete CDN backend service
+    action: delete
+    target: gcp-cloud-cdn-test/test-backend-service
+    expect:
+      exitCode: 0
+
+  - name: Delete GCS origin bucket
+    action: delete
+    target: gcp-cloud-cdn-test/test-storage
+    expect:
+      exitCode: 0
