@@ -377,8 +377,7 @@ Total: ${packages.length} packages`);
     const pricing = this.fetchPricing();
     const sizeBytes = this.getStorageSize();
     const sizeGb = sizeBytes / (1024 * 1024 * 1024);
-    const billableGb = Math.max(0, sizeGb - 0.5);
-    const storageCost = billableGb * pricing.storagePerGb;
+    const storageCost = sizeGb * pricing.storagePerGb;
     return { total: storageCost, storageCost, sizeBytes, pricing };
   }
   getCostEstimate(_args) {
@@ -388,7 +387,6 @@ Total: ${packages.length} packages`);
     }
     const { total, storageCost, sizeBytes, pricing } = this.calculateMonthlyCost();
     const sizeGb = sizeBytes / (1024 * 1024 * 1024);
-    const billableGb = Math.max(0, sizeGb - 0.5);
     cli.output(`
 Cost Estimate for Artifact Registry Repository: ${this.definition.name}`);
     cli.output(`  Project: ${this.projectId}`);
@@ -397,11 +395,10 @@ Cost Estimate for Artifact Registry Repository: ${this.definition.name}`);
     cli.output(`  Pricing Source: ${pricing.source}`);
     cli.output(`
 Pricing Rates:`);
-    cli.output(`  Storage: $${pricing.storagePerGb.toFixed(2)}/GB/month (first 0.5 GB free)`);
+    cli.output(`  Storage: $${pricing.storagePerGb.toFixed(2)}/GB/month`);
     cli.output(`
 Usage:`);
     cli.output(`  Total Storage: ${sizeGb.toFixed(3)} GB (${sizeBytes} bytes)`);
-    cli.output(`  Billable Storage: ${billableGb.toFixed(3)} GB`);
     cli.output(`
 Cost Breakdown:`);
     cli.output(`  Storage: $${storageCost.toFixed(4)}`);
@@ -409,7 +406,7 @@ Cost Breakdown:`);
     cli.output(`  Estimated Monthly Total: $${total.toFixed(2)}`);
     cli.output(`
 Notes:`);
-    cli.output(`  - First 0.5 GB of storage is free per billing account`);
+    cli.output(`  - First 0.5 GB of storage is free per billing account (not deducted per-repo)`);
     cli.output(`  - Network egress costs are not included (varies by destination)`);
     cli.output(`  - Virtual repositories are not charged (costs apply to upstream repos)`);
   }
