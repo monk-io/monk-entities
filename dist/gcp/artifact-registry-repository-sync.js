@@ -89,7 +89,7 @@ var _ArtifactRegistryRepository = class _ArtifactRegistryRepository extends (_a 
     if (this.definition.mode) {
       body.mode = this.definition.mode;
     }
-    if (this.definition.repo_description) {
+    if (this.definition.repo_description !== void 0) {
       body.description = this.definition.repo_description;
     }
     if (this.definition.labels) {
