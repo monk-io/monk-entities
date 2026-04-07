@@ -22,6 +22,8 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-dns-zone` | Cloud DNS managed zones (public/private) |
 | `gcp/cloud-dns-record-set` | DNS record sets (A, AAAA, CNAME, MX, TXT, etc.) |
 | `gcp/artifact-registry-repository` | Artifact Registry repositories (Docker, Maven, npm, Python, etc.) |
+| `gcp/cloud-cdn-backend-bucket` | Cloud CDN backend bucket for static content from GCS |
+| `gcp/cloud-cdn-backend-service` | Cloud CDN backend service for dynamic backends |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -648,6 +650,73 @@ my-docker-repo:
 
 **Required API:**
 - `artifactregistry.googleapis.com` via `gcp/service-usage`
+
+### cloud-cdn-backend-bucket
+
+Create a CDN-enabled backend bucket to serve static content from Cloud Storage through Cloud CDN.
+
+```yaml
+my-cdn-bucket:
+  defines: gcp/cloud-cdn-backend-bucket
+  name: my-static-cdn                   # Required: backend bucket name
+  bucket_name: my-gcs-bucket            # Required: GCS bucket to serve from
+  enable_cdn: true                      # Default: true
+  cache_mode: CACHE_ALL_STATIC          # Default: CACHE_ALL_STATIC
+  default_ttl: 3600                     # Default: 3600 (1 hour)
+  max_ttl: 86400                        # Default: 86400 (1 day)
+  client_ttl: 300                       # Optional: browser cache TTL
+  compression_mode: AUTOMATIC           # Optional: AUTOMATIC or DISABLED
+  custom_response_headers:              # Optional
+    - "X-Cache-Status:{cdn_cache_status}"
+```
+
+**Actions:**
+- `get-info`: Get backend bucket details
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `compute.backendBuckets.create`, `compute.backendBuckets.get`, `compute.backendBuckets.update`, `compute.backendBuckets.delete`
+- `compute.globalOperations.get` (for LRO polling)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `compute.googleapis.com` via `gcp/service-usage`
+
+### cloud-cdn-backend-service
+
+Create a CDN-enabled backend service for instance groups, NEGs, or serverless backends.
+
+```yaml
+my-cdn-service:
+  defines: gcp/cloud-cdn-backend-service
+  name: my-api-cdn                       # Required: backend service name
+  backends:                              # Required: backend targets
+    - group: https://compute.googleapis.com/.../networkEndpointGroups/my-neg
+      balancing_mode: RATE
+      max_rate_per_instance: 100
+  enable_cdn: true                       # Default: true
+  cache_mode: USE_ORIGIN_HEADERS         # Default: CACHE_ALL_STATIC
+  protocol: HTTPS                        # Default: HTTP
+  health_check: https://...              # Optional: health check self-link
+  timeout_sec: 30                        # Default: 30
+  labels:                                # Optional
+    environment: production
+```
+
+**Actions:**
+- `get-info`: Get backend service details
+- `get-health`: Check health of backend instances
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `compute.backendServices.create`, `compute.backendServices.get`, `compute.backendServices.update`, `compute.backendServices.delete`
+- `compute.globalOperations.get` (for LRO polling)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `compute.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 

@@ -50,6 +50,9 @@ export const CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
 /** Artifact Registry API base URL */
 export const ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.com/v1";
 
+/** Compute Engine API base URL */
+export const COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.
@@ -102,6 +105,10 @@ export const GCP_API_CATALOG = {
     pubsub: {
         service: "pubsub.googleapis.com",
         base_url: PUBSUB_API_URL,
+    },
+    compute: {
+        service: "compute.googleapis.com",
+        base_url: COMPUTE_API_URL,
     },
 } as const;
 
@@ -700,6 +707,87 @@ export type CloudRunExecutionEnvironment =
     | "EXECUTION_ENVIRONMENT_GEN1"
     /** Second generation execution environment */
     | "EXECUTION_ENVIRONMENT_GEN2";
+
+// =============================================================================
+// Cloud CDN Enums
+// =============================================================================
+
+/**
+ * Cloud CDN cache modes
+ * @see https://cloud.google.com/cdn/docs/caching
+ */
+export type CdnCacheMode =
+    /** Respect origin Cache-Control headers */
+    | "USE_ORIGIN_HEADERS"
+    /** Cache everything, ignore no-store/no-cache/private */
+    | "FORCE_CACHE_ALL"
+    /** Auto-cache static content (images, media, web assets) */
+    | "CACHE_ALL_STATIC";
+
+/**
+ * Cloud CDN negative caching policy entry
+ */
+export interface NegativeCachingPolicy {
+    /**
+     * @description HTTP status code to cache (e.g., 300, 301, 404, 410, 501)
+     */
+    code: number;
+    /**
+     * @description TTL in seconds for this status code (max 1800)
+     */
+    ttl: number;
+}
+
+/**
+ * Cloud CDN compression modes
+ */
+export type CdnCompressionMode =
+    /** Automatically compress responses */
+    | "AUTOMATIC"
+    /** Disable compression */
+    | "DISABLED";
+
+/**
+ * Cloud CDN backend service load balancing schemes
+ */
+export type CdnLoadBalancingScheme =
+    /** Classic external HTTP(S) load balancer */
+    | "EXTERNAL"
+    /** Global external Application Load Balancer */
+    | "EXTERNAL_MANAGED"
+    /** Traffic Director */
+    | "INTERNAL_SELF_MANAGED";
+
+/**
+ * Backend balancing modes
+ */
+export type BackendBalancingMode =
+    /** Balance based on CPU utilization */
+    | "UTILIZATION"
+    /** Balance based on requests per second */
+    | "RATE"
+    /** Balance based on connections */
+    | "CONNECTION";
+
+/**
+ * Backend service protocols
+ */
+export type BackendProtocol =
+    | "HTTP"
+    | "HTTPS"
+    | "HTTP2";
+
+/**
+ * Backend service session affinity types
+ */
+export type SessionAffinity =
+    | "NONE"
+    | "CLIENT_IP"
+    | "CLIENT_IP_PORT_PROTO"
+    | "CLIENT_IP_PROTO"
+    | "GENERATED_COOKIE"
+    | "HEADER_FIELD"
+    | "HTTP_COOKIE";
 
 // =============================================================================
 // Memorystore for Redis Enums
