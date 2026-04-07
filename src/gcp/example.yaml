@@ -19,6 +19,7 @@ enable-apis:
     - iam.googleapis.com
     - redis.googleapis.com
     - dns.googleapis.com
+    - artifactregistry.googleapis.com
 
 # =============================================================================
 # Step 2: Create Service Account (optional)
@@ -353,6 +354,30 @@ app-dns-record-cname:
       runnables:
         - gcp-example/app-dns-zone
       timeout: 120
+
+# =============================================================================
+# Step 12: Create Artifact Registry Repository
+# =============================================================================
+# Docker container registry for application images.
+
+docker-repo:
+  defines: gcp/artifact-registry-repository
+  name: my-app-docker
+  location: us-central1
+  repo_format: DOCKER
+  repo_description: "Docker images for my application"
+  docker_immutable_tags: false
+  labels:
+    environment: production
+    team: platform
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/enable-apis
+      timeout: 300
 
 # =============================================================================
 # Example: Minimal Cloud SQL Setup

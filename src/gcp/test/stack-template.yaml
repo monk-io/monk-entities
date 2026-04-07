@@ -19,6 +19,7 @@ test-enable-apis:
     - redis.googleapis.com
     - pubsub.googleapis.com
     - dns.googleapis.com
+    - artifactregistry.googleapis.com
   services:
     data:
       protocol: custom
@@ -253,6 +254,28 @@ test-dns-record:
       runnables:
         - gcp-test/test-dns-zone
       timeout: 120
+
+# =============================================================================
+# Artifact Registry Repository
+# =============================================================================
+
+test-artifact-registry:
+  defines: gcp/artifact-registry-repository
+  name: test-monkec-docker-repo
+  location: us-central1
+  repo_format: DOCKER
+  repo_description: "MonkEC integration test repository"
+  docker_immutable_tags: false
+  labels:
+    environment: test
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-enable-apis
+      timeout: 300
 
 # =============================================================================
 # Pub/Sub Topic

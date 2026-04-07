@@ -21,6 +21,7 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/pubsub-subscription` | Pub/Sub subscriptions (pull or push delivery) |
 | `gcp/cloud-dns-zone` | Cloud DNS managed zones (public/private) |
 | `gcp/cloud-dns-record-set` | DNS record sets (A, AAAA, CNAME, MX, TXT, etc.) |
+| `gcp/artifact-registry-repository` | Artifact Registry repositories (Docker, Maven, npm, Python, etc.) |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -613,6 +614,40 @@ my-record:
 
 **Required API:**
 - `dns.googleapis.com` via `gcp/service-usage`
+
+### artifact-registry-repository
+
+Create and manage Artifact Registry repositories for container images and language packages.
+
+```yaml
+my-docker-repo:
+  defines: gcp/artifact-registry-repository
+  name: my-app-docker                    # Required: repository ID
+  location: us-central1                  # Required: GCP region
+  repo_format: DOCKER                    # Required: DOCKER, MAVEN, NPM, PYTHON, APT, YUM, GO, GENERIC
+  mode: STANDARD_REPOSITORY              # Optional: STANDARD_REPOSITORY, VIRTUAL_REPOSITORY, REMOTE_REPOSITORY
+  repo_description: "Docker images"      # Optional
+  docker_immutable_tags: false            # Optional: Docker-specific
+  labels:                                # Optional
+    environment: production
+  services:
+    data:
+      protocol: custom
+```
+
+**Actions:**
+- `get-info`: Get repository details
+- `list-packages`: List packages in the repository
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `artifactregistry.repositories.create`, `artifactregistry.repositories.get`, `artifactregistry.repositories.update`, `artifactregistry.repositories.delete`
+- `artifactregistry.packages.list` (for list-packages action)
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `artifactregistry.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 

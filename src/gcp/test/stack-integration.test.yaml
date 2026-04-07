@@ -188,6 +188,45 @@ tests:
       exitCode: 0
 
   # =========================================================================
+  # Artifact Registry Tests
+  # =========================================================================
+  - name: Create Artifact Registry repository
+    action: run
+    target: gcp-test/test-artifact-registry
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Artifact Registry repository to be ready
+    action: wait
+    target: gcp-test/test-artifact-registry
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Test Artifact Registry get-info action
+    action: action
+    target: gcp-test/test-artifact-registry
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test Artifact Registry list-packages action
+    action: action
+    target: gcp-test/test-artifact-registry
+    actionName: list-packages
+    expect:
+      exitCode: 0
+
+  - name: Test Artifact Registry costs action
+    action: action
+    target: gcp-test/test-artifact-registry
+    actionName: costs
+    expect:
+      exitCode: 0
+
+  # =========================================================================
   # BigQuery Tests (fast, run first)
   # =========================================================================
   - name: Create BigQuery dataset
@@ -363,6 +402,12 @@ tests:
 
 cleanup:
   # Delete in reverse dependency order
+  - name: Delete Artifact Registry repository
+    action: delete
+    target: gcp-test/test-artifact-registry
+    expect:
+      exitCode: 0
+
   - name: Delete Cloud DNS record set
     action: delete
     target: gcp-test/test-dns-record
