@@ -1,0 +1,53 @@
+# Cloud CDN Integration Test Template
+# Tests Cloud CDN Backend Bucket and Backend Service entities
+
+namespace: gcp-cloud-cdn-test
+
+# Cloud Storage bucket — origin for the backend bucket
+test-storage:
+  defines: gcp/cloud-storage
+  name: monk-test-cdn-bucket-origin
+  location: US
+  storage_class: STANDARD
+  uniform_bucket_level_access: true
+  services:
+    data:
+      protocol: custom
+
+# Cloud CDN Backend Bucket — serves static content from GCS
+test-backend-bucket:
+  defines: gcp/cloud-cdn-backend-bucket
+  name: monk-test-cdn-bb
+  bucket_name: monk-test-cdn-bucket-origin
+  enable_cdn: true
+  cache_mode: CACHE_ALL_STATIC
+  default_ttl: 3600
+  max_ttl: 86400
+  compression_mode: AUTOMATIC
+  custom_response_headers:
+    - "X-Cache-Status:{cdn_cache_status}"
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-cdn-test/test-storage
+      timeout: 120
+
+# Cloud CDN Backend Service — CDN-enabled backend service (no backends for testing)
+test-backend-service:
+  defines: gcp/cloud-cdn-backend-service
+  name: monk-test-cdn-bs
+  enable_cdn: true
+  cache_mode: CACHE_ALL_STATIC
+  default_ttl: 1800
+  max_ttl: 3600
+  protocol: HTTP
+  timeout_sec: 30
+  backend_service_description: "MonkEC Cloud CDN integration test"
+  labels:
+    monk-test: cloud-cdn
+  services:
+    data:
+      protocol: custom

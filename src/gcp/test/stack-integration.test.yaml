@@ -227,70 +227,6 @@ tests:
       exitCode: 0
 
   # =========================================================================
-  # Cloud CDN Backend Bucket Tests
-  # =========================================================================
-  - name: Create Cloud CDN backend bucket
-    action: run
-    target: gcp-test/test-cdn-backend-bucket
-    args:
-      tag: "local"
-    expect:
-      exitCode: 0
-
-  - name: Wait for CDN backend bucket to be ready
-    action: wait
-    target: gcp-test/test-cdn-backend-bucket
-    waitFor:
-      condition: ready
-      timeout: 120000
-
-  - name: Test CDN backend bucket get-info action
-    action: action
-    target: gcp-test/test-cdn-backend-bucket
-    actionName: get-info
-    expect:
-      exitCode: 0
-
-  - name: Test CDN backend bucket costs action
-    action: action
-    target: gcp-test/test-cdn-backend-bucket
-    actionName: costs
-    expect:
-      exitCode: 0
-
-  # =========================================================================
-  # Cloud CDN Backend Service Tests
-  # =========================================================================
-  - name: Create Cloud CDN backend service
-    action: run
-    target: gcp-test/test-cdn-backend-service
-    args:
-      tag: "local"
-    expect:
-      exitCode: 0
-
-  - name: Wait for CDN backend service to be ready
-    action: wait
-    target: gcp-test/test-cdn-backend-service
-    waitFor:
-      condition: ready
-      timeout: 120000
-
-  - name: Test CDN backend service get-info action
-    action: action
-    target: gcp-test/test-cdn-backend-service
-    actionName: get-info
-    expect:
-      exitCode: 0
-
-  - name: Test CDN backend service costs action
-    action: action
-    target: gcp-test/test-cdn-backend-service
-    actionName: costs
-    expect:
-      exitCode: 0
-
-  # =========================================================================
   # BigQuery Tests (fast, run first)
   # =========================================================================
   - name: Create BigQuery dataset
@@ -535,18 +471,6 @@ cleanup:
   - name: Delete service account
     action: delete
     target: gcp-test/test-service-account
-    expect:
-      exitCode: 0
-
-  - name: Delete Cloud CDN backend bucket
-    action: delete
-    target: gcp-test/test-cdn-backend-bucket
-    expect:
-      exitCode: 0
-
-  - name: Delete Cloud CDN backend service
-    action: delete
-    target: gcp-test/test-cdn-backend-service
     expect:
       exitCode: 0
 
