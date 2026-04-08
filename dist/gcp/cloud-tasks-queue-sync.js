@@ -126,7 +126,7 @@ var _CloudTasksQueue = class _CloudTasksQueue extends (_a = GcpEntity, _getInfo_
     }
     if (this.definition.log_level) {
       body.stackdriverLoggingConfig = {
-        samplingRatio: 1
+        samplingRatio: this.definition.log_level === "DEBUG" ? 1 : this.definition.log_level === "INFO" ? 0.7 : this.definition.log_level === "WARNING" ? 0.5 : this.definition.log_level === "ERROR" ? 0.3 : this.definition.log_level === "CRITICAL" ? 0.1 : 1
       };
     }
     return body;
@@ -277,7 +277,10 @@ Cloud Tasks Queue: ${this.definition.name}`);
   listTasks(args) {
     if (!this.state.queue_name) throw new Error("Queue not created yet");
     const pageSize = args?.page_size ? parseInt(String(args.page_size), 10) : 20;
-    const tasksUrl = `${this.getQueueUrl()}/tasks?pageSize=${pageSize}`;
+    let tasksUrl = `${this.getQueueUrl()}/tasks?pageSize=${pageSize}`;
+    if (args?.page_token) {
+      tasksUrl += `&pageToken=${encodeURIComponent(String(args.page_token))}`;
+    }
     const result = this.get(tasksUrl);
     const tasks = result.tasks || [];
     cli.output(`
