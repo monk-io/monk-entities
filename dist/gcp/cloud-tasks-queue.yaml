@@ -1,0 +1,116 @@
+namespace: gcp
+cloud-tasks-queue:
+  defines: entity
+  metadata:
+    name: CloudTasksQueue
+    description: |-
+      GCP Cloud Tasks Queue entity. Creates and manages Cloud Tasks queues
+      for dispatching HTTP tasks with configurable rate limits, retry policies, and logging.
+
+      ## Required Permissions
+      - `cloudtasks.queues.create` — create queues
+      - `cloudtasks.queues.get` — check existence and readiness
+      - `cloudtasks.queues.update` — update configuration
+      - `cloudtasks.queues.delete` — delete queues
+      - `cloudtasks.queues.pause` — pause task dispatch
+      - `cloudtasks.queues.resume` — resume task dispatch
+      - `cloudtasks.queues.purge` — purge all tasks
+      - `cloudtasks.tasks.create` — create tasks (create-task action)
+      - `cloudtasks.tasks.list` — list tasks (list-tasks action)
+      - `monitoring.timeSeries.list` — cost estimation metrics
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.queue_name` — full queue resource name, used by other entities to reference this queue
+      - `state.queue_state` — current queue state (RUNNING, PAUSED, DISABLED)
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/service-usage` — enable `cloudtasks.googleapis.com` API
+      - `gcp/service-account` — service account for task authentication
+    version-hash: 5d94aad44506
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: 'Queue name (alphanumeric characters, hyphens, underscores)'
+    location:
+      type: string
+      description: 'GCP region for the queue (e.g., "us-central1")'
+    max_dispatches_per_second:
+      type: number
+      description: Maximum rate at which tasks are dispatched per second (default 500)
+    max_burst_size:
+      type: number
+      description: Maximum number of tasks that can be dispatched in a burst (default 100)
+    max_concurrent_dispatches:
+      type: number
+      description: Maximum number of concurrent task dispatches (default 1000)
+    max_attempts:
+      type: number
+      description: 'Maximum number of retry attempts for a task (-1 for unlimited, default 100)'
+    min_backoff:
+      type: string
+      description: 'Minimum backoff duration between retries (e.g., "0.100s")'
+    max_backoff:
+      type: string
+      description: 'Maximum backoff duration between retries (e.g., "3600s")'
+    max_doublings:
+      type: number
+      description: Maximum number of times the retry interval will be doubled (default 16)
+    max_retry_duration:
+      type: string
+      description: 'Maximum total time for retrying a failed task (e.g., "3600s")'
+    log_level:
+      type: string
+      enum:
+        - LOG_LEVEL_UNSPECIFIED
+        - DEBUG
+        - INFO
+        - WARNING
+        - ERROR
+        - CRITICAL
+      description: Stackdriver logging level for the queue
+    required:
+      - name
+      - location
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    queue_name:
+      type: string
+      description: 'Full resource name of the queue (projects/{project}/locations/{location}/queues/{name})'
+    queue_state:
+      type: string
+      description: 'Current queue state (RUNNING, PAUSED, or DISABLED)'
+  lifecycle:
+    sync: <<< cloud-tasks-queue-sync.js
+    get-info: ''
+    pause: ''
+    resume: ''
+    purge-tasks: ''
+    create-task: ''
+    list-tasks: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common
