@@ -53,6 +53,9 @@ export const ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.co
 /** Compute Engine API base URL */
 export const COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
 
+/** Cloud Tasks API base URL */
+export const CLOUD_TASKS_API_URL = "https://cloudtasks.googleapis.com/v2";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.
@@ -109,6 +112,10 @@ export const GCP_API_CATALOG = {
     compute: {
         service: "compute.googleapis.com",
         base_url: COMPUTE_API_URL,
+    },
+    cloud_tasks: {
+        service: "cloudtasks.googleapis.com",
+        base_url: CLOUD_TASKS_API_URL,
     },
 } as const;
 

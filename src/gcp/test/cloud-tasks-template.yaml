@@ -1,0 +1,16 @@
+namespace: gcp-tasks-test
+
+# Cloud Tasks Queue
+test-cloud-tasks-queue:
+  defines: gcp/cloud-tasks-queue
+  name: monk-ct-queue-run1
+  location: us-central1
+  max_dispatches_per_second: 10
+  max_concurrent_dispatches: 5
+  max_attempts: 3
+  min_backoff: "1s"
+  max_backoff: "60s"
+  max_doublings: 3
+  services:
+    data:
+      protocol: custom
