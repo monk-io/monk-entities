@@ -1,0 +1,138 @@
+# GCP Cloud Tasks Demo
+# Provisions a Cloud Tasks queue with rate limiting and retry policies,
+# then runs a client app that creates HTTP tasks and monitors the queue.
+
+namespace: gcp-cloud-tasks
+
+# === Enable Cloud Tasks API ===
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - cloudtasks.googleapis.com
+    - iam.googleapis.com
+
+# === Service Account for task authentication ===
+
+tasks-sa:
+  defines: gcp/service-account
+  name: cloud-tasks-demo-sa
+  display_name: Cloud Tasks Demo Service Account
+  roles:
+    - roles/cloudtasks.enqueuer
+    - roles/cloudtasks.viewer
+  services:
+    service-account:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-tasks/enable-apis
+      timeout: 300
+
+tasks-sa-key:
+  defines: gcp/service-account-key
+  secret: cloud-tasks-sa-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  permitted-secrets:
+    cloud-tasks-sa-key: true
+  connections:
+    sa:
+      runnable: gcp-cloud-tasks/tasks-sa
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-tasks/tasks-sa
+      timeout: 60
+
+# === Cloud Tasks Queue ===
+
+# Queue with conservative rate limits and retry policy
+task-queue:
+  defines: gcp/cloud-tasks-queue
+  name: demo-task-queue
+  location: us-central1
+  max_dispatches_per_second: 10
+  max_burst_size: 5
+  max_concurrent_dispatches: 5
+  max_attempts: 3
+  min_backoff: "1s"
+  max_backoff: "30s"
+  max_doublings: 3
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-tasks/enable-apis
+      timeout: 300
+
+# === Client Application ===
+
+# Creates tasks in the queue and monitors their execution
+tasks-client:
+  defines: runnable
+  permitted-secrets:
+    cloud-tasks-sa-key: true
+  connections:
+    queue:
+      runnable: gcp-cloud-tasks/task-queue
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-tasks/task-queue
+        - gcp-cloud-tasks/tasks-sa-key
+      timeout: 300
+  variables:
+    # Full queue resource name from entity state
+    queue_name:
+      env: QUEUE_NAME
+      value: <- connection-target("queue") entity-state get-member("queue_name")
+      type: string
+    # GCP project from provider
+    gcp_project:
+      env: GCP_PROJECT
+      value: us-central1
+      type: string
+    # Queue location
+    queue_location:
+      env: QUEUE_LOCATION
+      value: us-central1
+      type: string
+    # Service account credentials
+    sa_credentials:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("cloud-tasks-sa-key")
+      type: string
+    # Tasks are dispatched to httpbin.org for demo purposes
+    target_url:
+      env: TARGET_URL
+      value: "https://httpbin.org/post"
+      type: string
+    # Create a task every 5 seconds, max 20
+    operation_interval:
+      env: OPERATION_INTERVAL_MS
+      value: "5000"
+      type: string
+    max_ops:
+      env: MAX_OPERATIONS
+      value: "20"
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/gcp-cloud-tasks:latest
+
+# === Deploy Everything ===
+
+# Deploy: monk run -t TAG gcp-cloud-tasks/demo-stack
+demo-stack:
+  defines: group
+  members:
+    - gcp-cloud-tasks/enable-apis
+    - gcp-cloud-tasks/tasks-sa
+    - gcp-cloud-tasks/tasks-sa-key
+    - gcp-cloud-tasks/task-queue
+    - gcp-cloud-tasks/tasks-client
