@@ -92,16 +92,6 @@ tasks-client:
       env: QUEUE_NAME
       value: <- connection-target("queue") entity-state get-member("queue_name")
       type: string
-    # GCP project from provider
-    gcp_project:
-      env: GCP_PROJECT
-      value: us-central1
-      type: string
-    # Queue location
-    queue_location:
-      env: QUEUE_LOCATION
-      value: us-central1
-      type: string
     # Service account credentials
     sa_credentials:
       env: GOOGLE_APPLICATION_CREDENTIALS_JSON

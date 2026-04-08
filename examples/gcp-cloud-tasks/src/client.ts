@@ -5,8 +5,6 @@ dotenv.config();
 
 const config = {
   queueName: process.env.QUEUE_NAME || '',
-  projectId: process.env.GCP_PROJECT || '',
-  location: process.env.QUEUE_LOCATION || 'us-central1',
   targetUrl: process.env.TARGET_URL || 'https://httpbin.org/post',
   operationIntervalMs: parseInt(process.env.OPERATION_INTERVAL_MS || '5000', 10),
   maxOperations: parseInt(process.env.MAX_OPERATIONS || '0', 10),
@@ -31,12 +29,12 @@ class CloudTasksDemo {
     console.log(`  Max operations: ${config.maxOperations || 'unlimited'}`);
     console.log('');
 
-    // Initialize client with credentials
+    // Initialize client with credentials (project ID is extracted from SA key)
     if (config.credentialsJson) {
       const creds = JSON.parse(config.credentialsJson);
-      this.client = new CloudTasksClient({ credentials: creds, projectId: config.projectId });
+      this.client = new CloudTasksClient({ credentials: creds, projectId: creds.project_id });
     } else {
-      this.client = new CloudTasksClient({ projectId: config.projectId });
+      this.client = new CloudTasksClient();
     }
 
     this.setupGracefulShutdown();
