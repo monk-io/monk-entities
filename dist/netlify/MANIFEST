@@ -3,5 +3,5 @@ VERSION_HASH bda3452f3b74
 DESCRIPTION Hosting, deploys, and forms.
 HOSTING managed
 TAGS netlify,hosting,deploy,forms
-LOAD netlify-base.yaml common.yaml form.yaml site.yaml account.yaml
-RESOURCES form-sync.js site-sync.js netlify-base.js common.js account-sync.js
+LOAD site.yaml common.yaml netlify-base.yaml form.yaml account.yaml
+RESOURCES common.js site-sync.js account-sync.js form-sync.js netlify-base.js
