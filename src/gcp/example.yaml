@@ -20,6 +20,7 @@ enable-apis:
     - redis.googleapis.com
     - dns.googleapis.com
     - artifactregistry.googleapis.com
+    - cloudtasks.googleapis.com
 
 # =============================================================================
 # Step 2: Create Service Account (optional)
@@ -419,6 +420,30 @@ cdn-static-assets:
 #   timeout_sec: 30
 #   labels:
 #     environment: production
+
+# =============================================================================
+# Step 15: Cloud Tasks Queue
+# =============================================================================
+# Task queue for dispatching HTTP requests with rate limiting and retries.
+
+task-queue:
+  defines: gcp/cloud-tasks-queue
+  name: app-task-queue
+  location: us-central1
+  max_dispatches_per_second: 100
+  max_concurrent_dispatches: 50
+  max_attempts: 5
+  min_backoff: "1s"
+  max_backoff: "300s"
+  max_doublings: 4
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-example/enable-apis
+      timeout: 300
 
 # =============================================================================
 # Example: Minimal Cloud SQL Setup

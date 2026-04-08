@@ -1,0 +1,110 @@
+# GCP Cloud Tasks Integration Test Suite
+#
+# Tests the complete lifecycle of Cloud Tasks queue entity.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter cloud-tasks
+
+name: GCP Cloud Tasks Integration Test
+description: Full lifecycle test for Cloud Tasks queue entity
+timeout: 300000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Cloud Tasks test template
+    action: load
+    target: input/gcp/test/cloud-tasks-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Cloud Tasks Queue Lifecycle
+  # =========================================================================
+  - name: Create Cloud Tasks queue
+    action: run
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud Tasks queue to be ready
+    action: wait
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test get-info action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test list-tasks action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: list-tasks
+    expect:
+      exitCode: 0
+
+  - name: Test pause action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: pause
+    expect:
+      exitCode: 0
+
+  - name: Test resume action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: resume
+    expect:
+      exitCode: 0
+
+  - name: Test create-task action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: create-task
+    args:
+      url: "https://httpbin.org/post"
+      method: "POST"
+      body: '{"test": "monk-integration"}'
+    expect:
+      exitCode: 0
+
+  - name: Test purge-tasks action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: purge-tasks
+    expect:
+      exitCode: 0
+
+  - name: Test get-cost-estimate action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Test costs action
+    action: action
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    actionName: costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Cloud Tasks queue
+    action: delete
+    target: gcp-tasks-test/test-cloud-tasks-queue
+    expect:
+      exitCode: 0

@@ -24,6 +24,7 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/artifact-registry-repository` | Artifact Registry repositories (Docker, Maven, npm, Python, etc.) |
 | `gcp/cloud-cdn-backend-bucket` | Cloud CDN backend bucket for static content from GCS |
 | `gcp/cloud-cdn-backend-service` | Cloud CDN backend service for dynamic backends |
+| `gcp/cloud-tasks-queue` | Cloud Tasks queues for HTTP task dispatch |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 
@@ -717,6 +718,48 @@ my-cdn-service:
 
 **Required API:**
 - `compute.googleapis.com` via `gcp/service-usage`
+
+### cloud-tasks-queue
+
+Create and manage Cloud Tasks queues for dispatching HTTP tasks.
+
+```yaml
+my-queue:
+  defines: gcp/cloud-tasks-queue
+  name: my-task-queue                    # Required: queue name
+  location: us-central1                  # Required: GCP region
+  max_dispatches_per_second: 100         # Optional: dispatch rate (default 500)
+  max_burst_size: 50                     # Optional: burst size (default 100)
+  max_concurrent_dispatches: 50          # Optional: concurrency (default 1000)
+  max_attempts: 5                        # Optional: retry attempts (default 100)
+  min_backoff: "1s"                      # Optional: min retry delay
+  max_backoff: "300s"                    # Optional: max retry delay
+  max_doublings: 4                       # Optional: backoff doublings (default 16)
+  max_retry_duration: "3600s"            # Optional: total retry window
+  log_level: INFO                        # Optional: logging level
+  services:
+    data:
+      protocol: custom
+```
+
+**Actions:**
+- `get-info`: Get queue details
+- `pause`: Pause task dispatch
+- `resume`: Resume task dispatch
+- `purge-tasks`: Delete all tasks in the queue
+- `create-task`: Create an HTTP task (args: url, method, body, schedule_time, service_account_email)
+- `list-tasks`: List tasks (args: page_size)
+- `get-cost-estimate`: Detailed cost breakdown
+- `costs`: Standardized JSON cost for billing
+
+**Required Permissions:**
+- `cloudtasks.queues.create`, `cloudtasks.queues.get`, `cloudtasks.queues.update`, `cloudtasks.queues.delete`
+- `cloudtasks.queues.pause`, `cloudtasks.queues.resume`, `cloudtasks.queues.purge`
+- `cloudtasks.tasks.create`, `cloudtasks.tasks.list`
+- `monitoring.timeSeries.list` (for cost estimation)
+
+**Required API:**
+- `cloudtasks.googleapis.com` via `gcp/service-usage`
 
 ### service-account
 
