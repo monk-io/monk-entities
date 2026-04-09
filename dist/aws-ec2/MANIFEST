@@ -4,4 +4,4 @@ DESCRIPTION Compute capacity and networking primitives (VPC, subnets, security g
 HOSTING managed
 TAGS aws,compute,ec2,vpc,subnet,security-group
 LOAD security-group.yaml base.yaml vpc.yaml subnet.yaml ec2-base.yaml
-RESOURCES subnet-sync.js vpc-sync.js ec2-base.js base.js security-group-sync.js
+RESOURCES vpc-sync.js subnet-sync.js base.js ec2-base.js security-group-sync.js

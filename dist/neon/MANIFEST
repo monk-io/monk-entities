@@ -3,5 +3,5 @@ VERSION_HASH b9e9da8541b6
 DESCRIPTION Serverless Postgres with branching.
 HOSTING managed
 TAGS neon,postgres,database
-LOAD role.yaml branch.yaml project.yaml compute.yaml neon-base.yaml common.yaml database.yaml
-RESOURCES common.js database-sync.js compute-sync.js project-sync.js role-sync.js neon-base.js branch-sync.js
+LOAD branch.yaml database.yaml common.yaml compute.yaml neon-base.yaml role.yaml project.yaml
+RESOURCES neon-base.js branch-sync.js common.js role-sync.js compute-sync.js project-sync.js database-sync.js

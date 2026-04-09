@@ -4,5 +4,5 @@ DESCRIPTION Manage DigitalOcean GenAI Agents, deployments, and keys.
 HOSTING managed
 TAGS digitalocean,ai,agent,genai
  
-LOAD gradient-base.yaml agent.yaml
+LOAD agent.yaml gradient-base.yaml
 RESOURCES gradient-base.js agent-sync.js
