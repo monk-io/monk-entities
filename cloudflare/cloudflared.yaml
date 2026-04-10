@@ -13,7 +13,9 @@ cloudflared:
     CLOUDFLARED_TOKEN:
       type: string
       env: CLOUDFLARED_TOKEN
-      value: <- secret($token_secret_ref)
+      # set to empty string if secret is not found to allow startup,
+      # the secret will be set by the entity before this starts
+      value: <- secret($token_secret_ref) if-error("")
     command_options:
       type: string
       value: --no-autoupdate
