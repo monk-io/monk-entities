@@ -1,4 +1,4 @@
 REPO supabase
 VERSION_HASH db65b125f79b
-LOAD supabase-base.yaml project.yaml
-RESOURCES supabase-base.js project-sync.js
+LOAD project.yaml supabase-base.yaml
+RESOURCES project-sync.js supabase-base.js
