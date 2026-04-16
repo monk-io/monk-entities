@@ -234,7 +234,8 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
             }
         }
 
-        if (binding.members.length === 0 && !this.state.prior_had_binding) {
+        if (binding.members.length === 0) {
+            // GCP IAM rejects bindings with zero members — always drop empty bindings.
             policy.bindings = policy.bindings.filter(b => b.role !== role);
         }
 
@@ -265,7 +266,8 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
         }
 
         binding.members = (binding.members || []).filter(m => !addedMembers.includes(m));
-        if (binding.members.length === 0 && !this.state.prior_had_binding) {
+        if (binding.members.length === 0) {
+            // GCP IAM rejects bindings with zero members — always drop empty bindings.
             policy.bindings = policy.bindings.filter(b => b.role !== role);
         }
 
@@ -359,7 +361,8 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
             return;
         }
         binding.members = binding.members.filter(m => m !== member);
-        if (binding.members.length === 0 && !this.state.prior_had_binding) {
+        if (binding.members.length === 0) {
+            // GCP IAM rejects bindings with zero members — always drop empty bindings.
             policy.bindings = policy.bindings.filter(b => b.role !== role);
         }
         this.setPolicy(policy);

@@ -225,8 +225,7 @@ var _IapSettings = class _IapSettings extends (_a = GcpEntity, _getInfo_dec = [a
       cli.output("No IAP settings to apply (definition has no access_settings or application_settings)");
       return;
     }
-    const updateMask = encodeURIComponent(paths.join(","));
-    const url = `${IAP_API_URL}/${resourceName}:iapSettings?updateMask=${updateMask}`;
+    const url = `${IAP_API_URL}/${resourceName}:iapSettings?updateMask=${paths.join(",")}`;
     this.patch(url, body);
     cli.output(`Applied IAP settings on ${resourceName}`);
     cli.output(`  updateMask: ${paths.join(",")}`);

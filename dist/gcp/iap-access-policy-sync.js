@@ -143,7 +143,7 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
         newlyAdded.push(m);
       }
     }
-    if (binding.members.length === 0 && !this.state.prior_had_binding) {
+    if (binding.members.length === 0) {
       policy.bindings = policy.bindings.filter((b) => b.role !== role);
     }
     this.setPolicy(policy);
@@ -169,7 +169,7 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
       return;
     }
     binding.members = (binding.members || []).filter((m) => !addedMembers.includes(m));
-    if (binding.members.length === 0 && !this.state.prior_had_binding) {
+    if (binding.members.length === 0) {
       policy.bindings = policy.bindings.filter((b) => b.role !== role);
     }
     this.setPolicy(policy);
@@ -237,7 +237,7 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
       return;
     }
     binding.members = binding.members.filter((m) => m !== member);
-    if (binding.members.length === 0 && !this.state.prior_had_binding) {
+    if (binding.members.length === 0) {
       policy.bindings = policy.bindings.filter((b) => b.role !== role);
     }
     this.setPolicy(policy);
