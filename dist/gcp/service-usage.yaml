@@ -22,7 +22,7 @@ service-usage:
       Use this entity as a dependency for other GCP entities that require
       specific APIs to be enabled. No state fields need to be passed to
       dependent entities - they just need to wait for this entity to be ready.
-    version-hash: eded1663b733
+    version-hash: e7f4066e1dba
   schema:
     name:
       type: string
@@ -63,6 +63,7 @@ service-usage:
         - language.googleapis.com
         - cloudbuild.googleapis.com
         - artifactregistry.googleapis.com
+        - identitytoolkit.googleapis.com
       description: |-
         Single API name to enable.
         Use this for enabling just one API.
@@ -109,6 +110,7 @@ service-usage:
           - language.googleapis.com
           - cloudbuild.googleapis.com
           - artifactregistry.googleapis.com
+          - identitytoolkit.googleapis.com
       description: |-
         Array of API names to batch enable.
         Use this for enabling multiple APIs efficiently.
