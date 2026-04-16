@@ -185,7 +185,9 @@ export type GcpApiServiceName =
     | "language.googleapis.com"
     | "cloudbuild.googleapis.com"
     | "artifactregistry.googleapis.com"
-    | "identitytoolkit.googleapis.com";
+    | "identitytoolkit.googleapis.com"
+    | "iap.googleapis.com"
+    | "clientauthconfig.googleapis.com";
 
 // =============================================================================
 // Common Enums

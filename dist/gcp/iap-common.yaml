@@ -1,7 +1,7 @@
 namespace: gcp
 
-gcp-base:
+iap-common:
   defines: module
   metadata:
     version-hash: c13a527ad1b7
-  source: <<< gcp-base.js
+  source: <<< iap-common.js

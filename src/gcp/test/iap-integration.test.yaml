@@ -1,0 +1,101 @@
+# GCP IAP Integration Test Suite (minimal, CI-safe)
+#
+# Covers the always-testable subset:
+#   - Enable iap.googleapis.com via gcp/service-usage
+#   - gcp/iap-tunnel-dest-group full lifecycle + actions
+#
+# Other IAP entities (iap-brand, iap-oauth-client, iap-settings, iap-access-policy)
+# require project setup that isn't universal across test projects:
+#   - iap-brand / iap-oauth-client: OAuth consent screen configured
+#     (APIs & Services → OAuth consent screen)
+#   - iap-access-policy: monk cluster service account granted roles/iap.admin
+#   - iap-settings: an existing IAP-protected resource (App Engine app,
+#     Compute backend service, Cloud Run service) as PATCH target
+#
+# See src/gcp/PLAN-iap.md for the full manual-test matrix and issues log.
+#
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter iap
+
+name: GCP IAP Integration Test
+description: Tunnel destination group lifecycle + IAP API enablement
+timeout: 600000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load IAP test template
+    action: load
+    target: input/gcp/test/iap-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # 1. Enable IAP API (prerequisite for all IAP operations)
+  # =========================================================================
+  - name: Enable IAP API
+    action: run
+    target: gcp-iap-test/enable-iap-api
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for IAP API enablement
+    action: wait
+    target: gcp-iap-test/enable-iap-api
+    waitFor:
+      condition: ready
+      timeout: 180000
+
+  # =========================================================================
+  # 2. iap-tunnel-dest-group full lifecycle
+  # =========================================================================
+  - name: Create tunnel dest group
+    action: run
+    target: gcp-iap-test/test-iap-tunnel-group
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for tunnel group to be ready
+    action: wait
+    target: gcp-iap-test/test-iap-tunnel-group
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Tunnel group get-info
+    action: action
+    target: gcp-iap-test/test-iap-tunnel-group
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Tunnel group list-cidrs
+    action: action
+    target: gcp-iap-test/test-iap-tunnel-group
+    actionName: list-cidrs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete tunnel dest group
+    action: delete
+    target: gcp-iap-test/test-iap-tunnel-group
+    expect:
+      exitCode: 0
+
+  - name: Delete enable-iap-api entity
+    action: delete
+    target: gcp-iap-test/enable-iap-api
+    expect:
+      exitCode: 0
