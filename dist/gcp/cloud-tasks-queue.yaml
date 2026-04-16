@@ -31,7 +31,7 @@ cloud-tasks-queue:
       Works with:
       - `gcp/service-usage` — enable `cloudtasks.googleapis.com` API
       - `gcp/service-account` — service account for task authentication
-    version-hash: 041c367dfa49
+    version-hash: 99b20b4d7ac6
   schema:
     project:
       type: string

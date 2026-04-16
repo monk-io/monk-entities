@@ -93,6 +93,9 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
   getPolicy() {
     const resp = this.post(`${IAP_API_URL}/${this.getResourceName()}:getIamPolicy`, {});
     if (!resp.bindings) resp.bindings = [];
+    for (const b of resp.bindings) {
+      if (!b.members) b.members = [];
+    }
     return resp;
   }
   setPolicy(policy) {

@@ -172,6 +172,10 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
     private getPolicy(): IamPolicy {
         const resp = this.post(`${IAP_API_URL}/${this.getResourceName()}:getIamPolicy`, {}) as IamPolicy;
         if (!resp.bindings) resp.bindings = [];
+        // Normalize: every binding must have a mutable members array.
+        for (const b of resp.bindings) {
+            if (!b.members) b.members = [];
+        }
         return resp;
     }
 
