@@ -204,5 +204,5 @@ Identity Platform pricing is per-MAU (monthly active users), not per-resource. T
 - [x] Tests — template + integration test with 28 steps covering full lifecycle
 - [x] Manual testing — all 5 entities pass create/ready/actions/delete
 - [x] Integration tests — 34/34 steps passed (96s)
-- [ ] PR
+- [x] PR — #188
 - [ ] Merged
