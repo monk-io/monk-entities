@@ -1,0 +1,83 @@
+namespace: gcp-identity-platform-example
+
+# Step 1: Enable the Identity Toolkit API
+enable-identity-api:
+  defines: gcp/service-usage
+  service_name: identitytoolkit.googleapis.com
+
+# Step 2: Configure Identity Platform at the project level
+identity-config:
+  defines: gcp/identity-platform-config
+  authorized_domains:
+    - myapp.example.com
+    - localhost
+  sign_in_email_enabled: true
+  sign_in_email_password_required: true
+  sign_in_phone_enabled: false
+  sign_in_anonymous_enabled: false
+  allow_tenants: true
+  mfa_state: ENABLED
+  mfa_enabled_providers:
+    - PHONE_SMS
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform-example/enable-identity-api
+      timeout: 120
+
+# Step 3: Create a tenant for a SaaS customer
+acme-tenant:
+  defines: gcp/identity-platform-tenant
+  display_name: Acme Corporation
+  allow_password_signup: true
+  enable_email_link_signin: true
+  mfa_state: ENABLED
+  mfa_enabled_providers:
+    - PHONE_SMS
+  services:
+    tenant:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform-example/identity-config
+      timeout: 120
+
+# Step 4: Configure Google sign-in for the tenant
+google-signin:
+  defines: gcp/identity-platform-default-idp-config
+  idp_id: google.com
+  tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
+  enabled: true
+  client_id: 123456789.apps.googleusercontent.com
+  client_secret: GOCSPX-example-secret
+  connections:
+    tenant:
+      runnable: gcp-identity-platform-example/acme-tenant
+      service: tenant
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform-example/acme-tenant
+      timeout: 120
+
+# Step 5: Configure a custom OIDC provider for the tenant
+corp-oidc:
+  defines: gcp/identity-platform-o-auth-idp-config
+  name: oidc.corp-sso
+  tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
+  display_name: Corporate SSO
+  enabled: true
+  client_id: corp-oidc-client-id
+  issuer: https://sso.corp.example.com
+  response_type_code: true
+  client_secret: corp-oidc-secret
+  connections:
+    tenant:
+      runnable: gcp-identity-platform-example/acme-tenant
+      service: tenant
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform-example/acme-tenant
+      timeout: 120

@@ -56,6 +56,9 @@ export const COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
 /** Cloud Tasks API base URL */
 export const CLOUD_TASKS_API_URL = "https://cloudtasks.googleapis.com/v2";
 
+/** Identity Platform (Identity Toolkit) API base URL */
+export const IDENTITY_TOOLKIT_API_URL = "https://identitytoolkit.googleapis.com/v2";
+
 /**
  * Catalog of common GCP APIs with service name and base URL.
  * Useful for schema enumerations and documentation references.
@@ -117,6 +120,10 @@ export const GCP_API_CATALOG = {
         service: "cloudtasks.googleapis.com",
         base_url: CLOUD_TASKS_API_URL,
     },
+    identity_toolkit: {
+        service: "identitytoolkit.googleapis.com",
+        base_url: IDENTITY_TOOLKIT_API_URL,
+    },
 } as const;
 
 /**
@@ -177,7 +184,8 @@ export type GcpApiServiceName =
     | "vision.googleapis.com"
     | "language.googleapis.com"
     | "cloudbuild.googleapis.com"
-    | "artifactregistry.googleapis.com";
+    | "artifactregistry.googleapis.com"
+    | "identitytoolkit.googleapis.com";
 
 // =============================================================================
 // Common Enums

@@ -27,6 +27,11 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-tasks-queue` | Cloud Tasks queues for HTTP task dispatch |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
+| `gcp/identity-platform-config` | Identity Platform project-level configuration (sign-in, MFA, domains) |
+| `gcp/identity-platform-tenant` | Identity Platform tenants for multi-tenant user isolation |
+| `gcp/identity-platform-oauth-idp-config` | Custom OIDC identity provider configurations |
+| `gcp/identity-platform-default-idp-config` | Built-in social identity providers (Google, Facebook, Apple, etc.) |
+| `gcp/identity-platform-inbound-saml-config` | SAML 2.0 identity provider configurations for enterprise SSO |
 
 ## Prerequisites
 

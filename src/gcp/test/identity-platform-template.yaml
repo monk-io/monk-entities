@@ -1,0 +1,79 @@
+namespace: gcp-identity-platform-test
+
+# Identity Platform project-level config
+test-identity-config:
+  defines: gcp/identity-platform-config
+  authorized_domains:
+    - monk-test-identity.example.com
+    - localhost
+  sign_in_email_enabled: true
+  sign_in_email_password_required: true
+  sign_in_phone_enabled: false
+  sign_in_anonymous_enabled: false
+  allow_tenants: true
+  mfa_state: DISABLED
+
+# Tenant for testing
+test-tenant:
+  defines: gcp/identity-platform-tenant
+  display_name: monk-test-tenant
+  allow_password_signup: true
+  enable_email_link_signin: false
+  enable_anonymous_user: false
+  disable_auth: false
+  mfa_state: DISABLED
+  services:
+    tenant:
+      protocol: custom
+
+# OIDC provider at project level (no tenant_id)
+test-oidc-config:
+  defines: gcp/identity-platform-o-auth-idp-config
+  name: oidc.monk-test-provider
+  display_name: Monk Test OIDC
+  enabled: true
+  client_id: monk-test-oidc-client-id
+  issuer: https://accounts.google.com
+  response_type_id_token: true
+
+# Tenant-scoped OIDC provider
+test-tenant-oidc-config:
+  defines: gcp/identity-platform-o-auth-idp-config
+  name: oidc.monk-test-tenant-provider
+  tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
+  display_name: monk-test-tenant OIDC
+  enabled: true
+  client_id: monk-test-tenant-oidc-client-id
+  issuer: https://accounts.google.com
+  response_type_id_token: true
+  connections:
+    tenant:
+      runnable: gcp-identity-platform-test/test-tenant
+      service: tenant
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform-test/test-tenant
+      timeout: 120
+
+# Default IdP (Google) at project level
+test-default-idp:
+  defines: gcp/identity-platform-default-idp-config
+  idp_id: google.com
+  enabled: true
+  client_id: monk-test-google-client-id.apps.googleusercontent.com
+  client_secret: monk-test-google-secret
+
+# SAML provider at project level
+test-saml-config:
+  defines: gcp/identity-platform-inbound-saml-config
+  name: saml.monk-test-provider
+  display_name: Monk Test SAML
+  enabled: true
+  idp_entity_id: https://idp.monk-test.example.com/saml/metadata
+  sso_url: https://idp.monk-test.example.com/saml/sso
+  sign_request: false
+  idp_certificates:
+    - "MIICpDCCAYwCCQDU+pQi42ruRDANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAkxMjcuMC4wLjEwHhcNMjQwMTAxMDAwMDAwWhcNMjUwMTAxMDAwMDAwWjAUMRIwEAYDVQQDDAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7o4qne60TB3pOYaBy/YFR8EEJolVMMxMWMGRbBOBAyFPmRqLAqEz2eMbfHOx/JGHiS1HVpB0QLRE3kpGBYew=="
+  sp_entity_id: https://monk-test.example.com
+  callback_uri: https://monk-test.example.com/saml/callback

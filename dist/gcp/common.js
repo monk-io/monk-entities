@@ -33,6 +33,7 @@ __export(common_exports, {
   FIRESTORE_API_URL: () => FIRESTORE_API_URL,
   GCP_API_CATALOG: () => GCP_API_CATALOG,
   IAM_API_URL: () => IAM_API_URL,
+  IDENTITY_TOOLKIT_API_URL: () => IDENTITY_TOOLKIT_API_URL,
   MEMORYSTORE_REDIS_API_URL: () => MEMORYSTORE_REDIS_API_URL,
   PUBSUB_API_URL: () => PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL: () => RESOURCE_MANAGER_API_URL,
@@ -63,6 +64,7 @@ var CLOUD_DNS_API_URL = "https://dns.googleapis.com/dns/v1";
 var ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.com/v1";
 var COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
 var CLOUD_TASKS_API_URL = "https://cloudtasks.googleapis.com/v2";
+var IDENTITY_TOOLKIT_API_URL = "https://identitytoolkit.googleapis.com/v2";
 var GCP_API_CATALOG = {
   cloud_sql: {
     service: "sqladmin.googleapis.com",
@@ -119,6 +121,10 @@ var GCP_API_CATALOG = {
   cloud_tasks: {
     service: "cloudtasks.googleapis.com",
     base_url: CLOUD_TASKS_API_URL
+  },
+  identity_toolkit: {
+    service: "identitytoolkit.googleapis.com",
+    base_url: IDENTITY_TOOLKIT_API_URL
   }
 };
 function getDefaultPort(databaseVersion) {
@@ -298,6 +304,7 @@ function extractPriceFromSku(sku) {
   FIRESTORE_API_URL,
   GCP_API_CATALOG,
   IAM_API_URL,
+  IDENTITY_TOOLKIT_API_URL,
   MEMORYSTORE_REDIS_API_URL,
   PUBSUB_API_URL,
   RESOURCE_MANAGER_API_URL,

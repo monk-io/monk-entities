@@ -1,0 +1,273 @@
+# GCP Identity Platform Integration Test Suite
+#
+# Tests the complete lifecycle of Identity Platform entities:
+# config, tenant, OIDC IdP, default IdP, and SAML IdP.
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter identity-platform
+
+name: GCP Identity Platform Integration Test
+description: Full lifecycle test for Identity Platform entities
+timeout: 600000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Identity Platform test template
+    action: load
+    target: input/gcp/test/identity-platform-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # =========================================================================
+  # Identity Platform Config Lifecycle
+  # =========================================================================
+  - name: Configure Identity Platform
+    action: run
+    target: gcp-identity-platform-test/test-identity-config
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Identity Platform config to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-identity-config
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test config get-info action
+    action: action
+    target: gcp-identity-platform-test/test-identity-config
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test config get-config action
+    action: action
+    target: gcp-identity-platform-test/test-identity-config
+    actionName: get-config
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Tenant Lifecycle
+  # =========================================================================
+  - name: Create tenant
+    action: run
+    target: gcp-identity-platform-test/test-tenant
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for tenant to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-tenant
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test tenant get-info action
+    action: action
+    target: gcp-identity-platform-test/test-tenant
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Test tenant list-tenants action
+    action: action
+    target: gcp-identity-platform-test/test-tenant
+    actionName: list-tenants
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Project-Level OIDC IdP Config Lifecycle
+  # =========================================================================
+  - name: Create project-level OIDC config
+    action: run
+    target: gcp-identity-platform-test/test-oidc-config
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for OIDC config to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-oidc-config
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test OIDC get-info action
+    action: action
+    target: gcp-identity-platform-test/test-oidc-config
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Tenant-Scoped OIDC IdP Config Lifecycle
+  # =========================================================================
+  - name: Create tenant-scoped OIDC config
+    action: run
+    target: gcp-identity-platform-test/test-tenant-oidc-config
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for tenant OIDC config to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-tenant-oidc-config
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test tenant OIDC get-info action
+    action: action
+    target: gcp-identity-platform-test/test-tenant-oidc-config
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Default IdP (Google) Config Lifecycle
+  # =========================================================================
+  - name: Create default IdP config (Google)
+    action: run
+    target: gcp-identity-platform-test/test-default-idp
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for default IdP config to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-default-idp
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test default IdP get-info action
+    action: action
+    target: gcp-identity-platform-test/test-default-idp
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Inbound SAML Config Lifecycle
+  # =========================================================================
+  - name: Create SAML config
+    action: run
+    target: gcp-identity-platform-test/test-saml-config
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for SAML config to be ready
+    action: wait
+    target: gcp-identity-platform-test/test-saml-config
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Test SAML get-info action
+    action: action
+    target: gcp-identity-platform-test/test-saml-config
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  # =========================================================================
+  # Action Tests (enable/disable)
+  # =========================================================================
+  - name: Test OIDC disable action
+    action: action
+    target: gcp-identity-platform-test/test-oidc-config
+    actionName: disable
+    expect:
+      exitCode: 0
+
+  - name: Test OIDC enable action
+    action: action
+    target: gcp-identity-platform-test/test-oidc-config
+    actionName: enable
+    expect:
+      exitCode: 0
+
+  - name: Test default IdP disable action
+    action: action
+    target: gcp-identity-platform-test/test-default-idp
+    actionName: disable
+    expect:
+      exitCode: 0
+
+  - name: Test default IdP enable action
+    action: action
+    target: gcp-identity-platform-test/test-default-idp
+    actionName: enable
+    expect:
+      exitCode: 0
+
+  - name: Test SAML disable action
+    action: action
+    target: gcp-identity-platform-test/test-saml-config
+    actionName: disable
+    expect:
+      exitCode: 0
+
+  - name: Test SAML enable action
+    action: action
+    target: gcp-identity-platform-test/test-saml-config
+    actionName: enable
+    expect:
+      exitCode: 0
+
+cleanup:
+  # Delete in reverse dependency order
+  - name: Delete SAML config
+    action: delete
+    target: gcp-identity-platform-test/test-saml-config
+    expect:
+      exitCode: 0
+
+  - name: Delete default IdP config
+    action: delete
+    target: gcp-identity-platform-test/test-default-idp
+    expect:
+      exitCode: 0
+
+  - name: Delete tenant-scoped OIDC config
+    action: delete
+    target: gcp-identity-platform-test/test-tenant-oidc-config
+    expect:
+      exitCode: 0
+
+  - name: Delete project-level OIDC config
+    action: delete
+    target: gcp-identity-platform-test/test-oidc-config
+    expect:
+      exitCode: 0
+
+  - name: Delete tenant
+    action: delete
+    target: gcp-identity-platform-test/test-tenant
+    expect:
+      exitCode: 0
+
+  - name: Delete Identity Platform config (no-op)
+    action: delete
+    target: gcp-identity-platform-test/test-identity-config
+    expect:
+      exitCode: 0

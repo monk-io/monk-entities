@@ -30,7 +30,7 @@ o-auth-client:
       - `iam.oauthClients.delete`
 
       Or use the predefined role: `roles/iam.oauthClientAdmin`
-    version-hash: eded1663b733
+    version-hash: e7f4066e1dba
   schema:
     project:
       type: string
