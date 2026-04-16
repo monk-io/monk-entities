@@ -1,0 +1,112 @@
+# GCP Identity Platform — Multi-Tenant Auth Setup
+# Sets up Identity Platform with a tenant, Google sign-in, and a custom OIDC provider.
+# Flow: Enable API → Configure project → Create tenant → Wire identity providers
+#
+# Prerequisites:
+#   - GCP provider configured: monk cluster provider add -p gcp
+#   - Identity Toolkit API enabled on the project (entity handles auto-initialization)
+
+namespace: gcp-identity-platform
+
+# === Enable Identity Toolkit API ===
+
+enable-api:
+  defines: gcp/service-usage
+  name: identitytoolkit.googleapis.com
+
+# === Project-Level Configuration ===
+
+# Enable email sign-in, MFA, and multi-tenancy for the project
+identity-config:
+  defines: gcp/identity-platform-config
+  authorized_domains:
+    - myapp.example.com
+    - localhost
+  sign_in_email_enabled: true
+  sign_in_email_password_required: true
+  sign_in_phone_enabled: false
+  sign_in_anonymous_enabled: false
+  allow_tenants: true
+  mfa_state: ENABLED
+  mfa_enabled_providers:
+    - PHONE_SMS
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform/enable-api
+      timeout: 120
+
+# === Tenant ===
+
+# Isolate users for "Acme Corp" — each SaaS customer gets its own tenant
+acme-tenant:
+  defines: gcp/identity-platform-tenant
+  display_name: acme-corp
+  allow_password_signup: true
+  enable_email_link_signin: true
+  mfa_state: ENABLED
+  mfa_enabled_providers:
+    - PHONE_SMS
+  services:
+    tenant:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform/identity-config
+      timeout: 120
+
+# === Identity Providers (scoped to tenant) ===
+
+# Google sign-in for the Acme tenant
+# Replace client_id and client_secret with real values from Google Cloud Console
+google-signin:
+  defines: gcp/identity-platform-default-idp-config
+  idp_id: google.com
+  tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
+  enabled: true
+  client_id: YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com
+  client_secret: YOUR_GOOGLE_CLIENT_SECRET
+  connections:
+    tenant:
+      runnable: gcp-identity-platform/acme-tenant
+      service: tenant
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform/acme-tenant
+      timeout: 120
+
+# Custom OIDC provider for corporate SSO
+# Replace client_id, issuer, and client_secret with your IdP values
+corp-oidc:
+  defines: gcp/identity-platform-o-auth-idp-config
+  name: oidc.corp-sso
+  tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
+  display_name: Corporate SSO
+  enabled: true
+  client_id: YOUR_OIDC_CLIENT_ID
+  issuer: https://your-idp.example.com
+  client_secret: YOUR_OIDC_CLIENT_SECRET
+  response_type_code: true
+  connections:
+    tenant:
+      runnable: gcp-identity-platform/acme-tenant
+      service: tenant
+  depends:
+    wait-for:
+      runnables:
+        - gcp-identity-platform/acme-tenant
+      timeout: 120
+
+# === Deploy Everything ===
+
+# Deploy: monk run -t TAG gcp-identity-platform/stack
+stack:
+  defines: group
+  members:
+    - gcp-identity-platform/enable-api
+    - gcp-identity-platform/identity-config
+    - gcp-identity-platform/acme-tenant
+    - gcp-identity-platform/google-signin
+    - gcp-identity-platform/corp-oidc
