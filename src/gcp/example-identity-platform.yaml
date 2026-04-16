@@ -3,7 +3,7 @@ namespace: gcp-identity-platform-example
 # Step 1: Enable the Identity Toolkit API
 enable-identity-api:
   defines: gcp/service-usage
-  service_name: identitytoolkit.googleapis.com
+  name: identitytoolkit.googleapis.com
 
 # Step 2: Configure Identity Platform at the project level
 identity-config:
@@ -28,7 +28,7 @@ identity-config:
 # Step 3: Create a tenant for a SaaS customer
 acme-tenant:
   defines: gcp/identity-platform-tenant
-  display_name: Acme Corporation
+  display_name: acme-corp
   allow_password_signup: true
   enable_email_link_signin: true
   mfa_state: ENABLED
