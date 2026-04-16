@@ -32,6 +32,11 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/identity-platform-oauth-idp-config` | Custom OIDC identity provider configurations |
 | `gcp/identity-platform-default-idp-config` | Built-in social identity providers (Google, Facebook, Apple, etc.) |
 | `gcp/identity-platform-inbound-saml-config` | SAML 2.0 identity provider configurations for enterprise SSO |
+| `gcp/iap-brand` | IAP OAuth brand (adopt-only) — required for OAuth clients |
+| `gcp/iap-oauth-client` | IAP OAuth 2.0 client under a brand (secret written to Monk secret) |
+| `gcp/iap-settings` | IAP access/application settings attached to a resource |
+| `gcp/iap-tunnel-dest-group` | IAP TCP tunnel destination group |
+| `gcp/iap-access-policy` | IAM role binding for an IAP-protected resource |
 
 ## Prerequisites
 
@@ -934,6 +939,53 @@ my-dataset:
   storage_billing_model: PHYSICAL
   max_time_travel_hours: 1176    # 49 days (7 weeks)
 ```
+
+## Identity-Aware Proxy (IAP) Entities
+
+Five entities manage different aspects of Google Cloud Identity-Aware Proxy.
+
+### Prerequisites
+
+1. **Enable the IAP API** via `gcp/service-usage` with `apis: [iap.googleapis.com]`.
+2. **Configure the OAuth consent screen** in the Cloud Console (APIs & Services → OAuth consent screen). `iap-brand` is adopt-only and throws a clear error if the brand does not exist.
+3. **Grant IAP permissions** to the monk cluster service account. For full IAP management:
+   - `roles/iap.admin` — required for `iap-access-policy` (setIamPolicy on web and tunnel resources) and for `iap-settings` PATCH.
+   - `clientauthconfig.clients.*` permissions — required for `iap-oauth-client` (included in `roles/iap.admin`).
+   - `resourcemanager.projects.get` — required by `iap-settings` and `iap-access-policy` to resolve the project number used in `iap_web` paths (included in basic roles).
+
+### Entities
+
+- `gcp/iap-brand` — adopts the project's OAuth brand (read-only) so OAuth clients can be created under it.
+- `gcp/iap-oauth-client` — creates/manages IAP OAuth 2.0 clients; writes the generated secret to a Monk secret (`secret_ref`). Supports `reset-secret` to rotate.
+- `gcp/iap-settings` — PATCHes `accessSettings`/`applicationSettings` on an existing IAP-protected resource (App Engine app, Compute backend service, Cloud Run service, organization, or folder). Snapshots prior settings and restores them on delete.
+- `gcp/iap-tunnel-dest-group` — full CRUD for TCP tunnel destination groups (CIDRs + FQDNs) scoped to a project + location.
+- `gcp/iap-access-policy` — manages a single `(target, role)` IAM binding on an IAP-protected resource. Only members added by this entity are tracked for clean removal on delete; pre-existing members are left intact.
+
+### Target resource path builder
+
+Both `iap-settings` and `iap-access-policy` use a common set of `target_*` fields to build the IAP resource path (using the project NUMBER, not project ID — auto-resolved via Resource Manager):
+
+| `target_kind` | Path produced | Required fields |
+|---------------|---------------|-----------------|
+| `project` | `projects/{PN}/iap_web` | — |
+| `organization` | `organizations/{ID}/iap_web` | `organization_id` |
+| `folder` | `folders/{ID}/iap_web` | `folder_id` |
+| `app-engine` | `projects/{PN}/iap_web/appengine-{APP}` | `app_id` |
+| `app-engine-service` | `…/services/{SVC}` | `app_id`, `app_engine_service` |
+| `compute` | `projects/{PN}/iap_web/compute/services/{BE}` | `backend_service` |
+| `compute-regional` | `…/compute-{REGION}/services/{BE}` | `backend_service`, `region` |
+| `cloud-run` | `projects/{PN}/iap_web/cloud_run-{REGION}/services/{NAME}` | `cloud_run_service`, `region` |
+| `raw` | `resource_path` verbatim | `resource_path` |
+
+### Example stack
+
+See `src/gcp/example-iap.yaml` for a full example wiring brand → OAuth client → access policy → tunnel group → (commented) settings on a Compute backend service.
+
+### Known limitations
+
+- **External-audience brands** cannot be created via the IAP API (only via Cloud Console). `iap-brand` is adopt-only.
+- **Client secret on GET** — GCP does not return IAP OAuth client secrets on GET. Adopting an existing client triggers a secret rotation so the Monk secret always holds a valid value.
+- **IAP settings PATCH** requires the target resource to already exist. This entity does not create the underlying Compute backend service / App Engine app / Cloud Run service.
 
 ## Best Practices
 
