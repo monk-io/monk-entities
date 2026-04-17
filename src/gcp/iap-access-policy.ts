@@ -194,15 +194,22 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
 
         const addedMembers = desired.filter(m => !priorMembers.includes(m));
 
+        let policyChanged = false;
         if (existingBinding) {
             for (const m of addedMembers) {
                 existingBinding.members.push(m);
             }
+            policyChanged = addedMembers.length > 0;
         } else if (desired.length > 0) {
             policy.bindings.push({ role, members: [...desired] });
+            policyChanged = true;
         }
 
-        this.setPolicy(policy);
+        // Skip setPolicy when nothing changed — avoids spurious etag conflicts
+        // if another actor modifies the policy between getPolicy and setPolicy.
+        if (policyChanged) {
+            this.setPolicy(policy);
+        }
         this.state.managed_role = role;
         this.state.added_members = addedMembers;
         this.state.existing = this.state.prior_had_binding;
