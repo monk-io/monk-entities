@@ -135,6 +135,7 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
     if (!binding) {
       if (desired.length === 0) {
         this.state.managed_role = role;
+        this.state.added_members = [];
         return;
       }
       binding = { role, members: [] };

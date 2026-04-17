@@ -230,7 +230,9 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
         if (!binding) {
             if (desired.length === 0) {
                 // No binding and no members desired — nothing to do.
+                // Clear stale tracked members so delete() takes the clean "no members tracked" path.
                 this.state.managed_role = role;
+                this.state.added_members = [];
                 return;
             }
             binding = { role, members: [] };

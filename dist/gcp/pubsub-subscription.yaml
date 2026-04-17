@@ -27,7 +27,7 @@ pubsub-subscription:
       Works with:
       - `gcp/pubsub-topic` — reads `state.topic_name` to know which topic to subscribe to
       - `gcp/service-usage` — enable `pubsub.googleapis.com` API
-    version-hash: 5324a504e9c3
+    version-hash: 888755cce30a
   schema:
     project:
       type: string
