@@ -126,6 +126,17 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
   }
   update() {
     const role = this.definition.role;
+    const previousRole = this.state.managed_role;
+    if (previousRole && previousRole !== role) {
+      const policy2 = this.getPolicy();
+      this.removeTrackedFromBinding(policy2, previousRole, this.state.added_members || []);
+      this.setPolicy(policy2);
+      this.state.managed_role = void 0;
+      this.state.added_members = void 0;
+      this.state.prior_had_binding = void 0;
+      this.create();
+      return;
+    }
     const desired = this.definition.members || [];
     const previouslyAdded = this.state.added_members || [];
     const policy = this.getPolicy();
@@ -155,8 +166,18 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
     for (const m of [...stillAdded, ...newlyAdded]) {
       if (!combined.includes(m)) combined.push(m);
     }
+    this.state.managed_role = role;
     this.state.added_members = combined;
     cli.output(`Updated IAM policy: role=${role}, tracked=${combined.length} member(s)`);
+  }
+  removeTrackedFromBinding(policy, role, members) {
+    if (members.length === 0) return;
+    const binding = policy.bindings.find((b) => b.role === role);
+    if (!binding) return;
+    binding.members = binding.members.filter((m) => !members.includes(m));
+    if (binding.members.length === 0) {
+      policy.bindings = policy.bindings.filter((b) => b.role !== role);
+    }
   }
   delete() {
     const role = this.state.managed_role || this.definition.role;
