@@ -15,8 +15,7 @@ import {
     IAP_API_URL,
     IapTarget,
     IapTargetKind,
-    buildIapTargetPath,
-    resolveProjectNumber,
+    resolveIapResourceName,
 } from "./iap-common.ts";
 import { IamPolicy } from "./common.ts";
 
@@ -145,28 +144,12 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
         return `GCP IAP Access Policy (${this.definition.role} on ${this.definition.target_kind})`;
     }
 
-    private asTarget(): IapTarget {
-        return {
-            target_kind: this.definition.target_kind,
-            app_id: this.definition.app_id,
-            app_engine_service: this.definition.app_engine_service,
-            backend_service: this.definition.backend_service,
-            region: this.definition.region,
-            cloud_run_service: this.definition.cloud_run_service,
-            organization_id: this.definition.organization_id,
-            folder_id: this.definition.folder_id,
-            resource_path: this.definition.resource_path,
-        };
-    }
-
     private getResourceName(): string {
-        if (this.state.resource_name) return this.state.resource_name;
-        if (!this.state.project_number) {
-            this.state.project_number = resolveProjectNumber(this.projectId);
-        }
-        const name = buildIapTargetPath(this.asTarget(), this.state.project_number);
-        this.state.resource_name = name;
-        return name;
+        return resolveIapResourceName(
+            this.definition as unknown as IapTarget,
+            this.state,
+            this.projectId,
+        );
     }
 
     private getPolicy(): IamPolicy {
@@ -241,17 +224,27 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
 
         const policy = this.getPolicy();
         let binding = policy.bindings.find(b => b.role === role);
+        const bindingExistedBefore = binding !== undefined;
+        let policyChanged = false;
 
         if (!binding) {
+            if (desired.length === 0) {
+                // No binding and no members desired — nothing to do.
+                this.state.managed_role = role;
+                return;
+            }
             binding = { role, members: [] };
             policy.bindings.push(binding);
+            policyChanged = true;
         }
 
         const desiredSet = new Set(desired);
+        const membersBefore = binding.members.length;
         binding.members = binding.members.filter(m => {
             if (previouslyAdded.includes(m) && !desiredSet.has(m)) return false;
             return true;
         });
+        if (binding.members.length !== membersBefore) policyChanged = true;
 
         const newlyAdded: string[] = [];
         for (const m of desired) {
@@ -260,13 +253,19 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
                 newlyAdded.push(m);
             }
         }
+        if (newlyAdded.length > 0) policyChanged = true;
 
         if (binding.members.length === 0) {
             // GCP IAM rejects bindings with zero members — always drop empty bindings.
             policy.bindings = policy.bindings.filter(b => b.role !== role);
+            if (bindingExistedBefore) policyChanged = true;
         }
 
-        this.setPolicy(policy);
+        // Skip setPolicy when nothing changed — avoids spurious etag conflicts
+        // on repeat sync cycles (same guard as create()).
+        if (policyChanged) {
+            this.setPolicy(policy);
+        }
 
         const stillAdded = previouslyAdded.filter(m => desiredSet.has(m));
         const combined: string[] = [];
@@ -275,7 +274,10 @@ export class IapAccessPolicy extends GcpEntity<IapAccessPolicyDefinition, IapAcc
         }
         this.state.managed_role = role;
         this.state.added_members = combined;
-        cli.output(`Updated IAM policy: role=${role}, tracked=${combined.length} member(s)`);
+        cli.output(
+            `Updated IAM policy: role=${role}, tracked=${combined.length} member(s)` +
+            (policyChanged ? "" : " (no policy change)")
+        );
     }
 
     private removeTrackedFromBinding(policy: IamPolicy, role: string, members: string[]): void {

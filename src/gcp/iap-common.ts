@@ -164,6 +164,35 @@ export function buildIapTargetPath(target: IapTarget, projectNumber: string): st
 }
 
 /**
+ * State cache slots used by resolveIapResourceName.
+ * Both iap-settings and iap-access-policy persist the resolved resource path
+ * and project number in these state fields to avoid repeated lookups.
+ */
+export interface IapResourceNameCache {
+    resource_name?: string;
+    project_number?: string;
+}
+
+/**
+ * Resolve (and cache in state) the full IAP resource path for a target.
+ * Shared by iap-settings and iap-access-policy so the caching + target-path
+ * construction isn't duplicated.
+ */
+export function resolveIapResourceName(
+    target: IapTarget,
+    cache: IapResourceNameCache,
+    projectId: string,
+): string {
+    if (cache.resource_name) return cache.resource_name;
+    if (!cache.project_number) {
+        cache.project_number = resolveProjectNumber(projectId);
+    }
+    const name = buildIapTargetPath(target, cache.project_number);
+    cache.resource_name = name;
+    return name;
+}
+
+/**
  * Collect second-level field paths (e.g. "accessSettings.oauthSettings") for objects
  * where only top-level keys with non-undefined values are set.
  *

@@ -57,9 +57,8 @@ const GcpEntity = gcpBase.GcpEntity;
 const cli = require("cli");
 const iapCommon = require("gcp/iap-common");
 const IAP_API_URL = iapCommon.IAP_API_URL;
-const buildIapTargetPath = iapCommon.buildIapTargetPath;
-const resolveProjectNumber = iapCommon.resolveProjectNumber;
 const collectUpdateMaskPaths = iapCommon.collectUpdateMaskPaths;
+const resolveIapResourceName = iapCommon.resolveIapResourceName;
 var _showRaw_dec, _getInfo_dec, _a, _init;
 var _IapSettings = class _IapSettings extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _showRaw_dec = [action("show-raw")], _a) {
   constructor() {
@@ -69,27 +68,12 @@ var _IapSettings = class _IapSettings extends (_a = GcpEntity, _getInfo_dec = [a
   getEntityName() {
     return `GCP IAP Settings (${this.state.resource_name || this.definition.target_kind})`;
   }
-  asTarget() {
-    return {
-      target_kind: this.definition.target_kind,
-      app_id: this.definition.app_id,
-      app_engine_service: this.definition.app_engine_service,
-      backend_service: this.definition.backend_service,
-      region: this.definition.region,
-      cloud_run_service: this.definition.cloud_run_service,
-      organization_id: this.definition.organization_id,
-      folder_id: this.definition.folder_id,
-      resource_path: this.definition.resource_path
-    };
-  }
   getResourceName() {
-    if (this.state.resource_name) return this.state.resource_name;
-    if (!this.state.project_number) {
-      this.state.project_number = resolveProjectNumber(this.projectId);
-    }
-    const name = buildIapTargetPath(this.asTarget(), this.state.project_number);
-    this.state.resource_name = name;
-    return name;
+    return resolveIapResourceName(
+      this.definition,
+      this.state,
+      this.projectId
+    );
   }
   buildIapSettingsBody() {
     const body = { name: this.getResourceName() };
