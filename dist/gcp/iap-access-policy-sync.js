@@ -109,14 +109,19 @@ var _IapAccessPolicy = class _IapAccessPolicy extends (_a = GcpEntity, _getInfo_
     const priorMembers = existingBinding ? [...existingBinding.members || []] : [];
     this.state.prior_had_binding = Boolean(existingBinding);
     const addedMembers = desired.filter((m) => !priorMembers.includes(m));
+    let policyChanged = false;
     if (existingBinding) {
       for (const m of addedMembers) {
         existingBinding.members.push(m);
       }
+      policyChanged = addedMembers.length > 0;
     } else if (desired.length > 0) {
       policy.bindings.push({ role, members: [...desired] });
+      policyChanged = true;
     }
-    this.setPolicy(policy);
+    if (policyChanged) {
+      this.setPolicy(policy);
+    }
     this.state.managed_role = role;
     this.state.added_members = addedMembers;
     this.state.existing = this.state.prior_had_binding;
