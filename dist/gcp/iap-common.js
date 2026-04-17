@@ -33,6 +33,7 @@ __export(iap_common_exports, {
   IAP_API_URL: () => IAP_API_URL,
   buildIapTargetPath: () => buildIapTargetPath,
   collectUpdateMaskPaths: () => collectUpdateMaskPaths,
+  resolveIapResourceName: () => resolveIapResourceName,
   resolveProjectNumber: () => resolveProjectNumber
 });
 module.exports = __toCommonJS(iap_common_exports);
@@ -119,6 +120,15 @@ function buildIapTargetPath(target, projectNumber) {
       throw new Error(`Unknown target_kind: ${String(target.target_kind)}`);
   }
 }
+function resolveIapResourceName(target, cache, projectId) {
+  if (cache.resource_name) return cache.resource_name;
+  if (!cache.project_number) {
+    cache.project_number = resolveProjectNumber(projectId);
+  }
+  const name = buildIapTargetPath(target, cache.project_number);
+  cache.resource_name = name;
+  return name;
+}
 function collectUpdateMaskPaths(obj) {
   const paths = [];
   for (const topKey of Object.keys(obj)) {
@@ -145,5 +155,6 @@ function collectUpdateMaskPaths(obj) {
   IAP_API_URL,
   buildIapTargetPath,
   collectUpdateMaskPaths,
+  resolveIapResourceName,
   resolveProjectNumber
 });
