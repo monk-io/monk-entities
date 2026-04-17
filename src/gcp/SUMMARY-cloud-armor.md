@@ -35,5 +35,6 @@
 
 ## PR
 
-- URL: _pending_
+- URL: https://github.com/monk-io/monk-entities/pull/190
+- Branch: `feat/gcp-cloud-armor` (commit `5a1d8a6`)
 - Linear: _(not linked — no issue identified yet)_
