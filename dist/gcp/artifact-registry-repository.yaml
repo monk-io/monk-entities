@@ -28,7 +28,7 @@ artifact-registry-repository:
       Works with:
       - `gcp/service-usage` — enable `artifactregistry.googleapis.com` API
       - `gcp/service-account` — create service accounts with Artifact Registry roles
-    version-hash: 27fa8349e99e
+    version-hash: 29a843e57326
   schema:
     project:
       type: string
