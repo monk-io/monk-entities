@@ -37,6 +37,7 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/iap-settings` | IAP access/application settings attached to a resource |
 | `gcp/iap-tunnel-dest-group` | IAP TCP tunnel destination group |
 | `gcp/iap-access-policy` | IAM role binding for an IAP-protected resource |
+| `gcp/cloud-armor-security-policy` | Global Cloud Armor security policy with inline rules + backend attach |
 
 ## Prerequisites
 
@@ -986,6 +987,76 @@ See `src/gcp/example-iap.yaml` for a full example wiring brand → OAuth client 
 - **External-audience brands** cannot be created via the IAP API (only via Cloud Console). `iap-brand` is adopt-only.
 - **Client secret on GET** — GCP does not return IAP OAuth client secrets on GET. Adopting an existing client triggers a secret rotation so the Monk secret always holds a valid value.
 - **IAP settings PATCH** requires the target resource to already exist. This entity does not create the underlying Compute backend service / App Engine app / Cloud Run service.
+
+## Cloud Armor Security Policies
+
+`gcp/cloud-armor-security-policy` manages global Cloud Armor security policies (type `CLOUD_ARMOR`) that protect external/global HTTP(S) load balancer backend services. Rules are declared inline in the Definition and reconciled via per-rule API endpoints, avoiding fingerprint races on rule edits.
+
+### Prerequisites
+
+1. **Enable the Compute Engine API** via `gcp/service-usage` with `apis: [compute.googleapis.com]`.
+2. **Grant permissions** to the monk cluster service account. The single role `roles/compute.securityAdmin` covers everything needed. For a principle-of-least-privilege custom role, grant:
+   - `compute.securityPolicies.create` / `.get` / `.list` / `.update` / `.delete` / `.use`
+   - `compute.securityPolicies.addRule` / `.getRule` / `.patchRule` / `.removeRule`
+   - `compute.backendServices.get` / `.setSecurityPolicy` (for attach/detach actions)
+   - `compute.globalOperations.get` (LRO polling)
+   - `monitoring.timeSeries.list` and `cloudbilling.services.list` (cost estimation)
+
+### Example
+
+```yaml
+my-waf:
+  defines: gcp/cloud-armor-security-policy
+  name: monk-test-ca-policy
+  policy_description: "Block bad actors, rate-limit everything else"
+  default_action: deny(403)
+  rules:
+    - priority: 1000
+      action: deny(403)
+      src_ip_ranges: ["203.0.113.0/24"]       # Known bad range
+      rule_description: "Block known bad IPs"
+    - priority: 2000
+      action: allow
+      src_ip_ranges: ["10.0.0.0/8", "192.168.0.0/16"]
+      rule_description: "Allow internal"
+    - priority: 3000
+      action: throttle
+      match_expression: "true"
+      rate_limit:
+        rate_limit_count: 100
+        rate_limit_interval_sec: 60
+        conform_action: allow
+        exceed_action: deny(429)
+        enforce_on_key: IP
+  adaptive_protection: true
+  advanced_options:
+    json_parsing: STANDARD
+    log_level: NORMAL
+```
+
+### Actions
+
+| Action | Args | Purpose |
+|--------|------|---------|
+| `get-info` | — | Dump full policy JSON |
+| `list-rules` | — | Pretty-print rules (sorted by priority, default marked) |
+| `add-rule` | `priority`, `action`, `src_ip_ranges` OR `match_expression`, `rule_description?`, `preview?` | Add a rule |
+| `update-rule` | `priority`, plus any of `action`, `src_ip_ranges`, `match_expression`, `rule_description`, `preview` | Patch a rule |
+| `remove-rule` | `priority` | Remove a rule (rejects default priority `2147483647`) |
+| `set-default-action` | `action` | Change action on the default rule |
+| `attach-backend-service` | `backend_service` (name or self-link) | Attach policy to a backend service |
+| `detach-backend-service` | `backend_service` | Detach policy from a backend service |
+| `get-cost-estimate` | — | Human-readable cost breakdown |
+| `costs` | — | JSON cost for billing system |
+
+### Notes and limitations
+
+- **Scope**: only global `CLOUD_ARMOR` policies. Edge (`CLOUD_ARMOR_EDGE`) and regional policies are not supported by this entity.
+- **Default rule**: GCP auto-creates a default rule at priority `2147483647`. Use `default_action` in the definition (or the `set-default-action` action) to change it — it cannot be deleted.
+- **Rule priorities**: integer `0`–`2147483646`, unique within the policy. Lower = higher priority.
+- **Adaptive Protection ML features** require Cloud Armor Enterprise. Enabling `adaptive_protection: true` on a Standard project is accepted but ML signals stay inactive.
+- **Deletion is blocked if attached** to any backend service. Use the `detach-backend-service` action first.
+- **`attach-backend-service`** applies the policy via `setSecurityPolicy`; `detach-backend-service` does the same with an empty policy string.
 
 ## Best Practices
 

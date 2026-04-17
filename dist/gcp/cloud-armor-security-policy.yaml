@@ -1,0 +1,253 @@
+namespace: gcp
+cloud-armor-security-policy:
+  defines: entity
+  metadata:
+    name: CloudArmorSecurityPolicy
+    description: |-
+      Manages a global Cloud Armor security policy (type=CLOUD_ARMOR) that
+      protects external/global HTTP(S) load balancer backend services. Supports inline
+      rules with IP or CEL matching, rate limiting, redirects, header mutations, a
+      configurable default action, Adaptive Protection, and advanced JSON parsing.
+
+      ## Required Permissions
+      - `compute.securityPolicies.create` / `.get` / `.list` / `.update` / `.delete` / `.use`
+      - `compute.securityPolicies.addRule` / `.getRule` / `.patchRule` / `.removeRule`
+      - `compute.backendServices.get` / `.setSecurityPolicy` (for attach/detach actions)
+      - `compute.globalOperations.get` — poll long-running operations
+      - `monitoring.timeSeries.list` — cost estimation metrics
+      - `cloudbilling.services.list` — cost estimation pricing
+
+      All of the above are contained in `roles/compute.securityAdmin`.
+
+      ## Secrets
+      - Reads: none (authenticated via gcp provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Numeric policy resource ID
+      - `state.self_link` - Full resource URL — use for manual wiring when another entity needs the policy reference
+      - `state.attached_backends` - Backend services this entity has attached to
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/cloud-cdn-backend-service` — attach via the `attach-backend-service` action
+        passing the backend service name or self-link
+      - `gcp/service-usage` — enable `compute.googleapis.com` before creating policies
+    version-hash: 942578e4aa3b
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    name:
+      type: string
+      description: 'Policy name (1-63 chars, lowercase letters, digits, dashes, must start with a letter)'
+    policy_description:
+      type: string
+      description: Human-readable policy description
+    default_action:
+      type: string
+      enum:
+        - allow
+        - deny(403)
+        - deny(404)
+        - deny(502)
+      description: Action applied to requests not matching any user rule. Defaults to deny(403).
+    rules:
+      type: array
+      items:
+        type: object
+        properties:
+          priority:
+            type: number
+            description: 'Integer priority, 0-2147483646. Lower number = higher priority. Must be unique within the policy.'
+          action:
+            type: string
+            enum:
+              - allow
+              - deny(403)
+              - deny(404)
+              - deny(502)
+              - throttle
+              - rate_based_ban
+              - redirect
+            description: Action to apply on match
+          src_ip_ranges:
+            type: array
+            items:
+              type: string
+            description: Source IP CIDRs to match (max 10). Mutually exclusive with match_expression.
+          match_expression:
+            type: string
+            description: 'CEL match expression (e.g., origin.region_code == "US"). Mutually exclusive with src_ip_ranges.'
+          rule_description:
+            type: string
+            description: Human-readable rule description
+          preview:
+            type: boolean
+            description: Log the rule without enforcing it
+          rate_limit:
+            type: object
+            properties:
+              rate_limit_count:
+                type: number
+                description: Max requests allowed within the interval before action triggers
+              rate_limit_interval_sec:
+                type: number
+                description: Interval window in seconds for rate_limit_count
+              conform_action:
+                type: string
+                const: allow
+                description: Action applied to conforming (below threshold) requests
+              exceed_action:
+                type: string
+                enum:
+                  - deny(403)
+                  - deny(404)
+                  - deny(429)
+                  - deny(502)
+                description: Action applied when threshold is exceeded
+              enforce_on_key:
+                type: string
+                enum:
+                  - IP
+                  - ALL
+                  - HTTP_HEADER
+                  - XFF_IP
+                  - HTTP_COOKIE
+                  - HTTP_PATH
+                  - SNI
+                  - REGION_CODE
+                description: Key used to aggregate traffic for rate-limit matching
+              enforce_on_key_name:
+                type: string
+                description: Header/cookie name when enforce_on_key is HTTP_HEADER or HTTP_COOKIE
+              ban_duration_sec:
+                type: number
+                description: Ban duration in seconds (rate_based_ban only)
+              ban_threshold_count:
+                type: number
+                description: Threshold count for ban (rate_based_ban only)
+              ban_threshold_interval_sec:
+                type: number
+                description: Threshold interval for ban (rate_based_ban only)
+            required:
+              - rate_limit_count
+              - rate_limit_interval_sec
+            additionalProperties: false
+            description: Rate-limit config (required for throttle and rate_based_ban)
+          redirect:
+            type: object
+            properties:
+              redirect_type:
+                type: string
+                enum:
+                  - GOOGLE_RECAPTCHA
+                  - EXTERNAL_302
+                description: 'Redirect type: reCAPTCHA challenge or external HTTP 302'
+              target:
+                type: string
+                description: Target URL (required when redirect_type is EXTERNAL_302)
+            required:
+              - redirect_type
+            additionalProperties: false
+            description: Redirect config (required for redirect)
+          request_headers_to_add:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Header name
+                value:
+                  type: string
+                  description: Header value
+              required:
+                - name
+                - value
+              additionalProperties: false
+            description: Request headers to add when the rule matches
+        required:
+          - priority
+          - action
+        additionalProperties: false
+      description: User-defined rules (in addition to the auto-created default rule at priority 2147483647)
+    adaptive_protection:
+      type: boolean
+      description: Enable Adaptive Protection Layer 7 DDoS defense (requires Cloud Armor Enterprise for ML features)
+    ddos_protection:
+      type: string
+      enum:
+        - STANDARD
+        - ADVANCED
+      description: DDoS protection tier. ADVANCED requires Cloud Armor Enterprise.
+    advanced_options:
+      type: object
+      properties:
+        json_parsing:
+          type: string
+          enum:
+            - DISABLED
+            - STANDARD
+            - STANDARD_WITH_GRAPHQL
+          description: JSON parsing mode for request bodies
+        log_level:
+          type: string
+          enum:
+            - NORMAL
+            - VERBOSE
+          description: Log verbosity for requests processed by this policy
+        user_ip_request_headers:
+          type: array
+          items:
+            type: string
+          description: Request headers used to derive the client IP (for X-Forwarded-For style setups)
+      additionalProperties: false
+      description: 'Advanced JSON parsing, logging, and client-IP options'
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    id:
+      type: string
+      description: Server-generated numeric ID
+    self_link:
+      type: string
+      description: Full resource self-link (used when attaching to backend services)
+    fingerprint:
+      type: string
+      description: Fingerprint for concurrent-update control on policy-level PATCH
+    attached_backends:
+      type: array
+      items:
+        type: string
+      description: Self-links of backend services this entity has attached the policy to
+  lifecycle:
+    sync: <<< cloud-armor-security-policy-sync.js
+    get-info: ''
+    list-rules: ''
+    add-rule: ''
+    update-rule: ''
+    remove-rule: ''
+    set-default-action: ''
+    attach-backend-service: ''
+    detach-backend-service: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

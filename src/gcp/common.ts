@@ -807,6 +807,55 @@ export type SessionAffinity =
     | "HTTP_COOKIE";
 
 // =============================================================================
+// Cloud Armor Enums and Constants
+// =============================================================================
+
+/**
+ * Priority reserved for the auto-generated default rule in a Cloud Armor policy.
+ * Cannot be deleted, can only be patched (e.g., to change the default action).
+ */
+export const CLOUD_ARMOR_DEFAULT_PRIORITY = 2147483647;
+
+/**
+ * Cloud Armor security policy rule actions.
+ * @see https://cloud.google.com/armor/docs/rules-language-reference
+ */
+export type CloudArmorRuleAction =
+    /** Permit the request */
+    | "allow"
+    /** Deny with 403 Forbidden */
+    | "deny(403)"
+    /** Deny with 404 Not Found */
+    | "deny(404)"
+    /** Deny with 502 Bad Gateway */
+    | "deny(502)"
+    /** Throttle requests matching the rule */
+    | "throttle"
+    /** Rate-based ban matching clients */
+    | "rate_based_ban"
+    /** Redirect to reCAPTCHA or external URL */
+    | "redirect";
+
+/**
+ * DDoS protection tier for a Cloud Armor policy.
+ * ADVANCED requires Cloud Armor Enterprise.
+ */
+export type CloudArmorDdosProtection = "STANDARD" | "ADVANCED";
+
+/**
+ * JSON request parsing mode for Cloud Armor advanced options.
+ */
+export type CloudArmorJsonParsing =
+    | "DISABLED"
+    | "STANDARD"
+    | "STANDARD_WITH_GRAPHQL";
+
+/**
+ * Log verbosity for Cloud Armor advanced options.
+ */
+export type CloudArmorLogLevel = "NORMAL" | "VERBOSE";
+
+// =============================================================================
 // Memorystore for Redis Enums
 // =============================================================================
 

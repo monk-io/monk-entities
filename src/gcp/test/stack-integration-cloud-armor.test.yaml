@@ -1,0 +1,171 @@
+# Cloud Armor Integration Test Suite
+#
+# Covers full lifecycle of gcp/cloud-armor-security-policy:
+#   create → ready → list-rules → add-rule → update-rule → set-default-action
+#   → remove-rule → get-info → cost actions → delete
+#
+# attach-backend-service / detach-backend-service are NOT exercised here because they
+# require a pre-existing Compute backend service. They are covered in manual testing.
+#
+# Run with:
+#   sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-file test/stack-integration-cloud-armor.test.yaml
+
+name: Cloud Armor Integration Test
+description: Full lifecycle test for gcp/cloud-armor-security-policy
+timeout: 600000 # 10 minutes
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Cloud Armor test template
+    action: load
+    target: test/stack-template-cloud-armor.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # ==========================================================================
+  # Create + readiness
+  # ==========================================================================
+  - name: Create Cloud Armor security policy
+    action: run
+    target: gcp-cloud-armor-test/test-ca-policy
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for policy to be ready
+    action: wait
+    target: gcp-cloud-armor-test/test-ca-policy
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  # ==========================================================================
+  # Read-only actions: verify initial state
+  # ==========================================================================
+  - name: Get policy info (get-info)
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: List rules — expect 3 user rules + default
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: list-rules
+    expect:
+      exitCode: 0
+
+  # ==========================================================================
+  # Mutating rule actions
+  # ==========================================================================
+  - name: Add a rule at priority 500
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: add-rule
+    args:
+      priority: "500"
+      action: "allow"
+      src_ip_ranges: "192.0.2.0/24"
+      rule_description: "Allow TEST-NET-1 range (added at runtime)"
+    expect:
+      exitCode: 0
+
+  - name: List rules — expect 4 user rules + default
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: list-rules
+    expect:
+      exitCode: 0
+
+  - name: Update rule at priority 1000 to preview mode
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: update-rule
+    args:
+      priority: "1000"
+      preview: "true"
+      rule_description: "Block TEST-NET-3 (preview)"
+    expect:
+      exitCode: 0
+
+  - name: Change default action to deny(404)
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: set-default-action
+    args:
+      action: "deny(404)"
+    expect:
+      exitCode: 0
+
+  - name: Remove rule at priority 500
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: remove-rule
+    args:
+      priority: "500"
+    expect:
+      exitCode: 0
+
+  - name: List rules — expect 3 user rules + default after remove
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: list-rules
+    expect:
+      exitCode: 0
+
+  # ==========================================================================
+  # Negative cases
+  # ==========================================================================
+  - name: Remove-rule on default priority should fail
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: remove-rule
+    args:
+      priority: "2147483647"
+    expect:
+      exitCode: 1
+
+  - name: Add-rule on default priority should fail
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: add-rule
+    args:
+      priority: "2147483647"
+      action: "deny(403)"
+    expect:
+      exitCode: 1
+
+  # ==========================================================================
+  # Cost estimation
+  # ==========================================================================
+  - name: Run get-cost-estimate
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Run costs (JSON)
+    action: action
+    target: gcp-cloud-armor-test/test-ca-policy
+    actionName: costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Cloud Armor security policy
+    action: delete
+    target: gcp-cloud-armor-test/test-ca-policy
+    expect:
+      exitCode: 0
