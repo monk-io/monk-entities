@@ -26,7 +26,7 @@ iap-access-policy:
       Works with:
       - `gcp/iap-settings` — typically apply settings first, then grant access via this entity
       - `gcp/iap-tunnel-dest-group` — used as target for tunnel-related role bindings
-    version-hash: 942578e4aa3b
+    version-hash: 571c15233702
   schema:
     project:
       type: string
