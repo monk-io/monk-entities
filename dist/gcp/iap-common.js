@@ -31,10 +31,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var iap_common_exports = {};
 __export(iap_common_exports, {
   IAP_API_URL: () => IAP_API_URL,
-  buildIapTargetPath: () => buildIapTargetPath,
   collectUpdateMaskPaths: () => collectUpdateMaskPaths,
-  resolveIapResourceName: () => resolveIapResourceName,
-  resolveProjectNumber: () => resolveProjectNumber
+  resolveIapResourceName: () => resolveIapResourceName
 });
 module.exports = __toCommonJS(iap_common_exports);
 var import_gcp = __toESM(require("cloud/gcp"));
@@ -163,8 +161,6 @@ function collectUpdateMaskPaths(obj) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   IAP_API_URL,
-  buildIapTargetPath,
   collectUpdateMaskPaths,
-  resolveIapResourceName,
-  resolveProjectNumber
+  resolveIapResourceName
 });
