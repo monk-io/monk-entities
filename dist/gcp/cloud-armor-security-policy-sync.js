@@ -537,6 +537,9 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
     const ruleAction = this.getStringArg(args, "action");
     const srcIpRanges = this.getStringArg(args, "src_ip_ranges");
     const matchExpr = this.getStringArg(args, "match_expression");
+    if (srcIpRanges && matchExpr) {
+      throw new Error("Provide src_ip_ranges OR match_expression, not both");
+    }
     const ruleDescription = this.getStringArg(args, "rule_description");
     const preview = this.getBoolArg(args, "preview");
     const body = {};
