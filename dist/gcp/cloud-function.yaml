@@ -43,7 +43,7 @@ cloud-function:
       - `gcp/service-account` - Create dedicated SA with `roles/cloudfunctions.invoker`
       - `gcp/cloud-storage` - Trigger functions on storage events
       - `gcp/service-usage` - Enable required APIs before deployment
-    version-hash: 86b4faad2fd5
+    version-hash: 942578e4aa3b
   schema:
     project:
       type: string

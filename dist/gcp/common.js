@@ -22,6 +22,7 @@ var common_exports = {};
 __export(common_exports, {
   ARTIFACT_REGISTRY_API_URL: () => ARTIFACT_REGISTRY_API_URL,
   BIGQUERY_API_URL: () => BIGQUERY_API_URL,
+  CLOUD_ARMOR_DEFAULT_PRIORITY: () => CLOUD_ARMOR_DEFAULT_PRIORITY,
   CLOUD_DNS_API_URL: () => CLOUD_DNS_API_URL,
   CLOUD_FUNCTIONS_API_URL: () => CLOUD_FUNCTIONS_API_URL,
   CLOUD_RUN_API_URL: () => CLOUD_RUN_API_URL,
@@ -127,6 +128,7 @@ var GCP_API_CATALOG = {
     base_url: IDENTITY_TOOLKIT_API_URL
   }
 };
+var CLOUD_ARMOR_DEFAULT_PRIORITY = 2147483647;
 function getDefaultPort(databaseVersion) {
   if (databaseVersion.includes("MYSQL")) {
     return 3306;
@@ -293,6 +295,7 @@ function extractPriceFromSku(sku) {
 0 && (module.exports = {
   ARTIFACT_REGISTRY_API_URL,
   BIGQUERY_API_URL,
+  CLOUD_ARMOR_DEFAULT_PRIORITY,
   CLOUD_DNS_API_URL,
   CLOUD_FUNCTIONS_API_URL,
   CLOUD_RUN_API_URL,

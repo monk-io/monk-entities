@@ -1,0 +1,42 @@
+# Cloud Armor Integration Test Template
+# Global Cloud Armor security policy with inline rules.
+# No cross-entity dependencies — the policy is self-contained for the automated test.
+# Attach/detach-backend-service actions are manually tested against a real backend.
+
+namespace: gcp-cloud-armor-test
+
+# Single security policy with 2 user rules + a configurable default rule.
+# Rules exercise: IP allow, IP deny, CEL expression + throttle (rate limit).
+test-ca-policy:
+  defines: gcp/cloud-armor-security-policy
+  name: monk-test-ca-policy
+  policy_description: "MonkEC Cloud Armor integration test policy"
+  default_action: deny(403)
+  rules:
+    - priority: 1000
+      action: deny(403)
+      src_ip_ranges:
+        - "203.0.113.0/24"
+      rule_description: "Block TEST-NET-3 range"
+    - priority: 2000
+      action: allow
+      src_ip_ranges:
+        - "198.51.100.0/24"
+      rule_description: "Allow TEST-NET-2 range"
+    - priority: 3000
+      action: throttle
+      match_expression: "origin.region_code == 'CN'"
+      rule_description: "Throttle requests from region CN"
+      rate_limit:
+        rate_limit_count: 100
+        rate_limit_interval_sec: 60
+        conform_action: allow
+        exceed_action: deny(429)
+        enforce_on_key: IP
+  adaptive_protection: true
+  advanced_options:
+    json_parsing: STANDARD
+    log_level: NORMAL
+  services:
+    data:
+      protocol: custom
