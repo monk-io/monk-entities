@@ -28,7 +28,7 @@ pubsub-topic:
       - `gcp/pubsub-subscription` — attach pull or push subscriptions to this topic
       - `gcp/cloud-function` — trigger functions via Pub/Sub event trigger
       - `gcp/service-usage` — enable `pubsub.googleapis.com` API
-    version-hash: 888755cce30a
+    version-hash: 27fa8349e99e
   schema:
     project:
       type: string

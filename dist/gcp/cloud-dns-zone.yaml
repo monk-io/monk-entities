@@ -28,7 +28,7 @@ cloud-dns-zone:
       Works with:
       - `gcp/cloud-dns-record-set` — create DNS records in this zone
       - `gcp/service-usage` — enable `dns.googleapis.com` API
-    version-hash: 888755cce30a
+    version-hash: 27fa8349e99e
   schema:
     project:
       type: string

@@ -79,8 +79,9 @@ export interface IapTarget {
 /**
  * Resolve a GCP project ID to its numeric project number.
  * IAP paths under `iap_web` use the project NUMBER, not the project ID.
+ * Module-internal — callers should use {@link resolveIapResourceName}.
  */
-export function resolveProjectNumber(projectId: string): string {
+function resolveProjectNumber(projectId: string): string {
     const url = `${RESOURCE_MANAGER_API_URL}/projects/${projectId}`;
     const response = gcp.get(url);
     if (response.error || response.statusCode >= 400) {
@@ -99,8 +100,9 @@ export function resolveProjectNumber(projectId: string): string {
  * Build the full IAP-protected resource path for a given target.
  * Paths follow the conventions documented at
  * https://cloud.google.com/iap/docs/managing-access
+ * Module-internal — callers should use {@link resolveIapResourceName}.
  */
-export function buildIapTargetPath(target: IapTarget, projectNumber: string): string {
+function buildIapTargetPath(target: IapTarget, projectNumber: string): string {
     switch (target.target_kind) {
         case "raw": {
             if (!target.resource_path) {

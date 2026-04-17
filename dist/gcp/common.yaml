@@ -3,5 +3,5 @@ namespace: gcp
 common:
   defines: module
   metadata:
-    version-hash: 888755cce30a
+    version-hash: 27fa8349e99e
   source: <<< common.js

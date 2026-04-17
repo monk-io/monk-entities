@@ -32,7 +32,7 @@ identity-platform-config:
       - `gcp/identity-platform-oauth-idp-config` — Configure OIDC providers at project level
       - `gcp/identity-platform-inbound-saml-config` — Configure SAML providers at project level
       - `gcp/service-usage` — Enable identitytoolkit.googleapis.com API first
-    version-hash: 888755cce30a
+    version-hash: 27fa8349e99e
   schema:
     project:
       type: string
