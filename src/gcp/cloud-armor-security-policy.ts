@@ -581,10 +581,11 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
                 paths.push("advancedOptionsConfig.logLevel");
                 advChanged = true;
             }
-            if (ao.user_ip_request_headers) {
+            const desiredUserIpHeaders = this.collectArray<string>(ao, "user_ip_request_headers");
+            if (desiredUserIpHeaders.length > 0 || (ao && ao["user_ip_request_headers"] !== undefined)) {
                 const cur = currentAdv.userIpRequestHeaders || [];
-                if (JSON.stringify(cur) !== JSON.stringify(ao.user_ip_request_headers)) {
-                    advanced.userIpRequestHeaders = ao.user_ip_request_headers;
+                if (JSON.stringify(cur) !== JSON.stringify(desiredUserIpHeaders)) {
+                    advanced.userIpRequestHeaders = desiredUserIpHeaders;
                     paths.push("advancedOptionsConfig.userIpRequestHeaders");
                     advChanged = true;
                 }
@@ -643,34 +644,77 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
     }
 
     private rulesEqual(liveRule: any, encoded: any): boolean {
-        // Normalize both sides to the fields we control, then compare stringified.
-        const live = {
-            action: liveRule.action,
-            description: liveRule.description || "",
-            preview: liveRule.preview === true,
-            match: liveRule.match ? {
-                versionedExpr: liveRule.match.versionedExpr,
-                config: liveRule.match.config ? { srcIpRanges: liveRule.match.config.srcIpRanges } : undefined,
-                expr: liveRule.match.expr ? { expression: liveRule.match.expr.expression } : undefined,
-            } : undefined,
-            rateLimitOptions: liveRule.rateLimitOptions,
-            redirectOptions: liveRule.redirectOptions,
-            headerAction: liveRule.headerAction,
+        return JSON.stringify(this.normalizeRule(liveRule)) === JSON.stringify(this.normalizeRule(encoded));
+    }
+
+    /**
+     * Reduce a rule (live from GCP or locally encoded) to only the fields this entity
+     * controls. GCP augments rule responses with server-computed fields like
+     * `rateLimitOptions.enforceOnKeyConfigs` that aren't in our request body; if we
+     * compared those directly, every update() would see a diff and trigger a spurious
+     * patchRule.
+     */
+    private normalizeRule(rule: any): any {
+        if (!rule) return rule;
+        return {
+            action: rule.action,
+            description: rule.description || "",
+            preview: rule.preview === true,
+            match: this.normalizeMatch(rule.match),
+            rateLimitOptions: this.normalizeRateLimit(rule.rateLimitOptions),
+            redirectOptions: this.normalizeRedirect(rule.redirectOptions),
+            headerAction: this.normalizeHeaderAction(rule.headerAction),
         };
-        const desired = {
-            action: encoded.action,
-            description: encoded.description || "",
-            preview: encoded.preview === true,
-            match: encoded.match ? {
-                versionedExpr: encoded.match.versionedExpr,
-                config: encoded.match.config ? { srcIpRanges: encoded.match.config.srcIpRanges } : undefined,
-                expr: encoded.match.expr ? { expression: encoded.match.expr.expression } : undefined,
-            } : undefined,
-            rateLimitOptions: encoded.rateLimitOptions,
-            redirectOptions: encoded.redirectOptions,
-            headerAction: encoded.headerAction,
+    }
+
+    private normalizeMatch(m: any): any {
+        if (!m) return undefined;
+        return {
+            versionedExpr: m.versionedExpr,
+            config: m.config ? { srcIpRanges: m.config.srcIpRanges } : undefined,
+            expr: m.expr ? { expression: m.expr.expression } : undefined,
         };
-        return JSON.stringify(live) === JSON.stringify(desired);
+    }
+
+    private normalizeRateLimit(rl: any): any {
+        if (!rl) return undefined;
+        const out: any = {};
+        if (rl.rateLimitThreshold) {
+            out.rateLimitThreshold = {
+                count: rl.rateLimitThreshold.count,
+                intervalSec: rl.rateLimitThreshold.intervalSec,
+            };
+        }
+        if (rl.conformAction !== undefined) out.conformAction = rl.conformAction;
+        if (rl.exceedAction !== undefined) out.exceedAction = rl.exceedAction;
+        if (rl.enforceOnKey !== undefined) out.enforceOnKey = rl.enforceOnKey;
+        if (rl.enforceOnKeyName !== undefined) out.enforceOnKeyName = rl.enforceOnKeyName;
+        if (rl.banDurationSec !== undefined) out.banDurationSec = rl.banDurationSec;
+        if (rl.banThreshold) {
+            out.banThreshold = {
+                count: rl.banThreshold.count,
+                intervalSec: rl.banThreshold.intervalSec,
+            };
+        }
+        return out;
+    }
+
+    private normalizeRedirect(r: any): any {
+        if (!r) return undefined;
+        const out: any = { type: r.type };
+        if (r.target !== undefined) out.target = r.target;
+        return out;
+    }
+
+    private normalizeHeaderAction(h: any): any {
+        if (!h) return undefined;
+        const adds = h.requestHeadersToAdds || [];
+        return {
+            requestHeadersToAdds: adds.map((a: any) => ({
+                headerName: a.headerName,
+                headerValue: a.headerValue,
+            })),
+        };
     }
 
     override delete(): void {
