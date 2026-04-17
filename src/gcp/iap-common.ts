@@ -191,18 +191,22 @@ const TARGET_KINDS_NEEDING_PROJECT_NUMBER: ReadonlySet<IapTargetKind> = new Set<
 ]);
 
 /**
- * Resolve (and cache in state) the full IAP resource path for a target.
- * Shared by iap-settings and iap-access-policy so the caching + target-path
- * construction isn't duplicated. The project number is resolved lazily — only
- * for target kinds whose path actually uses it.
+ * Resolve the full IAP resource path for a target. The resolved path is
+ * written to `cache.resource_name` for observability but is ALWAYS recomputed
+ * from the current target on each call — target fields (target_kind,
+ * backend_service, region, ...) may have changed between lifecycle calls, and
+ * returning a stale cached path would silently apply changes to the old
+ * resource. The `project_number` IS cached in state (it's constant per
+ * project) so we don't re-hit Resource Manager every call.
+ *
+ * The project number is resolved lazily — only for target kinds whose path
+ * actually uses it (organization/folder/raw targets skip the lookup).
  */
 export function resolveIapResourceName(
     target: IapTarget,
     cache: IapResourceNameCache,
     projectId: string,
 ): string {
-    if (cache.resource_name) return cache.resource_name;
-
     let projectNumber = cache.project_number || "";
     if (TARGET_KINDS_NEEDING_PROJECT_NUMBER.has(target.target_kind) && !projectNumber) {
         projectNumber = resolveProjectNumber(projectId);
