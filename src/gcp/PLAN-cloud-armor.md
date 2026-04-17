@@ -206,7 +206,7 @@ No `MANIFEST` change (entity auto-registers via compile); no `build.sh` change (
 - [x] Tests — stack-template-cloud-armor.yaml + stack-integration-cloud-armor.test.yaml; 15 test steps covering lifecycle, 8 actions, 2 negative cases, cost estimation
 - [x] Manual testing — full lifecycle passes: create (3 rules + default-action=deny(403)) → list-rules → add-rule 500 → update-rule 1000 preview → set-default-action deny(404) → remove-rule 500 → get-cost-estimate ($9/month) → costs JSON → delete
 - [x] Integration tests — 17/17 steps passed (214.86s) via `./monkec.sh test --test-file stack-integration-cloud-armor.test.yaml`
-- [ ] PR
+- [x] PR — https://github.com/monk-io/monk-entities/pull/190 (branch: `feat/gcp-cloud-armor`, commit `5a1d8a6`)
 - [ ] Merged
 
 ## Issues Found
