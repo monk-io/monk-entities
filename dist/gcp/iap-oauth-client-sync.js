@@ -70,10 +70,24 @@ var _IapOauthClient = class _IapOauthClient extends (_a = GcpEntity, _getInfo_de
   getParentUrl() {
     return `${IAP_API_URL}/projects/${this.projectId}/brands/${this.definition.brand_id}/identityAwareProxyClients`;
   }
+  /**
+   * Walk all pages of the OAuth-client list and return the first match by displayName.
+   * GCP returns `nextPageToken` when more pages are available.
+   */
+  findClientByDisplayName(displayName) {
+    let pageToken;
+    do {
+      const url = pageToken ? `${this.getParentUrl()}?pageToken=${encodeURIComponent(pageToken)}` : this.getParentUrl();
+      const resp = this.get(url);
+      const clients = resp.identityAwareProxyClients || [];
+      const match = clients.find((c) => c.displayName === displayName);
+      if (match) return match;
+      pageToken = resp.nextPageToken ? String(resp.nextPageToken) : void 0;
+    } while (pageToken);
+    return void 0;
+  }
   create() {
-    const listResp = this.get(this.getParentUrl());
-    const clients = listResp.identityAwareProxyClients || [];
-    const existing = clients.find((c) => c.displayName === this.definition.display_name);
+    const existing = this.findClientByDisplayName(this.definition.display_name);
     if (existing) {
       this.state.client_name = String(existing.name || "");
       const parts2 = this.state.client_name.split("/");

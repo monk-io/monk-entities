@@ -93,10 +93,27 @@ export class IapOauthClient extends GcpEntity<IapOauthClientDefinition, IapOauth
         return `${IAP_API_URL}/projects/${this.projectId}/brands/${this.definition.brand_id}/identityAwareProxyClients`;
     }
 
+    /**
+     * Walk all pages of the OAuth-client list and return the first match by displayName.
+     * GCP returns `nextPageToken` when more pages are available.
+     */
+    private findClientByDisplayName(displayName: string): Record<string, unknown> | undefined {
+        let pageToken: string | undefined;
+        do {
+            const url = pageToken
+                ? `${this.getParentUrl()}?pageToken=${encodeURIComponent(pageToken)}`
+                : this.getParentUrl();
+            const resp = this.get(url);
+            const clients = (resp.identityAwareProxyClients as Array<Record<string, unknown>> | undefined) || [];
+            const match = clients.find(c => c.displayName === displayName);
+            if (match) return match;
+            pageToken = resp.nextPageToken ? String(resp.nextPageToken) : undefined;
+        } while (pageToken);
+        return undefined;
+    }
+
     override create(): void {
-        const listResp = this.get(this.getParentUrl());
-        const clients = (listResp.identityAwareProxyClients as Array<Record<string, unknown>> | undefined) || [];
-        const existing = clients.find(c => c.displayName === this.definition.display_name);
+        const existing = this.findClientByDisplayName(this.definition.display_name);
 
         if (existing) {
             this.state.client_name = String(existing.name || "");
