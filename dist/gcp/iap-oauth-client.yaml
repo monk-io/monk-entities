@@ -32,7 +32,7 @@ iap-oauth-client:
       Works with:
       - `gcp/iap-brand` — provides brand_id
       - `gcp/iap-settings` — consumes client_id + secret value to configure IAP on a resource
-    version-hash: 29a843e57326
+    version-hash: 86b4faad2fd5
   schema:
     project:
       type: string

@@ -127,7 +127,6 @@ var TARGET_KINDS_NEEDING_PROJECT_NUMBER = /* @__PURE__ */ new Set([
   "cloud-run"
 ]);
 function resolveIapResourceName(target, cache, projectId) {
-  if (cache.resource_name) return cache.resource_name;
   let projectNumber = cache.project_number || "";
   if (TARGET_KINDS_NEEDING_PROJECT_NUMBER.has(target.target_kind) && !projectNumber) {
     projectNumber = resolveProjectNumber(projectId);

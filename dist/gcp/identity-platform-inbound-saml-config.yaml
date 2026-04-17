@@ -29,7 +29,7 @@ identity-platform-inbound-saml-config:
       Works with:
       - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
       - `gcp/identity-platform-config` — Project-level configuration
-    version-hash: 29a843e57326
+    version-hash: 86b4faad2fd5
   schema:
     project:
       type: string
