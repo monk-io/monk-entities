@@ -30,7 +30,7 @@ identity-platform-default-idp-config:
       Works with:
       - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
       - `gcp/identity-platform-config` — Project-level configuration
-    version-hash: 5324a504e9c3
+    version-hash: 888755cce30a
   schema:
     project:
       type: string

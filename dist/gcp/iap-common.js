@@ -120,12 +120,22 @@ function buildIapTargetPath(target, projectNumber) {
       throw new Error(`Unknown target_kind: ${String(target.target_kind)}`);
   }
 }
+var TARGET_KINDS_NEEDING_PROJECT_NUMBER = /* @__PURE__ */ new Set([
+  "project",
+  "app-engine",
+  "app-engine-service",
+  "compute",
+  "compute-regional",
+  "cloud-run"
+]);
 function resolveIapResourceName(target, cache, projectId) {
   if (cache.resource_name) return cache.resource_name;
-  if (!cache.project_number) {
-    cache.project_number = resolveProjectNumber(projectId);
+  let projectNumber = cache.project_number || "";
+  if (TARGET_KINDS_NEEDING_PROJECT_NUMBER.has(target.target_kind) && !projectNumber) {
+    projectNumber = resolveProjectNumber(projectId);
+    cache.project_number = projectNumber;
   }
-  const name = buildIapTargetPath(target, cache.project_number);
+  const name = buildIapTargetPath(target, projectNumber);
   cache.resource_name = name;
   return name;
 }

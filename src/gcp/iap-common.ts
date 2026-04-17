@@ -174,9 +174,25 @@ export interface IapResourceNameCache {
 }
 
 /**
+ * Target kinds whose resource path contains `projects/{projectNumber}/iap_web/...`
+ * and therefore require Resource Manager lookup. Organization/folder/raw targets
+ * do not need the project number — avoid the API call (and the extra IAM
+ * permission requirement) for those.
+ */
+const TARGET_KINDS_NEEDING_PROJECT_NUMBER: ReadonlySet<IapTargetKind> = new Set<IapTargetKind>([
+    "project",
+    "app-engine",
+    "app-engine-service",
+    "compute",
+    "compute-regional",
+    "cloud-run",
+]);
+
+/**
  * Resolve (and cache in state) the full IAP resource path for a target.
  * Shared by iap-settings and iap-access-policy so the caching + target-path
- * construction isn't duplicated.
+ * construction isn't duplicated. The project number is resolved lazily — only
+ * for target kinds whose path actually uses it.
  */
 export function resolveIapResourceName(
     target: IapTarget,
@@ -184,10 +200,14 @@ export function resolveIapResourceName(
     projectId: string,
 ): string {
     if (cache.resource_name) return cache.resource_name;
-    if (!cache.project_number) {
-        cache.project_number = resolveProjectNumber(projectId);
+
+    let projectNumber = cache.project_number || "";
+    if (TARGET_KINDS_NEEDING_PROJECT_NUMBER.has(target.target_kind) && !projectNumber) {
+        projectNumber = resolveProjectNumber(projectId);
+        cache.project_number = projectNumber;
     }
-    const name = buildIapTargetPath(target, cache.project_number);
+
+    const name = buildIapTargetPath(target, projectNumber);
     cache.resource_name = name;
     return name;
 }

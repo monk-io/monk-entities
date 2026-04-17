@@ -3,5 +3,5 @@ namespace: gcp
 iap-common:
   defines: module
   metadata:
-    version-hash: 5324a504e9c3
+    version-hash: 888755cce30a
   source: <<< iap-common.js
