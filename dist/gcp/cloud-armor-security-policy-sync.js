@@ -192,7 +192,7 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
   buildPolicyBody(includeRules) {
     const body = {
       name: this.definition.name,
-      type: "CLOUD_ARMOR"
+      type: this.definition.policy_type || "CLOUD_ARMOR"
     };
     if (this.definition.policy_description) {
       body.description = this.definition.policy_description;

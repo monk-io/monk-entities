@@ -33,7 +33,7 @@ cloud-armor-security-policy:
       - `gcp/cloud-cdn-backend-service` — attach via the `attach-backend-service` action
         passing the backend service name or self-link
       - `gcp/service-usage` — enable `compute.googleapis.com` before creating policies
-    version-hash: 510b0f38e9f8
+    version-hash: 1f539dc2c3c8
   schema:
     project:
       type: string
@@ -44,6 +44,15 @@ cloud-armor-security-policy:
     policy_description:
       type: string
       description: Human-readable policy description
+    policy_type:
+      type: string
+      enum:
+        - CLOUD_ARMOR
+        - CLOUD_ARMOR_EDGE
+      description: |-
+        Policy type. CLOUD_ARMOR protects backend services (default);
+        CLOUD_ARMOR_EDGE protects backend buckets at the edge. Must match the
+        kind of backend you intend to attach to.
     default_action:
       type: string
       enum:
