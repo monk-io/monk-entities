@@ -113,6 +113,14 @@ export interface CloudCdnBackendBucketDefinition extends GcpEntityDefinition {
      * @description Response compression mode
      */
     compression_mode?: CdnCompressionMode;
+
+    /**
+     * @description Self-link of a Cloud Armor security policy to attach as the
+     * edge security policy. The policy must be of type CLOUD_ARMOR_EDGE
+     * (backend buckets only accept edge policies). Pass an empty string to
+     * detach.
+     */
+    security_policy?: string;
 }
 
 /**
@@ -309,6 +317,8 @@ export class CloudCdnBackendBucket extends GcpEntity<CloudCdnBackendBucketDefini
         this.state.existing = false;
 
         cli.output(`Backend bucket ${this.definition.name} created with CDN ${this.definition.enable_cdn !== false ? 'enabled' : 'disabled'}`);
+
+        this.applyEdgeSecurityPolicy();
     }
 
     override update(): void {
@@ -332,6 +342,30 @@ export class CloudCdnBackendBucket extends GcpEntity<CloudCdnBackendBucketDefini
         }
 
         cli.output(`Backend bucket ${this.definition.name} updated`);
+
+        this.applyEdgeSecurityPolicy();
+    }
+
+    private applyEdgeSecurityPolicy(): void {
+        if (this.definition.security_policy === undefined) {
+            return;
+        }
+        const desired = this.definition.security_policy || "";
+        const existing = this.getBackendBucket();
+        const current = existing?.edgeSecurityPolicy || "";
+        if (current === desired) {
+            return;
+        }
+        const url = `${this.getResourceUrl()}/setEdgeSecurityPolicy`;
+        cli.output(
+            desired
+                ? `Attaching edge security policy to ${this.definition.name}`
+                : `Detaching edge security policy from ${this.definition.name}`,
+        );
+        const op = this.post(url, { securityPolicy: desired });
+        if (op?.name) {
+            this.waitForComputeOperation(op.name);
+        }
     }
 
     override delete(): void {

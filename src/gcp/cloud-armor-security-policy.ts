@@ -197,6 +197,13 @@ export interface CloudArmorSecurityPolicyDefinition extends GcpEntityDefinition 
     policy_description?: string;
 
     /**
+     * @description Policy type. CLOUD_ARMOR protects backend services (default);
+     * CLOUD_ARMOR_EDGE protects backend buckets at the edge. Must match the
+     * kind of backend you intend to attach to.
+     */
+    policy_type?: "CLOUD_ARMOR" | "CLOUD_ARMOR_EDGE";
+
+    /**
      * @description Action applied to requests not matching any user rule. Defaults to deny(403).
      */
     default_action?: "allow" | "deny(403)" | "deny(404)" | "deny(502)";
@@ -428,7 +435,7 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
     private buildPolicyBody(includeRules: boolean): any {
         const body: any = {
             name: this.definition.name,
-            type: "CLOUD_ARMOR",
+            type: this.definition.policy_type || "CLOUD_ARMOR",
         };
         if (this.definition.policy_description) {
             body.description = this.definition.policy_description;

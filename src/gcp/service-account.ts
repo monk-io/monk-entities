@@ -265,7 +265,11 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
     }
 
     /**
-     * Add role bindings for this service account
+     * Add role bindings for this service account.
+     *
+     * Retries on transient propagation errors: newly-created service accounts
+     * sometimes take a few seconds to appear to resourcemanager.setIamPolicy,
+     * which returns 400 "does not exist" in that window.
      */
     private addRoleBindings(email: string): void {
         if (!this.definition.roles || this.definition.roles.length === 0) {
@@ -273,35 +277,43 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
         }
 
         cli.output(`Adding ${this.definition.roles.length} role bindings...`);
-
-        const policy = this.getIamPolicy();
         const member = `serviceAccount:${email}`;
 
-        // Ensure bindings array exists (may be missing for projects with default IAM only)
-        if (!policy.bindings) {
-            policy.bindings = [];
-        }
+        const maxAttempts = 6;
+        const backoffMs = 5000;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const policy = this.getIamPolicy();
+                if (!policy.bindings) policy.bindings = [];
 
-        for (const role of this.definition.roles) {
-            // Check if binding already exists
-            const binding = policy.bindings.find(b => b.role === role);
-
-            if (binding) {
-                // Add member if not already present
-                if (!binding.members.includes(member)) {
-                    binding.members.push(member);
+                for (const role of this.definition.roles) {
+                    const binding = policy.bindings.find(b => b.role === role);
+                    if (binding) {
+                        if (!binding.members.includes(member)) {
+                            binding.members.push(member);
+                        }
+                    } else {
+                        policy.bindings.push({ role: role, members: [member] });
+                    }
                 }
-            } else {
-                // Create new binding
-                policy.bindings.push({
-                    role: role,
-                    members: [member],
-                });
+                this.setIamPolicy(policy);
+                cli.output("Role bindings added successfully");
+                return;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                const isPropagationRace =
+                    /does not exist/i.test(msg) ||
+                    /INVALID_ARGUMENT/i.test(msg) && /service account/i.test(msg);
+                if (!isPropagationRace || attempt === maxAttempts) {
+                    throw err;
+                }
+                cli.output(
+                    `setIamPolicy attempt ${attempt}/${maxAttempts} hit propagation race, retrying in ${backoffMs / 1000}s...`,
+                );
+                const until = Date.now() + backoffMs;
+                while (Date.now() < until) { /* busy wait — entity runtime lacks setTimeout */ }
             }
         }
-
-        this.setIamPolicy(policy);
-        cli.output("Role bindings added successfully");
     }
 
     /**
@@ -341,17 +353,28 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
     }
 
     override create(): void {
-        // Check if service account already exists
-        const existing = this.getServiceAccount();
+        // `existing` is sticky — set on the very first create (true if we
+        // adopted a pre-existing SA, false if we created it) and never
+        // flipped afterwards. A mid-deploy retry that finds its own
+        // just-created SA must not reclassify itself as adopted.
+        const firstRun = this.state.existing === undefined;
+        const found = this.getServiceAccount();
 
-        if (existing) {
-            cli.output(`Service account ${this.definition.name} already exists, adopting...`);
-            this.state.existing = true;
-            this.populateState(existing);
+        if (found) {
+            if (firstRun) {
+                cli.output(`Service account ${this.definition.name} already exists, adopting...`);
+                this.state.existing = true;
+            } else {
+                cli.output(
+                    `Service account ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,
+                );
+            }
+            this.populateState(found);
 
-            // Still add role bindings if specified
+            // (Re)apply role bindings on every create — converges the IAM
+            // policy toward the declared set. Idempotent.
             if (this.definition.roles && this.definition.roles.length > 0) {
-                this.addRoleBindings(existing.email);
+                this.addRoleBindings(found.email);
             }
             return;
         }
@@ -370,7 +393,9 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
         const result = this.post(this.iamApiUrl, body);
 
         this.populateState(result);
-        this.state.existing = false;
+        if (firstRun) {
+            this.state.existing = false;
+        }
 
         cli.output(`Service account created: ${result.email}`);
 
@@ -389,10 +414,15 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
             return;
         }
 
-        // Update service account metadata
+        // Update service account metadata.
+        // IAM v1 patch requires a ServiceAccount body nested under `serviceAccount`
+        // plus an `updateMask` listing the fields being changed.
         const body = {
-            displayName: this.definition.display_name || this.definition.name,
-            description: this.definition.account_description,
+            serviceAccount: {
+                displayName: this.definition.display_name || this.definition.name,
+                description: this.definition.account_description,
+            },
+            updateMask: "displayName,description",
         };
 
         const url = `${this.iamApiUrl}/${existing.email}`;
@@ -408,6 +438,10 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
     }
 
     override delete(): void {
+        // `existing` is sticky (set once on the first create() and never
+        // flipped), so a retry that adopts its own just-created SA will
+        // *not* mistakenly set existing=true. Skip delete only for
+        // genuinely pre-existing SAs we adopted.
         if (this.state.existing) {
             cli.output(`Service account ${this.definition.name} was not created by this entity, skipping delete`);
             return;
