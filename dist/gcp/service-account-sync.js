@@ -106,33 +106,51 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     this.post(url, { policy });
   }
   /**
-   * Add role bindings for this service account
+   * Add role bindings for this service account.
+   *
+   * Retries on transient propagation errors: newly-created service accounts
+   * sometimes take a few seconds to appear to resourcemanager.setIamPolicy,
+   * which returns 400 "does not exist" in that window.
    */
   addRoleBindings(email) {
     if (!this.definition.roles || this.definition.roles.length === 0) {
       return;
     }
     cli.output(`Adding ${this.definition.roles.length} role bindings...`);
-    const policy = this.getIamPolicy();
     const member = `serviceAccount:${email}`;
-    if (!policy.bindings) {
-      policy.bindings = [];
-    }
-    for (const role of this.definition.roles) {
-      const binding = policy.bindings.find((b) => b.role === role);
-      if (binding) {
-        if (!binding.members.includes(member)) {
-          binding.members.push(member);
+    const maxAttempts = 6;
+    const backoffMs = 5e3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const policy = this.getIamPolicy();
+        if (!policy.bindings) policy.bindings = [];
+        for (const role of this.definition.roles) {
+          const binding = policy.bindings.find((b) => b.role === role);
+          if (binding) {
+            if (!binding.members.includes(member)) {
+              binding.members.push(member);
+            }
+          } else {
+            policy.bindings.push({ role, members: [member] });
+          }
         }
-      } else {
-        policy.bindings.push({
-          role,
-          members: [member]
-        });
+        this.setIamPolicy(policy);
+        cli.output("Role bindings added successfully");
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isPropagationRace = /does not exist/i.test(msg) || /INVALID_ARGUMENT/i.test(msg) && /service account/i.test(msg);
+        if (!isPropagationRace || attempt === maxAttempts) {
+          throw err;
+        }
+        cli.output(
+          `setIamPolicy attempt ${attempt}/${maxAttempts} hit propagation race, retrying in ${backoffMs / 1e3}s...`
+        );
+        const until = Date.now() + backoffMs;
+        while (Date.now() < until) {
+        }
       }
     }
-    this.setIamPolicy(policy);
-    cli.output("Role bindings added successfully");
   }
   /**
    * Remove role bindings for this service account
@@ -159,13 +177,20 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     cli.output("Role bindings removed successfully");
   }
   create() {
-    const existing = this.getServiceAccount();
-    if (existing) {
-      cli.output(`Service account ${this.definition.name} already exists, adopting...`);
-      this.state.existing = true;
-      this.populateState(existing);
+    const firstRun = this.state.existing === void 0;
+    const found = this.getServiceAccount();
+    if (found) {
+      if (firstRun) {
+        cli.output(`Service account ${this.definition.name} already exists, adopting...`);
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Service account ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
+      this.populateState(found);
       if (this.definition.roles && this.definition.roles.length > 0) {
-        this.addRoleBindings(existing.email);
+        this.addRoleBindings(found.email);
       }
       return;
     }
@@ -179,7 +204,9 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
     cli.output(`Creating service account: ${this.definition.name}`);
     const result = this.post(this.iamApiUrl, body);
     this.populateState(result);
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
     cli.output(`Service account created: ${result.email}`);
     if (this.definition.roles && this.definition.roles.length > 0) {
       this.addRoleBindings(result.email);
@@ -193,8 +220,11 @@ var _ServiceAccount = class _ServiceAccount extends (_a = GcpEntity, _getInfo_de
       return;
     }
     const body = {
-      displayName: this.definition.display_name || this.definition.name,
-      description: this.definition.account_description
+      serviceAccount: {
+        displayName: this.definition.display_name || this.definition.name,
+        description: this.definition.account_description
+      },
+      updateMask: "displayName,description"
     };
     const url = `${this.iamApiUrl}/${existing.email}`;
     const result = this.patch(url, body);

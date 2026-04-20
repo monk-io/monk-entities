@@ -181,6 +181,7 @@ var _CloudCdnBackendBucket = class _CloudCdnBackendBucket extends (_a = GcpEntit
     }
     this.state.existing = false;
     cli.output(`Backend bucket ${this.definition.name} created with CDN ${this.definition.enable_cdn !== false ? "enabled" : "disabled"}`);
+    this.applyEdgeSecurityPolicy();
   }
   update() {
     if (!this.state.id) {
@@ -199,6 +200,26 @@ var _CloudCdnBackendBucket = class _CloudCdnBackendBucket extends (_a = GcpEntit
       this.populateState(resource);
     }
     cli.output(`Backend bucket ${this.definition.name} updated`);
+    this.applyEdgeSecurityPolicy();
+  }
+  applyEdgeSecurityPolicy() {
+    if (this.definition.security_policy === void 0) {
+      return;
+    }
+    const desired = this.definition.security_policy || "";
+    const existing = this.getBackendBucket();
+    const current = existing?.edgeSecurityPolicy || "";
+    if (current === desired) {
+      return;
+    }
+    const url = `${this.getResourceUrl()}/setEdgeSecurityPolicy`;
+    cli.output(
+      desired ? `Attaching edge security policy to ${this.definition.name}` : `Detaching edge security policy from ${this.definition.name}`
+    );
+    const op = this.post(url, { securityPolicy: desired });
+    if (op?.name) {
+      this.waitForComputeOperation(op.name);
+    }
   }
   delete() {
     if (this.state.existing) {
