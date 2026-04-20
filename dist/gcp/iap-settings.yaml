@@ -24,7 +24,7 @@ iap-settings:
       ## Composing with Other Entities
       Works with:
       - `gcp/iap-oauth-client` — supply client_id + secret into `access_settings.oauth_settings`
-    version-hash: 1f539dc2c3c8
+    version-hash: d28065c8c5da
   schema:
     project:
       type: string

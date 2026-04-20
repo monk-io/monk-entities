@@ -1,0 +1,95 @@
+namespace: gcp
+resource-iam-binding:
+  defines: entity
+  metadata:
+    name: ResourceIamBinding
+    description: |-
+      Manages a single IAM binding at a specific resource's scope.
+      Complements `gcp/project-iam-binding` — use this when you need to grant a
+      role on one bucket (or dataset, etc.) without polluting the project policy.
+    version-hash: d28065c8c5da
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    resource_type:
+      type: string
+      const: storage_bucket
+      description: |-
+        Kind of resource whose IAM policy this binding modifies.
+        Currently: `storage_bucket` (GCS bucket IAM).
+    resource_id:
+      type: string
+      description: |-
+        Resource identifier. For `storage_bucket` this is the
+        bucket name (not a `gs://` URL, just the name).
+    role:
+      type: string
+      description: |-
+        IAM role to grant. Predefined
+        (e.g. `roles/storage.objectViewer`) or custom.
+    member:
+      type: string
+      description: |-
+        Principal receiving the role. Must include the IAM prefix:
+        `user:alice@example.com`
+        `group:engineers@example.com`
+        `serviceAccount:foo@project.iam.gserviceaccount.com`
+        `domain:example.com`
+        `allAuthenticatedUsers` / `allUsers`
+    binding_condition:
+      type: object
+      properties:
+        title:
+          type: string
+        condition_description:
+          type: string
+        expression:
+          type: string
+      required:
+        - title
+        - expression
+      additionalProperties: false
+      description: Optional IAM Condition (CEL-gated access).
+    required:
+      - resource_type
+      - resource_id
+      - role
+      - member
+  state-schema:
+    existing:
+      type: boolean
+      description: |-
+        Sticky ownership flag. `true` if the binding was
+        already present when this entity first ran create() (adopted);
+        `false` if we appended the member. Once set, never flipped —
+        a retry cannot reclassify.
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_type:
+      type: string
+    resource_id:
+      type: string
+    role:
+      type: string
+    member:
+      type: string
+    last_etag:
+      type: string
+      description: Most recently observed etag for informational use.
+  lifecycle:
+    sync: <<< resource-iam-binding-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common
