@@ -25,7 +25,7 @@ cloud-dns-record-set:
       Works with:
       - `gcp/cloud-dns-zone` — the zone that contains this record set
       - `gcp/service-usage` — enable `dns.googleapis.com` API
-    version-hash: d28065c8c5da
+    version-hash: 8df7ffefd63e
   schema:
     project:
       type: string

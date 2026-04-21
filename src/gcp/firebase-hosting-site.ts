@@ -213,12 +213,19 @@ export class FirebaseHostingSite extends GcpEntity<FirebaseHostingSiteDefinition
     }
 
     override create(): void {
-        // Check if site already exists
+        // `existing` is sticky — see service-account.ts / project-iam-binding.ts.
+        const firstRun = this.state.existing === undefined;
         const existing = this.getSite();
 
         if (existing) {
-            cli.output(`Site ${this.definition.name} already exists, adopting...`);
-            this.state.existing = true;
+            if (firstRun) {
+                cli.output(`Site ${this.definition.name} already exists, adopting...`);
+                this.state.existing = true;
+            } else {
+                cli.output(
+                    `Site ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,
+                );
+            }
             this.populateState(existing);
             return;
         }
@@ -242,7 +249,9 @@ export class FirebaseHostingSite extends GcpEntity<FirebaseHostingSiteDefinition
         const result = this.post(url, body);
 
         this.populateState(result);
-        this.state.existing = false;
+        if (firstRun) {
+            this.state.existing = false;
+        }
 
         cli.output(`Site created: ${this.state.default_url}`);
     }

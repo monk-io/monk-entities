@@ -87,10 +87,17 @@ var _CloudStorage = class _CloudStorage extends (_a = GcpEntity, _getInfo_dec = 
     this.state.gs_uri = `gs://${bucket.name}`;
   }
   create() {
+    const firstRun = this.state.existing === void 0;
     const existing = this.getBucket();
     if (existing) {
-      cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
-      this.state.existing = true;
+      if (firstRun) {
+        cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Bucket ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
       this.populateState(existing);
       return;
     }
@@ -144,7 +151,9 @@ var _CloudStorage = class _CloudStorage extends (_a = GcpEntity, _getInfo_dec = 
     cli.output(`Request body: ${JSON.stringify(body, null, 2)}`);
     const result = this.post(url, body);
     this.populateState(result);
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
     cli.output(`Bucket created: gs://${this.definition.name}`);
   }
   update() {

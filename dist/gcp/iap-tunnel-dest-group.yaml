@@ -25,7 +25,7 @@ iap-tunnel-dest-group:
       ## Composing with Other Entities
       Works with:
       - `gcp/iap-access-policy` — grant `roles/iap.tunnelResourceAccessor` on a tunnel resource
-    version-hash: d28065c8c5da
+    version-hash: 8df7ffefd63e
   schema:
     project:
       type: string

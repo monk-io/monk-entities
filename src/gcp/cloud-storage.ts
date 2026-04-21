@@ -442,12 +442,19 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
     }
 
     override create(): void {
-        // Check if bucket already exists
+        // `existing` is sticky — see service-account.ts / project-iam-binding.ts.
+        const firstRun = this.state.existing === undefined;
         const existing = this.getBucket();
 
         if (existing) {
-            cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
-            this.state.existing = true;
+            if (firstRun) {
+                cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
+                this.state.existing = true;
+            } else {
+                cli.output(
+                    `Bucket ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,
+                );
+            }
             this.populateState(existing);
             return;
         }
@@ -528,7 +535,9 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
         const result = this.post(url, body);
 
         this.populateState(result);
-        this.state.existing = false;
+        if (firstRun) {
+            this.state.existing = false;
+        }
 
         cli.output(`Bucket created: gs://${this.definition.name}`);
     }
