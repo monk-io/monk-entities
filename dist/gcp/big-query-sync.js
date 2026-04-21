@@ -105,12 +105,19 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
     }
   }
   create() {
+    const firstRun = this.state.existing === void 0;
     const existing = this.getDataset();
     if (existing) {
-      cli.output(
-        `Dataset ${this.definition.dataset} already exists, adopting...`
-      );
-      this.state.existing = true;
+      if (firstRun) {
+        cli.output(
+          `Dataset ${this.definition.dataset} already exists, adopting...`
+        );
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Dataset ${this.definition.dataset} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
       this.state.dataset_id = existing.datasetReference.datasetId;
       this.state.dataset_reference = `${this.projectId}:${existing.datasetReference.datasetId}`;
       this.state.self_link = existing.selfLink;
@@ -162,7 +169,9 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
     this.state.creation_time = result.creationTime;
     this.state.last_modified_time = result.lastModifiedTime;
     this.state.storage_billing_model = result.storageBillingModel;
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
     cli.output(`Dataset created: ${this.state.dataset_reference}`);
     if (this.definition.tables) {
       this.createTables();

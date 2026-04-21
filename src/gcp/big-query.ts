@@ -343,14 +343,21 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
   }
 
   override create(): void {
-    // Check if dataset already exists
+    // `existing` is sticky — see service-account.ts / project-iam-binding.ts.
+    const firstRun = this.state.existing === undefined;
     const existing = this.getDataset();
 
     if (existing) {
-      cli.output(
-        `Dataset ${this.definition.dataset} already exists, adopting...`
-      );
-      this.state.existing = true;
+      if (firstRun) {
+        cli.output(
+          `Dataset ${this.definition.dataset} already exists, adopting...`
+        );
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Dataset ${this.definition.dataset} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
       this.state.dataset_id = existing.datasetReference.datasetId;
       this.state.dataset_reference = `${this.projectId}:${existing.datasetReference.datasetId}`;
       this.state.self_link = existing.selfLink;
@@ -423,7 +430,9 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
     this.state.creation_time = result.creationTime;
     this.state.last_modified_time = result.lastModifiedTime;
     this.state.storage_billing_model = result.storageBillingModel;
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
 
     cli.output(`Dataset created: ${this.state.dataset_reference}`);
 

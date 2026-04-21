@@ -104,10 +104,17 @@ var _FirebaseHostingSite = class _FirebaseHostingSite extends (_a = GcpEntity, _
     }
   }
   create() {
+    const firstRun = this.state.existing === void 0;
     const existing = this.getSite();
     if (existing) {
-      cli.output(`Site ${this.definition.name} already exists, adopting...`);
-      this.state.existing = true;
+      if (firstRun) {
+        cli.output(`Site ${this.definition.name} already exists, adopting...`);
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Site ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
       this.populateState(existing);
       return;
     }
@@ -124,7 +131,9 @@ var _FirebaseHostingSite = class _FirebaseHostingSite extends (_a = GcpEntity, _
     const url = `${this.getBaseUrl()}?siteId=${this.definition.name}`;
     const result = this.post(url, body);
     this.populateState(result);
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
     cli.output(`Site created: ${this.state.default_url}`);
   }
   update() {

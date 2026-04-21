@@ -471,10 +471,21 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
     // ---------- Lifecycle ----------
 
     override create(): void {
+        // `existing` is sticky — set once on the first create() (true =
+        // adopted a pre-existing policy, false = we created it) and never
+        // flipped again. A mid-deploy retry that finds its own just-created
+        // policy cannot reclassify itself as adopted.
+        const firstRun = this.state.existing === undefined;
         const existing = this.getPolicy();
         if (existing) {
-            cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
-            this.state.existing = true;
+            if (firstRun) {
+                cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
+                this.state.existing = true;
+            } else {
+                cli.output(
+                    `Cloud Armor policy ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,
+                );
+            }
             this.populateState(existing);
             return;
         }
@@ -513,7 +524,9 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
         // Final state refresh.
         resource = this.getPolicy();
         if (resource) this.populateState(resource);
-        this.state.existing = false;
+        if (firstRun) {
+            this.state.existing = false;
+        }
         this.state.attached_backends = this.state.attached_backends || [];
 
         cli.output(`Cloud Armor policy ${this.definition.name} created with ${userRules.length} user rule(s) + default (${desiredDefault})`);

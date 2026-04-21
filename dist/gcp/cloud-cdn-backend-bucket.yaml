@@ -30,7 +30,7 @@ cloud-cdn-backend-bucket:
       Works with:
       - `gcp/cloud-storage` — GCS bucket that serves as the origin
       - `gcp/service-usage` — enable compute.googleapis.com API
-    version-hash: d28065c8c5da
+    version-hash: 8df7ffefd63e
   schema:
     project:
       type: string

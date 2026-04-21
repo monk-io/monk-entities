@@ -226,10 +226,17 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
   }
   // ---------- Lifecycle ----------
   create() {
+    const firstRun = this.state.existing === void 0;
     const existing = this.getPolicy();
     if (existing) {
-      cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
-      this.state.existing = true;
+      if (firstRun) {
+        cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
+        this.state.existing = true;
+      } else {
+        cli.output(
+          `Cloud Armor policy ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`
+        );
+      }
       this.populateState(existing);
       return;
     }
@@ -252,7 +259,9 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
     }
     resource = this.getPolicy();
     if (resource) this.populateState(resource);
-    this.state.existing = false;
+    if (firstRun) {
+      this.state.existing = false;
+    }
     this.state.attached_backends = this.state.attached_backends || [];
     cli.output(`Cloud Armor policy ${this.definition.name} created with ${userRules.length} user rule(s) + default (${desiredDefault})`);
   }

@@ -125,6 +125,12 @@ export class IapBrand extends GcpEntity<IapBrandDefinition, IapBrandState> {
     }
 
     private adoptBrand(brand: Record<string, unknown>): void {
+        // Brands can only be created via the Cloud Console (OAuth Admin API
+        // shut down March 2026), so every invocation of this entity goes
+        // through the adopt path. `existing=true` is the permanently-correct
+        // classification — delete() always skips removal. The sticky-existing
+        // pattern used by other entities (big-query, cloud-storage, etc.)
+        // doesn't apply here because there is no self-created branch.
         this.state.existing = true;
         const name = String(brand.name || "");
         this.state.brand_name = name;
