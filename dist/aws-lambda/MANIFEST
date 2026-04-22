@@ -4,4 +4,4 @@ DESCRIPTION Serverless compute functions on AWS.
 HOSTING managed
 TAGS aws,serverless,lambda,functions
 LOAD lambda-base.yaml lambda-function.yaml base.yaml common.yaml
-RESOURCES lambda-base.js lambda-function-sync.js common.js base.js
+RESOURCES lambda-function-sync.js base.js common.js lambda-base.js

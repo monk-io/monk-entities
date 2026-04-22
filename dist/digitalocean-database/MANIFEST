@@ -3,5 +3,5 @@ VERSION_HASH 2ddf4d9ca479
 DESCRIPTION Managed databases on DigitalOcean.
 HOSTING managed
 TAGS digitalocean,database,postgres,mysql,redis,mongodb
-LOAD do-provider-base.yaml digitalocean-base.yaml common.yaml database.yaml api-token.yaml
-RESOURCES common.js database-sync.js api-token-sync.js do-provider-base.js digitalocean-base.js
+LOAD digitalocean-base.yaml database.yaml common.yaml do-provider-base.yaml api-token.yaml
+RESOURCES digitalocean-base.js do-provider-base.js common.js database-sync.js api-token-sync.js
