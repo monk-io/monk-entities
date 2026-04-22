@@ -343,16 +343,24 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
   }
 
   override create(): void {
-    // `existing` is sticky — see service-account.ts / project-iam-binding.ts.
+    // `existing` is sticky; `force_ownership: true` reclaims adopted.
+    // See gcp-base.ts.
     const firstRun = this.state.existing === undefined;
     const existing = this.getDataset();
 
     if (existing) {
       if (firstRun) {
-        cli.output(
-          `Dataset ${this.definition.dataset} already exists, adopting...`
-        );
-        this.state.existing = true;
+        if (this.definition.force_ownership) {
+          cli.output(
+            `Dataset ${this.definition.dataset} already exists; reclaiming ownership (force_ownership=true)`
+          );
+          this.state.existing = false;
+        } else {
+          cli.output(
+            `Dataset ${this.definition.dataset} already exists, adopting...`
+          );
+          this.state.existing = true;
+        }
       } else {
         cli.output(
           `Dataset ${this.definition.dataset} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`

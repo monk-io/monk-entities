@@ -230,8 +230,13 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
     const existing = this.getPolicy();
     if (existing) {
       if (firstRun) {
-        cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
-        this.state.existing = true;
+        if (this.definition.force_ownership) {
+          cli.output(`Cloud Armor policy ${this.definition.name} already exists; reclaiming ownership (force_ownership=true)`);
+          this.state.existing = false;
+        } else {
+          cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
+          this.state.existing = true;
+        }
       } else {
         cli.output(
           `Cloud Armor policy ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`

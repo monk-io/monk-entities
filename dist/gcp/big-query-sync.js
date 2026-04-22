@@ -109,10 +109,17 @@ var _BigQuery = class _BigQuery extends (_a = GcpEntity, _getInfo_dec = [action(
     const existing = this.getDataset();
     if (existing) {
       if (firstRun) {
-        cli.output(
-          `Dataset ${this.definition.dataset} already exists, adopting...`
-        );
-        this.state.existing = true;
+        if (this.definition.force_ownership) {
+          cli.output(
+            `Dataset ${this.definition.dataset} already exists; reclaiming ownership (force_ownership=true)`
+          );
+          this.state.existing = false;
+        } else {
+          cli.output(
+            `Dataset ${this.definition.dataset} already exists, adopting...`
+          );
+          this.state.existing = true;
+        }
       } else {
         cli.output(
           `Dataset ${this.definition.dataset} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`

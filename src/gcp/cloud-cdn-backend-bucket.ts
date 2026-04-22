@@ -293,11 +293,26 @@ export class CloudCdnBackendBucket extends GcpEntity<CloudCdnBackendBucketDefini
     }
 
     override create(): void {
+        // `existing` is sticky; `force_ownership: true` reclaims an
+        // adopted resource. See gcp-base.ts.
+        const firstRun = this.state.existing === undefined;
         const existing = this.getBackendBucket();
         if (existing) {
-            cli.output(`Backend bucket ${this.definition.name} already exists, adopting`);
-            this.state.existing = true;
+            if (firstRun) {
+                if (this.definition.force_ownership) {
+                    cli.output(`Backend bucket ${this.definition.name} already exists; reclaiming ownership (force_ownership=true)`);
+                    this.state.existing = false;
+                } else {
+                    cli.output(`Backend bucket ${this.definition.name} already exists, adopting`);
+                    this.state.existing = true;
+                }
+            } else {
+                cli.output(
+                    `Backend bucket ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,
+                );
+            }
             this.populateState(existing);
+            this.applyEdgeSecurityPolicy();
             return;
         }
 
@@ -314,7 +329,9 @@ export class CloudCdnBackendBucket extends GcpEntity<CloudCdnBackendBucketDefini
         if (resource) {
             this.populateState(resource);
         }
-        this.state.existing = false;
+        if (firstRun) {
+            this.state.existing = false;
+        }
 
         cli.output(`Backend bucket ${this.definition.name} created with CDN ${this.definition.enable_cdn !== false ? 'enabled' : 'disabled'}`);
 

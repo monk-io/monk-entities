@@ -475,12 +475,22 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
         // adopted a pre-existing policy, false = we created it) and never
         // flipped again. A mid-deploy retry that finds its own just-created
         // policy cannot reclassify itself as adopted.
+        //
+        // `force_ownership: true` in the definition overrides the adopt
+        // branch: record `existing=false` so delete() cleans the resource
+        // up. Use when you know this stack previously created it but
+        // Monk's ledger was lost (e.g. after a cluster reset).
         const firstRun = this.state.existing === undefined;
         const existing = this.getPolicy();
         if (existing) {
             if (firstRun) {
-                cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
-                this.state.existing = true;
+                if (this.definition.force_ownership) {
+                    cli.output(`Cloud Armor policy ${this.definition.name} already exists; reclaiming ownership (force_ownership=true)`);
+                    this.state.existing = false;
+                } else {
+                    cli.output(`Cloud Armor policy ${this.definition.name} already exists, adopting`);
+                    this.state.existing = true;
+                }
             } else {
                 cli.output(
                     `Cloud Armor policy ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,

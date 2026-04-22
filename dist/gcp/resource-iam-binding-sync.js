@@ -162,10 +162,17 @@ var _ResourceIamBinding = class _ResourceIamBinding extends (_a = GcpEntity, _ge
       binding.members.push(this.definition.member);
     });
     if (firstRun) {
-      this.state.existing = alreadyPresent;
-      cli.output(
-        alreadyPresent ? `Binding already present; adopting (will not remove on delete)` : `Binding applied`
-      );
+      if (alreadyPresent && this.definition.force_ownership) {
+        this.state.existing = false;
+        cli.output(
+          `Binding already present; reclaiming ownership (force_ownership=true)`
+        );
+      } else {
+        this.state.existing = alreadyPresent;
+        cli.output(
+          alreadyPresent ? `Binding already present; adopting (will not remove on delete)` : `Binding applied`
+        );
+      }
     } else {
       cli.output(
         `Binding reconciled (existing=${this.state.existing ? "adopted" : "owned"})`
@@ -185,13 +192,15 @@ var _ResourceIamBinding = class _ResourceIamBinding extends (_a = GcpEntity, _ge
     }
     const describe = `revoke ${this.state.role} from ${this.state.member} on ${this.state.resource_type}:${this.state.resource_id}`;
     cli.output(`Removing resource IAM binding: ${describe}`);
+    const liveMember = this.definition.member;
+    const zombiePrefix = `deleted:${liveMember}?uid=`;
     this.withRetriedPolicy(describe, (policy) => {
       const idx = this.findSlot(policy);
       if (idx < 0) return;
       const binding = policy.bindings[idx];
-      const memberIdx = binding.members.indexOf(this.definition.member);
-      if (memberIdx < 0) return;
-      binding.members.splice(memberIdx, 1);
+      binding.members = binding.members.filter(
+        (m) => m !== liveMember && !m.startsWith(zombiePrefix)
+      );
       if (binding.members.length === 0) {
         policy.bindings.splice(idx, 1);
       }

@@ -443,13 +443,19 @@ export class CloudStorage extends GcpEntity<CloudStorageDefinition, CloudStorage
 
     override create(): void {
         // `existing` is sticky — see service-account.ts / project-iam-binding.ts.
+        // `force_ownership: true` reclaims an adopted resource (see gcp-base.ts).
         const firstRun = this.state.existing === undefined;
         const existing = this.getBucket();
 
         if (existing) {
             if (firstRun) {
-                cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
-                this.state.existing = true;
+                if (this.definition.force_ownership) {
+                    cli.output(`Bucket ${this.definition.name} already exists; reclaiming ownership (force_ownership=true)`);
+                    this.state.existing = false;
+                } else {
+                    cli.output(`Bucket ${this.definition.name} already exists, adopting...`);
+                    this.state.existing = true;
+                }
             } else {
                 cli.output(
                     `Bucket ${this.definition.name} present (existing=${this.state.existing ? "adopted" : "owned"}); reconciling`,

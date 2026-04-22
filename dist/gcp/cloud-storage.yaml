@@ -40,11 +40,25 @@ cloud-storage:
       point your S3-compatible clients to `https://storage.googleapis.com`.
       Make sure `storage.googleapis.com` is enabled via `gcp/service-usage`,
       and use a `gcp/service-account` email for the HMAC key.
-    version-hash: 8df7ffefd63e
+    version-hash: e900852a641e
   schema:
     project:
       type: string
       description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
     name:
       type: string
       description: |-

@@ -265,13 +265,22 @@ export class ProjectIamBinding extends GcpEntity<
 
         if (firstRun) {
             // First time we've been asked to create this binding.
-            this.state.existing = alreadyPresent;
-            if (alreadyPresent) {
+            // `force_ownership: true` reclaims an existing binding so
+            // delete() will remove it on teardown.
+            if (alreadyPresent && this.definition.force_ownership) {
+                this.state.existing = false;
                 cli.output(
-                    `Binding already present; adopting (will not remove on delete)`,
+                    `Binding already present; reclaiming ownership (force_ownership=true)`,
                 );
             } else {
-                cli.output(`Binding applied`);
+                this.state.existing = alreadyPresent;
+                if (alreadyPresent) {
+                    cli.output(
+                        `Binding already present; adopting (will not remove on delete)`,
+                    );
+                } else {
+                    cli.output(`Binding applied`);
+                }
             }
         } else {
             // Re-run: keep whatever `existing` said the first time. This
@@ -304,15 +313,22 @@ export class ProjectIamBinding extends GcpEntity<
         const describe = `revoke ${this.state.role} from ${this.state.member}`;
         cli.output(`Removing IAM binding: ${describe}`);
 
+        // When a GCP service account is deleted, existing IAM bindings
+        // referencing it get rewritten by the IAM service as
+        //   deleted:serviceAccount:<same-email>?uid=<numeric>
+        // Our entity's create() added the binding via the live email; on
+        // delete we clean both forms to prevent zombie accumulation across
+        // SA rotations.
+        const liveMember = this.definition.member;
+        const zombiePrefix = `deleted:${liveMember}?uid=`;
+
         this.withRetriedPolicy(describe, (policy) => {
             const idx = this.findSlot(policy);
             if (idx < 0) return; // nothing to do
             const binding = policy.bindings[idx];
-            const memberIdx = binding.members.indexOf(this.definition.member);
-            if (memberIdx < 0) return; // already gone
-            binding.members.splice(memberIdx, 1);
-            // If we just emptied the slot, drop the whole binding — GCP
-            // rejects setIamPolicy with empty-members bindings.
+            binding.members = binding.members.filter(
+                (m: string) => m !== liveMember && !m.startsWith(zombiePrefix),
+            );
             if (binding.members.length === 0) {
                 policy.bindings.splice(idx, 1);
             }

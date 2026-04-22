@@ -18,6 +18,21 @@ export interface GcpEntityDefinition {
      * @description Override the GCP project ID (optional, defaults to environment)
      */
     project?: string;
+
+    /**
+     * @description When true, classify the resource as owned by this entity
+     * even if `create()` finds it pre-existing in the cloud (the usual
+     * adopt branch). Subsequent `delete()` will remove it.
+     *
+     * Use this when you know the resource was created by a previous run of
+     * your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+     * this flag, the entity adopts (sets `existing=true`) and `delete()`
+     * refuses to clean up on teardown, leaving residue in the cloud.
+     *
+     * Leave unset/false when the resource is genuinely externally-managed
+     * and you just want to read/reconcile it.
+     */
+    force_ownership?: boolean;
 }
 
 /**
