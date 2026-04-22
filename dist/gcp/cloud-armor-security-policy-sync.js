@@ -458,22 +458,39 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
       return;
     }
     cli.output(`Deleting Cloud Armor policy: ${this.definition.name}`);
-    try {
-      const op = this.httpDelete(this.getResourceUrl());
-      if (op?.name) {
-        cli.output("Waiting for policy deletion...");
-        this.waitForComputeOperation(op.name);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("resourceInUseByAnotherResource") || msg.includes("FAILED_PRECONDITION") || msg.includes("400")) {
-        throw new Error(
-          `Cannot delete policy ${this.definition.name}: it is still attached to one or more backend services. Detach first via 'detach-backend-service' action or by setting the backend's securityPolicy to "". Underlying error: ${msg}`
+    const maxAttempts = 12;
+    const delayMs = 1e4;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const op = this.httpDelete(this.getResourceUrl());
+        if (op?.name) {
+          cli.output("Waiting for policy deletion...");
+          this.waitForComputeOperation(op.name);
+        }
+        cli.output(`Cloud Armor policy ${this.definition.name} deleted`);
+        return;
+      } catch (error) {
+        lastErr = error;
+        const msg = error instanceof Error ? error.message : String(error);
+        const stillAttached = msg.includes("resourceInUseByAnotherResource") || msg.includes("is already being used") || msg.includes("still attached");
+        if (!stillAttached || attempt === maxAttempts) {
+          if (stillAttached) {
+            throw new Error(
+              `Cannot delete policy ${this.definition.name}: it is still attached to one or more backend services after ${attempt} attempts. Detach first via 'detach-backend-service' action or by setting the backend's securityPolicy to "". Underlying error: ${msg}`
+            );
+          }
+          throw error;
+        }
+        cli.output(
+          `Policy still attached (attempt ${attempt}/${maxAttempts}); waiting ${delayMs / 1e3}s for referring resources to finish teardown...`
         );
+        const until = Date.now() + delayMs;
+        while (Date.now() < until) {
+        }
       }
-      throw error;
     }
-    cli.output(`Cloud Armor policy ${this.definition.name} deleted`);
+    throw lastErr ?? new Error("cloud-armor delete retry loop exited unexpectedly");
   }
   checkReadiness() {
     const resource = this.getPolicy();

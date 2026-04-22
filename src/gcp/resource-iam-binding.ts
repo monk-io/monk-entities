@@ -283,17 +283,31 @@ export class ResourceIamBinding extends GcpEntity<
         const liveMember = this.definition.member;
         const zombiePrefix = `deleted:${liveMember}?uid=`;
 
-        this.withRetriedPolicy(describe, (policy) => {
-            const idx = this.findSlot(policy);
-            if (idx < 0) return;
-            const binding = policy.bindings[idx];
-            binding.members = binding.members.filter(
-                (m: string) => m !== liveMember && !m.startsWith(zombiePrefix),
-            );
-            if (binding.members.length === 0) {
-                policy.bindings.splice(idx, 1);
+        try {
+            this.withRetriedPolicy(describe, (policy) => {
+                const idx = this.findSlot(policy);
+                if (idx < 0) return;
+                const binding = policy.bindings[idx];
+                binding.members = binding.members.filter(
+                    (m: string) => m !== liveMember && !m.startsWith(zombiePrefix),
+                );
+                if (binding.members.length === 0) {
+                    policy.bindings.splice(idx, 1);
+                }
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            // If the target resource is gone (common in stack teardowns
+            // where the bucket/dataset is deleted before us), the binding
+            // is effectively gone too — not an error.
+            if (msg.includes("404") || msg.includes("does not exist") || msg.includes("not found")) {
+                cli.output(
+                    `Target ${this.definition.resource_type}:${this.definition.resource_id} already deleted; binding gone with it`,
+                );
+                return;
             }
-        });
+            throw err;
+        }
 
         cli.output(`Binding removed`);
     }
