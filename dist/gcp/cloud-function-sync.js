@@ -193,7 +193,7 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
     if (this.definition.service?.all_traffic_on_latest_revision !== void 0) {
       body.serviceConfig.allTrafficOnLatestRevision = this.definition.service.all_traffic_on_latest_revision;
     }
-    if (this.definition.event_trigger) {
+    if (this.definition.event_trigger?.event_type) {
       body.eventTrigger = {
         eventType: this.definition.event_trigger.event_type
       };
@@ -443,29 +443,32 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
             networkRate = price;
           }
         }
-        if (invocationRate > 0 || cpuRate > 0) {
-          if (invocationRate <= 0 || cpuRate <= 0 || memoryRate <= 0) {
-            const missing = [];
-            if (invocationRate <= 0) missing.push("invocation");
-            if (cpuRate <= 0) missing.push("cpu");
-            if (memoryRate <= 0) missing.push("memory");
-            throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(", ")}`);
-          }
+        if (invocationRate > 0 || cpuRate > 0 || memoryRate > 0) {
+          const fb = { invocation: 4e-7, cpu: 1e-5, memory: 25e-7 };
+          const partial = invocationRate <= 0 || cpuRate <= 0 || memoryRate <= 0;
           return {
-            invocationPer1M: invocationRate * 1e6,
-            cpuGhzSecond: cpuRate,
-            memoryGbSecond: memoryRate,
+            invocationPer1M: (invocationRate > 0 ? invocationRate : fb.invocation) * 1e6,
+            cpuGhzSecond: cpuRate > 0 ? cpuRate : fb.cpu,
+            memoryGbSecond: memoryRate > 0 ? memoryRate : fb.memory,
             idleCpuGhzSecond: idleCpuRate,
             idleMemoryGbSecond: idleMemoryRate,
-            networkEgressPerGb: networkRate > 0 ? networkRate : 0,
-            source: "GCP Cloud Billing Catalog API"
+            networkEgressPerGb: networkRate > 0 ? networkRate : 0.12,
+            source: partial ? "GCP Cloud Billing Catalog API (partial; published fallbacks for missing rates)" : "GCP Cloud Billing Catalog API"
           };
         }
       }
     } catch (error) {
-      throw new Error(`Failed to fetch Cloud Functions pricing from GCP API: ${error.message}`);
+      cli.output(`Warning: GCP catalog fetch failed (${error.message}); using published fallbacks`);
     }
-    throw new Error("Could not retrieve Cloud Functions pricing from GCP Cloud Billing Catalog API");
+    return {
+      invocationPer1M: 0.4,
+      cpuGhzSecond: 1e-5,
+      memoryGbSecond: 25e-7,
+      idleCpuGhzSecond: 0,
+      idleMemoryGbSecond: 0,
+      networkEgressPerGb: 0.12,
+      source: "Published rates (catalog unavailable)"
+    };
   }
   /**
    * Extract price from a GCP Billing SKU

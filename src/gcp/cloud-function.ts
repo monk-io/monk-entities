@@ -545,8 +545,14 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
                 this.definition.service.all_traffic_on_latest_revision;
         }
 
-        // Event trigger configuration
-        if (this.definition.event_trigger) {
+        // Event trigger configuration.
+        // Gate on event_type, not on event_trigger itself: monkec's schema
+        // generator materializes defaults for scalar sub-fields (e.g.
+        // retry_policy), so `event_trigger` may be a non-null object even
+        // when the user never set it. Emitting an eventTrigger without
+        // eventType makes the v2 API reject the create with "Trigger event
+        // type must be specified" — which also breaks HTTP-triggered functions.
+        if (this.definition.event_trigger?.event_type) {
             body.eventTrigger = {
                 eventType: this.definition.event_trigger.event_type,
             };
@@ -881,30 +887,38 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
                     }
                 }
 
-                if (invocationRate > 0 || cpuRate > 0) {
-                    if (invocationRate <= 0 || cpuRate <= 0 || memoryRate <= 0) {
-                        const missing: string[] = [];
-                        if (invocationRate <= 0) missing.push('invocation');
-                        if (cpuRate <= 0) missing.push('cpu');
-                        if (memoryRate <= 0) missing.push('memory');
-                        throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(', ')}`);
-                    }
+                if (invocationRate > 0 || cpuRate > 0 || memoryRate > 0) {
+                    // Published fallbacks (USD, 2024 rates) for rates the
+                    // catalog omits. The Cloud Billing catalog regularly
+                    // ships partial SKU sets per region.
+                    const fb = { invocation: 0.0000004, cpu: 0.00001, memory: 0.0000025 };
+                    const partial = invocationRate <= 0 || cpuRate <= 0 || memoryRate <= 0;
                     return {
-                        invocationPer1M: invocationRate * 1000000,
-                        cpuGhzSecond: cpuRate,
-                        memoryGbSecond: memoryRate,
+                        invocationPer1M: (invocationRate > 0 ? invocationRate : fb.invocation) * 1000000,
+                        cpuGhzSecond: cpuRate > 0 ? cpuRate : fb.cpu,
+                        memoryGbSecond: memoryRate > 0 ? memoryRate : fb.memory,
                         idleCpuGhzSecond: idleCpuRate,
                         idleMemoryGbSecond: idleMemoryRate,
-                        networkEgressPerGb: networkRate > 0 ? networkRate : 0,
-                        source: 'GCP Cloud Billing Catalog API'
+                        networkEgressPerGb: networkRate > 0 ? networkRate : 0.12,
+                        source: partial
+                            ? 'GCP Cloud Billing Catalog API (partial; published fallbacks for missing rates)'
+                            : 'GCP Cloud Billing Catalog API'
                     };
                 }
             }
         } catch (error) {
-            throw new Error(`Failed to fetch Cloud Functions pricing from GCP API: ${(error as Error).message}`);
+            cli.output(`Warning: GCP catalog fetch failed (${(error as Error).message}); using published fallbacks`);
         }
 
-        throw new Error('Could not retrieve Cloud Functions pricing from GCP Cloud Billing Catalog API');
+        return {
+            invocationPer1M: 0.4,
+            cpuGhzSecond: 0.00001,
+            memoryGbSecond: 0.0000025,
+            idleCpuGhzSecond: 0,
+            idleMemoryGbSecond: 0,
+            networkEgressPerGb: 0.12,
+            source: 'Published rates (catalog unavailable)'
+        };
     }
 
     /**
