@@ -1,0 +1,3 @@
+REPO gcp-test
+LOAD cloud-function-template.yaml
+BLOBS cloud-function-code:cloud-function-code/

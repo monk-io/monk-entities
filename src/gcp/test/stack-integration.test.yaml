@@ -19,7 +19,7 @@ setup:
 
   - name: Load test stack template
     action: load
-    target: test/stack-template.yaml
+    target: input/gcp/test/stack-template.yaml
     expect:
       exitCode: 0
 
@@ -352,6 +352,53 @@ tests:
       timeout: 60000
 
   # =========================================================================
+  # IAM Binding Tests
+  # =========================================================================
+  - name: Create project IAM binding
+    action: run
+    target: gcp-test/test-project-iam-binding
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for project IAM binding to be ready
+    action: wait
+    target: gcp-test/test-project-iam-binding
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Project IAM binding get-info
+    action: action
+    target: gcp-test/test-project-iam-binding
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Create resource IAM binding
+    action: run
+    target: gcp-test/test-resource-iam-binding
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for resource IAM binding to be ready
+    action: wait
+    target: gcp-test/test-resource-iam-binding
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Resource IAM binding get-info
+    action: action
+    target: gcp-test/test-resource-iam-binding
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  # =========================================================================
   # Cloud SQL Tests (slowest, run last)
   # =========================================================================
   - name: Create Cloud SQL instance
@@ -402,6 +449,18 @@ tests:
 
 cleanup:
   # Delete in reverse dependency order
+  - name: Delete resource IAM binding
+    action: delete
+    target: gcp-test/test-resource-iam-binding
+    expect:
+      exitCode: 0
+
+  - name: Delete project IAM binding
+    action: delete
+    target: gcp-test/test-project-iam-binding
+    expect:
+      exitCode: 0
+
   - name: Delete Artifact Registry repository
     action: delete
     target: gcp-test/test-artifact-registry

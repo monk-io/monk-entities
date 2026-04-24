@@ -16,7 +16,7 @@ setup:
 
   - name: "Load backup test template"
     action: "load"
-    target: "test/backup-template.yaml"
+    target: "input/gcp/test/backup-template.yaml"
     expect:
       exitCode: 0
 

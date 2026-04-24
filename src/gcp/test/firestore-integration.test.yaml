@@ -1,0 +1,113 @@
+# GCP Firestore Integration Test Suite
+#
+# Covers full lifecycle + read-only actions for gcp/firestore.
+# Uses a non-default database_id to avoid colliding with the project's
+# default Firestore database (which is a per-project singleton).
+#
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter firestore
+
+name: GCP Firestore Integration Test
+description: Firestore database lifecycle + action coverage
+timeout: 600000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Firestore test template
+    action: load
+    target: input/gcp/test/firestore-simple-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Enable Firestore API
+    action: run
+    target: gcp-firestore-test/enable-firestore-api
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Firestore API enablement
+    action: wait
+    target: gcp-firestore-test/enable-firestore-api
+    waitFor:
+      condition: ready
+      timeout: 180000
+
+  - name: Create Firestore database
+    action: run
+    target: gcp-firestore-test/backup-firestore
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Firestore database to be ready
+    action: wait
+    target: gcp-firestore-test/backup-firestore
+    waitFor:
+      condition: ready
+      timeout: 300000
+
+  - name: Firestore get
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: get
+    expect:
+      exitCode: 0
+
+  - name: Firestore list-indexes
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: list-indexes
+    expect:
+      exitCode: 0
+
+  - name: Firestore list-fields
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: list-fields
+    expect:
+      exitCode: 0
+
+  - name: Firestore list-backups
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: list-backups
+    expect:
+      exitCode: 0
+
+  - name: Firestore get-cost-estimate
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Firestore costs
+    action: action
+    target: gcp-firestore-test/backup-firestore
+    actionName: costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Firestore database
+    action: delete
+    target: gcp-firestore-test/backup-firestore
+    expect:
+      exitCode: 0
+
+  - name: Delete Firestore API enablement
+    action: delete
+    target: gcp-firestore-test/enable-firestore-api
+    expect:
+      exitCode: 0

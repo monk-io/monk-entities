@@ -1,0 +1,102 @@
+# GCP Cloud Functions (Gen 2) Integration Test
+#
+# Requires the following APIs enabled (handled by the stack):
+#   - cloudfunctions.googleapis.com
+#   - cloudbuild.googleapis.com
+#   - artifactregistry.googleapis.com
+#   - run.googleapis.com
+#
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose \
+#             --test-file test/cloud-function-integration.test.yaml
+
+name: GCP Cloud Function Integration Test
+description: Cloud Function Gen 2 lifecycle + invoke + actions
+timeout: 1200000 # 20 minutes (build + deploy can be slow)
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Cloud Function test MANIFEST (blobs + template)
+    action: load
+    target: input/gcp/test/MANIFEST
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Enable Cloud Functions APIs
+    action: run
+    target: gcp-cloud-function-test/enable-apis
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for APIs to be enabled
+    action: wait
+    target: gcp-cloud-function-test/enable-apis
+    waitFor:
+      condition: ready
+      timeout: 300000
+
+  - name: Deploy Cloud Function
+    action: run
+    target: gcp-cloud-function-test/test-function
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Cloud Function to be ready
+    action: wait
+    target: gcp-cloud-function-test/test-function
+    waitFor:
+      condition: ready
+      timeout: 900000 # 15 minutes for build + deploy
+
+  - name: Cloud Function get
+    action: action
+    target: gcp-cloud-function-test/test-function
+    actionName: get
+    expect:
+      exitCode: 0
+
+  - name: Cloud Function invoke
+    action: action
+    target: gcp-cloud-function-test/test-function
+    actionName: invoke
+    expect:
+      exitCode: 0
+
+  - name: Cloud Function get-cost-estimate
+    action: action
+    target: gcp-cloud-function-test/test-function
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: Cloud Function costs
+    action: action
+    target: gcp-cloud-function-test/test-function
+    actionName: costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Cloud Function
+    action: delete
+    target: gcp-cloud-function-test/test-function
+    expect:
+      exitCode: 0
+
+  - name: Delete APIs enablement entity
+    action: delete
+    target: gcp-cloud-function-test/enable-apis
+    expect:
+      exitCode: 0

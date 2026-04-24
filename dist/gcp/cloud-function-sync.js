@@ -92,7 +92,7 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
    */
   generateUploadUrl() {
     const url = `${this.getBaseUrl()}/functions:generateUploadUrl`;
-    const response = this.post(url, {});
+    const response = this.post(url, { environment: "GEN_2" });
     if (!response.uploadUrl) {
       throw new Error("Failed to generate upload URL: No uploadUrl in response");
     }
@@ -132,6 +132,12 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
    */
   buildFunctionBody(storageSource) {
     const body = {
+      // Full resource name required by the Cloud Functions v2 API body.
+      name: `projects/${this.projectId}/locations/${this.definition.location}/functions/${this.definition.name}`,
+      // Explicit Gen 2 marker — v2 endpoint usually defaults to this, but
+      // omitting it can trigger "Trigger event type must be specified" on
+      // HTTP-triggered functions.
+      environment: "GEN_2",
       buildConfig: {
         source: {
           storageSource

@@ -23,6 +23,26 @@ test-service:
     data:
       protocol: custom
 
+# IAP settings applied to the cloud-run service above.
+# Requires iap.googleapis.com enabled in the project.
+test-iap-settings:
+  defines: gcp/iap-settings
+  target_kind: cloud-run
+  region: us-central1
+  cloud_run_service: monk-test-cr-service
+  access_settings:
+    cors_settings:
+      allow_http_options: false
+  application_settings:
+    cookie_domain: test.example.com
+    access_denied_page_settings:
+      generate_troubleshooting_uri: true
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-run-test/test-service
+      timeout: 120
+
 # Cloud Run Job — runs a simple container to completion
 test-job:
   defines: gcp/cloud-run-job

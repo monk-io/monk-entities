@@ -19,7 +19,7 @@ setup:
 
   - name: Load Cloud CDN test template
     action: load
-    target: test/cloud-cdn-template.yaml
+    target: input/gcp/test/cloud-cdn-template.yaml
     expect:
       exitCode: 0
 
