@@ -3,5 +3,5 @@ VERSION_HASH 3320bf43b59d
 DESCRIPTION Compute capacity and networking primitives (VPC, subnets, security groups).
 HOSTING managed
 TAGS aws,compute,ec2,vpc,subnet,security-group
-LOAD ec2-base.yaml vpc.yaml base.yaml security-group.yaml subnet.yaml
-RESOURCES vpc-sync.js base.js security-group-sync.js subnet-sync.js ec2-base.js
+LOAD ec2-base.yaml vpc.yaml subnet.yaml base.yaml security-group.yaml
+RESOURCES security-group-sync.js ec2-base.js base.js vpc-sync.js subnet-sync.js
