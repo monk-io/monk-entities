@@ -11,6 +11,7 @@ enable-firestore-api:
 
 backup-firestore:
   defines: gcp/firestore
+  database_id: monk-test-firestore
   location: us-central1
   depends:
     wait-for:

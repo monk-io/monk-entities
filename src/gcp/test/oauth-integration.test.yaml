@@ -1,0 +1,119 @@
+# GCP OAuth Client + Credential Integration Test
+#
+# Requires: IAM API enabled, roles/iam.oauthClientAdmin on the caller.
+#
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter oauth
+
+name: GCP OAuth Client Integration Test
+description: OAuth client + credential lifecycle
+timeout: 600000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load OAuth test template
+    action: load
+    target: input/gcp/test/oauth-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Enable IAM API
+    action: run
+    target: gcp-oauth-test/enable-iam-api
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for IAM API enablement
+    action: wait
+    target: gcp-oauth-test/enable-iam-api
+    waitFor:
+      condition: ready
+      timeout: 180000
+
+  - name: Create OAuth client
+    action: run
+    target: gcp-oauth-test/test-oauth-client
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for OAuth client to be ready
+    action: wait
+    target: gcp-oauth-test/test-oauth-client
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: OAuth client get-info
+    action: action
+    target: gcp-oauth-test/test-oauth-client
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: OAuth client list-credentials
+    action: action
+    target: gcp-oauth-test/test-oauth-client
+    actionName: list-credentials
+    expect:
+      exitCode: 0
+
+  - name: Create OAuth client credential
+    action: run
+    target: gcp-oauth-test/test-oauth-credential
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for credential to be ready
+    action: wait
+    target: gcp-oauth-test/test-oauth-credential
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: OAuth credential get-info
+    action: action
+    target: gcp-oauth-test/test-oauth-credential
+    actionName: get-info
+    expect:
+      exitCode: 0
+
+  - name: Disable OAuth credential
+    action: action
+    target: gcp-oauth-test/test-oauth-credential
+    actionName: disable
+    expect:
+      exitCode: 0
+
+  - name: Enable OAuth credential
+    action: action
+    target: gcp-oauth-test/test-oauth-credential
+    actionName: enable
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete OAuth credential
+    action: delete
+    target: gcp-oauth-test/test-oauth-credential
+    expect:
+      exitCode: 0
+
+  - name: Delete OAuth client
+    action: delete
+    target: gcp-oauth-test/test-oauth-client
+    expect:
+      exitCode: 0

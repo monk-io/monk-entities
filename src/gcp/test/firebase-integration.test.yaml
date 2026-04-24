@@ -1,0 +1,127 @@
+# GCP Firebase Hosting Integration Test
+#
+# Covers gcp/firebase-hosting-site and gcp/firebase-hosting-channel.
+# Requires Firebase enabled on the project (firebase.googleapis.com).
+#
+# Run with: sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose --test-filter firebase
+
+name: GCP Firebase Hosting Integration Test
+description: Firebase hosting site + channel lifecycle
+timeout: 900000
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load Firebase test template
+    action: load
+    target: input/gcp/test/firebase-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Enable Firebase APIs
+    action: run
+    target: gcp-firebase-test/enable-firebase-apis
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for Firebase APIs to be enabled
+    action: wait
+    target: gcp-firebase-test/enable-firebase-apis
+    waitFor:
+      condition: ready
+      timeout: 300000
+
+  - name: Create Firebase hosting site
+    action: run
+    target: gcp-firebase-test/test-firebase-site
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for site to be ready
+    action: wait
+    target: gcp-firebase-test/test-firebase-site
+    waitFor:
+      condition: ready
+      timeout: 180000
+
+  - name: Firebase site get
+    action: action
+    target: gcp-firebase-test/test-firebase-site
+    actionName: get
+    expect:
+      exitCode: 0
+
+  - name: Firebase site list-channels
+    action: action
+    target: gcp-firebase-test/test-firebase-site
+    actionName: list-channels
+    expect:
+      exitCode: 0
+
+  - name: Firebase site list-releases
+    action: action
+    target: gcp-firebase-test/test-firebase-site
+    actionName: list-releases
+    expect:
+      exitCode: 0
+
+  - name: Firebase site list-domains
+    action: action
+    target: gcp-firebase-test/test-firebase-site
+    actionName: list-domains
+    expect:
+      exitCode: 0
+
+  - name: Create Firebase preview channel
+    action: run
+    target: gcp-firebase-test/test-firebase-channel
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for channel to be ready
+    action: wait
+    target: gcp-firebase-test/test-firebase-channel
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Firebase channel get
+    action: action
+    target: gcp-firebase-test/test-firebase-channel
+    actionName: get
+    expect:
+      exitCode: 0
+
+  - name: Firebase channel list-releases
+    action: action
+    target: gcp-firebase-test/test-firebase-channel
+    actionName: list-releases
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: Delete Firebase channel
+    action: delete
+    target: gcp-firebase-test/test-firebase-channel
+    expect:
+      exitCode: 0
+
+  - name: Delete Firebase site
+    action: delete
+    target: gcp-firebase-test/test-firebase-site
+    expect:
+      exitCode: 0

@@ -503,7 +503,11 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
     @action("list-fields")
     listFields(args?: Args): void {
         const collectionGroup = args?.collection || "-";
-        const url = `${this.getDatabaseUrl()}/collectionGroups/${collectionGroup}/fields`;
+        // ListFields requires a filter. Default to fields overriding ancestor
+        // config (i.e. explicitly configured), which matches what "list the
+        // interesting fields" typically means.
+        const filter = args?.filter || "indexConfig.usesAncestorConfig:false";
+        const url = `${this.getDatabaseUrl()}/collectionGroups/${collectionGroup}/fields?filter=${encodeURIComponent(filter as string)}`;
         const result = this.get(url);
         cli.output(JSON.stringify(result, null, 2));
     }
@@ -634,30 +638,39 @@ export class Firestore extends GcpEntity<FirestoreDefinition, FirestoreState> {
                     }
                 }
 
-                if (storageRate > 0 || readRate > 0) {
-                    if (storageRate <= 0 || readRate <= 0 || writeRate <= 0 || deleteRate <= 0) {
-                        const missing: string[] = [];
-                        if (storageRate <= 0) missing.push('storage');
-                        if (readRate <= 0) missing.push('read');
-                        if (writeRate <= 0) missing.push('write');
-                        if (deleteRate <= 0) missing.push('delete');
-                        throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(', ')}`);
-                    }
+                if (storageRate > 0 || readRate > 0 || writeRate > 0 || deleteRate > 0) {
+                    // Published fallbacks (USD, 2024 rates) for any rate the catalog omits.
+                    // The catalog regularly ships incomplete SKU sets per region.
+                    const fallback = {
+                        storage: 0.18,      // $/GiB-month
+                        read: 0.06 / 100000,    // $ per read
+                        write: 0.18 / 100000,   // $ per write
+                        delete: 0.02 / 100000,  // $ per delete
+                    };
                     return {
-                        storagePerGibMonth: storageRate,
-                        readPer100K: readRate * 100000,
-                        writePer100K: writeRate * 100000,
-                        deletePer100K: deleteRate * 100000,
-                        networkEgressPerGb: networkRate > 0 ? networkRate : 0,
-                        source: 'GCP Cloud Billing Catalog API'
+                        storagePerGibMonth: storageRate > 0 ? storageRate : fallback.storage,
+                        readPer100K: (readRate > 0 ? readRate : fallback.read) * 100000,
+                        writePer100K: (writeRate > 0 ? writeRate : fallback.write) * 100000,
+                        deletePer100K: (deleteRate > 0 ? deleteRate : fallback.delete) * 100000,
+                        networkEgressPerGb: networkRate > 0 ? networkRate : 0.12,
+                        source: storageRate > 0 && readRate > 0 && writeRate > 0 && deleteRate > 0
+                            ? 'GCP Cloud Billing Catalog API'
+                            : 'GCP Cloud Billing Catalog API (partial; published fallbacks for missing rates)'
                     };
                 }
             }
         } catch (error) {
-            throw new Error(`Failed to fetch Firestore pricing from GCP API: ${(error as Error).message}`);
+            cli.output(`Warning: GCP catalog fetch failed (${(error as Error).message}); using published fallbacks`);
         }
 
-        throw new Error('Could not retrieve Firestore pricing from GCP Cloud Billing Catalog API');
+        return {
+            storagePerGibMonth: 0.18,
+            readPer100K: 0.06,
+            writePer100K: 0.18,
+            deletePer100K: 0.02,
+            networkEgressPerGb: 0.12,
+            source: 'Published rates (catalog unavailable)'
+        };
     }
 
     /**

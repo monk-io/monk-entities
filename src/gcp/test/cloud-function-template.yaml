@@ -1,0 +1,37 @@
+# Cloud Functions (Gen 2) Integration Test Template
+# Requires: cloudfunctions.googleapis.com, cloudbuild.googleapis.com,
+#           artifactregistry.googleapis.com, run.googleapis.com enabled.
+
+namespace: gcp-cloud-function-test
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - cloudfunctions.googleapis.com
+    - cloudbuild.googleapis.com
+    - artifactregistry.googleapis.com
+    - run.googleapis.com
+    - eventarc.googleapis.com
+
+test-function:
+  defines: gcp/cloud-function
+  name: monk-test-cloud-function
+  location: us-central1
+  blob_name: cloud-function-code
+  build:
+    runtime: nodejs20
+    entry_point: helloWorld
+  service:
+    available_memory: "256M"
+    timeout_seconds: 60
+    max_instance_count: 3
+    min_instance_count: 0
+  function_description: Monk integration test Cloud Function (HTTP)
+  services:
+    function:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-function-test/enable-apis
+      timeout: 300

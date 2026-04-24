@@ -245,7 +245,8 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
   }
   listFields(args) {
     const collectionGroup = args?.collection || "-";
-    const url = `${this.getDatabaseUrl()}/collectionGroups/${collectionGroup}/fields`;
+    const filter = args?.filter || "indexConfig.usesAncestorConfig:false";
+    const url = `${this.getDatabaseUrl()}/collectionGroups/${collectionGroup}/fields?filter=${encodeURIComponent(filter)}`;
     const result = this.get(url);
     cli.output(JSON.stringify(result, null, 2));
   }
@@ -348,29 +349,38 @@ var _Firestore = class _Firestore extends (_a = GcpEntity, _getInfo_dec = [actio
             networkRate = price;
           }
         }
-        if (storageRate > 0 || readRate > 0) {
-          if (storageRate <= 0 || readRate <= 0 || writeRate <= 0 || deleteRate <= 0) {
-            const missing = [];
-            if (storageRate <= 0) missing.push("storage");
-            if (readRate <= 0) missing.push("read");
-            if (writeRate <= 0) missing.push("write");
-            if (deleteRate <= 0) missing.push("delete");
-            throw new Error(`Incomplete pricing from GCP API: missing rates for ${missing.join(", ")}`);
-          }
+        if (storageRate > 0 || readRate > 0 || writeRate > 0 || deleteRate > 0) {
+          const fallback = {
+            storage: 0.18,
+            // $/GiB-month
+            read: 0.06 / 1e5,
+            // $ per read
+            write: 0.18 / 1e5,
+            // $ per write
+            delete: 0.02 / 1e5
+            // $ per delete
+          };
           return {
-            storagePerGibMonth: storageRate,
-            readPer100K: readRate * 1e5,
-            writePer100K: writeRate * 1e5,
-            deletePer100K: deleteRate * 1e5,
-            networkEgressPerGb: networkRate > 0 ? networkRate : 0,
-            source: "GCP Cloud Billing Catalog API"
+            storagePerGibMonth: storageRate > 0 ? storageRate : fallback.storage,
+            readPer100K: (readRate > 0 ? readRate : fallback.read) * 1e5,
+            writePer100K: (writeRate > 0 ? writeRate : fallback.write) * 1e5,
+            deletePer100K: (deleteRate > 0 ? deleteRate : fallback.delete) * 1e5,
+            networkEgressPerGb: networkRate > 0 ? networkRate : 0.12,
+            source: storageRate > 0 && readRate > 0 && writeRate > 0 && deleteRate > 0 ? "GCP Cloud Billing Catalog API" : "GCP Cloud Billing Catalog API (partial; published fallbacks for missing rates)"
           };
         }
       }
     } catch (error) {
-      throw new Error(`Failed to fetch Firestore pricing from GCP API: ${error.message}`);
+      cli.output(`Warning: GCP catalog fetch failed (${error.message}); using published fallbacks`);
     }
-    throw new Error("Could not retrieve Firestore pricing from GCP Cloud Billing Catalog API");
+    return {
+      storagePerGibMonth: 0.18,
+      readPer100K: 0.06,
+      writePer100K: 0.18,
+      deletePer100K: 0.02,
+      networkEgressPerGb: 0.12,
+      source: "Published rates (catalog unavailable)"
+    };
   }
   getCostEstimate(_args) {
     const dbId = this.getDatabaseId();

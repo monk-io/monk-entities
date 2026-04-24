@@ -1,0 +1,44 @@
+# Firebase Hosting Integration Test Template
+#
+# Prerequisites:
+#   - Firebase project must exist (typically auto-linked to GCP project)
+#   - firebasehosting.googleapis.com enabled
+#   - Caller must have roles/firebase.admin or roles/firebasehosting.admin
+
+namespace: gcp-firebase-test
+
+enable-firebase-apis:
+  defines: gcp/service-usage
+  apis:
+    - firebase.googleapis.com
+    - firebasehosting.googleapis.com
+
+# Firebase Hosting site (creates a {name}.web.app subdomain)
+test-firebase-site:
+  defines: gcp/firebase-hosting-site
+  name: monk-test-site-xyz123
+  services:
+    data:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firebase-test/enable-firebase-apis
+      timeout: 180
+
+# Preview channel for the site above (short TTL so it self-cleans)
+test-firebase-channel:
+  defines: gcp/firebase-hosting-channel
+  name: monk-test-preview
+  site: <- connection-target("site") entity-state get-member("site_id")
+  ttl: "3600s"
+  retained_release_count: 3
+  connections:
+    site:
+      runnable: gcp-firebase-test/test-firebase-site
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - gcp-firebase-test/test-firebase-site
+      timeout: 120

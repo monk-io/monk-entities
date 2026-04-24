@@ -26,7 +26,7 @@ setup:
 
   - name: Load Cloud Armor test template
     action: load
-    target: test/stack-template-cloud-armor.yaml
+    target: input/gcp/test/stack-template-cloud-armor.yaml
     expect:
       exitCode: 0
 

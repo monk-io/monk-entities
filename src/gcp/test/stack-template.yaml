@@ -279,6 +279,51 @@ test-artifact-registry:
       timeout: 300
 
 # =============================================================================
+# Project IAM Binding
+# =============================================================================
+# Grants roles/browser to the test service account at project scope.
+# Using roles/browser because it's cheap, safe, and rarely already bound.
+
+test-project-iam-binding:
+  defines: gcp/project-iam-binding
+  role: roles/browser
+  member: <- `serviceAccount:${connection-target("sa") entity-state get-member("email")}`
+  connections:
+    sa:
+      runnable: gcp-test/test-service-account
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-service-account
+      timeout: 60
+
+# =============================================================================
+# Resource IAM Binding (storage bucket)
+# =============================================================================
+# Grants roles/storage.objectViewer on the test bucket to the test service account.
+
+test-resource-iam-binding:
+  defines: gcp/resource-iam-binding
+  resource_type: storage_bucket
+  resource_id: gcp-test-bucket-monkec-unique
+  role: roles/storage.objectViewer
+  member: <- `serviceAccount:${connection-target("sa") entity-state get-member("email")}`
+  connections:
+    sa:
+      runnable: gcp-test/test-service-account
+      service: service-account
+    bucket:
+      runnable: gcp-test/test-storage
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - gcp-test/test-service-account
+        - gcp-test/test-storage
+      timeout: 60
+
+# =============================================================================
 # Pub/Sub Topic
 # =============================================================================
 
