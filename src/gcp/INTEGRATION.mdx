@@ -32,6 +32,45 @@ Steps:
 1) Ensure GCP provider is added: `monk cluster provider add -p gcp`
 2) monk update \<namespace>/\<name>
 
+## Required IAM Permissions
+
+The principal whose credentials are configured via `monk cluster provider add -p gcp` (a service account or user) needs IAM roles on the target project covering the entities you intend to manage.
+
+### Quick start (broad roles)
+
+Grants enough permission to manage every entity in this package:
+
+- `roles/editor` — create/update/delete most resources
+- `roles/resourcemanager.projectIamAdmin` — required because `roles/editor` cannot modify IAM (used by `gcp/service-account`, `gcp/project-iam-binding`, `gcp/resource-iam-binding`)
+- `roles/serviceusage.serviceUsageAdmin` — enable APIs via `gcp/service-usage`
+
+### Least-privilege roles
+
+Grant only the roles for the entities your stack uses:
+
+| Entity area | Role |
+|-------------|------|
+| API enablement (`gcp/service-usage`) | `roles/serviceusage.serviceUsageAdmin` |
+| Cloud SQL (`cloud-sql-instance`, `cloud-sql-database`, `cloud-sql-user`) | `roles/cloudsql.admin` |
+| Firestore (`firestore-database`) | `roles/datastore.owner` |
+| BigQuery (`bigquery-dataset`) | `roles/bigquery.admin` |
+| Memorystore Redis (`memorystore-redis`) | `roles/redis.admin` |
+| Cloud Storage (`cloud-storage`, `cloud-storage-hmac-keys`) | `roles/storage.admin` |
+| Pub/Sub (`pubsub-topic`, `pubsub-subscription`) | `roles/pubsub.admin` |
+| Cloud Run (`cloud-run-service`, `cloud-run-job`) | `roles/run.admin` |
+| Cloud DNS (`cloud-dns-zone`, `cloud-dns-record-set`) | `roles/dns.admin` |
+| Artifact Registry (`artifact-registry-repository`) | `roles/artifactregistry.admin` |
+| Cloud CDN / load balancing (`cloud-cdn-backend-bucket`, `cloud-cdn-backend-service`) | `roles/compute.loadBalancerAdmin` |
+| Cloud Tasks (`cloud-tasks-queue`) | `roles/cloudtasks.admin` |
+| Cloud Armor (`cloud-armor-security-policy`) | `roles/compute.securityAdmin` |
+| Service accounts (`gcp/service-account`, `service-account-key`) | `roles/iam.serviceAccountAdmin`, `roles/iam.serviceAccountKeyAdmin` |
+| Project IAM bindings (`project-iam-binding`, `resource-iam-binding`) | `roles/resourcemanager.projectIamAdmin` |
+| IAP (`iap-settings`, `iap-access-policy`, `iap-oauth-client`) | `roles/iap.admin` |
+| Identity Platform (`identity-platform-*`) | `roles/identityplatform.admin` |
+| Cost estimation (`get-cost-estimate`, `costs` actions) | `roles/monitoring.viewer` |
+
+For per-entity permission lists at the API-method level, see `src/gcp/README.md`.
+
 ## Auth
 - Uses GCP provider credentials configured via `monk cluster provider add -p gcp`
 - GCP credentials are automatically injected into the GCP client
