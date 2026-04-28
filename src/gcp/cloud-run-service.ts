@@ -473,6 +473,16 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
             return;
         }
 
+        // The service may have been deleted out-of-band (e.g., manually via
+        // gcloud); fall back to create() rather than PATCH'ing a missing
+        // resource and 404'ing.
+        const existing = this.getService();
+        if (!existing) {
+            cli.output(`Service ${this.definition.name} not found, creating...`);
+            this.create();
+            return;
+        }
+
         cli.output(`Updating Cloud Run service: ${this.definition.name}`);
         const body = this.buildServiceBody();
         const operation = this.patch(this.getServiceUrl(), body);

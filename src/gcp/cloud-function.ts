@@ -653,10 +653,37 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
         // Build request body
         const body = this.buildFunctionBody(storageSource);
 
-        // Create function
+        // Create function. Cloud Functions Gen 2 has an eventual-consistency
+        // window right after the cloudfunctions.googleapis.com API is first
+        // enabled, during which create() can fail with a misleading 400
+        // "Invalid resource name ''" even though the body is valid. Retry on
+        // these transient validation errors before giving up.
         cli.output(`Creating Cloud Function: ${this.definition.name}`);
         const url = `${this.getBaseUrl()}/functions?functionId=${this.definition.name}`;
-        const operation = this.post(url, body);
+
+        const maxAttempts = 5;
+        const backoffMs = 10000;
+        let operation: any = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                operation = this.post(url, body);
+                break;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                const isTransient =
+                    /Invalid resource name ''/i.test(msg) ||
+                    /Cloud Functions API has not been used/i.test(msg) ||
+                    /SERVICE_DISABLED/i.test(msg);
+                if (!isTransient || attempt === maxAttempts) {
+                    throw err;
+                }
+                cli.output(
+                    `Cloud Function create attempt ${attempt}/${maxAttempts} hit transient API race, retrying in ${backoffMs / 1000}s...`,
+                );
+                const until = Date.now() + backoffMs;
+                while (Date.now() < until) { /* busy wait — entity runtime lacks setTimeout */ }
+            }
+        }
 
         // Store operation name for tracking
         this.state.operation_name = operation.name;
