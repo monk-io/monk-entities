@@ -1,0 +1,13 @@
+{
+  "name": "gcp-fullstack-demo-function",
+  "version": "1.0.0",
+  "description": "HTTP-triggered Cloud Function for gcp-fullstack-demo",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.5"
+  }
+}

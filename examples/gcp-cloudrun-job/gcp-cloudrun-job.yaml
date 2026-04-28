@@ -1,0 +1,109 @@
+# Cloud Run Job Example
+#
+# Provisions a Cloud Run Job that runs Google's sample batch container with
+# parallel task execution. Cloud Run Jobs run a container to completion (unlike
+# cloud-run-service which serves long-running HTTP traffic), making them ideal
+# for batch processing, scheduled work, and one-off data jobs.
+#
+# Pattern: GCP-only (no monk-side app needed). The entity wires service-usage
+# + a least-privilege service-account to the job, and the workload itself runs
+# on GCP from a public sample image.
+#
+# Prerequisites:
+#   - sudo monk cluster provider add -p gcp
+#   - GCP credentials with: roles/run.admin, roles/iam.serviceAccountAdmin,
+#     roles/serviceusage.serviceUsageAdmin (or roles/owner)
+
+namespace: gcp-cloudrun-job
+
+# === Step 1: Enable required APIs ===
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - run.googleapis.com
+    - iam.googleapis.com
+
+# === Step 2: Service account the job runs as ===
+#
+# Cloud Run Jobs use a service account to authenticate when reading from
+# Cloud Storage, BigQuery, Pub/Sub, etc. Granting only the roles the workload
+# actually needs is the principle-of-least-privilege pattern.
+
+job-sa:
+  defines: gcp/service-account
+  name: cloudrun-job-runner
+  display_name: Cloud Run Job runner
+  account_description: Runtime identity for the demo Cloud Run job
+  # Grant the minimum the workload needs. The sample image needs nothing,
+  # but real jobs typically read from one of these services:
+  roles:
+    - roles/logging.logWriter
+    - roles/monitoring.metricWriter
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-job/enable-apis
+      timeout: 300
+
+# === Step 3: The Cloud Run Job ===
+#
+# Uses Google's public sample job image which prints task index/attempt info
+# and optionally fails to demonstrate retry behavior. Replace `image:` with
+# your own gcr.io/<project>/<image>:<tag> or
+# <region>-docker.pkg.dev/<project>/<repo>/<image>:<tag> for real workloads.
+#
+# Invoke after deploy:
+#   sudo monk do gcp-cloudrun-job/batch-job/execute
+#   sudo monk do gcp-cloudrun-job/batch-job/get-executions
+#   sudo monk do gcp-cloudrun-job/batch-job/get-cost-estimate
+
+batch-job:
+  defines: gcp/cloud-run-job
+  name: monk-demo-batch
+  location: us-central1
+  # Google's public sample image — runs to completion and prints task info.
+  # Source: https://github.com/GoogleCloudPlatform/jobs-demos
+  image: us-docker.pkg.dev/cloudrun/container/job:latest
+  # Run 4 tasks total, 2 in parallel — demonstrates Cloud Run Jobs' fan-out.
+  task_count: 4
+  parallelism: 2
+  # Per-task resources.
+  cpu: "1"
+  memory: 512Mi
+  # Each task gets up to 5 minutes; failed tasks retry up to 3 times.
+  timeout_seconds: 300
+  max_retries: 3
+  # Env vars are visible to every task. The sample image reads SLEEP_MS to
+  # control how long each task runs (default ~10s) and FAIL_RATE to inject
+  # failures (0.0–1.0). Tweak to demo retries.
+  env_vars:
+    SLEEP_MS: "5000"
+    FAIL_RATE: "0.0"
+  service_account: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    owner: monk-example
+  connections:
+    sa:
+      runnable: gcp-cloudrun-job/job-sa
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-job/enable-apis
+        - gcp-cloudrun-job/job-sa
+      timeout: 300
+
+# === Deploy everything ===
+#
+# sudo monk load dist/gcp/MANIFEST
+# sudo monk load examples/gcp-cloudrun-job/gcp-cloudrun-job.yaml
+# sudo monk run -t <node-tag> gcp-cloudrun-job/stack
+
+stack:
+  defines: group
+  members:
+    - gcp-cloudrun-job/enable-apis
+    - gcp-cloudrun-job/job-sa
+    - gcp-cloudrun-job/batch-job
