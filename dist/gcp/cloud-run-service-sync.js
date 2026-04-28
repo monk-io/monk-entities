@@ -273,6 +273,12 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
       this.create();
       return;
     }
+    const existing = this.getService();
+    if (!existing) {
+      cli.output(`Service ${this.definition.name} not found, creating...`);
+      this.create();
+      return;
+    }
     cli.output(`Updating Cloud Run service: ${this.definition.name}`);
     const body = this.buildServiceBody();
     const operation = this.patch(this.getServiceUrl(), body);

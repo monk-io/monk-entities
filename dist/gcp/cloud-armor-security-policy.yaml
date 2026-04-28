@@ -33,7 +33,7 @@ cloud-armor-security-policy:
       - `gcp/cloud-cdn-backend-service` — attach via the `attach-backend-service` action
         passing the backend service name or self-link
       - `gcp/service-usage` — enable `compute.googleapis.com` before creating policies
-    version-hash: ea534117ef70
+    version-hash: 5d422b697c08
   schema:
     project:
       type: string
