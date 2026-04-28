@@ -1,0 +1,3 @@
+REPO gcp-fullstack-demo
+LOAD stack.yaml
+BLOBS backend:backend/ function:function/

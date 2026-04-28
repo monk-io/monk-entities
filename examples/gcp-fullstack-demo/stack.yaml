@@ -1,0 +1,418 @@
+# GCP Fullstack Demo
+#
+# A six-tier example application demonstrating how the major GCP entities
+# compose into a single deployable stack. Designed as a reference for AI
+# agents and humans building real GCP integrations.
+#
+#   Browser
+#     │
+#     ▼
+#   nginx frontend (monk runnable)        ← serves index.html with injected URLs
+#     │ XHR
+#     ▼
+#   Cloud Run service (Express API)       ← gcp/cloud-run-service, blob_name: backend
+#     ├─► Cloud SQL Postgres              ← gcp/cloud-sql-instance + database + user
+#     ├─► Cloud Storage bucket            ← gcp/cloud-storage
+#     └─► Cloud Function (HTTP transform) ← gcp/cloud-function, blob_name: function
+#
+# Source code for the backend and the function ships via the MANIFEST as
+# blobs (no Docker registry needed). Cloud Build compiles them on GCP.
+#
+# Prerequisites:
+#   sudo monk cluster provider add -p gcp
+#   See README.md for required IAM roles.
+#
+# Deploy:
+#   sudo monk load dist/gcp/MANIFEST
+#   sudo monk load examples/gcp-fullstack-demo/MANIFEST
+#   sudo monk run -t TAG gcp-fullstack-demo/stack
+#
+# Cloud SQL takes 8–15 min to provision; the Cloud Function build takes 3–5 min.
+
+namespace: gcp-fullstack-demo
+
+# =============================================================================
+# 1. Enable required APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - run.googleapis.com
+    - storage.googleapis.com
+    - cloudfunctions.googleapis.com
+    - cloudbuild.googleapis.com
+    - artifactregistry.googleapis.com
+    - eventarc.googleapis.com
+    - iam.googleapis.com
+
+# =============================================================================
+# 2. Service account shared by Cloud Run and Cloud Function
+# =============================================================================
+# Both compute workloads run as this identity. Roles grant access to the
+# storage bucket and to invoke each other.
+
+app-sa:
+  defines: gcp/service-account
+  name: fullstack-demo-runner
+  display_name: Fullstack demo runtime SA
+  account_description: Runtime identity for the Cloud Run backend and Cloud Function
+  roles:
+    - roles/storage.objectAdmin       # read/write GCS objects
+    - roles/cloudsql.client           # connect to Cloud SQL
+    - roles/run.invoker               # invoke Cloud Run service
+    - roles/cloudfunctions.invoker    # invoke Cloud Function
+    - roles/logging.logWriter
+  services:
+    service-account:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# 3. Cloud Storage bucket — object store for the application
+# =============================================================================
+
+uploads-bucket:
+  defines: gcp/cloud-storage
+  # Bucket names are globally unique. Bump the suffix on collisions.
+  name: monk-fullstack-demo-uploads-1
+  location: US
+  storage_class: STANDARD
+  labels:
+    environment: example
+    owner: monk-example
+  services:
+    bucket:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/enable-apis
+      timeout: 300
+
+# =============================================================================
+# 4. Cloud SQL Postgres instance + app database + app user
+# =============================================================================
+# allow_all opens 0.0.0.0/0 for demo simplicity. Production stacks should
+# use Cloud SQL Auth Proxy or VPC private IP.
+
+postgres:
+  defines: gcp/cloud-sql-instance
+  # Cloud SQL blocks reuse of instance names for ~1 week after deletion.
+  # Bump this suffix if you redeploy within that window.
+  name: monk-fullstack-demo-db-1
+  database_version: POSTGRES_15
+  tier: db-f1-micro
+  region: us-central1
+  storage_size_gb: 10
+  allow_all: true
+  deletion_protection: false
+  availability_type: ZONAL
+  services:
+    instance:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/enable-apis
+      timeout: 300
+
+app-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: appdb
+  charset: UTF8
+  services:
+    database:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-fullstack-demo/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/postgres
+      timeout: 900
+
+app-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: appuser
+  password_secret: fullstack-demo-db-password
+  permitted-secrets:
+    fullstack-demo-db-password: true
+  services:
+    user:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-fullstack-demo/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/postgres
+        - gcp-fullstack-demo/app-database
+      timeout: 900
+
+# =============================================================================
+# 5. Cloud Function — HTTP-triggered text transform
+# =============================================================================
+# Deployed from local source via blob_name (see MANIFEST: BLOBS function:function/).
+# Cloud Build compiles the Node.js source into a managed container.
+
+echo-function:
+  defines: gcp/cloud-function
+  name: fullstack-demo-transform
+  location: us-central1
+  blob_name: function
+  function_description: HTTP function that transforms text input
+  build:
+    runtime: nodejs20
+    entry_point: transform
+  service:
+    available_memory: 256Mi
+    timeout_seconds: 30
+    max_instance_count: 5
+    min_instance_count: 0
+    ingress_settings: ALLOW_ALL
+    service_account_email: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    component: function
+  services:
+    function:
+      protocol: custom
+  connections:
+    sa:
+      runnable: gcp-fullstack-demo/app-sa
+      service: service-account
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/enable-apis
+        - gcp-fullstack-demo/app-sa
+      timeout: 600
+
+# =============================================================================
+# 6. Cloud Run service — Express API (the backend)
+# =============================================================================
+# Deployed from local source via blob_name (see MANIFEST: BLOBS backend:backend/).
+# Wires Postgres + Storage + Cloud Function into one container via env vars.
+
+backend:
+  defines: gcp/cloud-run-service
+  name: fullstack-demo-api
+  location: us-central1
+  # Source deploy from `backend/` (Cloud Run source deploy uses Google's
+  # Cloud Native Buildpacks — Dockerfiles in the source are NOT honored).
+  # Known limitation: the buildpack auto-installs npm deps but the explicit
+  # `command:` here runs from `/workspace` where the deps may not resolve.
+  # If your container fails to start with "Cannot find package …", build
+  # and push your own image instead — see README "Pre-built image" section
+  # and replace `blob_name:` with `image:` and remove `command:`.
+  blob_name: backend
+  command: ["node", "index.js"]
+  port: 8080
+  cpu: "1"
+  memory: 512Mi
+  min_instances: 0
+  max_instances: 3
+  concurrency: 80
+  timeout_seconds: 60
+  allow_unauthenticated: true
+  service_account: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    component: backend
+    revision: v2
+  env_vars:
+    DB_HOST: <- connection-target("db-instance") entity-state get-member("address")
+    DB_PORT: "5432"
+    DB_NAME: appdb
+    DB_USER: appuser
+    DB_PASSWORD: <- secret("fullstack-demo-db-password")
+    BUCKET_NAME: <- connection-target("bucket") entity-state get-member("name")
+    FUNCTION_URL: <- connection-target("function") entity-state get-member("url")
+  permitted-secrets:
+    fullstack-demo-db-password: true
+  connections:
+    sa:
+      runnable: gcp-fullstack-demo/app-sa
+      service: service-account
+    db-instance:
+      runnable: gcp-fullstack-demo/postgres
+      service: instance
+    db-user:
+      runnable: gcp-fullstack-demo/app-user
+      service: user
+    bucket:
+      runnable: gcp-fullstack-demo/uploads-bucket
+      service: bucket
+    function:
+      runnable: gcp-fullstack-demo/echo-function
+      service: function
+  services:
+    backend:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/postgres
+        - gcp-fullstack-demo/app-database
+        - gcp-fullstack-demo/app-user
+        - gcp-fullstack-demo/uploads-bucket
+        - gcp-fullstack-demo/echo-function
+      timeout: 1200
+
+# =============================================================================
+# 7. Frontend — nginx runnable serving inline HTML with injected URLs
+# =============================================================================
+# Pattern: stock nginx:alpine + a /docker-entrypoint.d/ shim that runs envsubst
+# on the HTML template at container start. The backend and function URLs are
+# wired in via variables: from cloud-run-service.state.url and
+# cloud-function.state.url.
+
+frontend:
+  defines: runnable
+  connections:
+    backend:
+      runnable: gcp-fullstack-demo/backend
+      service: backend
+    function:
+      runnable: gcp-fullstack-demo/echo-function
+      service: function
+  variables:
+    backend_url:
+      env: BACKEND_URL
+      value: <- connection-target("backend") entity-state get-member("url")
+      type: string
+    function_url:
+      env: FUNCTION_URL
+      value: <- connection-target("function") entity-state get-member("url")
+      type: string
+  containers:
+    web:
+      image: nginx:alpine
+      ports:
+        - "8080:80"
+  files:
+    template:
+      container: web
+      path: /etc/templates/index.html.tmpl
+      mode: 0644
+      contents: |
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>GCP Fullstack Demo</title>
+          <style>
+            body { font: 14px system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+            h1 { font-size: 1.5rem; }
+            section { border: 1px solid #ddd; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+            input, button { padding: .4rem .6rem; font-size: 14px; }
+            pre { background: #f5f5f5; padding: .6rem; overflow: auto; }
+          </style>
+        </head>
+        <body>
+          <h1>GCP Fullstack Demo</h1>
+          <p>Backend: <code>${BACKEND_URL}</code><br/>Function: <code>${FUNCTION_URL}</code></p>
+
+          <section>
+            <h2>Postgres (Cloud SQL)</h2>
+            <input id="item-name" placeholder="item name" />
+            <button onclick="addItem()">Add</button>
+            <button onclick="loadItems()">Refresh</button>
+            <pre id="items"></pre>
+          </section>
+
+          <section>
+            <h2>Object store (Cloud Storage)</h2>
+            <input id="file-name" placeholder="filename.txt" />
+            <button onclick="createFile()">Create</button>
+            <button onclick="loadFiles()">List</button>
+            <pre id="files"></pre>
+          </section>
+
+          <section>
+            <h2>Serverless transform (Cloud Function)</h2>
+            <input id="echo-text" placeholder="text to transform" value="hello"/>
+            <button onclick="echoText()">Send via backend</button>
+            <pre id="echo"></pre>
+          </section>
+
+          <script>
+            const BE = "${BACKEND_URL}";
+            const j = (el, v) => document.getElementById(el).textContent = JSON.stringify(v, null, 2);
+            async function loadItems() {
+              j('items', await (await fetch(BE + '/api/items')).json());
+            }
+            async function addItem() {
+              const name = document.getElementById('item-name').value;
+              await fetch(BE + '/api/items', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({name})});
+              loadItems();
+            }
+            async function loadFiles() {
+              j('files', await (await fetch(BE + '/api/files')).json());
+            }
+            async function createFile() {
+              const name = document.getElementById('file-name').value;
+              j('files', await (await fetch(BE + '/api/files/' + encodeURIComponent(name), {method:'POST', headers:{'content-type':'application/json'}, body:'{}'})).json());
+            }
+            async function echoText() {
+              const text = document.getElementById('echo-text').value;
+              j('echo', await (await fetch(BE + '/api/echo?text=' + encodeURIComponent(text))).json());
+            }
+            loadItems();
+            loadFiles();
+          </script>
+        </body>
+        </html>
+    render:
+      container: web
+      path: /docker-entrypoint.d/40-render.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        set -e
+        envsubst '${BACKEND_URL} ${FUNCTION_URL}' \
+          < /etc/templates/index.html.tmpl \
+          > /usr/share/nginx/html/index.html
+  services:
+    web:
+      container: web
+      port: 80
+      protocol: tcp
+      host-port: 8080
+  depends:
+    wait-for:
+      runnables:
+        - gcp-fullstack-demo/backend
+        - gcp-fullstack-demo/echo-function
+      timeout: 1500
+
+# =============================================================================
+# Deploy everything
+# =============================================================================
+# sudo monk run -t TAG gcp-fullstack-demo/stack
+# Open: http://<node>:8080
+
+stack:
+  defines: group
+  members:
+    - gcp-fullstack-demo/enable-apis
+    - gcp-fullstack-demo/app-sa
+    - gcp-fullstack-demo/uploads-bucket
+    - gcp-fullstack-demo/postgres
+    - gcp-fullstack-demo/app-database
+    - gcp-fullstack-demo/app-user
+    - gcp-fullstack-demo/echo-function
+    - gcp-fullstack-demo/backend
+    - gcp-fullstack-demo/frontend
