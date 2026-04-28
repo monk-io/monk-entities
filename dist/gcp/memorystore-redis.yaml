@@ -20,7 +20,7 @@ memorystore-redis:
       ## Composing with Other Entities
       Works with:
       - `gcp/service-usage` - Enable `redis.googleapis.com` API before create
-    version-hash: ea534117ef70
+    version-hash: 5d422b697c08
   schema:
     project:
       type: string

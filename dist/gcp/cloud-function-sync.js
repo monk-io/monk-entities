@@ -276,7 +276,27 @@ var _CloudFunction = class _CloudFunction extends (_a = GcpEntity, _getInfo_dec 
     const body = this.buildFunctionBody(storageSource);
     cli.output(`Creating Cloud Function: ${this.definition.name}`);
     const url = `${this.getBaseUrl()}/functions?functionId=${this.definition.name}`;
-    const operation = this.post(url, body);
+    const maxAttempts = 5;
+    const backoffMs = 1e4;
+    let operation = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        operation = this.post(url, body);
+        break;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTransient = /Invalid resource name ''/i.test(msg) || /Cloud Functions API has not been used/i.test(msg) || /SERVICE_DISABLED/i.test(msg);
+        if (!isTransient || attempt === maxAttempts) {
+          throw err;
+        }
+        cli.output(
+          `Cloud Function create attempt ${attempt}/${maxAttempts} hit transient API race, retrying in ${backoffMs / 1e3}s...`
+        );
+        const until = Date.now() + backoffMs;
+        while (Date.now() < until) {
+        }
+      }
+    }
     this.state.operation_name = operation.name;
     cli.output(`Waiting for function deployment to complete...`);
     this.waitForFunctionOperation(operation.name);
