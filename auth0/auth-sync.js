@@ -1,6 +1,31 @@
 const http = require("http");
 const secret = require("secret");
 
+function describeAuth0Error(res) {
+  let detail = res.body;
+  try {
+    const parsed = JSON.parse(res.body);
+    const parts = [];
+    if (parsed.statusCode) parts.push(`statusCode=${parsed.statusCode}`);
+    if (parsed.error) parts.push(`error=${parsed.error}`);
+    if (parsed.errorCode) parts.push(`errorCode=${parsed.errorCode}`);
+    if (parsed.message) parts.push(`message=${parsed.message}`);
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      parts.push(`errors=${JSON.stringify(parsed.errors)}`);
+    }
+    if (parts.length > 0) detail = parts.join(" | ");
+  } catch (_) {
+    // body is not JSON; keep raw body
+  }
+  return `status=${res.status} transport=${res.error || "none"} body=${detail}`;
+}
+
+function isHttpFailure(res) {
+  if (res.error) return true;
+  if (typeof res.status === "number" && res.status >= 400) return true;
+  return false;
+}
+
 const FIELD_MAPPING = {
   "app-name": "name",
   "app-type": "app_type",
@@ -134,9 +159,9 @@ function getManagementToken(def) {
     body: JSON.stringify(tokenPayload),
     headers: { "Content-Type": "application/json" },
   });
-  if (tokenResponse.error) {
+  if (isHttpFailure(tokenResponse)) {
     throw new Error(
-      `Failed to obtain Management API token. Error: ${tokenResponse.error} Body: ${tokenResponse.body}`
+      `Failed to obtain Management API token: ${describeAuth0Error(tokenResponse)}`
     );
   }
   return JSON.parse(tokenResponse.body).access_token;
@@ -217,11 +242,13 @@ function syncApplication(def, state, update) {
     throw err;
   }
 
-  console.log("Response status:", res.statusCode);
+  console.log("Response status:", res.status);
   console.log("Response body:", res.body);
 
-  if (res.error) {
-    throw new Error(`API error: status ${res.status}, body: ${res.body}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to ${update ? "update" : "create"} Auth0 application (name=${def["app-name"]}): ${describeAuth0Error(res)}`
+    );
   }
 
   let appObj;
@@ -270,9 +297,9 @@ function deleteApplication(def, state) {
   console.log("Delete response status:", res.status);
   console.log("Delete response body:", res.body);
 
-  if (res.status >= 400) {
+  if (isHttpFailure(res) && res.status !== 404) {
     throw new Error(
-      `Failed to delete application: status ${res.status}, body: ${res.body}`
+      `Failed to delete application (client-id=${state["client-id"]}): ${describeAuth0Error(res)}`
     );
   }
 }
@@ -386,8 +413,10 @@ function patchApplication(def, state, ctx) {
     `${def["management-api"]}/api/v2/clients/${state["client-id"]}`,
     req
   );
-  if (res.error) {
-    throw new Error(`API error: status ${res.status}, body: ${res.body}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to patch Auth0 application (client-id=${state["client-id"]}): ${describeAuth0Error(res)}`
+    );
   }
 
   let appObj;
