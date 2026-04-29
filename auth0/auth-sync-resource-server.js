@@ -1,8 +1,33 @@
 const http = require("http");
 const secret = require("secret");
 
+function describeAuth0Error(res) {
+  let detail = res.body;
+  try {
+    const parsed = JSON.parse(res.body);
+    const parts = [];
+    if (parsed.statusCode) parts.push(`statusCode=${parsed.statusCode}`);
+    if (parsed.error) parts.push(`error=${parsed.error}`);
+    if (parsed.errorCode) parts.push(`errorCode=${parsed.errorCode}`);
+    if (parsed.message) parts.push(`message=${parsed.message}`);
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      parts.push(`errors=${JSON.stringify(parsed.errors)}`);
+    }
+    if (parts.length > 0) detail = parts.join(" | ");
+  } catch (_) {
+    // body is not JSON; keep raw body
+  }
+  return `status=${res.status} transport=${res.error || "none"} body=${detail}`;
+}
+
+function isHttpFailure(res) {
+  if (res.error) return true;
+  if (typeof res.status === "number" && res.status >= 400) return true;
+  return false;
+}
+
 function getManagementToken(def) {
-  console.log(`Obtaining Management API token ${def}`, def);
+  console.log(`Obtaining Management API token`);
   let clientID = secret.get(def["management-client-id-secret"]);
   if (!clientID) {
     throw new Error(
@@ -25,9 +50,9 @@ function getManagementToken(def) {
     body: JSON.stringify(tokenPayload),
     headers: { "Content-Type": "application/json" },
   });
-  if (tokenResponse.error) {
+  if (isHttpFailure(tokenResponse)) {
     throw new Error(
-      `Failed to obtain Management API token. Error: ${tokenResponse.error} Body: ${tokenResponse.body}`
+      `Failed to obtain Management API token: ${describeAuth0Error(tokenResponse)}`
     );
   }
   return JSON.parse(tokenResponse.body).access_token;
@@ -56,8 +81,10 @@ function createResourceServer(def, managementToken) {
     req
   );
 
-  if (res.error) {
-    throw new Error(`Failed to create resource server: ${res.error}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to create resource server (audience=${def.audience} name=${def.name}): ${describeAuth0Error(res)}`
+    );
   }
 
   return JSON.parse(res.body);
@@ -85,8 +112,10 @@ function updateResourceServer(def, state, managementToken) {
     req
   );
 
-  if (res.error) {
-    throw new Error(`Failed to update resource server: ${res.error}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to update resource server (id=${state["resource-server-id"]}): ${describeAuth0Error(res)}`
+    );
   }
 
   return JSON.parse(res.body);
@@ -107,8 +136,10 @@ function deleteResourceServer(def, state, managementToken) {
     req
   );
 
-  if (res.error) {
-    throw new Error(`Failed to delete resource server: ${res.error}`);
+  if (isHttpFailure(res) && res.status !== 404) {
+    throw new Error(
+      `Failed to delete resource server (id=${state["resource-server-id"]}): ${describeAuth0Error(res)}`
+    );
   }
 }
 
@@ -131,8 +162,10 @@ function createClientGrant(def, state, managementToken) {
   console.log("Creating client grant:", JSON.stringify(body, null, 2));
   const res = http.post(`${def["management-api"]}/api/v2/client-grants`, req);
 
-  if (res.error) {
-    throw new Error(`Failed to create client grant: ${res.error}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to create client grant (client-id=${def["client-id"]} audience=${state.audience}): ${describeAuth0Error(res)}`
+    );
   }
 
   return JSON.parse(res.body);
@@ -159,8 +192,10 @@ function updateClientGrant(def, state, managementToken) {
     req
   );
 
-  if (res.error) {
-    throw new Error(`Failed to update client grant: ${res.error}`);
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to update client grant (grant-id=${state["grant-id"]}): ${describeAuth0Error(res)}`
+    );
   }
 
   return JSON.parse(res.body);
@@ -181,8 +216,10 @@ function deleteClientGrant(def, state, managementToken) {
     req
   );
 
-  if (res.error) {
-    throw new Error(`Failed to delete client grant: ${res.error}`);
+  if (isHttpFailure(res) && res.status !== 404) {
+    throw new Error(
+      `Failed to delete client grant (grant-id=${state["grant-id"]}): ${describeAuth0Error(res)}`
+    );
   }
 }
 
