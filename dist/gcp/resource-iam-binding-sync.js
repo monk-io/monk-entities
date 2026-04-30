@@ -221,9 +221,12 @@ var _ResourceIamBinding = class _ResourceIamBinding extends (_a = GcpEntity, _ge
       });
     } catch (err) {
       const msg = stringifyError(err);
-      if (msg.includes("404") || msg.includes("does not exist") || msg.includes("not found") || msg.includes("notFound") || msg.includes("Not Found") || msg === "[object Object]") {
+      const explicitGone = msg.includes("404") || msg.includes("does not exist") || msg.includes("not found") || msg.includes("notFound") || msg.includes("Not Found");
+      const looksLikeEntityThrow = err && typeof err === "object" && "path" in err && "metadata" in err;
+      const opaqueObject = msg === "[object Object]";
+      if (explicitGone || looksLikeEntityThrow || opaqueObject) {
         cli.output(
-          `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable (${msg}); treating binding as already gone`
+          `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable; treating binding as already gone`
         );
         return;
       }
