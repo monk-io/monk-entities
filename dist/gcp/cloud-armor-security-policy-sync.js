@@ -460,6 +460,7 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
     cli.output(`Deleting Cloud Armor policy: ${this.definition.name}`);
     const maxAttempts = 12;
     const delayMs = 1e4;
+    let detachAttempted = false;
     let lastErr = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -482,6 +483,16 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
           }
           throw error;
         }
+        if (!detachAttempted) {
+          detachAttempted = true;
+          try {
+            this.detachAllReferrers();
+          } catch (detachErr) {
+            cli.output(
+              `Warning: auto-detach pass failed: ${detachErr instanceof Error ? detachErr.message : String(detachErr)}`
+            );
+          }
+        }
         cli.output(
           `Policy still attached (attempt ${attempt}/${maxAttempts}); waiting ${delayMs / 1e3}s for referring resources to finish teardown...`
         );
@@ -491,6 +502,65 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
       }
     }
     throw lastErr ?? new Error("cloud-armor delete retry loop exited unexpectedly");
+  }
+  /**
+   * Walk all backend services + backend buckets in the project and clear
+   * any `securityPolicy` / `edgeSecurityPolicy` reference to this policy.
+   * Best-effort: surfaces enumeration / detach errors as warnings rather
+   * than throwing, so the caller can still decide whether to keep
+   * retrying the policy delete.
+   */
+  detachAllReferrers() {
+    const policyName = this.definition.name;
+    const matches = /* @__PURE__ */ __name((ref) => typeof ref === "string" && ref.length > 0 && (ref === policyName || ref.endsWith(`/securityPolicies/${policyName}`)), "matches");
+    const detach = /* @__PURE__ */ __name((resourceUrl, action2) => {
+      const op = this.post(`${resourceUrl}/${action2}`, { securityPolicy: "" });
+      if (op?.name) this.waitForComputeOperation(op.name);
+    }, "detach");
+    try {
+      const list = this.get(
+        `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices`
+      );
+      for (const be of list.items || []) {
+        const beUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices/${be.name}`;
+        if (matches(be.securityPolicy)) {
+          cli.output(`Auto-detaching from backend service ${be.name} (securityPolicy)`);
+          try {
+            detach(beUrl, "setSecurityPolicy");
+          } catch (err) {
+            cli.output(`Warning: detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+        if (matches(be.edgeSecurityPolicy)) {
+          cli.output(`Auto-detaching from backend service ${be.name} (edgeSecurityPolicy)`);
+          try {
+            detach(beUrl, "setEdgeSecurityPolicy");
+          } catch (err) {
+            cli.output(`Warning: edge-detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+    } catch (err) {
+      cli.output(`Warning: could not list backend services for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    try {
+      const list = this.get(
+        `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets`
+      );
+      for (const bb of list.items || []) {
+        if (matches(bb.edgeSecurityPolicy)) {
+          cli.output(`Auto-detaching from backend bucket ${bb.name} (edgeSecurityPolicy)`);
+          const bbUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets/${bb.name}`;
+          try {
+            detach(bbUrl, "setEdgeSecurityPolicy");
+          } catch (err) {
+            cli.output(`Warning: edge-detach from bucket ${bb.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+    } catch (err) {
+      cli.output(`Warning: could not list backend buckets for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   checkReadiness() {
     const resource = this.getPolicy();
