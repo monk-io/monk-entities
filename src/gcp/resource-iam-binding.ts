@@ -317,23 +317,37 @@ export class ResourceIamBinding extends GcpEntity<
             // objects (no `.message`) when a native bridge call fails,
             // which used to surface as "[object Object]" in monk logs.
             const msg = stringifyError(err);
-            // If the target resource is gone (common in stack teardowns
-            // where the bucket/dataset is deleted before us) the binding
-            // is effectively gone too — not an error. We accept any signal
-            // suggesting the resource is unreachable, including the
-            // ambiguous fallback (object-with-no-message): in delete() the
-            // worst case is leaving a stale binding pointing at a dead
-            // resource, which GCS reaps server-side.
-            if (
+
+            // Heuristic 1: the API surfaced an explicit "resource gone"
+            // signal — the binding's target was already deleted, the
+            // binding effectively went with it.
+            const explicitGone =
                 msg.includes("404") ||
                 msg.includes("does not exist") ||
                 msg.includes("not found") ||
                 msg.includes("notFound") ||
-                msg.includes("Not Found") ||
-                msg === "[object Object]"
-            ) {
+                msg.includes("Not Found");
+
+            // Heuristic 2: Goja's native-bridge layer occasionally throws
+            // the entity shape itself (an object with `path` + `metadata`
+            // + `definition` keys) when a low-level GCS call fails — see
+            // the surfaced JSON in the log:
+            //   Error: {"definition":{...},"state":{...},"path":...}
+            // That happens in stack teardowns where the bucket has just
+            // been deleted by a sibling entity. We can't recover, but the
+            // worst case in delete() is leaving a stale binding pointing
+            // at a dead resource (GCS reaps it server-side).
+            const looksLikeEntityThrow =
+                err && typeof err === "object" &&
+                "path" in (err as object) && "metadata" in (err as object);
+
+            // Heuristic 3: stringify failed entirely — no signal at all,
+            // but we're in delete(), so accept the same fallback.
+            const opaqueObject = msg === "[object Object]";
+
+            if (explicitGone || looksLikeEntityThrow || opaqueObject) {
                 cli.output(
-                    `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable (${msg}); treating binding as already gone`,
+                    `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable; treating binding as already gone`,
                 );
                 return;
             }
