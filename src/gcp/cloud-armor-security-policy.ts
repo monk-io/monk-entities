@@ -263,7 +263,9 @@ export interface CloudArmorSecurityPolicyState extends GcpEntityState {
  * ## Required Permissions
  * - `compute.securityPolicies.create` / `.get` / `.list` / `.update` / `.delete` / `.use`
  * - `compute.securityPolicies.addRule` / `.getRule` / `.patchRule` / `.removeRule`
- * - `compute.backendServices.get` / `.setSecurityPolicy` (for attach/detach actions)
+ * - `compute.backendServices.list` / `.get` / `.setSecurityPolicy` / `.setEdgeSecurityPolicy`
+ * - `compute.backendBuckets.list` / `.setEdgeSecurityPolicy`
+ *   (the list/edge perms are used by delete()'s auto-detach pass; the rest by the attach/detach actions)
  * - `compute.globalOperations.get` — poll long-running operations
  * - `monitoring.timeSeries.list` — cost estimation metrics
  * - `cloudbilling.services.list` — cost estimation pricing
@@ -761,13 +763,17 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
 
         cli.output(`Deleting Cloud Armor policy: ${this.definition.name}`);
 
-        // When a group teardown deletes this policy before the backend
-        // bucket / backend service that references it is gone, GCP returns
-        // 400 "still used by ...". Retry with backoff — the referring
-        // resource is usually on its way out from the same teardown, and
-        // the reference will clear within a minute or two.
+        // Cloud Armor policies can be attached to backend services
+        // (`securityPolicy` / `edgeSecurityPolicy`) and backend buckets
+        // (`edgeSecurityPolicy`). On group teardown those referring
+        // resources are *usually* deleted in the same pass, so a short
+        // retry loop is enough. But when this policy is attached to a
+        // resource the user wants to keep — or when GCP doesn't drop the
+        // reference during the referring resource's own delete — we need
+        // to detach proactively before the delete will succeed.
         const maxAttempts = 12;
         const delayMs = 10000;
+        let detachAttempted = false;
         let lastErr: unknown = null;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
@@ -794,6 +800,21 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
                     }
                     throw error;
                 }
+                // First time we see the "still attached" error, scan all
+                // backend services + buckets in the project, clear any
+                // reference to this policy, then resume the retry loop so
+                // the wait still covers any in-flight teardown of the
+                // referring resource itself.
+                if (!detachAttempted) {
+                    detachAttempted = true;
+                    try {
+                        this.detachAllReferrers();
+                    } catch (detachErr) {
+                        cli.output(
+                            `Warning: auto-detach pass failed: ${detachErr instanceof Error ? detachErr.message : String(detachErr)}`,
+                        );
+                    }
+                }
                 cli.output(
                     `Policy still attached (attempt ${attempt}/${maxAttempts}); waiting ${delayMs / 1000}s for referring resources to finish teardown...`,
                 );
@@ -802,6 +823,68 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
             }
         }
         throw lastErr ?? new Error("cloud-armor delete retry loop exited unexpectedly");
+    }
+
+    /**
+     * Walk all backend services + backend buckets in the project and clear
+     * any `securityPolicy` / `edgeSecurityPolicy` reference to this policy.
+     * Best-effort: surfaces enumeration / detach errors as warnings rather
+     * than throwing, so the caller can still decide whether to keep
+     * retrying the policy delete.
+     */
+    private detachAllReferrers(): void {
+        const policyName = this.definition.name;
+        const matches = (ref: any): boolean =>
+            typeof ref === "string" && ref.length > 0 &&
+            (ref === policyName ||
+             ref.endsWith(`/securityPolicies/${policyName}`));
+
+        const detach = (resourceUrl: string, action: string) => {
+            const op = this.post(`${resourceUrl}/${action}`, { securityPolicy: "" });
+            if (op?.name) this.waitForComputeOperation(op.name);
+        };
+
+        // Backend services.
+        try {
+            const list = this.get(
+                `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices`,
+            );
+            for (const be of (list.items || [])) {
+                const beUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices/${be.name}`;
+                if (matches(be.securityPolicy)) {
+                    cli.output(`Auto-detaching from backend service ${be.name} (securityPolicy)`);
+                    try { detach(beUrl, "setSecurityPolicy"); } catch (err) {
+                        cli.output(`Warning: detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                }
+                if (matches(be.edgeSecurityPolicy)) {
+                    cli.output(`Auto-detaching from backend service ${be.name} (edgeSecurityPolicy)`);
+                    try { detach(beUrl, "setEdgeSecurityPolicy"); } catch (err) {
+                        cli.output(`Warning: edge-detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                }
+            }
+        } catch (err) {
+            cli.output(`Warning: could not list backend services for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // Backend buckets (edge-only attachment).
+        try {
+            const list = this.get(
+                `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets`,
+            );
+            for (const bb of (list.items || [])) {
+                if (matches(bb.edgeSecurityPolicy)) {
+                    cli.output(`Auto-detaching from backend bucket ${bb.name} (edgeSecurityPolicy)`);
+                    const bbUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets/${bb.name}`;
+                    try { detach(bbUrl, "setEdgeSecurityPolicy"); } catch (err) {
+                        cli.output(`Warning: edge-detach from bucket ${bb.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                }
+            }
+        } catch (err) {
+            cli.output(`Warning: could not list backend buckets for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+        }
     }
 
     override checkReadiness(): boolean {
