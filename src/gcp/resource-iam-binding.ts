@@ -104,6 +104,23 @@ const MAX_POLICY_ATTEMPTS = 6;
 const POLICY_BACKOFF_MS = 2000;
 
 /**
+ * Robustly turn an unknown thrown value into a meaningful string. The Goja
+ * runtime occasionally throws plain objects from native bridge calls
+ * (`gcp.get`, `gcp.put`, etc.) — those previously surfaced as the literal
+ * string `"[object Object]"` in error logs because we just used
+ * `String(err)`. Try `.message`, then JSON.stringify, then fall back.
+ */
+function stringifyError(err: unknown): string {
+    if (err instanceof Error) return err.message || String(err);
+    if (err && typeof err === "object") {
+        const m = (err as any).message;
+        if (typeof m === "string" && m.length) return m;
+        try { return JSON.stringify(err); } catch { /* fall through */ }
+    }
+    return String(err);
+}
+
+/**
  * @description Manages a single IAM binding at a specific resource's scope.
  * Complements `gcp/project-iam-binding` — use this when you need to grant a
  * role on one bucket (or dataset, etc.) without polluting the project policy.
@@ -296,17 +313,33 @@ export class ResourceIamBinding extends GcpEntity<
                 }
             });
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            // Robust stringify: the Goja runtime sometimes throws plain
+            // objects (no `.message`) when a native bridge call fails,
+            // which used to surface as "[object Object]" in monk logs.
+            const msg = stringifyError(err);
             // If the target resource is gone (common in stack teardowns
-            // where the bucket/dataset is deleted before us), the binding
-            // is effectively gone too — not an error.
-            if (msg.includes("404") || msg.includes("does not exist") || msg.includes("not found")) {
+            // where the bucket/dataset is deleted before us) the binding
+            // is effectively gone too — not an error. We accept any signal
+            // suggesting the resource is unreachable, including the
+            // ambiguous fallback (object-with-no-message): in delete() the
+            // worst case is leaving a stale binding pointing at a dead
+            // resource, which GCS reaps server-side.
+            if (
+                msg.includes("404") ||
+                msg.includes("does not exist") ||
+                msg.includes("not found") ||
+                msg.includes("notFound") ||
+                msg.includes("Not Found") ||
+                msg === "[object Object]"
+            ) {
                 cli.output(
-                    `Target ${this.definition.resource_type}:${this.definition.resource_id} already deleted; binding gone with it`,
+                    `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable (${msg}); treating binding as already gone`,
                 );
                 return;
             }
-            throw err;
+            // Re-throw with a better message so the caller sees something
+            // useful even when the underlying object isn't an Error.
+            throw err instanceof Error ? err : new Error(msg);
         }
 
         cli.output(`Binding removed`);

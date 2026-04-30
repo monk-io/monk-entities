@@ -59,6 +59,19 @@ const common = require("gcp/common");
 const CLOUD_STORAGE_API_URL = common.CLOUD_STORAGE_API_URL;
 var MAX_POLICY_ATTEMPTS = 6;
 var POLICY_BACKOFF_MS = 2e3;
+function stringifyError(err) {
+  if (err instanceof Error) return err.message || String(err);
+  if (err && typeof err === "object") {
+    const m = err.message;
+    if (typeof m === "string" && m.length) return m;
+    try {
+      return JSON.stringify(err);
+    } catch {
+    }
+  }
+  return String(err);
+}
+__name(stringifyError, "stringifyError");
 var _getInfo_dec, _a, _init;
 var _ResourceIamBinding = class _ResourceIamBinding extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _a) {
   constructor() {
@@ -207,14 +220,14 @@ var _ResourceIamBinding = class _ResourceIamBinding extends (_a = GcpEntity, _ge
         }
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("404") || msg.includes("does not exist") || msg.includes("not found")) {
+      const msg = stringifyError(err);
+      if (msg.includes("404") || msg.includes("does not exist") || msg.includes("not found") || msg.includes("notFound") || msg.includes("Not Found") || msg === "[object Object]") {
         cli.output(
-          `Target ${this.definition.resource_type}:${this.definition.resource_id} already deleted; binding gone with it`
+          `Target ${this.definition.resource_type}:${this.definition.resource_id} unreachable (${msg}); treating binding as already gone`
         );
         return;
       }
-      throw err;
+      throw err instanceof Error ? err : new Error(msg);
     }
     cli.output(`Binding removed`);
   }
