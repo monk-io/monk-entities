@@ -7,7 +7,7 @@ resource-iam-binding:
       Manages a single IAM binding at a specific resource's scope.
       Complements `gcp/project-iam-binding` — use this when you need to grant a
       role on one bucket (or dataset, etc.) without polluting the project policy.
-    version-hash: 5d422b697c08
+    version-hash: 49eb08d04ae2
   schema:
     project:
       type: string
