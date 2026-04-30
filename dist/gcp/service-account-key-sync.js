@@ -80,7 +80,24 @@ var _ServiceAccountKey = class _ServiceAccountKey extends GcpEntity {
       return;
     }
     cli.output(`Deleting service account key: ${this.state.key_id}`);
-    this.httpDelete(`${IAM_API_URL}/${this.state.name}`);
+    try {
+      this.httpDelete(`${IAM_API_URL}/${this.state.name}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const saGone = /404/.test(msg) || /not found/i.test(msg) || /does not exist/i.test(msg);
+      const permDenied = /403/.test(msg) && /iam\.serviceAccountKeys\.delete/i.test(msg);
+      if (saGone) {
+        cli.output(
+          `Service account is already gone; key ${this.state.key_id} cascade-deleted with it`
+        );
+      } else if (permDenied) {
+        cli.output(
+          `Warning: caller lacks iam.serviceAccountKeys.delete; key ${this.state.key_id} will be cleaned up by the upcoming service-account delete (grant roles/iam.serviceAccountKeyAdmin to silence)`
+        );
+      } else {
+        throw err;
+      }
+    }
     try {
       secret.remove(this.definition.secret);
       cli.output(`Removed secret: ${this.definition.secret}`);
