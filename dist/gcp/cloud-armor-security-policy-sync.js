@@ -458,7 +458,7 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
       return;
     }
     cli.output(`Deleting Cloud Armor policy: ${this.definition.name}`);
-    const maxAttempts = 12;
+    const maxAttempts = 24;
     const delayMs = 1e4;
     let detachAttempted = false;
     let lastErr = null;
@@ -513,9 +513,41 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
   detachAllReferrers() {
     const policyName = this.definition.name;
     const matches = /* @__PURE__ */ __name((ref) => typeof ref === "string" && ref.length > 0 && (ref === policyName || ref.endsWith(`/securityPolicies/${policyName}`)), "matches");
-    const detach = /* @__PURE__ */ __name((resourceUrl, action2) => {
-      const op = this.post(`${resourceUrl}/${action2}`, { securityPolicy: "" });
-      if (op?.name) this.waitForComputeOperation(op.name);
+    const errStr = /* @__PURE__ */ __name((err) => {
+      if (err instanceof Error) return err.message || String(err);
+      if (err && typeof err === "object") {
+        const m = err.message;
+        if (typeof m === "string" && m.length) return m;
+        try {
+          return JSON.stringify(err);
+        } catch {
+        }
+      }
+      return String(err);
+    }, "errStr");
+    const detach = /* @__PURE__ */ __name((resourceUrl, patchField, label) => {
+      const body = {};
+      body[patchField] = null;
+      try {
+        const op = this.patch(resourceUrl, body);
+        if (op?.name) {
+          try {
+            this.waitForComputeOperation(op.name);
+          } catch (waitErr) {
+            cli.output(
+              `Warning: detach LRO wait failed for ${label}: ${errStr(waitErr)}`
+            );
+            return false;
+          }
+        }
+        cli.output(`Detached ${label}`);
+        return true;
+      } catch (patchErr) {
+        cli.output(
+          `Warning: PATCH (clear ${patchField}) on ${label} threw: ${errStr(patchErr)}`
+        );
+        return false;
+      }
     }, "detach");
     try {
       const list = this.get(
@@ -525,23 +557,15 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
         const beUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices/${be.name}`;
         if (matches(be.securityPolicy)) {
           cli.output(`Auto-detaching from backend service ${be.name} (securityPolicy)`);
-          try {
-            detach(beUrl, "setSecurityPolicy");
-          } catch (err) {
-            cli.output(`Warning: detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
+          detach(beUrl, "securityPolicy", `backend service ${be.name}`);
         }
         if (matches(be.edgeSecurityPolicy)) {
           cli.output(`Auto-detaching from backend service ${be.name} (edgeSecurityPolicy)`);
-          try {
-            detach(beUrl, "setEdgeSecurityPolicy");
-          } catch (err) {
-            cli.output(`Warning: edge-detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
+          detach(beUrl, "edgeSecurityPolicy", `backend service ${be.name} (edge)`);
         }
       }
     } catch (err) {
-      cli.output(`Warning: could not list backend services for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+      cli.output(`Warning: could not list backend services for auto-detach: ${errStr(err)}`);
     }
     try {
       const list = this.get(
@@ -551,15 +575,11 @@ var _CloudArmorSecurityPolicy = class _CloudArmorSecurityPolicy extends (_a = Gc
         if (matches(bb.edgeSecurityPolicy)) {
           cli.output(`Auto-detaching from backend bucket ${bb.name} (edgeSecurityPolicy)`);
           const bbUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets/${bb.name}`;
-          try {
-            detach(bbUrl, "setEdgeSecurityPolicy");
-          } catch (err) {
-            cli.output(`Warning: edge-detach from bucket ${bb.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
+          detach(bbUrl, "edgeSecurityPolicy", `backend bucket ${bb.name}`);
         }
       }
     } catch (err) {
-      cli.output(`Warning: could not list backend buckets for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+      cli.output(`Warning: could not list backend buckets for auto-detach: ${errStr(err)}`);
     }
   }
   checkReadiness() {

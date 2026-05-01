@@ -1,0 +1,115 @@
+# Cloud Armor Auto-Detach Integration Test
+#
+# Verifies that gcp/cloud-armor-security-policy.delete() proactively
+# detaches itself from any referring backend bucket / backend service
+# before retrying the delete API call. Without the fix, the delete fails
+# with 400 "still attached" after 12 retries and the policy is orphaned.
+#
+# Run with:
+#   sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose \
+#     --test-file test/stack-integration-cloud-armor-detach.test.yaml
+
+name: Cloud Armor Auto-Detach Test
+description: Policy delete must auto-detach from a referring backend bucket
+timeout: 900000 # 15 minutes — backend bucket + GCS bucket creates take a moment
+
+secrets:
+  global: {}
+
+setup:
+  - name: Load compiled GCP entity package
+    action: load
+    target: dist/input/gcp/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load auto-detach test template
+    action: load
+    target: input/gcp/test/stack-template-cloud-armor-detach.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # ==========================================================================
+  # Stand up the dependency chain: API → GCS bucket + Armor policy →
+  # CDN backend bucket attaching the policy.
+  # ==========================================================================
+  - name: Enable required APIs
+    action: run
+    target: gcp-cloud-armor-detach-test/enable-apis
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for APIs ready
+    action: wait
+    target: gcp-cloud-armor-detach-test/enable-apis
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Create origin GCS bucket
+    action: run
+    target: gcp-cloud-armor-detach-test/test-bucket
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for bucket ready
+    action: wait
+    target: gcp-cloud-armor-detach-test/test-bucket
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Create Cloud Armor edge policy
+    action: run
+    target: gcp-cloud-armor-detach-test/test-armor-policy
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for policy ready
+    action: wait
+    target: gcp-cloud-armor-detach-test/test-armor-policy
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Create CDN backend bucket attaching the policy
+    action: run
+    target: gcp-cloud-armor-detach-test/test-backend-bucket
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for backend bucket ready (policy now attached)
+    action: wait
+    target: gcp-cloud-armor-detach-test/test-backend-bucket
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  # ==========================================================================
+  # The actual test: delete the policy while it's still attached. Without
+  # the auto-detach fix, this fails with 400 after 12 retries. With the
+  # fix, the policy's delete() walks the project, clears the reference on
+  # the backend bucket, and the policy delete succeeds.
+  # ==========================================================================
+  - name: Delete policy while attached — must auto-detach + succeed
+    action: delete
+    target: gcp-cloud-armor-detach-test/test-armor-policy
+    expect:
+      exitCode: 0
+
+# Cleanup intentionally omitted — keep resources around so we can inspect
+# GCP state with gcloud after the test (edgeSecurityPolicy field on the
+# backend bucket should be null/absent if the PATCH detach worked).
+# Manual cleanup:
+#   sudo monk delete --force gcp-cloud-armor-detach-test/test-backend-bucket
+#   sudo monk delete --force gcp-cloud-armor-detach-test/test-bucket
+cleanup: []

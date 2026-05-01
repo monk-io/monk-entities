@@ -1,0 +1,78 @@
+# Cloud Armor Auto-Detach Test Template
+#
+# Reproduces the teardown scenario from monk-gcp-stack: a Cloud Armor edge
+# policy is referenced by a backend bucket. On group teardown the policy's
+# delete() call gets a 400 "still attached" until the backend's
+# edgeSecurityPolicy reference is cleared. The fix in
+# cloud-armor-security-policy.ts is supposed to detach itself proactively;
+# this template + test exercise that path in isolation, without the
+# 30-minute Cloud SQL provisioning of monk-gcp-stack.
+
+namespace: gcp-cloud-armor-detach-test
+
+# Step 1: Enable APIs the test needs.
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - compute.googleapis.com
+    - storage.googleapis.com
+
+# Step 2: GCS bucket — origin for the CDN backend bucket below.
+test-bucket:
+  defines: gcp/cloud-storage
+  name: monk-test-armor-detach-origin
+  location: US
+  storage_class: STANDARD
+  force_ownership: true
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-armor-detach-test/enable-apis
+      timeout: 300
+
+# Step 3: Cloud Armor edge policy. Will be attached to the backend bucket
+# below via that entity's security_policy field. Auto-detach on delete is
+# the behavior under test.
+test-armor-policy:
+  defines: gcp/cloud-armor-security-policy
+  name: monk-test-armor-detach-policy
+  policy_description: Auto-detach test policy
+  policy_type: CLOUD_ARMOR_EDGE
+  force_ownership: true
+  default_action: allow
+  rules:
+    - priority: 1000
+      action: deny(403)
+      src_ip_ranges:
+        - 192.0.2.0/24
+      rule_description: Test-net block (placeholder rule)
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-armor-detach-test/enable-apis
+      timeout: 300
+
+# Step 4: CDN backend bucket attaching the armor policy. This is the
+# referrer that has to be cleared from the policy before the policy can
+# be deleted on GCP. setEdgeSecurityPolicy expects a full self-link, so
+# we wire it via connection-target() + state.self_link rather than a
+# bare policy name.
+test-backend-bucket:
+  defines: gcp/cloud-cdn-backend-bucket
+  name: monk-test-armor-detach-backend
+  bucket_name: monk-test-armor-detach-origin
+  enable_cdn: true
+  cache_mode: CACHE_ALL_STATIC
+  default_ttl: 3600
+  max_ttl: 86400
+  security_policy: <- connection-target("armor") entity-state get-member("self_link")
+  connections:
+    armor:
+      runnable: gcp-cloud-armor-detach-test/test-armor-policy
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloud-armor-detach-test/test-bucket
+        - gcp-cloud-armor-detach-test/test-armor-policy
+      timeout: 300
