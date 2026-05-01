@@ -771,7 +771,11 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
         // resource the user wants to keep — or when GCP doesn't drop the
         // reference during the referring resource's own delete — we need
         // to detach proactively before the delete will succeed.
-        const maxAttempts = 12;
+        // 24 × 10s = 240s. After auto-detach succeeds GCP can take 60–120s
+        // to drop the reverse-reference on the security policy, which is
+        // why the previous 12-retry window (120s) wasn't enough even
+        // when the PATCH on the referring backend bucket succeeded.
+        const maxAttempts = 24;
         const delayMs = 10000;
         let detachAttempted = false;
         let lastErr: unknown = null;
@@ -839,9 +843,62 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
             (ref === policyName ||
              ref.endsWith(`/securityPolicies/${policyName}`));
 
-        const detach = (resourceUrl: string, action: string) => {
-            const op = this.post(`${resourceUrl}/${action}`, { securityPolicy: "" });
-            if (op?.name) this.waitForComputeOperation(op.name);
+        // Robustly stringify thrown values: Goja's native bridge can throw
+        // plain objects with no `.message`, which used to surface in logs
+        // as the literal string "[object Object]" and made it impossible
+        // to tell whether the detach succeeded or silently failed.
+        const errStr = (err: unknown): string => {
+            if (err instanceof Error) return err.message || String(err);
+            if (err && typeof err === "object") {
+                const m = (err as any).message;
+                if (typeof m === "string" && m.length) return m;
+                try { return JSON.stringify(err); } catch { /* fall through */ }
+            }
+            return String(err);
+        };
+
+        // Detach a single resource. Returns true on success, false on
+        // caught failure (with a descriptive cli.output line).
+        //
+        // GCP exposes two ways to clear a security-policy reference and
+        // each has its own gotcha:
+        //   - `POST <resource>/setEdgeSecurityPolicy` (or setSecurityPolicy)
+        //     with `{ "securityPolicy": "" }` — *rejected* with "URL is
+        //     malformed" because the parser requires a valid resource URL.
+        //   - `PATCH <resource>` with `{ "<field>": null }` — accepted, but
+        //     the reverse-reference on the security policy itself doesn't
+        //     fully drop for tens of seconds, so a follow-up policy delete
+        //     can still race.
+        // We use the PATCH path because it's the only one that succeeds at
+        // the API level, and rely on the outer retry loop to wait out the
+        // propagation lag.
+        const detach = (
+            resourceUrl: string,
+            patchField: "securityPolicy" | "edgeSecurityPolicy",
+            label: string,
+        ): boolean => {
+            const body: any = {};
+            body[patchField] = null;
+            try {
+                const op = this.patch(resourceUrl, body);
+                if (op?.name) {
+                    try {
+                        this.waitForComputeOperation(op.name);
+                    } catch (waitErr) {
+                        cli.output(
+                            `Warning: detach LRO wait failed for ${label}: ${errStr(waitErr)}`,
+                        );
+                        return false;
+                    }
+                }
+                cli.output(`Detached ${label}`);
+                return true;
+            } catch (patchErr) {
+                cli.output(
+                    `Warning: PATCH (clear ${patchField}) on ${label} threw: ${errStr(patchErr)}`,
+                );
+                return false;
+            }
         };
 
         // Backend services.
@@ -853,19 +910,15 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
                 const beUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendServices/${be.name}`;
                 if (matches(be.securityPolicy)) {
                     cli.output(`Auto-detaching from backend service ${be.name} (securityPolicy)`);
-                    try { detach(beUrl, "setSecurityPolicy"); } catch (err) {
-                        cli.output(`Warning: detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-                    }
+                    detach(beUrl, "securityPolicy", `backend service ${be.name}`);
                 }
                 if (matches(be.edgeSecurityPolicy)) {
                     cli.output(`Auto-detaching from backend service ${be.name} (edgeSecurityPolicy)`);
-                    try { detach(beUrl, "setEdgeSecurityPolicy"); } catch (err) {
-                        cli.output(`Warning: edge-detach from ${be.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-                    }
+                    detach(beUrl, "edgeSecurityPolicy", `backend service ${be.name} (edge)`);
                 }
             }
         } catch (err) {
-            cli.output(`Warning: could not list backend services for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+            cli.output(`Warning: could not list backend services for auto-detach: ${errStr(err)}`);
         }
 
         // Backend buckets (edge-only attachment).
@@ -877,13 +930,11 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
                 if (matches(bb.edgeSecurityPolicy)) {
                     cli.output(`Auto-detaching from backend bucket ${bb.name} (edgeSecurityPolicy)`);
                     const bbUrl = `${COMPUTE_API_URL}/projects/${this.projectId}/global/backendBuckets/${bb.name}`;
-                    try { detach(bbUrl, "setEdgeSecurityPolicy"); } catch (err) {
-                        cli.output(`Warning: edge-detach from bucket ${bb.name} failed: ${err instanceof Error ? err.message : String(err)}`);
-                    }
+                    detach(bbUrl, "edgeSecurityPolicy", `backend bucket ${bb.name}`);
                 }
             }
         } catch (err) {
-            cli.output(`Warning: could not list backend buckets for auto-detach: ${err instanceof Error ? err.message : String(err)}`);
+            cli.output(`Warning: could not list backend buckets for auto-detach: ${errStr(err)}`);
         }
     }
 
