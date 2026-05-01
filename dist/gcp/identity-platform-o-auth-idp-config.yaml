@@ -27,7 +27,7 @@ identity-platform-o-auth-idp-config:
       Works with:
       - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
       - `gcp/identity-platform-config` — Project-level configuration
-    version-hash: 49eb08d04ae2
+    version-hash: 318bcf1d649c
   schema:
     project:
       type: string

@@ -31,7 +31,7 @@ cloud-cdn-backend-service:
       Works with:
       - `gcp/cloud-run-service` — serverless backend via serverless NEG
       - `gcp/service-usage` — enable compute.googleapis.com API
-    version-hash: 49eb08d04ae2
+    version-hash: 318bcf1d649c
   schema:
     project:
       type: string
