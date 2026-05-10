@@ -1,0 +1,62 @@
+namespace: cloudflare-saas-example
+
+# Cloudflare for SaaS / Custom Hostnames example.
+#
+# Prerequisites:
+#   - The fallback zone (e.g. cf.bloccarbon.com) is registered in your CF
+#     account and the "SSL for SaaS" feature is enabled on it.
+#   - Your API token has `SSL and Certificates: Edit` on the zone.
+#   - Tenant DNS (carbon.acme.com) CNAMEs to your fallback zone so ACME
+#     validation can complete after Monk has provisioned the hostname.
+
+zone:
+  defines: cloudflare/cloudflare-dns-zone
+  name: cf.bloccarbon.com
+  permitted-secrets:
+    cloudflare-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Set once per environment. All custom hostnames default-route to this
+# origin unless they override with custom_origin_server.
+fallback-origin:
+  defines: cloudflare/cloudflare-custom-hostname-fallback-origin
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  origin: proxy.bloccarbon.com
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: cloudflare-saas-example/zone
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-saas-example/zone
+      timeout: 60
+
+# Per-tenant vanity hostname. ssl_status will sit at pending_validation
+# until the tenant's CNAME is in place, at which point Cloudflare drives
+# ACME issuance to completion. Use the `trigger-revalidation` action to
+# force a recheck after the tenant updates DNS.
+tenant-hostname:
+  defines: cloudflare/cloudflare-custom-hostname
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  hostname: carbon.acme.com
+  ssl_method: http
+  ssl_type: dv
+  ssl_settings:
+    min_tls_version: "1.2"
+    http2: "on"
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: cloudflare-saas-example/zone
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-saas-example/fallback-origin
+      timeout: 60

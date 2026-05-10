@@ -59,6 +59,47 @@ tests:
     expect:
       exitCode: 0
 
+  - name: Describe custom hostname state
+    action: describe
+    target: cloudflare-test/custom-hostname
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/custom-hostname"
+        - "monk-test-tenant.monktest.dev"
+
+  - name: Get custom hostname info
+    action: action
+    target: cloudflare-test/custom-hostname
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-tenant.monktest.dev"
+
+  - name: Trigger custom hostname revalidation
+    action: action
+    target: cloudflare-test/custom-hostname
+    actionName: trigger-revalidation
+    expect:
+      exitCode: 0
+
+  - name: Describe fallback origin state
+    action: describe
+    target: cloudflare-test/fallback-origin
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/fallback-origin"
+        - "proxy.thisbetterbe.online"
+
+  - name: Get fallback origin info
+    action: action
+    target: cloudflare-test/fallback-origin
+    actionName: get-info
+    expect:
+      exitCode: 0
+
 cleanup:
   - name: Delete stack
     action: delete
