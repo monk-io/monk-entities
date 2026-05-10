@@ -29,8 +29,47 @@ record:
         - cloudflare-test/zone
       timeout: 60
 
+fallback-origin:
+  defines: cloudflare/cloudflare-custom-hostname-fallback-origin
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  origin: proxy.thisbetterbe.online
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: cloudflare-test/zone
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-test/zone
+      timeout: 60
+
+custom-hostname:
+  defines: cloudflare/cloudflare-custom-hostname
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  hostname: monk-test-tenant.monktest.dev
+  ssl_method: http
+  ssl_type: dv
+  permitted-secrets:
+    cloudflare-api-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    zone:
+      runnable: cloudflare-test/zone
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-test/fallback-origin
+      timeout: 60
+
 stack:
   defines: group
   members:
     - cloudflare-test/zone
     - cloudflare-test/record
+    - cloudflare-test/fallback-origin
+    - cloudflare-test/custom-hostname

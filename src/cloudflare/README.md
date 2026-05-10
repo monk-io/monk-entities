@@ -108,12 +108,60 @@ interface CloudflareTunnelApplicationDefinition {
 }
 ```
 
+### `cloudflare-custom-hostname`
+
+Manages a tenant-facing vanity hostname for Cloudflare for SaaS. Adoption-safe via `(zone_id, hostname)` lookup. Delete removes the hostname (tenant-scoped lifecycle) unless `state.existing = true`.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareCustomHostnameDefinition {
+  secret_ref?: string;              // optional; defaults to cloudflare-api-token
+  zone_id: string;                  // fallback zone hosting the SaaS config
+  hostname: string;                 // tenant's vanity hostname
+  ssl_method?: "http" | "txt" | "email"; // default: http
+  ssl_type?: "dv";                  // only DV supported
+  ssl_settings?: {
+    min_tls_version?: "1.0" | "1.1" | "1.2" | "1.3";
+    http2?: "on" | "off";
+    early_hints?: "on" | "off";
+  };
+  custom_origin_server?: string;    // overrides the per-zone fallback origin
+  custom_origin_sni?: string;
+}
+```
+
+State: `{ id?, status?, ssl_status?, ssl_id?, verification_errors?, applied_custom_origin?, existing? }`.
+
+Actions: `get-info`, `trigger-revalidation`.
+
+Readiness: returns true once the hostname resource exists. ACME issuance (`ssl_status=active`) depends on the tenant pointing their DNS at the fallback zone, which Monk can't drive. Inspect `get-info` to track issuance, and call `trigger-revalidation` after DNS changes.
+
+Token scope: `SSL and Certificates: Edit` on the fallback zone. The zone must have **SSL for SaaS** enabled in the dashboard.
+
+### `cloudflare-custom-hostname-fallback-origin`
+
+Per-zone setting that all custom hostnames route to by default. Adopted when the configured origin already matches.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareCustomHostnameFallbackOriginDefinition {
+  secret_ref?: string; // optional; defaults to cloudflare-api-token
+  zone_id: string;     // fallback zone
+  origin: string;      // hostname Cloudflare proxies traffic to
+}
+```
+
+State: `{ origin?, status?, errors?, existing? }`. Actions: `get-info`. Token scope: same as `cloudflare-custom-hostname`.
+
 ## Secrets
 
 - Default secret name: `cloudflare-api-token`
 - Grant with `permitted-secrets` in templates
 - Cloudflare account ID is the account tag/UUID from the dashboard URL: `/accounts/<ACCOUNT_ID>`
 - Create a Cloudflare API token with account tunnel edit and DNS edit permissions
+- For Cloudflare for SaaS entities, add `SSL and Certificates: Edit` zone-level scope
 - Tunnel token secret (`cloudflare-tunnel-token`) is created by the tunnel entity and is distinct from the API token
 
 ## Example template
