@@ -193,6 +193,87 @@ Token scope: `Workers R2 Storage:Edit`.
 
 Deletion policy: `delete()` is a no-op unless `allow_destructive_delete: true` is set in the definition. Adopted buckets (`state.existing = true`) are never deleted.
 
+### `cloudflare-workers-script`
+
+Reserves a Worker name as a Cloudflare resource. Detects-then-stubs: if a script with the given name already exists in the account, it is adopted; if not, a tiny stub is uploaded so the resource exists and other entities/runnables can wire to it. Real code is then deployed via `cloudflare/wrangler-deploy`, which overwrites the stub.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareWorkersScriptDefinition {
+  secret_ref?: string;              // optional; defaults to cloudflare-api-token
+  account_id: string;
+  name: string;                     // canonical Worker script name
+  compatibility_date?: string;      // for the initial stub; wrangler-deploy sets the real value
+  allow_destructive_delete?: boolean; // default false; delete() is a no-op unless true
+}
+```
+
+State: `{ id?: string; created_on?: string; modified_on?: string; etag?: string; existing?: boolean }`.
+
+Actions: `get-info`, `force-delete`.
+
+Token scope: `Workers Scripts: Edit` on the account. Adopted scripts (`state.existing = true`) are skipped by `delete()` and `force-delete`. Adopted scripts (uploaded by something else, e.g. wrangler in CI) are the common case in production — Monk owns the *resource*, wrangler owns the *content*.
+
+Why a stub? CF's script-upload API doesn't have an "empty Worker" endpoint — every PUT needs a body. The stub is a service-worker that returns 503 with the message `monk: pending wrangler-deploy`, intended to be overwritten on the first `wrangler deploy`.
+
+### `cloudflare-workers-route`
+
+Maps a URL pattern on a zone to a Worker script. Adopts existing routes by `(pattern, script_name)`.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareWorkersRouteDefinition {
+  secret_ref?: string;       // optional; defaults to cloudflare-api-token
+  zone_id: string;           // Cloudflare zone ID
+  route_pattern: string;     // e.g., "api.example.com/*" — quote in YAML
+  script_name: string;       // Worker script name to bind
+}
+```
+
+State: `{ id?: string; existing?: boolean }`.
+
+Actions: `get-info`.
+
+Token scope: `Workers Routes: Edit` on the zone. Adopted routes (`state.existing = true`) are skipped by `delete()`; fresh routes are destroyed.
+
+Note: the field is named `route_pattern`, not `pattern`, because `pattern` is a reserved JSON Schema keyword.
+
+## Runnables
+
+### `cloudflare/wrangler-deploy`
+
+Companion runnable that uploads a Worker bundle via the `wrangler` CLI. Mirrors the `vercel/deploy` / `netlify/deploy` pattern: the operator packs source into a Monk blob, the runnable mounts it, generates `wrangler.toml` from JSON-encoded inputs, runs `wrangler deploy`, then pushes secrets.
+
+Inherit it from a runnable in your stack and pass variables:
+
+```yaml
+deploy:
+  defines: runnable
+  inherits: cloudflare/wrangler-deploy
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  variables:
+    source-path:        { type: string, value: my-worker-blob }
+    script-name:        { type: string, value: my-worker }
+    worker-main:        { type: string, value: src/index.js }
+    compatibility-date: { type: string, value: "2025-04-01" }
+    routes-json:        { type: string, value: '[{"pattern":"example.com/api/*","zone_name":"example.com"}]' }
+    bindings-json:      { type: string, value: '{"r2":[{"name":"ASSETS","bucket_name":"my-bucket"}],"vars":{"APP_ENV":"production"}}' }
+    secrets-json:       { type: string, value: '{}' }     # JSON map of NAME→VALUE, fully resolved at template time
+    pre-deploy:         { type: string, value: "npm ci && npm run build" }
+```
+
+`routes-json`, `bindings-json`, `secrets-json` are JSON strings (composable via Monk template expressions). When `routes-json` is non-empty the runnable sets `workers_dev = false` and adds `[[routes]]` blocks to `wrangler.toml`, so an account without a registered workers.dev subdomain can still deploy.
+
+Combine with the `cloudflare-workers-route` entity when you want routes managed declaratively outside the wrangler config (e.g. dynamic per-tenant routes added after deploy).
+
+Pack a blob: `monk blobs store --name my-worker-blob /path/to/bundled-worker`.
+
+Variable names are kebab-case (`source-path`, `script-name`, `pre-deploy`, etc.) per the runnable convention. Env-mapped variables map to `SCREAMING_SNAKE` env vars inside the container (`source-path` → `SOURCE_PATH` if it had an `env:` mapping; here it's only used by Monk's path interpolation).
+
 ## Secrets
 
 - Default secret name: `cloudflare-api-token`

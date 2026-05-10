@@ -80,6 +80,42 @@ bucket:
     data:
       protocol: custom
 
+worker:
+  defines: cloudflare/cloudflare-workers-script
+  account_id: <- secret("cloudflare-account-id")
+  name: monk-test-worker
+  compatibility_date: "2025-04-01"
+  # Tests need to be hermetic: allow destructive delete so cleanup wipes
+  # the Worker from the account when the stack is torn down.
+  allow_destructive_delete: true
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+route:
+  defines: cloudflare/cloudflare-workers-route
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  route_pattern: "thisbetterbe.online/monk-test-worker/*"
+  script_name: <- connection-target("worker") entity-state get-member("id")
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: cloudflare-test/zone
+      service: data
+    worker:
+      runnable: cloudflare-test/worker
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-test/zone
+        - cloudflare-test/worker
+      timeout: 60
+
 stack:
   defines: group
   members:
@@ -88,3 +124,5 @@ stack:
     - cloudflare-test/fallback-origin
     - cloudflare-test/custom-hostname
     - cloudflare-test/bucket
+    - cloudflare-test/worker
+    - cloudflare-test/route
