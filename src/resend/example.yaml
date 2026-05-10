@@ -1,0 +1,58 @@
+namespace: resend-example
+
+# Sending domain. Resend returns the DNS records to install on your zone;
+# verification happens out-of-band. Use the `verify` action after the
+# records propagate.
+mail-domain:
+  defines: resend/resend-domain
+  name: mail.example.com
+  region: us-east-1
+  open_tracking: true
+  click_tracking: false
+  permitted-secrets:
+    resend-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Scoped sending key — restricted to the domain above. Token is written
+# once to the secret named below.
+sending-key:
+  defines: resend/resend-api-key
+  name: prod-sending-key
+  permission: sending_access
+  domain_id: <- connection-target("domain") entity-state get-member("id")
+  token_secret_ref: my-app-resend-key
+  permitted-secrets:
+    resend-api-token: true
+    my-app-resend-key: true
+  connections:
+    domain:
+      runnable: resend-example/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - resend-example/mail-domain
+      timeout: 60
+
+# Inbound webhook for bounce/complaint handling. Signing secret stored
+# in Monk for verification at the receiving end.
+bounces-webhook:
+  defines: resend/resend-webhook
+  endpoint: https://api.example.com/resend/webhook
+  events:
+    - email.bounced
+    - email.complained
+    - email.delivered
+  signing_secret_ref: my-app-resend-webhook-secret
+  permitted-secrets:
+    resend-api-token: true
+    my-app-resend-webhook-secret: true
+
+stack:
+  defines: group
+  members:
+    - resend-example/mail-domain
+    - resend-example/sending-key
+    - resend-example/bounces-webhook
