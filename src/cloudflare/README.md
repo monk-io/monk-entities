@@ -155,6 +155,68 @@ Token scope: `Workers Routes: Edit` on the zone. Adopted routes (`state.existing
 
 Note: the field is named `route_pattern`, not `pattern`, because `pattern` is a reserved JSON Schema keyword.
 
+### `cloudflare-queue`
+
+Manages an account-scoped Cloudflare Queue. Adopts existing queues by name. Delete is disabled by default (queues may hold messages); enable with `allow_destructive_delete: true` or invoke `force-delete`.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareQueueDefinition {
+  secret_ref?: string;
+  account_id: string;
+  name: string;
+  settings?: {
+    delivery_delay?: number;          // seconds, 0–42300
+    delivery_paused?: boolean;
+    message_retention_period?: number; // seconds, 60–1209600 (14 days)
+  };
+  allow_destructive_delete?: boolean;
+}
+```
+
+State exposes `id` (queue id) and `name`. Token needs `Workers Queues: Edit`.
+
+Actions: `get-info`, `send-message` (args `message`), `pull-messages` (args `batch_size`, `visibility_timeout_ms`), `drain-messages` (pull-and-ack until empty), `force-delete`.
+
+### `cloudflare-queue-consumer`
+
+Binds a Worker script as the consumer for a queue. Adopts existing consumers matched on `(queue_id, script_name)`.
+
+```ts
+interface CloudflareQueueConsumerDefinition {
+  secret_ref?: string;
+  account_id: string;
+  queue_id: string;
+  script_name: string;
+  settings?: {
+    batch_size?: number;
+    max_concurrency?: number;
+    max_retries?: number;
+    max_wait_time_ms?: number;
+    retry_delay?: number;
+  };
+  dead_letter_queue?: string;
+}
+```
+
+Actions: `get-info`, `list-consumers`. The Worker script must declare a `queue` handler to actually process messages — the script entity's stub only registers `fetch`, so consumer delivery is not exercised end-to-end by this entity alone.
+
+### `cloudflare-workers-cron-trigger`
+
+Owns the full cron list for a Worker script. Applying this entity is a full-replace of `PUT /schedules` — don't mix with crons managed by `wrangler.toml`.
+
+```ts
+interface CloudflareWorkersCronTriggerDefinition {
+  secret_ref?: string;
+  account_id: string;
+  script_name: string;
+  crons: string[]; // standard UTC 5-field cron expressions
+}
+```
+
+Actions: `get-schedules`, `apply` (re-PUT after a script swap).
+
 ## Runnables
 
 ### `cloudflare/wrangler-deploy`

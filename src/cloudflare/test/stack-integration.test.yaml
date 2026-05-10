@@ -96,6 +96,118 @@ tests:
       output:
         - "monk-test-worker"
 
+  - name: Describe main queue
+    action: describe
+    target: cloudflare-test/main-queue
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/main-queue"
+        - "monk-test-queue"
+
+  - name: Describe DLQ
+    action: describe
+    target: cloudflare-test/dlq
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-queue-dlq"
+
+  - name: Get main queue info
+    action: action
+    target: cloudflare-test/main-queue
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-queue"
+
+  # Functional roundtrip: send and pull from DLQ (no worker consumer
+  # attached, so http_pull works). Purge first to drain anything left
+  # behind by a previous run.
+  - name: Drain DLQ before roundtrip
+    action: action
+    target: cloudflare-test/dlq
+    actionName: drain-messages
+    expect:
+      exitCode: 0
+      output:
+        - "Purged"
+
+  - name: Send message to DLQ
+    action: action
+    target: cloudflare-test/dlq
+    actionName: send-message
+    expect:
+      exitCode: 0
+      output:
+        - "Sent message"
+        - "monk-test"
+
+  - name: Pull message from DLQ
+    action: action
+    target: cloudflare-test/dlq
+    actionName: pull-messages
+    expect:
+      exitCode: 0
+      output:
+        - "Pulled"
+        - "monk-test"
+
+  # main-queue has a worker consumer attached, so send works but pulls
+  # would race with the consumer. Just verify send.
+  - name: Send message to main queue
+    action: action
+    target: cloudflare-test/main-queue
+    actionName: send-message
+    expect:
+      exitCode: 0
+      output:
+        - "Sent message"
+
+  - name: Describe queue consumer
+    action: describe
+    target: cloudflare-test/consumer
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-worker"
+
+  - name: Get consumer info
+    action: action
+    target: cloudflare-test/consumer
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-worker"
+
+  - name: List consumers on queue
+    action: action
+    target: cloudflare-test/consumer
+    actionName: list-consumers
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-worker"
+
+  - name: Describe cron trigger
+    action: describe
+    target: cloudflare-test/crons
+    expect:
+      exitCode: 0
+      output:
+        - "applied_crons"
+
+  - name: Get cron schedules
+    action: action
+    target: cloudflare-test/crons
+    actionName: get-schedules
+    expect:
+      exitCode: 0
+      output:
+        - "*/30 * * * *"
+
 cleanup:
   - name: Delete stack
     action: delete

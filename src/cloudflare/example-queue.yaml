@@ -1,0 +1,104 @@
+namespace: cloudflare-queue-example
+
+# Reserves the Worker name. Code is uploaded later via wrangler-deploy.
+# The worker script you ship must export a `queue` handler to actually
+# process messages.
+worker:
+  defines: cloudflare/cloudflare-workers-script
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-queue-worker
+  compatibility_date: "2025-04-01"
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+main-queue:
+  defines: cloudflare/cloudflare-queue
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-main-queue
+  settings:
+    message_retention_period: 86400
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+dlq:
+  defines: cloudflare/cloudflare-queue
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-main-queue-dlq
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+# Bind the worker as the consumer for main-queue, with dlq as the
+# dead-letter target. Use connection-target so it works wherever the
+# queue id lives.
+consumer:
+  defines: cloudflare/cloudflare-queue-consumer
+  account_id: <- secret("cloudflare-account-id")
+  queue_id: <- connection-target("queue") entity-state get-member("id")
+  script_name: <- connection-target("worker") entity-state get-member("id")
+  dead_letter_queue: my-app-main-queue-dlq
+  settings:
+    batch_size: 10
+    max_concurrency: 2
+    max_retries: 3
+    max_wait_time_ms: 5000
+    retry_delay: 5
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    queue:
+      runnable: cloudflare-queue-example/main-queue
+      service: data
+    worker:
+      runnable: cloudflare-queue-example/worker
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-queue-example/main-queue
+        - cloudflare-queue-example/worker
+        - cloudflare-queue-example/dlq
+      timeout: 60
+
+# Nightly + hourly schedules; this entity OWNS the full cron list for
+# the worker (full-replace PUT /schedules).
+crons:
+  defines: cloudflare/cloudflare-workers-cron-trigger
+  account_id: <- secret("cloudflare-account-id")
+  script_name: <- connection-target("worker") entity-state get-member("id")
+  crons:
+    - "0 3 * * *"   # nightly factor sync
+    - "*/30 * * * *" # half-hourly reconciliation
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    worker:
+      runnable: cloudflare-queue-example/worker
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-queue-example/worker
+      timeout: 60
+
+stack:
+  defines: group
+  members:
+    - cloudflare-queue-example/worker
+    - cloudflare-queue-example/main-queue
+    - cloudflare-queue-example/dlq
+    - cloudflare-queue-example/consumer
+    - cloudflare-queue-example/crons
