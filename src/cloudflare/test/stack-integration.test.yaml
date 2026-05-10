@@ -1,10 +1,11 @@
-name: Cloudflare DNS Zone & Record Integration Test
-description: Load entities, run process-group stack with zone and record
+name: Cloudflare Integration Test
+description: Load entities, run zone + record + worker script + route stack
 timeout: 300000
 
 secrets:
   global:
     cloudflare-api-token: "$CLOUDFLARE_API_TOKEN"
+    cloudflare-account-id: "$CLOUDFLARE_ACCOUNT_ID"
 
 setup:
   - name: Load compiled entity (skipped if no Monk permissions)
@@ -14,7 +15,7 @@ setup:
       exitCode: 0
     continueOnError: true
 
-  - name: Load zone+record template
+  - name: Load stack template
     action: load
     target: stack-template.yaml
     expect:
@@ -45,6 +46,24 @@ tests:
         - "cloudflare-test/zone"
         - "existing"
 
+  - name: Describe Worker script state
+    action: describe
+    target: cloudflare-test/worker
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/worker"
+        - "monk-test-worker"
+
+  - name: Describe Workers route state
+    action: describe
+    target: cloudflare-test/route
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/route"
+        - "id"
+
   - name: List zones
     action: action
     target: cloudflare-test/zone
@@ -59,11 +78,27 @@ tests:
     expect:
       exitCode: 0
 
+  - name: Get Worker script info
+    action: action
+    target: cloudflare-test/worker
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "compatibility_date"
+
+  - name: Get Workers route info
+    action: action
+    target: cloudflare-test/route
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-worker"
+
 cleanup:
   - name: Delete stack
     action: delete
     target: cloudflare-test/stack
     expect:
       exitCode: 0
-
-

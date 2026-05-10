@@ -1,0 +1,99 @@
+namespace: cloudflare-workers-example
+
+# Example showing the script entity + deploy runnable + route entity
+# working together. Composes with an R2 bucket via state lookup.
+#
+# Prerequisite: pack your built Worker bundle into a Monk blob first:
+#   monk blobs store --name worker /path/to/bundled-worker
+# (the directory should contain src/index.js or whatever worker-main points at).
+
+my-bucket:
+  defines: cloudflare/cloudflare-r2-bucket
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-assets
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+# The script entity reserves the Worker as a Cloudflare resource. On
+# first apply it uploads a tiny stub so the resource exists and
+# dependents (the deploy runnable, the route entity) can wire to it.
+worker:
+  defines: cloudflare/cloudflare-workers-script
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-worker
+  compatibility_date: "2025-04-01"
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+# The deploy runnable. Uploads the real Worker bundle via wrangler,
+# overwriting the stub the script entity placed.
+deploy:
+  defines: runnable
+  inherits: cloudflare/wrangler-deploy
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+    my-app-database-url: true
+  variables:
+    source-path: worker
+    script-name: <- connection-target("worker") entity-state get-member("id")
+    worker-main: src/index.js
+    compatibility-date: "2025-04-01"
+    compatibility-flags: nodejs_compat
+    routes-json: '[{"pattern":"api.example.com/*","zone_name":"example.com"}]'
+    bindings-json: <- `{"r2":[{"name":"ASSETS","bucket_name":"${connection-target("bucket") entity-state get-member("id")}"}],"vars":{"APP_ENV":"production"}}`
+    secrets-json: <- `{"DATABASE_URL":"${secret("my-app-database-url")}"}`
+    pre-deploy: |
+      echo "📦 Installing deps and bundling..."
+      npm ci
+      npm run build
+  connections:
+    worker:
+      runnable: cloudflare-workers-example/worker
+      service: data
+    bucket:
+      runnable: cloudflare-workers-example/my-bucket
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-workers-example/worker
+        - cloudflare-workers-example/my-bucket
+      timeout: 60
+
+# Route bindings: zone-scoped, managed by the workers-route entity. Use
+# this when you want routes declared declaratively on top of the
+# deployed Worker (e.g. per-tenant dynamic routes added after deploy).
+extra-route:
+  defines: cloudflare/cloudflare-workers-route
+  zone_id: <- secret("cloudflare-zone-id")
+  route_pattern: "admin.example.com/*"
+  script_name: <- connection-target("worker") entity-state get-member("id")
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-zone-id: true
+  connections:
+    worker:
+      runnable: cloudflare-workers-example/worker
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-workers-example/deploy
+      timeout: 600
+
+stack:
+  defines: group
+  members:
+    - cloudflare-workers-example/my-bucket
+    - cloudflare-workers-example/worker
+    - cloudflare-workers-example/deploy
+    - cloudflare-workers-example/extra-route
