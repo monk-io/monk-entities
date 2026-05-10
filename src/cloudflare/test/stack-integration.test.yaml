@@ -5,6 +5,7 @@ timeout: 300000
 secrets:
   global:
     cloudflare-api-token: "$CLOUDFLARE_API_TOKEN"
+    cloudflare-account-id: "$CLOUDFLARE_ACCOUNT_ID"
 
 setup:
   - name: Load compiled entity (skipped if no Monk permissions)
@@ -99,6 +100,24 @@ tests:
     actionName: get-info
     expect:
       exitCode: 0
+
+  - name: Describe R2 bucket
+    action: describe
+    target: cloudflare-test/bucket
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/bucket"
+        - "id"
+
+  - name: Get R2 bucket info
+    action: action
+    target: cloudflare-test/bucket
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-r2-test-bucket"
 
 cleanup:
   - name: Delete stack

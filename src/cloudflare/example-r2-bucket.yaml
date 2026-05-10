@@ -1,0 +1,17 @@
+namespace: cloudflare-r2-example
+
+bucket:
+  defines: cloudflare/cloudflare-r2-bucket
+  account_id: <- secret("cloudflare-account-id")
+  name: my-app-assets
+  location_hint: weur
+  storage_class: Standard
+  # delete() is a no-op by default. Set to true to allow stack-delete to
+  # destroy the bucket (the bucket must be empty for the API to accept it).
+  allow_destructive_delete: false
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
