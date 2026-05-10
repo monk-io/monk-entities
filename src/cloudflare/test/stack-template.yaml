@@ -66,6 +66,20 @@ custom-hostname:
         - cloudflare-test/fallback-origin
       timeout: 60
 
+bucket:
+  defines: cloudflare/cloudflare-r2-bucket
+  account_id: <- secret("cloudflare-account-id")
+  name: monk-r2-test-bucket
+  storage_class: Standard
+  # Tests need cleanup to actually destroy the bucket.
+  allow_destructive_delete: true
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
 stack:
   defines: group
   members:
@@ -73,3 +87,4 @@ stack:
     - cloudflare-test/record
     - cloudflare-test/fallback-origin
     - cloudflare-test/custom-hostname
+    - cloudflare-test/bucket

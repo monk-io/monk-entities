@@ -155,6 +155,44 @@ interface CloudflareCustomHostnameFallbackOriginDefinition {
 
 State: `{ origin?, status?, errors?, existing? }`. Actions: `get-info`. Token scope: same as `cloudflare-custom-hostname`.
 
+### `cloudflare-r2-bucket`
+
+Manages an R2 object-storage bucket in a Cloudflare account. Adopts pre-existing buckets by name.
+
+Definition (snake_case):
+
+```ts
+interface CloudflareR2BucketDefinition {
+  secret_ref?: string;       // optional; defaults to cloudflare-api-token
+  account_id: string;        // Cloudflare account ID
+  name: string;              // bucket name (3-63 chars, S3-compatible)
+  location_hint?: "wnam" | "enam" | "weur" | "eeur" | "apac";
+  storage_class?: "Standard" | "InfrequentAccess";
+  allow_destructive_delete?: boolean; // default false; delete() is a no-op unless true
+}
+```
+
+State:
+
+```ts
+interface CloudflareR2BucketState {
+  id?: string;            // bucket name
+  endpoint?: string;      // https://<account_id>.r2.cloudflarestorage.com
+  created_on?: string;
+  location?: string;
+  storage_class?: string;
+  existing?: boolean;
+}
+```
+
+Actions:
+- `get-info`: prints bucket metadata
+- `force-delete`: explicit destructive delete; refuses adopted buckets
+
+Token scope: `Workers R2 Storage:Edit`.
+
+Deletion policy: `delete()` is a no-op unless `allow_destructive_delete: true` is set in the definition. Adopted buckets (`state.existing = true`) are never deleted.
+
 ## Secrets
 
 - Default secret name: `cloudflare-api-token`
