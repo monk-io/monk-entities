@@ -1,0 +1,4 @@
+REPO resend
+DESCRIPTION Transactional email - domains, API keys, webhooks.
+HOSTING managed
+TAGS resend,email,transactional

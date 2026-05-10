@@ -1,0 +1,55 @@
+namespace: resend-test
+
+# Test domain. DNS verification will stay at "not_started" without real
+# DNS records on the zone — that's fine: the test verifies the API
+# contract (create returns records[], get-info works, delete cleans up).
+domain:
+  defines: resend/resend-domain
+  # Fixed hostname so adoption works across re-runs. Resend accepts
+  # any name; without real DNS the domain stays in not_started, which
+  # is fine for verifying the API contract.
+  name: monk-test.thisbetterbe.online
+  region: us-east-1
+  permitted-secrets:
+    resend-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Scoped sending key. The created token is written to this secret.
+api-key:
+  defines: resend/resend-api-key
+  name: monk-test-key
+  permission: sending_access
+  domain_id: <- connection-target("domain") entity-state get-member("id")
+  token_secret_ref: resend-test-provisioned-key
+  permitted-secrets:
+    resend-api-token: true
+    resend-test-provisioned-key: true
+  connections:
+    domain:
+      runnable: resend-test/domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - resend-test/domain
+      timeout: 60
+
+webhook:
+  defines: resend/resend-webhook
+  endpoint: https://example.com/monk-test-webhook
+  events:
+    - email.bounced
+    - email.complained
+  signing_secret_ref: resend-test-webhook-secret
+  permitted-secrets:
+    resend-api-token: true
+    resend-test-webhook-secret: true
+
+stack:
+  defines: group
+  members:
+    - resend-test/domain
+    - resend-test/api-key
+    - resend-test/webhook

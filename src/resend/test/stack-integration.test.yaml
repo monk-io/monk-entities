@@ -1,0 +1,108 @@
+name: Resend Integration Test
+description: Load entities, run domain + api-key + webhook stack against real Resend
+timeout: 300000
+
+secrets:
+  global:
+    resend-api-token: "$RESEND_API_TOKEN"
+
+setup:
+  - name: Load compiled entity (skipped if no Monk permissions)
+    action: load
+    target: dist/input/resend/MANIFEST
+    expect:
+      exitCode: 0
+    continueOnError: true
+
+  - name: Load stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  - name: Start stack
+    action: run
+    target: resend-test/stack
+    expect:
+      exitCode: 0
+
+  - name: Describe domain state
+    action: describe
+    target: resend-test/domain
+    expect:
+      exitCode: 0
+      output:
+        - "resend-test/domain"
+        - "records"
+
+  - name: Get domain info
+    action: action
+    target: resend-test/domain
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "records"
+        - "DKIM"
+
+  - name: Get domain records
+    action: action
+    target: resend-test/domain
+    actionName: get-records
+    expect:
+      exitCode: 0
+      output:
+        - "DKIM"
+        - "SPF"
+
+  - name: Trigger domain verify
+    action: action
+    target: resend-test/domain
+    actionName: verify
+    expect:
+      exitCode: 0
+      output:
+        - "Verification triggered"
+
+  - name: Describe api-key state
+    action: describe
+    target: resend-test/api-key
+    expect:
+      exitCode: 0
+      output:
+        - "resend-test/api-key"
+        - "token_secret_ref"
+
+  - name: List api keys
+    action: action
+    target: resend-test/api-key
+    actionName: list-keys
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-key"
+
+  - name: Describe webhook state
+    action: describe
+    target: resend-test/webhook
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-webhook"
+
+  - name: Get webhook info
+    action: action
+    target: resend-test/webhook
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-webhook"
+
+cleanup:
+  - name: Delete stack
+    action: delete
+    target: resend-test/stack
+    expect:
+      exitCode: 0
