@@ -168,6 +168,17 @@ export class CloudflareWorkersScript extends CloudflareEntity<
         cli.output(`Worker script ${this.state.id} already gone`);
         return;
       }
+      if (msg.includes("10064")) {
+        // Script is still bound as a queue consumer. Stack-level cleanup
+        // typically removes the consumer in parallel; surface a warning
+        // but don't fail the delete — the orphan will resolve once the
+        // queue/consumer is gone.
+        cli.output(
+          `Worker script ${this.state.id} still bound as a queue consumer; ` +
+            `remove the consumer first. Skipping script delete.`
+        );
+        return;
+      }
       throw e;
     }
   }
@@ -198,19 +209,25 @@ export class CloudflareWorkersScript extends CloudflareEntity<
   /**
    * Upload a minimal stub Worker via the multipart script-upload endpoint.
    * This reserves the script name as a real CF resource so dependent
-   * entities can wire to it. The body is overwritten on the first
-   * `wrangler deploy`.
+   * entities (routes, queue consumers, cron triggers) can wire to it.
+   * The body is overwritten on the first `wrangler deploy`.
+   *
+   * Module syntax with `fetch`, `queue`, and `scheduled` handlers — the
+   * Cloudflare API refuses to attach a queue consumer or cron trigger to
+   * a script that doesn't export the corresponding handler. The literal
+   * `export default` is split below to bypass esbuild's tree-shaker,
+   * which strips it from compiled string literals.
    */
   private uploadStub(accountId: string, name: string): any | null {
-    // Service-worker syntax (no ES module). Avoids `export default` —
-    // esbuild's tree-shaking strips bare `export default ` declarations
-    // from compiled string literals.
+    const exp = "export" + " " + "default";
     const stub =
-      "addEventListener(\"fetch\", function (event) {\n" +
-      "  event.respondWith(new Response(\"monk: pending wrangler-deploy\", { status: 503 }));\n" +
-      "});\n";
+      `${exp} {\n` +
+      `  async fetch() { return new Response("monk: pending wrangler-deploy", { status: 503 }); },\n` +
+      `  async queue() { /* monk stub: drops messages until wrangler deploys real handler */ },\n` +
+      `  async scheduled() { /* monk stub: no-op cron handler */ }\n` +
+      `};\n`;
     const metadata = {
-      body_part: "script",
+      main_module: "script.js",
       compatibility_date: this.definition.compatibility_date || "2025-04-01",
     };
 
@@ -221,8 +238,8 @@ export class CloudflareWorkersScript extends CloudflareEntity<
       `Content-Type: application/json\r\n\r\n` +
       `${JSON.stringify(metadata)}\r\n` +
       `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="script"; filename="script.js"\r\n` +
-      `Content-Type: application/javascript\r\n\r\n` +
+      `Content-Disposition: form-data; name="script.js"; filename="script.js"\r\n` +
+      `Content-Type: application/javascript+module\r\n\r\n` +
       `${stub}\r\n` +
       `--${boundary}--\r\n`;
 
