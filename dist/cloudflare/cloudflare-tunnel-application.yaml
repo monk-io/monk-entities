@@ -20,7 +20,7 @@ cloudflare-tunnel-application:
       Works with:
       - `cloudflare/cloudflare-tunnel` - Provides tunnel ID and token
       - `cloudflare/cloudflare-dns-record` - Alternative DNS management
-    version-hash: d6f2dba6e42b
+    version-hash: 4a79cd7d5da7
   schema:
     secret_ref:
       type: string
