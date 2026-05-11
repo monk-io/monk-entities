@@ -1,0 +1,251 @@
+# Resend + Cloudflare end-to-end email demo
+#
+# Wires:
+#   cloudflare-dns-zone (adopt)
+#     → resend-domain (POST /domains, gets the DKIM/SPF records to install)
+#       → cloudflare-dns-record × 3 (install the records on the zone)
+#         → resend-api-key (provision a scoped sending key)
+#           → send-email (one-shot curl runnable: verifies the domain
+#                        until status=verified, then POSTs /emails)
+#
+# Required secrets (set via `monk secret set <name> <value>` or env):
+#   cloudflare-api-token : Cloudflare API token with Zone:Read, DNS:Edit
+#                          on thisbetterbe.online.
+#   resend-api-token     : Resend Full Access key (https://resend.com/api-keys).
+
+namespace: monk-email-demo
+
+# === DNS zone (adopt existing) ===
+
+zone:
+  defines: cloudflare/cloudflare-dns-zone
+  name: thisbetterbe.online
+  permitted-secrets:
+    cloudflare-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# === Resend sending domain ===
+# State exposes flattened scalar fields for each record Resend wants
+# installed (dkim_*, spf_mx_*, spf_txt_*), consumable via
+# `entity-state get-member("...")` below.
+
+mail-domain:
+  defines: resend/resend-domain
+  name: thisbetterbe.online
+  region: us-east-1
+  permitted-secrets:
+    resend-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# === Install Resend's records on the Cloudflare zone ===
+# Names are returned by Resend relative to the apex zone (e.g.,
+# "resend._domainkey"). cloudflare-dns-record's API accepts FQDN, so
+# we string-concat the zone name on.
+
+dkim-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  record_type: TXT
+  name: <- `${connection-target("domain") entity-state get-member("dkim_name")}.thisbetterbe.online`
+  content: <- connection-target("domain") entity-state get-member("dkim_value")
+  ttl: 1
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: monk-email-demo/zone
+      service: data
+    domain:
+      runnable: monk-email-demo/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - monk-email-demo/zone
+        - monk-email-demo/mail-domain
+      timeout: 120
+
+spf-mx-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  record_type: MX
+  name: <- `${connection-target("domain") entity-state get-member("spf_mx_name")}.thisbetterbe.online`
+  content: <- connection-target("domain") entity-state get-member("spf_mx_value")
+  priority: <- connection-target("domain") entity-state get-member("spf_mx_priority")
+  ttl: 1
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: monk-email-demo/zone
+      service: data
+    domain:
+      runnable: monk-email-demo/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - monk-email-demo/zone
+        - monk-email-demo/mail-domain
+      timeout: 120
+
+spf-txt-record:
+  defines: cloudflare/cloudflare-dns-record
+  zone_id: <- connection-target("zone") entity-state get-member("id")
+  record_type: TXT
+  name: <- `${connection-target("domain") entity-state get-member("spf_txt_name")}.thisbetterbe.online`
+  content: <- connection-target("domain") entity-state get-member("spf_txt_value")
+  ttl: 1
+  permitted-secrets:
+    cloudflare-api-token: true
+  connections:
+    zone:
+      runnable: monk-email-demo/zone
+      service: data
+    domain:
+      runnable: monk-email-demo/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - monk-email-demo/zone
+        - monk-email-demo/mail-domain
+      timeout: 120
+
+# === Provisioned sending key ===
+# Demonstrates the production pattern: a scoped sending-only key,
+# token written to a Monk secret on create. The send-email runnable
+# below uses this provisioned key (not the management key).
+
+sending-key:
+  defines: resend/resend-api-key
+  name: monk-email-demo-sender
+  permission: sending_access
+  domain_id: <- connection-target("domain") entity-state get-member("id")
+  token_secret_ref: monk-email-demo-sending-key
+  permitted-secrets:
+    resend-api-token: true
+    monk-email-demo-sending-key: true
+  connections:
+    domain:
+      runnable: monk-email-demo/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - monk-email-demo/mail-domain
+      timeout: 60
+
+# === Send a test email ===
+# One-shot runnable. Verify-polls the Resend domain (DNS verification
+# takes up to a few minutes after the records propagate) and then POSTs
+# /emails using the scoped sending key. Re-run with
+# `monk run -l monk-email-demo/send-email` to send again.
+
+send-email:
+  defines: runnable
+  variables:
+    resend_mgmt_token:
+      env: RESEND_MGMT_TOKEN
+      value: <- secret("resend-api-token")
+      type: string
+    resend_sending_key:
+      env: RESEND_SENDING_KEY
+      value: <- secret("monk-email-demo-sending-key")
+      type: string
+    domain_id:
+      env: DOMAIN_ID
+      value: <- connection-target("domain") entity-state get-member("id")
+      type: string
+    from_email:
+      env: FROM_EMAIL
+      value: "hello@thisbetterbe.online"
+      type: string
+    to_email:
+      env: TO_EMAIL
+      value: "xnooga@gmail.com"
+      type: string
+  permitted-secrets:
+    resend-api-token: true
+    monk-email-demo-sending-key: true
+  connections:
+    domain:
+      runnable: monk-email-demo/mail-domain
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - monk-email-demo/mail-domain
+        - monk-email-demo/dkim-record
+        - monk-email-demo/spf-mx-record
+        - monk-email-demo/spf-txt-record
+        - monk-email-demo/sending-key
+      timeout: 300
+  containers:
+    sender:
+      image: curlimages/curl:latest
+      entrypoint: /bin/sh
+      bash: |
+        set -eu
+        echo "→ Triggering Resend domain verification (id=$DOMAIN_ID)"
+        curl -s -X POST "https://api.resend.com/domains/$DOMAIN_ID/verify" \
+          -H "Authorization: Bearer $RESEND_MGMT_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{}' > /tmp/verify.json || true
+        cat /tmp/verify.json
+        echo ""
+
+        echo "→ Polling status until verified (up to 5 minutes)"
+        for i in $(seq 1 30); do
+          STATUS=$(curl -s "https://api.resend.com/domains/$DOMAIN_ID" \
+            -H "Authorization: Bearer $RESEND_MGMT_TOKEN" | \
+            grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "  attempt $i: status=$STATUS"
+          if [ "$STATUS" = "verified" ]; then
+            break
+          fi
+          sleep 10
+        done
+
+        if [ "$STATUS" != "verified" ]; then
+          echo "✘ Domain did not reach verified state in time."
+          echo "  Records may not have propagated yet. Check DNS:"
+          echo "    dig +short TXT resend._domainkey.thisbetterbe.online"
+          echo "    dig +short MX send.thisbetterbe.online"
+          echo "    dig +short TXT send.thisbetterbe.online"
+          exit 1
+        fi
+
+        echo ""
+        echo "→ Sending email from $FROM_EMAIL to $TO_EMAIL"
+        RESPONSE=$(curl -s -X POST https://api.resend.com/emails \
+          -H "Authorization: Bearer $RESEND_SENDING_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"from\": \"Monk Email Demo <$FROM_EMAIL>\",
+            \"to\": [\"$TO_EMAIL\"],
+            \"subject\": \"📨 Hello from Monk + Resend + Cloudflare\",
+            \"html\": \"<p>This email was sent end-to-end via Monk-managed entities:</p><ul><li>cloudflare-dns-zone (adopt)</li><li>resend-domain</li><li>cloudflare-dns-record × 3 (DKIM, SPF MX, SPF TXT)</li><li>resend-api-key (sending scope)</li></ul><p>Cheers, Monk.</p>\",
+            \"text\": \"This email was sent end-to-end via Monk-managed entities: cloudflare-dns-zone, resend-domain, cloudflare-dns-record x3, resend-api-key. Cheers, Monk.\"
+          }")
+        echo "$RESPONSE"
+        echo ""
+        echo "$RESPONSE" | grep -q '"id"' || { echo "✘ Send failed"; exit 1; }
+        echo "✔ Email queued for delivery."
+
+# === Group ===
+
+stack:
+  defines: group
+  members:
+    - monk-email-demo/zone
+    - monk-email-demo/mail-domain
+    - monk-email-demo/dkim-record
+    - monk-email-demo/spf-mx-record
+    - monk-email-demo/spf-txt-record
+    - monk-email-demo/sending-key
+    - monk-email-demo/send-email
