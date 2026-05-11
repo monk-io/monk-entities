@@ -56,6 +56,25 @@ export interface ResendDomainState extends ResendEntityState {
     status?: string;
     priority?: number;
   }>;
+  // Flattened records — scalar fields so they're consumable via
+  // `connection-target("...") entity-state get-member("dkim_value")` etc.
+  // Names are relative to the apex zone (e.g. "resend._domainkey.mail"),
+  // matching what Resend returns. Append the zone name in the consumer
+  // template to get the FQDN.
+  /** @description DKIM record name (relative to apex zone) */
+  dkim_name?: string;
+  /** @description DKIM TXT record value (the public key string) */
+  dkim_value?: string;
+  /** @description SPF MX record name (relative to apex zone) */
+  spf_mx_name?: string;
+  /** @description SPF MX record target hostname */
+  spf_mx_value?: string;
+  /** @description SPF MX record priority (e.g., 10) */
+  spf_mx_priority?: number;
+  /** @description SPF TXT record name (relative to apex zone) */
+  spf_txt_name?: string;
+  /** @description SPF TXT record value */
+  spf_txt_value?: string;
 }
 
 /**
@@ -96,6 +115,7 @@ export class ResendDomain extends ResendEntity<
         records: full?.records || [],
         existing: true,
       };
+      this.flattenRecords();
       cli.output(
         `📧 Adopted existing Resend domain ${this.state.name} (${this.state.id})`
       );
@@ -120,6 +140,7 @@ export class ResendDomain extends ResendEntity<
       records: created?.records || [],
       existing: false,
     };
+    this.flattenRecords();
     cli.output(
       `✅ Created Resend domain ${this.state.name} (${this.state.id}) — status: ${this.state.status}`
     );
@@ -140,6 +161,7 @@ export class ResendDomain extends ResendEntity<
       this.state.status = full.status || this.state.status;
       this.state.region = full.region || this.state.region;
       this.state.records = full.records || this.state.records;
+      this.flattenRecords();
     }
   }
 
@@ -199,10 +221,30 @@ export class ResendDomain extends ResendEntity<
     if (full) {
       this.state.status = full.status || this.state.status;
       this.state.records = full.records || this.state.records;
+      this.flattenRecords();
     }
     cli.output(
       `🔁 Verification triggered. Current status: ${this.state.status}`
     );
+  }
+
+  private flattenRecords(): void {
+    const records = this.state.records || [];
+    for (const r of records) {
+      const kind = (r?.record || "").toUpperCase();
+      const type = (r?.type || "").toUpperCase();
+      if (kind === "DKIM" && type === "TXT") {
+        this.state.dkim_name = r.name;
+        this.state.dkim_value = r.value;
+      } else if (kind === "SPF" && type === "MX") {
+        this.state.spf_mx_name = r.name;
+        this.state.spf_mx_value = r.value;
+        this.state.spf_mx_priority = r.priority;
+      } else if (kind === "SPF" && type === "TXT") {
+        this.state.spf_txt_name = r.name;
+        this.state.spf_txt_value = r.value;
+      }
+    }
   }
 
   private fetchDomain(id: string): any | null {
