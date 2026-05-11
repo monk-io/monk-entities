@@ -3,5 +3,5 @@ namespace: cloudflare
 cloudflare-base:
   defines: module
   metadata:
-    version-hash: 4a79cd7d5da7
+    version-hash: 3ccfa5993b58
   source: <<< cloudflare-base.js

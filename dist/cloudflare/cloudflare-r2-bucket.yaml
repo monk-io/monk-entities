@@ -1,0 +1,88 @@
+namespace: cloudflare
+cloudflare-r2-bucket:
+  defines: entity
+  metadata:
+    name: CloudflareR2Bucket
+    description: |-
+      Cloudflare R2 Bucket entity.
+      Detects-then-creates an R2 bucket in the given account. Adopts pre-existing
+      buckets by name. delete() is a no-op by default; opt in with
+      `allow_destructive_delete: true` or call the `force-delete` action.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
+        `Workers R2 Storage:Edit` permission.
+      - Writes: none.
+
+      ## State Fields for Composition
+      - `state.id` - Bucket name; pass to S3 SDK consumers as the bucket key
+      - `state.endpoint` - `https://{account_id}.r2.cloudflarestorage.com`
+
+      ## Actions
+      - `get-info` - Fetch bucket metadata
+      - `force-delete` - Explicit destructive delete (refuses if state.existing)
+    version-hash: 3ccfa5993b58
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    account_id:
+      type: string
+      description: Cloudflare account ID that owns the bucket
+    name:
+      type: string
+      description: 'Bucket name (3-63 chars, S3-compatible). Canonical R2 identifier.'
+    location_hint:
+      type: string
+      enum:
+        - wnam
+        - enam
+        - weur
+        - eeur
+        - apac
+      description: Optional region hint at create time
+    storage_class:
+      type: string
+      enum:
+        - Standard
+        - InfrequentAccess
+      description: Storage class; defaults to Standard
+    allow_destructive_delete:
+      type: boolean
+      description: 'If true, delete() will destroy the bucket. Defaults to false (no-op delete).'
+      default: false
+    required:
+      - account_id
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Bucket name; canonical R2 identifier
+    endpoint:
+      type: string
+      description: S3-compatible endpoint URL for SDK consumers
+    created_on:
+      type: string
+      description: ISO-8601 timestamp the bucket was created
+    location:
+      type: string
+      description: Active location echoed back by Cloudflare
+    storage_class:
+      type: string
+      description: Active storage class
+  lifecycle:
+    sync: <<< cloudflare-r2-bucket-sync.js
+    get-info: ''
+    force-delete: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

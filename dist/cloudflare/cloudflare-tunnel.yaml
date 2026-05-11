@@ -20,7 +20,7 @@ cloudflare-tunnel:
       ## Composing with Other Entities
       Works with:
       - `cloudflare/cloudflare-tunnel-application` - Publish applications through the tunnel
-    version-hash: 4a79cd7d5da7
+    version-hash: 3ccfa5993b58
   schema:
     secret_ref:
       type: string

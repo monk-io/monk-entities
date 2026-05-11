@@ -21,7 +21,7 @@ cloudflare-custom-hostname:
       ## Actions
       - `get-info` — fetch current hostname + SSL state from Cloudflare
       - `trigger-revalidation` — force the SaaS layer to re-check DNS/ACME
-    version-hash: 4a79cd7d5da7
+    version-hash: 3ccfa5993b58
   schema:
     secret_ref:
       type: string
