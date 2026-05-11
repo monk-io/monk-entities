@@ -21,7 +21,7 @@ cloudflare-r2-bucket:
       ## Actions
       - `get-info` - Fetch bucket metadata
       - `force-delete` - Explicit destructive delete (refuses if state.existing)
-    version-hash: 3ccfa5993b58
+    version-hash: c80ea9e6bbbb
   schema:
     secret_ref:
       type: string

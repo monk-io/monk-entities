@@ -1,0 +1,58 @@
+namespace: cloudflare
+cloudflare-workers-route:
+  defines: entity
+  metadata:
+    name: CloudflareWorkersRoute
+    description: |-
+      Cloudflare Workers Route entity.
+      Binds a URL pattern on a zone to a Worker script. Adopts existing routes
+      by matching on (pattern, script_name). delete() removes the route — routes
+      are pure bindings with no persistent data, so destructive delete is safe by
+      default.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
+        `Workers Routes: Edit` scope on the zone.
+
+      ## State Fields for Composition
+      - `state.id` — route ID, used for update/delete
+
+      ## Actions
+      - `get-info` — fetch the route record
+    version-hash: c80ea9e6bbbb
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    zone_id:
+      type: string
+      description: Cloudflare zone ID that owns this route
+    route_pattern:
+      type: string
+      description: 'URL pattern (e.g., "example.com/api/*")'
+    script_name:
+      type: string
+      description: Worker script name to bind to the pattern
+    required:
+      - zone_id
+      - route_pattern
+      - script_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Route ID assigned by Cloudflare
+  lifecycle:
+    sync: <<< cloudflare-workers-route-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base
