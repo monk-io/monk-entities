@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: taskdb
+      POSTGRES_USER: taskadmin
+      POSTGRES_PASSWORD: localpass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskadmin -d taskdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9001:9001"  # console
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/task-results &&
+        echo 'Bucket ready'
+      "
+
+  api:
+    image: monkimages.azurecr.io/multi-cloud-demo:latest
+    ports:
+      - "3000:3000"
+    environment:
+      MODE: api
+      PORT: "3000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: taskdb
+      DB_USER: taskadmin
+      DB_PASSWORD: localpass
+      DB_SSL: "false"
+      QUEUE_TYPE: db
+      STORAGE_TYPE: s3
+      STORAGE_BUCKET: task-results
+      STORAGE_REGION: us-east-1
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_FORCE_PATH_STYLE: "true"
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  worker:
+    image: monkimages.azurecr.io/multi-cloud-demo:latest
+    environment:
+      MODE: worker
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: taskdb
+      DB_USER: taskadmin
+      DB_PASSWORD: localpass
+      DB_SSL: "false"
+      QUEUE_TYPE: db
+      STORAGE_TYPE: s3
+      STORAGE_BUCKET: task-results
+      STORAGE_REGION: us-east-1
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_FORCE_PATH_STYLE: "true"
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully

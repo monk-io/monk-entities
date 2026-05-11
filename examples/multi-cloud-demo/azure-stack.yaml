@@ -1,0 +1,234 @@
+namespace: mcd-azure
+
+# =============================================================================
+# Azure Task Manager Demo
+# PostgreSQL (Flexible Server) + Service Bus queue + Blob Storage
+# Single app container (MODE=both) — required for access-list IP resolution
+#
+# Secrets required:
+#   sudo monk secrets add -g azure-pg-password=<value>
+#   sudo monk secrets add -g azure-storage-conn=<value>  (if not using connection_string_secret_ref)
+# =============================================================================
+
+# --- Database ---
+
+pg-server:
+  defines: azure-postgresql/flexible-server
+  permitted-secrets:
+    azure-pg-password: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  server_name: "mcd-tasks-pg"
+  location: "East US"
+  administrator_login: taskadmin
+  administrator_password_secret_ref: azure-pg-password
+  sku:
+    name: Standard_B1ms
+    tier: Burstable
+  storage:
+    storage_size_gb: 32
+  backup:
+    backup_retention_days: 7
+    geo_redundant_backup: Disabled
+  network:
+    public_network_access: Enabled
+  version: "16"
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+pg-database:
+  defines: azure-postgresql/database
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  database_name: taskdb
+  connections:
+    server:
+      runnable: mcd-azure/pg-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-azure/pg-server
+      timeout: 600
+
+# --- Service Bus ---
+
+servicebus-namespace:
+  defines: azure-servicebus/service-bus-namespace
+  permitted-secrets:
+    mcd-azure-sb-conn: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "mcd-tasks-sb"
+  location: "East US"
+  sku:
+    name: "Basic"
+  primary_connection_string_secret_ref: "mcd-azure-sb-conn"
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+tasks-queue:
+  defines: azure-servicebus/queue
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  namespace_name: "mcd-tasks-sb"
+  queue_name: "tasks"
+  max_size_in_megabytes: 1024
+  default_message_time_to_live: "P1D"
+  lock_duration: "PT1M"
+  max_delivery_count: 5
+  depends:
+    - wait-for:
+        runnables:
+          - mcd-azure/servicebus-namespace
+
+# --- Storage ---
+
+storage-account:
+  defines: azure-storage-account/storage-account
+  permitted-secrets:
+    mcd-azure-storage-conn: true
+  subscription_id: "your-subscription-id"
+  resource_group_name: "your-resource-group"
+  account_name: "mcdtaskresults"
+  location: "East US"
+  sku:
+    name: "Standard_LRS"
+  account_kind: "StorageV2"
+  connection_string_secret_ref: "mcd-azure-storage-conn"
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+# --- App (API + Worker in one container, required for access-list IP resolution) ---
+
+app:
+  defines: runnable
+  permitted-secrets:
+    azure-pg-password: true
+    mcd-azure-sb-conn: true
+    mcd-azure-storage-conn: true
+  connections:
+    pg-server:
+      runnable: mcd-azure/pg-server
+      service: data
+    pg-database:
+      runnable: mcd-azure/pg-database
+      service: data
+    storage:
+      runnable: mcd-azure/storage-account
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - mcd-azure/pg-server
+        - mcd-azure/pg-database
+        - mcd-azure/servicebus-namespace
+        - mcd-azure/tasks-queue
+        - mcd-azure/storage-account
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: both
+      type: string
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+    # DB — indirect password secret pattern
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("pg-server") entity-state get-member("fqdn")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: "5432"
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("pg-database") entity get-member("database_name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("pg-server") entity-state get-member("administrator_login")
+      type: string
+    pg_password_secret:
+      value: <- connection-target("pg-server") entity get-member("administrator_password_secret_ref")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret($pg_password_secret)
+      type: string
+    # Queue — Service Bus connection string from secret
+    queue_type:
+      env: QUEUE_TYPE
+      value: servicebus
+      type: string
+    sb_conn_secret:
+      value: <- connection-target("storage") entity get-member("connection_string_secret_ref")
+      type: string
+    servicebus_queue_name:
+      env: SERVICEBUS_QUEUE_NAME
+      value: "tasks"
+      type: string
+    servicebus_connection_string:
+      env: SERVICEBUS_CONNECTION_STRING
+      value: <- secret("mcd-azure-sb-conn")
+      type: string
+    # Storage — Azure Blob connection string from secret
+    storage_type:
+      env: STORAGE_TYPE
+      value: azure-blob
+      type: string
+    azure_storage_connection_string:
+      env: AZURE_STORAGE_CONNECTION_STRING
+      value: <- secret("mcd-azure-storage-conn")
+      type: string
+    azure_storage_container:
+      env: AZURE_STORAGE_CONTAINER
+      value: task-results
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+      ports:
+        - "3000:3000"
+
+# --- Firewall: allow app node to reach PostgreSQL ---
+
+pg-access-list:
+  defines: azure-postgresql/access-list
+  connections:
+    server:
+      runnable: mcd-azure/pg-server
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-azure/pg-server
+        - mcd-azure/app
+      timeout: 600
+  subscription_id: <- connection-target("server") entity get-member("subscription_id")
+  resource_group_name: <- connection-target("server") entity get-member("resource_group_name")
+  server_name: <- connection-target("server") entity-state get-member("server_name")
+  allowed_cidr_blocks: <- runnable-peers-public-ips("mcd-azure/app")
+
+# --- Stack ---
+
+stack:
+  defines: group
+  members:
+    - mcd-azure/pg-server
+    - mcd-azure/pg-database
+    - mcd-azure/servicebus-namespace
+    - mcd-azure/tasks-queue
+    - mcd-azure/storage-account
+    - mcd-azure/app
+    - mcd-azure/pg-access-list

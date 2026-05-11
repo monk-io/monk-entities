@@ -1,0 +1,3 @@
+REPO multi-cloud-demo
+LOAD aws-stack.yaml azure-stack.yaml do-stack.yaml gcp-stack.yaml
+IMAGE monkimages.azurecr.io/multi-cloud-demo:latest mcd-aws/api . Dockerfile

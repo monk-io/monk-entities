@@ -1,0 +1,255 @@
+namespace: mcd-aws
+
+# =============================================================================
+# AWS Task Manager Demo
+# PostgreSQL (RDS) + SQS queue + S3 storage
+# API container creates tasks; Worker container processes them
+#
+# Secrets required:
+#   sudo monk secrets add -g aws-access-key-id=<value>
+#   sudo monk secrets add -g aws-secret-access-key=<value>
+#   sudo monk secrets add -g rds-master-password=<value>
+# =============================================================================
+
+# --- Database ---
+
+tasks-db:
+  defines: aws-rds/rds-instance
+  permitted-secrets:
+    rds-master-password: true
+  region: us-east-1
+  db_instance_identifier: mcd-tasks-db
+  db_instance_class: db.t3.micro
+  engine: postgres
+  engine_version: "16.3"
+  allocated_storage: 20
+  max_allocated_storage: 100
+  db_name: taskdb
+  master_username: taskadmin
+  password_secret_ref: rds-master-password
+  publicly_accessible: true
+  storage_encrypted: true
+  deletion_protection: false
+  auto_create_security_group: true
+  allowed_cidr_blocks:
+    - "0.0.0.0/0"
+  backup_retention_period: 1
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+# --- Queue ---
+
+tasks-queue:
+  defines: aws-sqs/sqs-queue
+  queue_name: mcd-tasks
+  region: us-east-1
+  visibility_timeout: 60
+  message_retention_seconds: 86400
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+# --- Storage ---
+
+results-bucket:
+  defines: aws-s3/s3-bucket
+  bucket_name: mcd-task-results
+  region: us-east-1
+  versioning_enabled: false
+  force_destroy: true
+  tags:
+    Environment: example
+    Owner: monk-example
+    App: multi-cloud-demo
+
+# --- API Service ---
+
+api:
+  defines: runnable
+  permitted-secrets:
+    aws-access-key-id: true
+    aws-secret-access-key: true
+    rds-master-password: true
+  connections:
+    db:
+      runnable: mcd-aws/tasks-db
+      service: default
+    queue:
+      runnable: mcd-aws/tasks-queue
+      service: default
+    bucket:
+      runnable: mcd-aws/results-bucket
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - mcd-aws/tasks-db
+        - mcd-aws/tasks-queue
+        - mcd-aws/results-bucket
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: api
+      type: string
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("endpoint_address")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("endpoint_port") "" concat-all
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("db") entity get-member("db_name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("db") entity get-member("master_username")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("rds-master-password")
+      type: string
+    sqs_queue_url:
+      env: SQS_QUEUE_URL
+      value: <- connection-target("queue") entity-state get-member("queue_url")
+      type: string
+    aws_region:
+      env: AWS_REGION
+      value: <- connection-target("queue") entity get-member("region")
+      type: string
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("aws-access-key-id")
+      type: string
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("aws-secret-access-key")
+      type: string
+    storage_type:
+      env: STORAGE_TYPE
+      value: s3
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("bucket") entity get-member("bucket_name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: <- connection-target("bucket") entity get-member("region")
+      type: string
+    queue_type:
+      env: QUEUE_TYPE
+      value: sqs
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+      ports:
+        - "3000:3000"
+
+# --- Worker Service ---
+
+worker:
+  defines: runnable
+  permitted-secrets:
+    aws-access-key-id: true
+    aws-secret-access-key: true
+    rds-master-password: true
+  connections:
+    db:
+      runnable: mcd-aws/tasks-db
+      service: default
+    queue:
+      runnable: mcd-aws/tasks-queue
+      service: default
+    bucket:
+      runnable: mcd-aws/results-bucket
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - mcd-aws/tasks-db
+        - mcd-aws/tasks-queue
+        - mcd-aws/results-bucket
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: worker
+      type: string
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("endpoint_address")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("endpoint_port") "" concat-all
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("db") entity get-member("db_name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("db") entity get-member("master_username")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("rds-master-password")
+      type: string
+    sqs_queue_url:
+      env: SQS_QUEUE_URL
+      value: <- connection-target("queue") entity-state get-member("queue_url")
+      type: string
+    aws_region:
+      env: AWS_REGION
+      value: <- connection-target("queue") entity get-member("region")
+      type: string
+    aws_access_key_id:
+      env: AWS_ACCESS_KEY_ID
+      value: <- secret("aws-access-key-id")
+      type: string
+    aws_secret_access_key:
+      env: AWS_SECRET_ACCESS_KEY
+      value: <- secret("aws-secret-access-key")
+      type: string
+    storage_type:
+      env: STORAGE_TYPE
+      value: s3
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("bucket") entity get-member("bucket_name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: <- connection-target("bucket") entity get-member("region")
+      type: string
+    queue_type:
+      env: QUEUE_TYPE
+      value: sqs
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+
+# --- Stack ---
+
+stack:
+  defines: group
+  members:
+    - mcd-aws/tasks-db
+    - mcd-aws/tasks-queue
+    - mcd-aws/results-bucket
+    - mcd-aws/api
+    - mcd-aws/worker

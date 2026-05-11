@@ -1,0 +1,203 @@
+namespace: mcd-do
+
+# =============================================================================
+# DigitalOcean Task Manager Demo
+# DigitalOcean Managed PostgreSQL + Spaces (S3-compatible) + DB-based queue
+# No native queue — worker polls DB with SELECT FOR UPDATE SKIP LOCKED
+#
+# Secrets required:
+#   sudo monk secrets add -g do-spaces-access-key=<value>
+#   sudo monk secrets add -g do-spaces-secret-key=<value>
+#   (Obtain from DigitalOcean > API > Spaces access keys)
+# =============================================================================
+
+# --- Database ---
+
+tasks-db:
+  defines: digitalocean-database/database
+  name: mcd-tasks-db
+  engine: pg
+  version: "16"
+  size: db-s-1vcpu-1gb
+  region: nyc3
+  num_nodes: 1
+  tags:
+    - monk-example
+    - multi-cloud-demo
+
+# --- Storage ---
+
+results-bucket:
+  defines: digitalocean-spaces/spaces-bucket
+  bucket_name: mcd-task-results
+  region: nyc3
+  acl: private
+  access_key_secret_ref: do-spaces-access-key
+  secret_key_secret_ref: do-spaces-secret-key
+  tags:
+    Environment: example
+    Owner: monk-example
+
+# --- API Service ---
+
+api:
+  defines: runnable
+  connections:
+    db:
+      runnable: mcd-do/tasks-db
+      service: data
+    bucket:
+      runnable: mcd-do/results-bucket
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - mcd-do/tasks-db
+        - mcd-do/results-bucket
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: api
+      type: string
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("connection_host")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("connection_port")
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("db") entity-state get-member("connection_database")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("db") entity-state get-member("connection_user")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- connection-target("db") entity-state get-member("connection_password")
+      type: string
+    queue_type:
+      env: QUEUE_TYPE
+      value: db
+      type: string
+    storage_type:
+      env: STORAGE_TYPE
+      value: spaces
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("bucket") entity-state get-member("bucket_name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: <- connection-target("bucket") entity-state get-member("region")
+      type: string
+    storage_endpoint:
+      env: STORAGE_ENDPOINT
+      value: <- connection-target("bucket") entity-state get-member("endpoint")
+      type: string
+    storage_access_key:
+      env: STORAGE_ACCESS_KEY
+      value: <- secret("do-spaces-access-key")
+      type: string
+    storage_secret_key:
+      env: STORAGE_SECRET_KEY
+      value: <- secret("do-spaces-secret-key")
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+      ports:
+        - "3000:3000"
+
+# --- Worker Service ---
+
+worker:
+  defines: runnable
+  connections:
+    db:
+      runnable: mcd-do/tasks-db
+      service: data
+    bucket:
+      runnable: mcd-do/results-bucket
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - mcd-do/tasks-db
+        - mcd-do/results-bucket
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: worker
+      type: string
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("db") entity-state get-member("connection_host")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("db") entity-state get-member("connection_port")
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("db") entity-state get-member("connection_database")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("db") entity-state get-member("connection_user")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- connection-target("db") entity-state get-member("connection_password")
+      type: string
+    queue_type:
+      env: QUEUE_TYPE
+      value: db
+      type: string
+    storage_type:
+      env: STORAGE_TYPE
+      value: spaces
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("bucket") entity-state get-member("bucket_name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: <- connection-target("bucket") entity-state get-member("region")
+      type: string
+    storage_endpoint:
+      env: STORAGE_ENDPOINT
+      value: <- connection-target("bucket") entity-state get-member("endpoint")
+      type: string
+    storage_access_key:
+      env: STORAGE_ACCESS_KEY
+      value: <- secret("do-spaces-access-key")
+      type: string
+    storage_secret_key:
+      env: STORAGE_SECRET_KEY
+      value: <- secret("do-spaces-secret-key")
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+
+# --- Stack ---
+
+stack:
+  defines: group
+  members:
+    - mcd-do/tasks-db
+    - mcd-do/results-bucket
+    - mcd-do/api
+    - mcd-do/worker

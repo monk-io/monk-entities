@@ -1,0 +1,460 @@
+namespace: mcd-gcp
+
+# =============================================================================
+# GCP Task Manager Demo
+# Cloud SQL (PostgreSQL) + Pub/Sub queue + Cloud Storage (S3-compat via HMAC)
+# API container creates tasks; Worker container processes them
+#
+# Secrets created automatically by entities:
+#   mcd-gcp-db-password  — Cloud SQL user password (created by pg-user)
+#   mcd-gcp-sa-key       — Service account JSON key (created by app-sa-key)
+#   mcd-gcp-hmac-access  — GCS HMAC access key ID (created by storage-hmac)
+#   mcd-gcp-hmac-secret  — GCS HMAC secret key (created by storage-hmac)
+# =============================================================================
+
+# --- Enable required GCP APIs ---
+
+service-usage:
+  defines: gcp/service-usage
+  apis:
+    - sqladmin.googleapis.com
+    - storage.googleapis.com
+    - pubsub.googleapis.com
+    - iam.googleapis.com
+  services:
+    data:
+      protocol: custom
+
+# --- Service account for the app containers ---
+
+app-sa:
+  defines: gcp/service-account
+  name: mcd-gcp-app-sa
+  display_name: Multi-Cloud Demo app service account
+  roles:
+    - roles/pubsub.publisher
+    - roles/pubsub.subscriber
+    - roles/storage.objectAdmin
+  services:
+    data:
+      protocol: custom
+  connections:
+    service-usage:
+      target: mcd-gcp/service-usage
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/service-usage
+      timeout: 300
+
+# JSON key stored as monk secret mcd-gcp-sa-key
+app-sa-key:
+  defines: gcp/service-account-key
+  service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
+  secret: mcd-gcp-sa-key
+  services:
+    data:
+      protocol: custom
+  connections:
+    sa:
+      target: mcd-gcp/app-sa
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/app-sa
+      timeout: 300
+  permitted-secrets:
+    mcd-gcp-sa-key: true
+
+# --- Database ---
+
+pg-instance:
+  defines: gcp/cloud-sql-instance
+  name: mcd-gcp-pg
+  database_version: POSTGRES_15
+  tier: db-f1-micro
+  region: us-central1
+  allow_all: true
+  deletion_protection: false
+  services:
+    data:
+      protocol: custom
+  connections:
+    service-usage:
+      target: mcd-gcp/service-usage
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/service-usage
+      timeout: 1200
+
+pg-database:
+  defines: gcp/cloud-sql-database
+  name: taskdb
+  instance: <- connection-target("instance") entity get-member("name")
+  services:
+    data:
+      protocol: custom
+  connections:
+    instance:
+      target: mcd-gcp/pg-instance
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/pg-instance
+      timeout: 300
+
+pg-user:
+  defines: gcp/cloud-sql-user
+  name: taskadmin
+  instance: <- connection-target("instance") entity get-member("name")
+  password_secret: mcd-gcp-db-password
+  services:
+    data:
+      protocol: custom
+  connections:
+    instance:
+      target: mcd-gcp/pg-instance
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/pg-instance
+      timeout: 300
+  permitted-secrets:
+    mcd-gcp-db-password: true
+
+# --- Pub/Sub queue ---
+
+tasks-topic:
+  defines: gcp/pubsub-topic
+  name: mcd-tasks
+  services:
+    data:
+      protocol: custom
+  connections:
+    service-usage:
+      target: mcd-gcp/service-usage
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/service-usage
+      timeout: 300
+
+tasks-subscription:
+  defines: gcp/pubsub-subscription
+  name: mcd-tasks-sub
+  topic_name: <- connection-target("topic") entity-state get-member("topic_name")
+  ack_deadline_seconds: 60
+  services:
+    data:
+      protocol: custom
+  connections:
+    topic:
+      target: mcd-gcp/tasks-topic
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/tasks-topic
+      timeout: 300
+
+# --- Cloud Storage for results ---
+
+results-bucket:
+  defines: gcp/cloud-storage
+  name: mcd-task-results-gcp
+  location: us-central1
+  storage_class: STANDARD
+  services:
+    data:
+      protocol: custom
+  connections:
+    service-usage:
+      target: mcd-gcp/service-usage
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/service-usage
+      timeout: 300
+
+# HMAC keys allow S3-compatible API access to GCS (reuses existing S3Storage class)
+storage-hmac:
+  defines: gcp/cloud-storage-hmac-keys
+  service_account_email: <- connection-target("sa") entity-state get-member("email")
+  access_key_secret_ref: mcd-gcp-hmac-access
+  secret_key_secret_ref: mcd-gcp-hmac-secret
+  services:
+    data:
+      protocol: custom
+  connections:
+    sa:
+      target: mcd-gcp/app-sa
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/app-sa
+      timeout: 300
+  permitted-secrets:
+    mcd-gcp-hmac-access: true
+    mcd-gcp-hmac-secret: true
+
+# --- API Service ---
+
+api:
+  defines: runnable
+  permitted-secrets:
+    mcd-gcp-sa-key: true
+    mcd-gcp-db-password: true
+    mcd-gcp-hmac-access: true
+    mcd-gcp-hmac-secret: true
+  connections:
+    pg-instance:
+      target: mcd-gcp/pg-instance
+      service: data
+    pg-database:
+      target: mcd-gcp/pg-database
+      service: data
+    pg-user:
+      target: mcd-gcp/pg-user
+      service: data
+    tasks-topic:
+      target: mcd-gcp/tasks-topic
+      service: data
+    tasks-subscription:
+      target: mcd-gcp/tasks-subscription
+      service: data
+    results-bucket:
+      target: mcd-gcp/results-bucket
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/pg-instance
+        - mcd-gcp/pg-database
+        - mcd-gcp/pg-user
+        - mcd-gcp/tasks-topic
+        - mcd-gcp/tasks-subscription
+        - mcd-gcp/results-bucket
+        - mcd-gcp/storage-hmac
+        - mcd-gcp/app-sa-key
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: api
+      type: string
+    port:
+      env: PORT
+      value: "3000"
+      type: string
+    # DB
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("pg-instance") entity-state get-member("address")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("pg-instance") entity-state get-member("port") "" concat-all
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("pg-database") entity get-member("name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("pg-user") entity get-member("name")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("mcd-gcp-db-password")
+      type: string
+    # Queue — GCP Pub/Sub via service account JSON key
+    queue_type:
+      env: QUEUE_TYPE
+      value: pubsub
+      type: string
+    pubsub_topic:
+      env: PUBSUB_TOPIC
+      value: <- connection-target("tasks-topic") entity-state get-member("topic_name")
+      type: string
+    pubsub_subscription:
+      env: PUBSUB_SUBSCRIPTION
+      value: <- connection-target("tasks-subscription") entity-state get-member("subscription_name")
+      type: string
+    gcp_credentials:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("mcd-gcp-sa-key")
+      type: string
+    # Storage — GCS via S3-compatible HMAC API
+    storage_type:
+      env: STORAGE_TYPE
+      value: s3
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("results-bucket") entity-state get-member("name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: us-central1
+      type: string
+    storage_endpoint:
+      env: STORAGE_ENDPOINT
+      value: https://storage.googleapis.com
+      type: string
+    storage_force_path_style:
+      env: STORAGE_FORCE_PATH_STYLE
+      value: "false"
+      type: string
+    storage_access_key:
+      env: STORAGE_ACCESS_KEY
+      value: <- secret("mcd-gcp-hmac-access")
+      type: string
+    storage_secret_key:
+      env: STORAGE_SECRET_KEY
+      value: <- secret("mcd-gcp-hmac-secret")
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+      ports:
+        - "3000:3000"
+
+# --- Worker Service ---
+
+worker:
+  defines: runnable
+  permitted-secrets:
+    mcd-gcp-sa-key: true
+    mcd-gcp-db-password: true
+    mcd-gcp-hmac-access: true
+    mcd-gcp-hmac-secret: true
+  connections:
+    pg-instance:
+      target: mcd-gcp/pg-instance
+      service: data
+    pg-database:
+      target: mcd-gcp/pg-database
+      service: data
+    pg-user:
+      target: mcd-gcp/pg-user
+      service: data
+    tasks-topic:
+      target: mcd-gcp/tasks-topic
+      service: data
+    tasks-subscription:
+      target: mcd-gcp/tasks-subscription
+      service: data
+    results-bucket:
+      target: mcd-gcp/results-bucket
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mcd-gcp/pg-instance
+        - mcd-gcp/pg-database
+        - mcd-gcp/pg-user
+        - mcd-gcp/tasks-topic
+        - mcd-gcp/tasks-subscription
+        - mcd-gcp/results-bucket
+        - mcd-gcp/storage-hmac
+        - mcd-gcp/app-sa-key
+      timeout: 600
+  variables:
+    mode:
+      env: MODE
+      value: worker
+      type: string
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("pg-instance") entity-state get-member("address")
+      type: string
+    db_port:
+      env: DB_PORT
+      value: <- connection-target("pg-instance") entity-state get-member("port") "" concat-all
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("pg-database") entity get-member("name")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("pg-user") entity get-member("name")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("mcd-gcp-db-password")
+      type: string
+    queue_type:
+      env: QUEUE_TYPE
+      value: pubsub
+      type: string
+    pubsub_topic:
+      env: PUBSUB_TOPIC
+      value: <- connection-target("tasks-topic") entity-state get-member("topic_name")
+      type: string
+    pubsub_subscription:
+      env: PUBSUB_SUBSCRIPTION
+      value: <- connection-target("tasks-subscription") entity-state get-member("subscription_name")
+      type: string
+    gcp_credentials:
+      env: GOOGLE_APPLICATION_CREDENTIALS_JSON
+      value: <- secret("mcd-gcp-sa-key")
+      type: string
+    storage_type:
+      env: STORAGE_TYPE
+      value: s3
+      type: string
+    storage_bucket:
+      env: STORAGE_BUCKET
+      value: <- connection-target("results-bucket") entity-state get-member("name")
+      type: string
+    storage_region:
+      env: STORAGE_REGION
+      value: us-central1
+      type: string
+    storage_endpoint:
+      env: STORAGE_ENDPOINT
+      value: https://storage.googleapis.com
+      type: string
+    storage_force_path_style:
+      env: STORAGE_FORCE_PATH_STYLE
+      value: "false"
+      type: string
+    storage_access_key:
+      env: STORAGE_ACCESS_KEY
+      value: <- secret("mcd-gcp-hmac-access")
+      type: string
+    storage_secret_key:
+      env: STORAGE_SECRET_KEY
+      value: <- secret("mcd-gcp-hmac-secret")
+      type: string
+  containers:
+    app:
+      image: monkimages.azurecr.io/multi-cloud-demo:latest
+
+# --- Stack ---
+
+stack:
+  defines: group
+  members:
+    - mcd-gcp/service-usage
+    - mcd-gcp/app-sa
+    - mcd-gcp/app-sa-key
+    - mcd-gcp/pg-instance
+    - mcd-gcp/pg-database
+    - mcd-gcp/pg-user
+    - mcd-gcp/tasks-topic
+    - mcd-gcp/tasks-subscription
+    - mcd-gcp/results-bucket
+    - mcd-gcp/storage-hmac
+    - mcd-gcp/api
+    - mcd-gcp/worker
