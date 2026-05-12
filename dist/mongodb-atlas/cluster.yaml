@@ -1,0 +1,113 @@
+namespace: mongodb-atlas
+cluster:
+  defines: entity
+  metadata:
+    name: Cluster
+    description: |-
+      MongoDB Atlas Cluster entity.
+      Creates and manages MongoDB Atlas database clusters for document storage.
+      Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.name` - Cluster name
+      - `state.connection_srv` - SRV connection string (mongodb+srv://...)
+      - `state.connection_standard` - Standard connection string
+
+      ## Composing with Other Entities
+      Works with:
+      - `mongodb-atlas/user` - Create database users with role-based access
+      - `mongodb-atlas/project` - The parent project containing the cluster
+    version-hash: 3ac5fe00117f
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      description: Cluster name
+    project_id:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Project ID where the cluster will be created
+    provider:
+      type: string
+      enum:
+        - AWS
+        - GCP
+        - AZURE
+      description: Cloud provider
+    region:
+      type: string
+      description: Cloud provider region
+    instance_size:
+      type: string
+      enum:
+        - M0
+        - M2
+        - M5
+        - M10
+        - M20
+        - M30
+        - M40
+        - M50
+        - M60
+        - M80
+      description: Instance size/tier
+    allow_ips:
+      type: array
+      items:
+        type: string
+      description: Array of IP addresses allowed to access the cluster
+    required:
+      - secret_ref
+      - name
+      - project_id
+      - provider
+      - region
+      - instance_size
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Cluster ID
+    name:
+      type: string
+      description: Cluster Name
+    connection_standard:
+      type: string
+      description: Standard connection string
+    connection_srv:
+      type: string
+      description: SRV connection string
+  lifecycle:
+    sync: <<< cluster-sync.js
+    get-backup-info: ''
+    create-snapshot: ''
+    list-snapshots: ''
+    restore: ''
+    get-restore-status: ''
+    list-restore-jobs: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
+  checks:
+    readiness:
+      period: 30
+      initialDelay: 60
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - mongodb-atlas/atlas-base
+    - cli
+    - monkec/base

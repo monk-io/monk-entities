@@ -1,0 +1,104 @@
+namespace: gcp
+pubsub-topic:
+  defines: entity
+  metadata:
+    name: PubsubTopic
+    description: |-
+      GCP Pub/Sub Topic entity. Creates and manages Pub/Sub topics for
+      asynchronous publish-subscribe messaging between independent applications.
+
+      ## Required Permissions
+      - `pubsub.topics.create` — create topics
+      - `pubsub.topics.get` — check existence and readiness
+      - `pubsub.topics.update` — update labels, retention, etc.
+      - `pubsub.topics.delete` — delete topics
+      - `pubsub.topics.publish` — publish messages (publish action)
+      - `pubsub.topics.list` — list subscriptions (list-subscriptions action)
+      - `monitoring.timeSeries.list` — cost estimation metrics
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.topic_name` — full topic resource name, used by `gcp/pubsub-subscription` to attach subscriptions
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/pubsub-subscription` — attach pull or push subscriptions to this topic
+      - `gcp/cloud-function` — trigger functions via Pub/Sub event trigger
+      - `gcp/service-usage` — enable `pubsub.googleapis.com` API
+    version-hash: '26548e489472'
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: 'Topic name (3-255 characters, letters, numbers, dashes, underscores, periods, tildes, plus, percent)'
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Labels to apply to the topic
+      description: Labels to apply to the topic
+    message_retention_duration:
+      type: string
+      description: 'How long to retain published messages (e.g., "604800s" for 7 days). Minimum 600s, maximum 2678400s (31 days)'
+    kms_key_name:
+      type: string
+      description: Cloud KMS CryptoKey name for encrypting messages at rest
+    schema_name:
+      type: string
+      description: Full resource name of a Pub/Sub schema for message validation
+    schema_encoding:
+      type: string
+      enum:
+        - JSON
+        - BINARY
+      description: Encoding of messages validated against the schema
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    topic_name:
+      type: string
+      description: 'Full resource name of the topic (projects/{project}/topics/{name})'
+  lifecycle:
+    sync: <<< pubsub-topic-sync.js
+    get-info: ''
+    publish: ''
+    list-subscriptions: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

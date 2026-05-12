@@ -1,0 +1,7 @@
+namespace: netlify
+
+common:
+  defines: module
+  metadata:
+    version-hash: 4f1e0990e805
+  source: <<< common.js

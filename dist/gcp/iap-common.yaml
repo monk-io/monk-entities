@@ -1,0 +1,7 @@
+namespace: gcp
+
+iap-common:
+  defines: module
+  metadata:
+    version-hash: 26548e489472
+  source: <<< iap-common.js

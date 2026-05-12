@@ -1,0 +1,125 @@
+namespace: gcp
+identity-platform-o-auth-idp-config:
+  defines: entity
+  metadata:
+    name: IdentityPlatformOAuthIdpConfig
+    description: |-
+      GCP Identity Platform OIDC identity provider configuration entity.
+      Creates and manages custom OIDC provider configurations for authenticating users
+      via external identity providers. Supports both project-level and tenant-scoped configs.
+
+      ## Required Permissions
+      - `firebaseauth.configs.get` — read IdP configurations
+      - `firebaseauth.configs.update` — create, update, and delete IdP configurations
+
+      Or use the predefined role: `roles/identityplatform.admin`
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.config_id` — Config ID for reference
+      - `state.resource_name` — Full resource name for API operations
+      - `state.enabled` — Whether the provider is currently enabled
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
+      - `gcp/identity-platform-config` — Project-level configuration
+    version-hash: '26548e489472'
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: |-
+        Config ID for this OIDC provider (e.g., oidc.my-provider).
+        Must start with "oidc." prefix.
+    tenant_id:
+      type: string
+      description: |-
+        Tenant ID to scope this config to a specific tenant.
+        Omit for project-level configuration.
+    display_name:
+      type: string
+      description: Human-readable display name for this OIDC provider.
+    enabled:
+      type: boolean
+      description: Whether users can sign in with this provider.
+    client_id:
+      type: string
+      description: OIDC client ID issued by the identity provider.
+    issuer:
+      type: string
+      description: 'OIDC issuer URI (e.g., https://accounts.google.com).'
+    client_secret:
+      type: string
+      description: OIDC client secret (required for authorization code flow).
+    response_type_id_token:
+      type: boolean
+      description: Use implicit flow (ID token response).
+    response_type_code:
+      type: boolean
+      description: Use authorization code flow.
+    required:
+      - name
+      - client_id
+      - issuer
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: Full resource name of the config.
+    config_id:
+      type: string
+      description: The config ID.
+    display_name:
+      type: string
+      description: Human-readable display name.
+    enabled:
+      type: boolean
+      description: Whether this provider is enabled.
+    client_id:
+      type: string
+      description: The OIDC client ID.
+    issuer:
+      type: string
+      description: The OIDC issuer URI.
+  lifecycle:
+    sync: <<< identity-platform-o-auth-idp-config-sync.js
+    get-info: ''
+    enable: ''
+    disable: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

@@ -1,0 +1,7 @@
+namespace: mongodb-atlas
+
+atlas-base:
+  defines: module
+  metadata:
+    version-hash: 3ac5fe00117f
+  source: <<< atlas-base.js

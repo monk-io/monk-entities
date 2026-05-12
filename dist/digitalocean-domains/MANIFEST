@@ -1,0 +1,8 @@
+REPO digitalocean-domains
+VERSION_HASH 4065e6f21fd4
+DESCRIPTION Managed DNS via DigitalOcean.
+HOSTING managed
+TAGS digitalocean,dns,domains
+ 
+LOAD domain.yaml common.yaml
+RESOURCES common.js domain-sync.js

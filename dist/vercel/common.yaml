@@ -1,0 +1,7 @@
+namespace: vercel
+
+common:
+  defines: module
+  metadata:
+    version-hash: 0e6146e82788
+  source: <<< common.js

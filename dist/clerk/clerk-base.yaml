@@ -1,0 +1,7 @@
+namespace: clerk
+
+clerk-base:
+  defines: module
+  metadata:
+    version-hash: e0d4d7e68911
+  source: <<< clerk-base.js

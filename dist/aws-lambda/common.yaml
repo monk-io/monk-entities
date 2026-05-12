@@ -1,0 +1,7 @@
+namespace: aws-lambda
+
+common:
+  defines: module
+  metadata:
+    version-hash: 93ad1bc200a4
+  source: <<< common.js

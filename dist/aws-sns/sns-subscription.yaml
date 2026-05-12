@@ -1,0 +1,111 @@
+namespace: aws-sns
+sns-subscription:
+  defines: entity
+  metadata:
+    name: SNSSubscription
+    description: |-
+      AWS SNS Subscription entity.
+      Creates and manages subscriptions to Amazon SNS topics for message delivery.
+      Supports protocols: HTTP/HTTPS, email, SMS, SQS, Lambda, application, and Firehose.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.subscription_arn` - Subscription ARN for management operations
+      - `state.protocol` - Subscription protocol (email, sqs, lambda, etc.)
+      - `state.endpoint` - Target endpoint receiving messages
+      - `state.pending_confirmation` - Whether subscription awaits confirmation
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-sns/topic` - The topic to subscribe to
+      - `aws-sqs/queue` - Use queue ARN as endpoint for SQS subscriptions
+      - `aws-lambda/function` - Use function ARN for Lambda subscriptions
+    version-hash: 91dd11d9bb0e
+  schema:
+    region:
+      type: string
+      description: AWS region for SNS operations
+    topic_arn:
+      type: string
+      description: ARN of the SNS topic to subscribe to
+    protocol:
+      type: string
+      enum:
+        - http
+        - https
+        - email
+        - email-json
+        - sms
+        - sqs
+        - lambda
+        - application
+        - firehose
+      description: Protocol for the subscription
+    endpoint:
+      type: string
+      description: 'Endpoint for the subscription (email, URL, queue ARN, etc.)'
+    filter_policy:
+      type: string
+      description: JSON message filtering policy
+    delivery_policy:
+      type: string
+      description: JSON delivery retry policy
+    redrive_policy:
+      type: string
+      description: Dead letter queue configuration (JSON string)
+    raw_message_delivery:
+      type: boolean
+      description: Enable raw message delivery (for SQS/HTTP)
+    attributes:
+      type: object
+      additionalProperties:
+        type: string
+        description: Additional subscription attributes
+      description: Additional subscription attributes
+    required:
+      - region
+      - topic_arn
+      - protocol
+      - endpoint
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    subscription_arn:
+      type: string
+      description: ARN of the subscription
+    pending_confirmation:
+      type: boolean
+      description: Whether the subscription is pending confirmation
+    protocol:
+      type: string
+      description: Protocol of the subscription
+    endpoint:
+      type: string
+      description: Endpoint of the subscription
+    required:
+      - existing
+      - subscription_arn
+      - pending_confirmation
+      - protocol
+      - endpoint
+  lifecycle:
+    sync: <<< sns-subscription-sync.js
+    get-attributes: ''
+    set-filter-policy: ''
+    set-redrive-policy: ''
+    confirm-subscription: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 3
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - aws-sns/sns-base
+    - monkec/base
+    - cli

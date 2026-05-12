@@ -1,0 +1,67 @@
+namespace: cloudflare
+cloudflare-workers-cron-trigger:
+  defines: entity
+  metadata:
+    name: CloudflareWorkersCronTrigger
+    description: |-
+      Cloudflare Workers Cron Trigger entity.
+      Manages the cron schedule list for a Worker script via the
+      `PUT /schedules` endpoint (full-replace semantics — this entity owns
+      the entire list). Adoption: any pre-existing list with the same set of
+      cron strings is treated as adopted; otherwise a PUT is issued on create.
+      Delete clears the schedule list (PUT []) unless `state.existing` is true.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
+        `Workers Scripts: Edit` scope on the account.
+
+      ## Actions
+      - `get-schedules` — list current schedules from Cloudflare
+      - `apply` — re-apply the configured cron list (useful after script swap)
+    version-hash: c80ea9e6bbbb
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    account_id:
+      type: string
+      description: Cloudflare account ID
+    script_name:
+      type: string
+      description: Worker script name whose cron list this entity owns
+    crons:
+      type: array
+      items:
+        type: string
+      description: |-
+        List of cron expressions (standard 5-field UTC).
+        An empty list disables all crons on the script.
+    required:
+      - account_id
+      - script_name
+      - crons
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: 'Synthetic id: "{account_id}/{script_name}"'
+    applied_crons:
+      type: array
+      items:
+        type: string
+      description: Most recently applied cron list
+  lifecycle:
+    sync: <<< cloudflare-workers-cron-trigger-sync.js
+    get-schedules: ''
+    apply: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

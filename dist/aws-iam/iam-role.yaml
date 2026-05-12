@@ -1,0 +1,80 @@
+namespace: aws-iam
+iam-role:
+  defines: entity
+  metadata:
+    name: IAMRole
+    description: |-
+      AWS IAM Role entity.
+      Creates and manages AWS IAM roles for granting permissions to AWS services and users.
+      Supports trust policies for cross-account access and service-linked roles.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.role_arn` - Role ARN for service configurations and cross-account access
+      - `state.role_id` - Unique role identifier
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-lambda/function` - Execution role for Lambda functions
+      - `aws-rds/instance` - Enhanced monitoring and S3 import roles
+      - `aws-iam/policy` - Attach custom policies for fine-grained permissions
+    version-hash: 8b63de20f0b6
+  schema:
+    region:
+      type: string
+      description: AWS region for IAM operations (signing region)
+    role_name:
+      type: string
+      description: IAM role name
+    assume_role_policy_document:
+      description: Trust policy document allowing principals to assume this role
+    path:
+      type: string
+      description: Optional path for the role (defaults to "/")
+    role_description:
+      type: string
+      description: Human-readable description for the role
+    max_session_duration:
+      type: number
+      description: Session duration in seconds (3600-43200)
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the role
+      description: Resource tags for the role
+    attached_policies:
+      type: array
+      items:
+        type: string
+      description: List of managed policy ARNs to attach to the role
+    required:
+      - region
+      - role_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Whether role pre-existed before this entity managed it
+    role_arn:
+      type: string
+      description: Role ARN
+    role_id:
+      type: string
+      description: Role ID
+    create_date:
+      type: string
+      description: Creation timestamp
+  lifecycle:
+    sync: <<< iam-role-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 5
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - aws-iam/iam-base

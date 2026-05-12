@@ -1,0 +1,7 @@
+REPO netlify
+VERSION_HASH 4f1e0990e805
+DESCRIPTION Hosting, deploys, and forms.
+HOSTING managed
+TAGS netlify,hosting,deploy,forms
+LOAD netlify-base.yaml form.yaml site.yaml common.yaml account.yaml
+RESOURCES site-sync.js account-sync.js common.js form-sync.js netlify-base.js

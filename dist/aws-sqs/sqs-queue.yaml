@@ -1,0 +1,151 @@
+namespace: aws-sqs
+sqs-queue:
+  defines: entity
+  metadata:
+    name: SQSQueue
+    description: |-
+      AWS SQS Queue entity.
+      Creates and manages Amazon SQS queues for reliable message-based communication.
+      Supports both standard queues (high throughput) and FIFO queues (ordered, exactly-once delivery).
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.queue_url` - Queue URL for sending/receiving messages
+      - `state.queue_arn` - Queue ARN for IAM policies and cross-service integration
+      - `state.queue_name` - Queue name
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-lambda/function` - Trigger Lambda functions from queue messages
+      - `aws-sns/topic` - Subscribe queue to SNS topic for fanout patterns
+      - `aws-iam/role` - Grant queue access to other services
+    version-hash: 4a75d5bae6d7
+  schema:
+    region:
+      type: string
+      description: AWS region for the queue
+    queue_name:
+      type: string
+      description: Queue name (append .fifo for FIFO queues)
+    delay_seconds:
+      type: number
+      description: Default delay (seconds) for messages
+      default: 0
+    maximum_message_size:
+      type: number
+      description: Maximum message size in bytes
+      default: 262144
+    message_retention_period:
+      type: number
+      description: How long to retain messages (seconds)
+      default: 345600
+    receive_message_wait_time_seconds:
+      type: number
+      description: Long polling wait time (seconds)
+      default: 0
+    visibility_timeout:
+      type: number
+      description: Visibility timeout (seconds)
+      default: 30
+    fifo_queue:
+      type: boolean
+      description: Whether this is a FIFO queue
+      default: false
+    content_based_deduplication:
+      type: boolean
+      description: Enable content-based deduplication (FIFO only)
+      default: false
+    kms_master_key_id:
+      type: string
+      description: KMS key ID/ARN for server-side encryption
+    kms_data_key_reuse_period_seconds:
+      type: number
+      description: KMS data key reuse period (seconds)
+    redrive_policy:
+      type: object
+      properties:
+        dead_letter_target_arn:
+          type: string
+          description: Target DLQ ARN
+        max_receive_count:
+          type: number
+          description: Max receives before moving to DLQ
+      required:
+        - dead_letter_target_arn
+        - max_receive_count
+      additionalProperties: false
+      description: Dead-letter queue settings
+    redrive_allow_policy:
+      type: object
+      properties:
+        redrive_permission:
+          type: string
+          enum:
+            - allowAll
+            - denyAll
+            - byQueue
+          description: Redrive permission mode
+        source_queue_arns:
+          type: array
+          items:
+            type: string
+          description: Allowed source queue ARNs
+      required:
+        - redrive_permission
+      additionalProperties: false
+      description: Redrive allow policy configuration
+    sqs_managed_sse_enabled:
+      type: boolean
+      description: Enable SQS-managed server-side encryption
+      default: false
+    policy:
+      type: string
+      description: JSON policy document string
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags for the queue
+      description: Resource tags for the queue
+    required:
+      - region
+      - queue_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the queue pre-existed before this entity managed it
+    queue_name:
+      type: string
+      description: Queue name
+    queue_url:
+      type: string
+      description: Queue URL
+    queue_arn:
+      type: string
+      description: Queue ARN
+    required:
+      - existing
+  lifecycle:
+    sync: <<< sqs-queue-sync.js
+    send-message: ''
+    receive-messages: ''
+    purge-messages: ''
+    get-statistics: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - aws-sqs/sqs-base
+    - monkec/base
+    - cli
+    - cloud/aws
+    - aws-sqs/common

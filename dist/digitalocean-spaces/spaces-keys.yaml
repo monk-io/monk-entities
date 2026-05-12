@@ -1,0 +1,40 @@
+namespace: digitalocean-spaces
+spaces-keys:
+  defines: entity
+  metadata:
+    name: SpacesKeys
+    description: |-
+      DigitalOcean Spaces Keys entity.
+      Creates and manages Spaces access keys with full access permissions.
+      Upon creation, stores the access key and secret key into Monk secrets:
+      - `do-spaces-access-key`: The access key ID
+      - `do-spaces-secret-key`: The secret access key
+
+      These secrets can be used by other Spaces entities (e.g., bucket) for S3-compatible API operations.
+    version-hash: 3e5a34e7e68d
+  schema:
+    name:
+      type: string
+      description: 'Name of the Spaces key. If not provided, a unique name will be generated.'
+  state-schema:
+    id:
+      type: string
+      description: Unique identifier of the Spaces key (or access_key if id not returned)
+    access_key:
+      type: string
+      description: The access key ID for S3-compatible API access
+    existing:
+      type: boolean
+      description: Indicates if the resource was successfully created
+  lifecycle:
+    sync: <<< spaces-keys-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - cloud/digitalocean
+    - secret
+    - cli

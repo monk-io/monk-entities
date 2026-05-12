@@ -1,0 +1,190 @@
+namespace: digitalocean-database
+database:
+  defines: entity
+  metadata:
+    name: Database
+    description: |-
+      DigitalOcean Database entity.
+      Creates and manages DigitalOcean managed database clusters.
+      Supports PostgreSQL, MySQL, Redis, MongoDB, and Kafka engines.
+
+      ## Secrets
+      - Reads: none (authenticated via DigitalOcean provider)
+      - Writes: none (connection credentials available in state)
+
+      ## State Fields for Composition
+      - `state.id` - Database cluster UUID
+      - `state.host` - Database hostname for connections
+      - `state.port` - Database port
+      - `state.status` - Cluster status (online, creating, etc.)
+
+      ## Composing with Other Entities
+      Works with:
+      - `digitalocean/database-user` - Create additional database users
+      - `digitalocean/database-db` - Create databases within the cluster
+    version-hash: 2ddf4d9ca479
+  schema:
+    name:
+      type: string
+      description: 'Name of the database cluster (3-63 characters, alphanumeric and hyphens only)'
+    engine:
+      type: string
+      enum:
+        - mysql
+        - pg
+        - mongodb
+        - kafka
+        - opensearch
+        - valkey
+      description: 'The database engine to use (mysql, pg, valkey, mongodb, kafka, opensearch)'
+    version:
+      type: string
+      description: 'Version of the database engine (optional, uses latest if not specified)'
+    num_nodes:
+      type: number
+      minimum: 1
+      maximum: 10
+      description: 'Number of nodes for the database cluster (1 for single node, 2+ for cluster)'
+    region:
+      type: string
+      enum:
+        - ams3
+        - blr1
+        - fra1
+        - lon1
+        - nyc1
+        - nyc3
+        - sfo3
+        - sgp1
+        - tor1
+        - syd1
+      description: The DigitalOcean region where the database will be created
+    size:
+      type: string
+      enum:
+        - db-s-1vcpu-1gb
+        - db-s-1vcpu-2gb
+        - db-s-2vcpu-4gb
+        - db-s-4vcpu-8gb
+        - db-s-6vcpu-16gb
+        - db-s-8vcpu-32gb
+        - db-s-16vcpu-64gb
+        - gd-2vcpu-8gb
+        - gd-4vcpu-16gb
+        - gd-8vcpu-32gb
+        - gd-16vcpu-64gb
+        - gd-32vcpu-128gb
+        - gd-40vcpu-160gb
+        - so1_5-2vcpu-16gb
+        - so1_5-4vcpu-32gb
+        - so1_5-8vcpu-64gb
+        - so1_5-16vcpu-128gb
+        - so1_5-24vcpu-192gb
+        - so1_5-32vcpu-256gb
+      description: The size/performance tier of the database cluster
+    tags:
+      type: array
+      items:
+        type: string
+      description: Tags to apply to the database cluster
+    private_network_uuid:
+      type: string
+      description: VPC UUID for private networking (optional)
+    storage_size_mib:
+      type: number
+      description: 'Additional storage added to the cluster, in MiB. If not set, no additional storage is added beyond the base amount from the size.'
+    project_id:
+      type: string
+      description: 'The ID of the project that the database cluster is assigned to. If excluded, it will be assigned to your default project.'
+    required:
+      - name
+      - engine
+      - num_nodes
+      - region
+      - size
+  state-schema:
+    existing:
+      type: boolean
+    id:
+      type: string
+    name:
+      type: string
+    engine:
+      type: string
+    version:
+      type: string
+    status:
+      type: string
+      enum:
+        - creating
+        - online
+        - forking
+        - migrating
+        - resizing
+    num_nodes:
+      type: number
+    region:
+      type: string
+    size:
+      type: string
+    storage_size_mib:
+      type: number
+    connection_uri:
+      type: string
+    connection_password:
+      type: string
+    connection_host:
+      type: string
+    connection_port:
+      type: number
+    connection_user:
+      type: string
+    connection_database:
+      type: string
+    connection_ssl:
+      type: boolean
+    private_connection_uri:
+      type: string
+    private_connection_host:
+      type: string
+    private_connection_port:
+      type: number
+    standby_connection_host:
+      type: string
+    standby_connection_port:
+      type: number
+    created_at:
+      type: string
+    semantic_version:
+      type: string
+    tags:
+      type: array
+      items:
+        type: string
+  lifecycle:
+    sync: <<< database-sync.js
+    get-database: ''
+    list-databases: ''
+    create-database: ''
+    delete-database: ''
+    get-connection-info: ''
+    resize-cluster: ''
+    get-backup-info: ''
+    list-backups: ''
+    describe-backup: ''
+    restore: ''
+    get-restore-status: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 5
+      attempts: 40
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - digitalocean-database/do-provider-base
+    - digitalocean-database/common
+    - cli

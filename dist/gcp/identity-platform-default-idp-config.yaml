@@ -1,0 +1,124 @@
+namespace: gcp
+identity-platform-default-idp-config:
+  defines: entity
+  metadata:
+    name: IdentityPlatformDefaultIdpConfig
+    description: |-
+      GCP Identity Platform built-in social identity provider configuration entity.
+      Configures social sign-in providers like Google, Facebook, Apple, GitHub, Microsoft,
+      and Twitter. Supports both project-level and tenant-scoped configurations.
+
+      ## Required Permissions
+      - `firebaseauth.configs.get` — read IdP configurations
+      - `firebaseauth.configs.update` — create, update, and delete IdP configurations
+
+      Or use the predefined role: `roles/identityplatform.admin`
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      Note: The client_id and client_secret fields are credentials from the social provider
+      (e.g., Facebook App ID/Secret), passed as definition fields, not Monk secrets.
+
+      ## State Fields for Composition
+      - `state.idp_id` — Provider ID (e.g., google.com)
+      - `state.resource_name` — Full resource name for API operations
+      - `state.enabled` — Whether the provider is currently enabled
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
+      - `gcp/identity-platform-config` — Project-level configuration
+    version-hash: '26548e489472'
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    idp_id:
+      type: string
+      description: |-
+        The identity provider ID (e.g., google.com, facebook.com, apple.com,
+        github.com, microsoft.com, twitter.com).
+    tenant_id:
+      type: string
+      description: |-
+        Tenant ID to scope this config to a specific tenant.
+        Omit for project-level configuration.
+    enabled:
+      type: boolean
+      description: Whether users can sign in with this provider.
+    client_id:
+      type: string
+      description: OAuth client ID from the identity provider.
+    client_secret:
+      type: string
+      description: OAuth client secret from the identity provider.
+    apple_team_id:
+      type: string
+      description: Apple Developer Team ID (only for apple.com provider).
+    apple_key_id:
+      type: string
+      description: Key ID for the Apple private key (only for apple.com provider).
+    apple_private_key:
+      type: string
+      description: Private key for Apple Sign-In (only for apple.com provider).
+    apple_bundle_ids:
+      type: array
+      items:
+        type: string
+      description: Apple bundle IDs (only for apple.com provider).
+    required:
+      - idp_id
+      - client_id
+      - client_secret
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: Full resource name of the config.
+    idp_id:
+      type: string
+      description: 'The identity provider ID (e.g., google.com).'
+    enabled:
+      type: boolean
+      description: Whether this provider is enabled.
+    client_id:
+      type: string
+      description: The OAuth client ID.
+  lifecycle:
+    sync: <<< identity-platform-default-idp-config-sync.js
+    get-info: ''
+    enable: ''
+    disable: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

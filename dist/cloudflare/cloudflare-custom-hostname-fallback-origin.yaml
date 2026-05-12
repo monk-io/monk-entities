@@ -1,0 +1,59 @@
+namespace: cloudflare
+cloudflare-custom-hostname-fallback-origin:
+  defines: entity
+  metadata:
+    name: CloudflareCustomHostnameFallbackOrigin
+    description: |-
+      Cloudflare for SaaS Fallback Origin entity.
+      Configures the single per-zone fallback origin that all custom hostnames
+      route to by default. Detects an existing setting and adopts it when the
+      configured `origin` matches. Delete clears the fallback origin only for
+      non-adopted state (BlocCarbon-style: set once per environment).
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
+        `SSL and Certificates: Edit` on the fallback zone.
+
+      ## Actions
+      - `get-info` — fetch current fallback origin record
+    version-hash: c80ea9e6bbbb
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    zone_id:
+      type: string
+      description: Fallback zone ID owning the SaaS configuration
+    origin:
+      type: string
+      description: 'Fallback origin hostname (e.g., proxy.bloccarbon.com)'
+    required:
+      - zone_id
+      - origin
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    origin:
+      type: string
+      description: Origin currently configured (echoes definition on success)
+    status:
+      type: string
+      description: Provisioning status reported by Cloudflare
+    errors:
+      type: array
+      items:
+        type: string
+      description: Errors reported during fallback origin provisioning
+  lifecycle:
+    sync: <<< cloudflare-custom-hostname-fallback-origin-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

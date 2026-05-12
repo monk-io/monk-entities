@@ -1,0 +1,118 @@
+namespace: neon
+compute:
+  defines: entity
+  metadata:
+    name: Compute
+    description: |-
+      Neon Compute entity.
+      Creates and manages Neon compute endpoints for database connections.
+      Compute endpoints provide connection URLs and control compute resources.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Compute endpoint ID
+      - `state.host` - Connection hostname
+      - `state.current_state` - Endpoint state (idle, active)
+
+      ## Composing with Other Entities
+      Works with:
+      - `neon/project` - The project containing this endpoint
+      - `neon/branch` - The branch this endpoint connects to
+    version-hash: 1381865b4e5f
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for Neon API authentication
+    project_id:
+      type: string
+      description: 'The Neon project ID (format: project-name-123456)'
+    branch_id:
+      type: string
+      description: 'The Neon branch ID (format: br-name-123456)'
+    compute_type:
+      type: string
+      enum:
+        - read_write
+        - read_only
+      description: Whether this is a read-write or read-only compute
+      default: read_write
+    min_cu:
+      type: number
+      description: Minimum compute units for autoscaling
+      default: 1
+    max_cu:
+      type: number
+      description: Maximum compute units for autoscaling
+      default: 1
+    pooler_enabled:
+      type: boolean
+      description: Enable connection pooler for the compute
+      default: false
+    pooler_mode:
+      type: string
+      enum:
+        - transaction
+        - session
+      description: Mode for the connection pooler
+      default: transaction
+    required:
+      - secret_ref
+      - project_id
+      - branch_id
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: 'Unique identifier for the compute (format: ep-name-123456)'
+    host:
+      type: string
+      description: Hostname for connecting to the compute
+    proxy_host:
+      type: string
+      description: Proxy hostname for connecting to the compute
+    current_state:
+      type: string
+      description: 'Current state of the compute (active, idle, etc)'
+    pending_state:
+      type: string
+      description: Pending state if compute is transitioning
+    created_at:
+      type: string
+      format: date-time
+      description: When the compute was created
+    updated_at:
+      type: string
+      format: date-time
+      description: When the compute was last updated
+    last_active:
+      type: string
+      format: date-time
+      description: When the compute was last active
+    disabled:
+      type: boolean
+      description: 'If true, compute is disabled'
+    operation_id:
+      type: string
+      description: ID of the operation that created the compute
+  lifecycle:
+    sync: <<< compute-sync.js
+    restart-compute: ''
+    get-compute-details: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - neon/neon-base
+    - cli

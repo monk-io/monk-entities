@@ -1,0 +1,76 @@
+namespace: workos
+role:
+  defines: entity
+  metadata:
+    name: Role
+    description: |-
+      WorkOS Role entity.
+      Creates and manages WorkOS environment-level roles for role-based access control (RBAC).
+      Roles group permissions and can be assigned to organization memberships.
+      Uses the /authorization/roles API with slug-based identification.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - WorkOS API key
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.role_id` - WorkOS role ID (role_...)
+      - `state.name` - Role name
+      - `state.slug` - Role slug
+
+      ## Composing with Other Entities
+      Works with:
+      - `workos/credentials` - Shares API credentials
+      - `workos/organization` - Roles are used within organizations
+      - `workos/user` - Users are assigned roles via organization memberships
+    version-hash: 989ef547a790
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing WorkOS API key (sk_test_... or sk_production_...)
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: Role name
+    slug:
+      type: string
+      description: 'URL-friendly slug for the role (lowercase, numbers, hyphens, underscores)'
+    role_description:
+      type: string
+      description: Human-readable role summary
+    permissions:
+      type: array
+      items:
+        type: string
+      description: List of permission slugs assigned to this role
+    required:
+      - secret_ref
+      - name
+      - slug
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    role_id:
+      type: string
+      description: WorkOS role ID (role_...)
+    name:
+      type: string
+      description: Role name
+    slug:
+      type: string
+      description: Role slug
+  lifecycle:
+    sync: <<< role-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - workos/workos-base
+    - cli
