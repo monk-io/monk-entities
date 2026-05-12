@@ -1,7 +1,0 @@
-namespace: aws-rds
-
-base:
-  defines: module
-  metadata:
-    version-hash: e96aa6ffe796
-  source: <<< base.js

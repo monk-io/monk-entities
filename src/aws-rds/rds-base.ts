@@ -414,17 +414,14 @@ export abstract class AWSRDSEntity<
                 }
 
                 // Wait 30 seconds before next attempt
-                const start = Date.now();
-                while (Date.now() - start < 30000) {
-                    // Simple busy wait
-                }
+                sleep(30000);
             } catch (error) {
                 if (attempt === maxAttempts - 1) {
                     throw error;
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -447,10 +444,7 @@ export abstract class AWSRDSEntity<
                 // If still deleting, continue waiting
                 if (status === 'deleting') {
                     // Wait 30 seconds before next attempt
-                    const start = Date.now();
-                    while (Date.now() - start < 30000) {
-                        // Simple busy wait
-                    }
+                    sleep(30000);
                     continue;
                 }
                 
@@ -470,10 +464,7 @@ export abstract class AWSRDSEntity<
                 }
                 
                 // Wait before retrying
-                const start = Date.now();
-                while (Date.now() - start < 30000) {
-                    // Simple busy wait
-                }
+                sleep(30000);
             }
         }
         

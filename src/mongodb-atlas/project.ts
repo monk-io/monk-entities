@@ -200,11 +200,7 @@ export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState>
                     break;
                 }
                 
-                // Simple delay - this is not ideal but works in Goja
-                const start = Date.now();
-                while (Date.now() - start < 10000) {
-                    // 10 second delay
-                }
+                sleep(10000);
                 
             } catch (error) {
                 cli.output(`Warning: Error checking cluster deletion status: ${error instanceof Error ? error.message : 'Unknown error'}`);

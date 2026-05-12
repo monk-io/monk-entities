@@ -1,7 +1,0 @@
-REPO aws-cloudfront
-VERSION_HASH 81d5872b9074
-DESCRIPTION Global CDN and edge delivery.
-HOSTING managed
-TAGS aws,cloudfront,cdn,edge
-LOAD cloudfront-base.yaml base.yaml cloud-front-distribution.yaml common.yaml
-RESOURCES cloud-front-distribution-sync.js common.js cloudfront-base.js base.js

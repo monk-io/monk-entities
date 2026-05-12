@@ -822,8 +822,7 @@ export class CloudArmorSecurityPolicy extends GcpEntity<CloudArmorSecurityPolicy
                 cli.output(
                     `Policy still attached (attempt ${attempt}/${maxAttempts}); waiting ${delayMs / 1000}s for referring resources to finish teardown...`,
                 );
-                const until = Date.now() + delayMs;
-                while (Date.now() < until) { /* spin — Goja lacks setTimeout */ }
+                sleep(delayMs);
             }
         }
         throw lastErr ?? new Error("cloud-armor delete retry loop exited unexpectedly");

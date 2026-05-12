@@ -11,7 +11,7 @@ export interface NeonBranchDefinition extends NeonEntityDefinition {
      * Project ID that this branch belongs to
      * @description The Neon project ID (format: project-name-123456)
      */
-    projectId: string;
+    project_id: string;
 
     /**
      * Optional branch name (defaults to generated name)
@@ -23,13 +23,13 @@ export interface NeonBranchDefinition extends NeonEntityDefinition {
      * Parent branch ID to branch from (defaults to main branch)
      * @description The ID of the parent branch (format: br-name-123456)
      */
-    parentId?: string;
+    parent_id?: string;
 
     /**
      * Optional point-in-time LSN to branch from
      * @description Log Sequence Number to create branch from
      */
-    parentLsn?: string;
+    parent_lsn?: string;
 }
 
 /**
@@ -53,57 +53,57 @@ export interface NeonBranchState extends NeonEntityState {
      * Parent branch ID
      * @description ID of the parent branch
      */
-    parentId?: string;
+    parent_id?: string;
 
     /**
      * Parent LSN
      * @description Log Sequence Number the branch was created from
      */
-    parentLsn?: string;
+    parent_lsn?: string;
 
     /**
      * Current state of the branch
      * @description Branch state (init, ready, etc)
      */
-    currentState?: string;
+    current_state?: string;
 
     /**
      * Creation timestamp
      * @description When the branch was created
      * @format date-time
      */
-    createdAt?: string;
+    created_at?: string;
 
     /**
      * Last update timestamp
      * @description When the branch was last updated
      * @format date-time
      */
-    updatedAt?: string;
+    updated_at?: string;
 
     /**
      * Logical size in MB
      * @description Logical size of the branch data
      */
-    logicalSize?: number;
+    logical_size?: number;
 
     /**
      * Physical size in MB
      * @description Physical size of the branch data
      */
-    physicalSize?: number;
+    physical_size?: number;
 
     /**
      * Operation IDs for tracking branch creation
      * @description Array of operation IDs that need to complete
      */
-    operationIds?: string[];
+    operation_ids?: string[];
 
     /**
      * Pending state of the branch
      * @description Pending state of the branch
      */
-    pendingState?: string;
+    pending_state?: string;
 
     /**
      * Endpoint information
@@ -135,15 +135,15 @@ export interface NeonBranchState extends NeonEntityState {
 export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
     
     protected getEntityName(): string {
-        return `Neon Branch ${this.definition.name || 'unnamed'} in project ${this.definition.projectId}`;
+        return `Neon Branch ${this.definition.name || 'unnamed'} in project ${this.definition.project_id}`;
     }
 
     override create(): void {
         const branchData = {
             branch: {
                 name: this.definition.name,
-                parent_id: this.definition.parentId,
-                parent_lsn: this.definition.parentLsn
+                parent_id: this.definition.parent_id,
+                parent_lsn: this.definition.parent_lsn
             },
             endpoints: [
                 {
@@ -157,23 +157,23 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
 
         const response = this.makeRequest(
             "POST",
-            `/projects/${this.definition.projectId}/branches`,
+            `/projects/${this.definition.project_id}/branches`,
             branchData
         );
 
         const branch = response.branch;
         this.state.id = branch.id;
         this.state.name = branch.name;
-        this.state.currentState = branch.current_state;
-        this.state.pendingState = branch.pending_state;
-        this.state.parentId = branch.parent_id;
-        this.state.parentLsn = branch.parent_lsn;
-        this.state.createdAt = branch.created_at;
-        this.state.updatedAt = branch.updated_at;
+        this.state.current_state = branch.current_state;
+        this.state.pending_state = branch.pending_state;
+        this.state.parent_id = branch.parent_id;
+        this.state.parent_lsn = branch.parent_lsn;
+        this.state.created_at = branch.created_at;
+        this.state.updated_at = branch.updated_at;
 
         // Extract operation IDs from operations array
         if (response.operations && response.operations.length > 0) {
-            this.state.operationIds = response.operations.map((op: any) => op.id);
+            this.state.operation_ids = response.operations.map((op: any) => op.id);
         }
 
         // Extract endpoint information
@@ -189,8 +189,8 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
 
     override start(): void {
         // Wait for branch operations to complete
-        if (this.state.operationIds && this.state.operationIds.length > 0) {
-            this.waitForOperations(this.definition.projectId, this.state.operationIds);
+        if (this.state.operation_ids && this.state.operation_ids.length > 0) {
+            this.waitForOperations(this.definition.project_id, this.state.operation_ids);
         }
     }
 
@@ -200,7 +200,7 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
             throw new Error("Branch ID not available");
         }
 
-        const branch = this.makeRequest("GET", `/projects/${this.definition.projectId}/branches/${this.state.id}`);
+        const branch = this.makeRequest("GET", `/projects/${this.definition.project_id}/branches/${this.state.id}`);
         cli.output(`Branch: ${JSON.stringify(branch, null, 2)}`);
     }
 
@@ -210,7 +210,7 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
             return;
         }
 
-        this.deleteResource(`/projects/${this.definition.projectId}/branches/${this.state.id}`, `Branch ${this.state.name}`);
+        this.deleteResource(`/projects/${this.definition.project_id}/branches/${this.state.id}`, `Branch ${this.state.name}`);
     }
 
     override checkReadiness(): boolean {
@@ -220,7 +220,7 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
 
         // Check if branch is ready by getting its current status
         try {
-            const branch = this.makeRequest("GET", `/projects/${this.definition.projectId}/branches/${this.state.id}`);
+            const branch = this.makeRequest("GET", `/projects/${this.definition.project_id}/branches/${this.state.id}`);
             const isReady = branch.branch && branch.branch.current_state === "ready";
             
             if (isReady) {

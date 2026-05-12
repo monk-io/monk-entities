@@ -594,10 +594,7 @@ export class LambdaFunction extends AWSLambdaEntity<LambdaFunctionDefinition, La
                     
                     if (isConflictError && attempt < maxRetries - 1) {
                         // Wait 10 seconds before retry
-                        const start = Date.now();
-                        while (Date.now() - start < 10000) {
-                            // Simple busy wait
-                        }
+                        sleep(10000);
                         
                         // Check function state again before retrying
                         if (!this.waitForFunctionState(this.definition.function_name, "Active")) {

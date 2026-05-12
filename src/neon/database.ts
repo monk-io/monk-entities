@@ -23,19 +23,19 @@ export interface NeonDatabaseDefinition {
      * Project ID
      * @description The Neon project ID (format: project-name-123456)
      */
-    projectId: string;
+    project_id: string;
 
     /**
      * Branch ID
      * @description The Neon branch ID (format: br-name-123456)
      */
-    branchId: string;
+    branch_id: string;
 
     /**
      * Optional owner name
      * @description Name of the role that will own the database (optional, defaults to project owner)
      */
-    ownerName?: string;
+    owner_name?: string;
 }
 
 /**
@@ -59,33 +59,33 @@ export interface NeonDatabaseState {
      * Branch ID
      * @description ID of the branch containing this database
      */
-    branchId?: string;
+    branch_id?: string;
 
     /**
      * Owner name
      * @description Name of the role that owns the database
      */
-    ownerName?: string;
+    owner_name?: string;
 
     /**
      * Database creation timestamp
      * @description When the database was created
      * @format date-time
      */
-    createdAt?: string;
+    created_at?: string;
 
     /**
      * Last update timestamp
      * @description When the database was last updated
      * @format date-time
      */
-    updatedAt?: string;
+    updated_at?: string;
 
     /**
      * Operation ID for tracking database operations
      * @description ID of the current operation
      */
-    operationId?: string;
+    operation_id?: string;
 }
 
 /**
@@ -148,39 +148,39 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         const databaseData = {
             database: {
                 name: this.definition.name,
-                owner_name: this.definition.ownerName
+                owner_name: this.definition.owner_name
             }
         };
 
         const response = this.request(
             "POST",
-            `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/databases`,
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/databases`,
             databaseData
         );
 
         const database = response.database;
         this.state.id = database.id;
         this.state.name = database.name;
-        this.state.branchId = database.branch_id;
-        this.state.ownerName = database.owner_name;
-        this.state.createdAt = database.created_at;
-        this.state.updatedAt = database.updated_at;
+        this.state.branch_id = database.branch_id;
+        this.state.owner_name = database.owner_name;
+        this.state.created_at = database.created_at;
+        this.state.updated_at = database.updated_at;
 
         // Extract operation ID if present
         if (response.operations && response.operations.length > 0) {
-            this.state.operationId = response.operations[0].id;
+            this.state.operation_id = response.operations[0].id;
         }
     }
 
     override start(): void {
         // Wait for database operations to complete
-        if (this.state.operationId) {
+        if (this.state.operation_id) {
             this.waitForOperation();
         }
     }
 
     private waitForOperation(): void {
-        if (!this.state.operationId) return;
+        if (!this.state.operation_id) return;
 
         let attempts = 0;
         const maxAttempts = 40;
@@ -188,11 +188,11 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
 
         while (attempts < maxAttempts) {
             try {
-                const operationData = this.request("GET", `/projects/${this.definition.projectId}/operations/${this.state.operationId}`);
+                const operationData = this.request("GET", `/projects/${this.definition.project_id}/operations/${this.state.operation_id}`);
                 
                 if (operationData.operation) {
                     if (operationData.operation.status === "finished" || operationData.operation.status === "completed") {
-                        this.state.operationId = undefined;
+                        this.state.operation_id = undefined;
                         return;
                     }
                     
@@ -206,11 +206,7 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
 
             attempts++;
             if (attempts < maxAttempts) {
-                // Wait before next attempt
-                const start = Date.now();
-                while (Date.now() - start < delayMs) {
-                    // Busy wait
-                }
+                sleep(delayMs);
             }
         }
 
@@ -223,13 +219,13 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         }
 
         // If we have an operation ID, check operation status first
-        if (this.state.operationId) {
+        if (this.state.operation_id) {
             return false;
         }
 
         // Check if database is accessible
         try {
-            const response = this.request("GET", `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/databases/${this.state.name}`);
+            const response = this.request("GET", `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/databases/${this.state.name}`);
             return !!response.database;
         } catch (error: unknown) {
             return false;
@@ -248,7 +244,7 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         try {
             this.request(
                 "DELETE",
-                `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/databases/${this.state.name}`
+                `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/databases/${this.state.name}`
             );
         } catch (error: unknown) {
             // Ignore 404 errors (database already deleted)
@@ -272,24 +268,24 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         if (args.name) {
             updateData.database.name = args.name;
         }
-        if (args.ownerName) {
-            updateData.database.owner_name = args.ownerName;
+        if (args.owner_name) {
+            updateData.database.owner_name = args.owner_name;
         }
 
         const response = this.request(
             "PATCH",
-            `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/databases/${this.state.name}`,
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/databases/${this.state.name}`,
             updateData
         );
 
         const database = response.database;
         this.state.name = database.name;
-        this.state.ownerName = database.owner_name;
-        this.state.updatedAt = database.updated_at;
+        this.state.owner_name = database.owner_name;
+        this.state.updated_at = database.updated_at;
 
         // Extract operation ID if present
         if (response.operations && response.operations.length > 0) {
-            this.state.operationId = response.operations[0].id;
+            this.state.operation_id = response.operations[0].id;
         }
     }
 } 

@@ -680,8 +680,7 @@ export class CloudFunction extends GcpEntity<CloudFunctionDefinition, CloudFunct
                 cli.output(
                     `Cloud Function create attempt ${attempt}/${maxAttempts} hit transient API race, retrying in ${backoffMs / 1000}s...`,
                 );
-                const until = Date.now() + backoffMs;
-                while (Date.now() < until) { /* busy wait — entity runtime lacks setTimeout */ }
+                sleep(backoffMs);
             }
         }
 

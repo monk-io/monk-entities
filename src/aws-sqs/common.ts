@@ -284,10 +284,7 @@ export function createBasicQueuePolicy(queueArn: string, allowedActions: string[
  */
 export function exponentialBackoffWait(attempt: number, baseDelay: number = 1000, maxDelay: number = 30000): void {
     const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
-    const start = Date.now();
-    while (Date.now() - start < delay) {
-        // Busy wait
-    }
+    sleep(delay);
 }
 
 /**

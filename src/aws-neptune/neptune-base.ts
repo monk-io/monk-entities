@@ -173,14 +173,7 @@ export abstract class AWSNeptuneEntity<
         return false;
     }
 
-    /**
-     * Simple delay implementation using busy wait
-     */
     protected delay(seconds: number): void {
-        const delayMs = seconds * 1000;
-        const start = Date.now();
-        while (Date.now() - start < delayMs) {
-            // Busy wait
-        }
+        sleep(seconds * 1000);
     }
 }

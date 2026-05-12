@@ -186,9 +186,7 @@ export class ProjectIamBinding extends GcpEntity<
                 cli.output(
                     `${describe}: etag conflict (attempt ${attempt}/${MAX_POLICY_ATTEMPTS}), retrying in ${POLICY_BACKOFF_MS / 1000}s...`,
                 );
-                const until = Date.now() + POLICY_BACKOFF_MS;
-                // Busy wait — Goja runtime lacks setTimeout.
-                while (Date.now() < until) { /* spin */ }
+                sleep(POLICY_BACKOFF_MS);
             }
         }
         throw lastErr ?? new Error(`${describe}: unreachable`);
