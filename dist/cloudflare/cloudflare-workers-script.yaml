@@ -28,7 +28,7 @@ cloudflare-workers-script:
       ## Actions
       - `get-info` — fetch script metadata from Cloudflare
       - `force-delete` — explicit destructive delete; refuses adopted scripts
-    version-hash: c80ea9e6bbbb
+    version-hash: fbd989232548
   schema:
     secret_ref:
       type: string

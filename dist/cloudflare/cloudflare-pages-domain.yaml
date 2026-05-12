@@ -1,0 +1,76 @@
+namespace: cloudflare
+cloudflare-pages-domain:
+  defines: entity
+  metadata:
+    name: CloudflarePagesDomain
+    description: |-
+      Cloudflare Pages Custom Domain entity.
+
+      Attaches a hostname to an existing Pages project. Detect-then-create:
+      if the hostname is already bound to the project, it is adopted. Delete
+      is a no-op unless opted in.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
+        `Cloudflare Pages: Edit` scope on the account.
+
+      ## Composition
+      - Wire `project_name` from a `cloudflare/pages-project` entity-state.
+      - Create the actual DNS record separately via `cloudflare/dns-record`,
+        pointing to `<project>.pages.dev`.
+
+      ## Actions
+      - `get-info` — fetch current binding record
+      - `retry-validation` — re-run Cloudflare's validation checks
+      - `force-delete` — explicit destructive delete (refuses adopted bindings)
+    version-hash: fbd989232548
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for API token; falls back to provider default
+    account_id:
+      type: string
+      description: Cloudflare account ID that owns the Pages project
+    project_name:
+      type: string
+      description: Pages project name. Wire via connection-target to a cloudflare/pages-project entity.
+    domain:
+      type: string
+      description: Fully-qualified hostname to attach (e.g. `app.example.com`)
+    allow_destructive_delete:
+      type: boolean
+      description: 'If true, delete() detaches the domain. Default false (no-op).'
+      default: false
+    required:
+      - account_id
+      - project_name
+      - domain
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Domain name (canonical identifier; mirrors definition.domain)
+    status:
+      type: string
+      description: 'Validation status reported by Cloudflare (e.g. `pending`, `active`)'
+    verification_data:
+      description: Verification data returned by Cloudflare (CNAME target etc.)
+    created_on:
+      type: string
+      description: ISO-8601 timestamp the binding was created
+  lifecycle:
+    sync: <<< cloudflare-pages-domain-sync.js
+    get-info: ''
+    retry-validation: ''
+    force-delete: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 12
+  requires:
+    - monkec/base
+    - cli
+    - cloudflare/cloudflare-base

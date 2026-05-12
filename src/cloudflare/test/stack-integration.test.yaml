@@ -267,6 +267,48 @@ tests:
       output:
         - "*/30 * * * *"
 
+  - name: Describe Pages project
+    action: describe
+    target: cloudflare-test/pages-project
+    expect:
+      exitCode: 0
+      output:
+        - "cloudflare-test/pages-project"
+        - "monk-test-pages"
+
+  - name: Get Pages project info
+    action: action
+    target: cloudflare-test/pages-project
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-pages"
+
+  - name: List Pages deployments
+    action: action
+    target: cloudflare-test/pages-project
+    actionName: list-deployments
+    expect:
+      exitCode: 0
+
+  - name: Describe Pages custom domain
+    action: describe
+    target: cloudflare-test/pages-domain
+    expect:
+      exitCode: 0
+      output:
+        - "pages-test.thisbetterbe.online"
+
+  - name: Get Pages domain info
+    action: action
+    target: cloudflare-test/pages-domain
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "pages-test.thisbetterbe.online"
+
 cleanup:
   - name: Delete stack
     action: delete

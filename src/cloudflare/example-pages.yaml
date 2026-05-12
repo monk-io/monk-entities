@@ -1,0 +1,59 @@
+namespace: cloudflare-pages-example
+
+# Cloudflare Pages: project + custom domain + Pages deploy runnable.
+#
+# The project entity reserves the project name as a direct-upload Pages
+# resource; code is uploaded by the inheriting wrangler-pages-deploy
+# runnable, which mounts a blob containing the built site.
+#
+# Replace the placeholders and the `blobs://...` source-path before use.
+
+project:
+  defines: cloudflare/pages-project
+  account_id: <- secret("cloudflare-account-id")
+  name: my-site
+  production_branch: main
+  production_env_vars:
+    PUBLIC_API_BASE: https://api.example.com
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+
+# Custom domain bound to the project. Don't forget to also create a
+# cloudflare/dns-record pointing `app.example.com` → `my-site.pages.dev`.
+app-domain:
+  defines: cloudflare/pages-domain
+  account_id: <- secret("cloudflare-account-id")
+  project_name: my-site
+  domain: app.example.com
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-pages-example/project
+
+# Deploy runnable — inherits cloudflare/wrangler-pages-deploy and overrides
+# project-name + the blob containing the built site.
+deploy:
+  defines: runnable
+  inherits: cloudflare/wrangler-pages-deploy
+  variables:
+    source-path: my-site-blob   # replace with your Monk blob name
+    output-dir: dist            # where your build output lives in the blob
+    branch: main
+    project-name: <- connection-target("project") entity-state get-member("id")
+    # Bump node/wrangler if needed:
+    # node-version: "22-slim"
+    # wrangler-version: "latest"
+    pre-deploy: |
+      cd /home/node/app && npm ci && npm run build
+  connections:
+    project:
+      runnable: cloudflare-pages-example/project
+      service: default
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-pages-example/project

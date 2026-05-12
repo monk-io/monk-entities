@@ -17,7 +17,7 @@ cloudflare-queue-consumer:
       ## Actions
       - `get-info` — print the consumer record
       - `list-consumers` — list all consumers on the bound queue (debugging)
-    version-hash: c80ea9e6bbbb
+    version-hash: fbd989232548
   schema:
     secret_ref:
       type: string

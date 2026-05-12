@@ -1,0 +1,125 @@
+namespace: cloudflare
+
+# Cloudflare Pages deployment runnable.
+# Mirrors wrangler-deploy: blob-mounted source, generic node container,
+# vendor CLI (wrangler) drives the upload. No wrangler.toml is generated —
+# Pages deploys take a directory plus flags.
+#
+# Inheritors mount the built Pages site from a Monk blob and override
+# `project-name` (typically wired via connection to a cloudflare/pages-project
+# entity) and `output-dir` (the built artifact directory, e.g. `dist`).
+wrangler-pages-deploy:
+  defines: runnable
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  containers:
+    deploy:
+      image: node
+      image-tag: <- `${node-version}`
+      restart: no
+      bash: /tmp/init.sh
+      paths:
+        - <- `blobs://${source-path}:/home/node/app`
+  files:
+    init:
+      container: deploy
+      path: /tmp/init.sh
+      mode: 0755
+      contents: |
+        #!/bin/sh
+        set -eu
+
+        echo "🚀 Cloudflare Pages deploy"
+        echo "  Project:   $PAGES_PROJECT"
+        echo "  Account:   $CLOUDFLARE_ACCOUNT_ID"
+        echo "  Directory: $DEPLOY_DIR"
+        echo "  Output:    $OUTPUT_DIR"
+        echo "  Branch:    $PAGES_BRANCH"
+
+        cd "$DEPLOY_DIR"
+
+        # Optional pre-deploy step (template-substituted into the script).
+        # Inheritors override `pre-deploy` to run npm install / build steps.
+        {{ v "pre-deploy" }}
+
+        # Auth via env: wrangler reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID
+        BRANCH_FLAG=""
+        if [ -n "$PAGES_BRANCH" ]; then
+          BRANCH_FLAG="--branch=$PAGES_BRANCH"
+        fi
+        COMMIT_FLAG=""
+        if [ -n "$COMMIT_MESSAGE" ]; then
+          COMMIT_FLAG="--commit-message=$COMMIT_MESSAGE"
+        fi
+
+        npx --yes "wrangler@$WRANGLER_VERSION" pages deploy "$OUTPUT_DIR" \
+          --project-name="$PAGES_PROJECT" \
+          $BRANCH_FLAG \
+          $COMMIT_FLAG
+
+        echo "✅ Pages project $PAGES_PROJECT deployed"
+  variables:
+    source-path:
+      type: string
+      value: pages
+      description: Monk blob containing the Pages source tree (or pre-built output).
+    project-name:
+      env: PAGES_PROJECT
+      type: string
+      description: |
+        Cloudflare Pages project name. Wire via connection-target to a
+        cloudflare/pages-project entity:
+        `project-name: <- connection-target("project") entity-state get-member("id")`
+    account-id:
+      env: CLOUDFLARE_ACCOUNT_ID
+      type: string
+      value: <- secret("cloudflare-account-id")
+    api-token:
+      env: CLOUDFLARE_API_TOKEN
+      type: string
+      value: <- secret("cloudflare-api-token")
+    deploy-dir:
+      env: DEPLOY_DIR
+      type: string
+      value: /home/node/app
+      description: Working directory inside the container (where the blob is mounted).
+    output-dir:
+      env: OUTPUT_DIR
+      type: string
+      value: dist
+      description: |
+        Built artifact directory uploaded to Pages, relative to `deploy-dir`.
+        Typical values: `dist`, `build`, `out`, `public`.
+    branch:
+      env: PAGES_BRANCH
+      type: string
+      value: ""
+      description: |
+        Branch name attached to the deployment. Use the production branch
+        (e.g. `main`) for a production deploy; any other value creates a
+        preview deployment. Empty = wrangler default.
+    commit-message:
+      env: COMMIT_MESSAGE
+      type: string
+      value: ""
+      description: Optional commit message attached to the deployment.
+    node-version:
+      type: string
+      value: "22-slim"
+      description: |
+        Docker image tag for the deploy container (image is `node:${node-version}`).
+        Defaults to `22-slim`. Examples: `22`, `22-slim`, `22-alpine`.
+    wrangler-version:
+      env: WRANGLER_VERSION
+      type: string
+      value: "latest"
+      description: |
+        Wrangler version passed to `npx wrangler@${WRANGLER_VERSION}`.
+        Defaults to `latest`. Pin (e.g. `4.20.0`) for reproducible builds.
+    pre-deploy:
+      type: string
+      value: |
+        # Default pre-deploy is a no-op; inheritors override to add
+        # npm install / bun install / build steps.
+        :
