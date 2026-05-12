@@ -48,7 +48,7 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// ../monk-entities/src/neon/branch.ts
+// input/neon/branch.ts
 const base = require("monkec/base");
 const action = base.action;
 const neonBase = require("neon/neon-base");

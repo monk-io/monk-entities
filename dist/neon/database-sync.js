@@ -42,13 +42,14 @@ var __decorateElement = (array, flags, name, decorators, target, extra) => {
   }
   return k || __decoratorMetadata(array, target), desc && __defProp(target, name, desc), p ? k ^ 4 ? extra : desc : target;
 };
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
 var __privateIn = (member, obj) => Object(obj) !== obj ? __typeError('Cannot use the "in" operator on this value') : member.has(obj);
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// ../monk-entities/src/neon/database.ts
+// input/neon/database.ts
 const base = require("monkec/base");
 const MonkEntity = base.MonkEntity;
 const action = base.action;
@@ -59,8 +60,8 @@ var _Database = class _Database extends (_a = MonkEntity, _updateDatabase_dec = 
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
-    this.apiKey = "";
-    this.baseUrl = "https://console.neon.tech/api/v2";
+    __publicField(this, "apiKey", "");
+    __publicField(this, "baseUrl", "https://console.neon.tech/api/v2");
   }
   before() {
     const apiKey = secret.get(this.definition.secret_ref);
