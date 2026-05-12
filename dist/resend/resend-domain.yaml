@@ -1,0 +1,123 @@
+namespace: resend
+resend-domain:
+  defines: entity
+  metadata:
+    name: ResendDomain
+    description: |-
+      Resend Domain entity.
+      Registers a sending domain with Resend. Adopts existing domains by
+      matching on `name`. Delete removes the domain from Resend; adopted
+      domains (`state.existing = true`) are skipped to keep deletion safe.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `resend-api-token`) — needs Full Access.
+
+      ## Composition
+      - `state.records` — array of DNS records to install on your zone.
+        Each entry has the shape Resend returns (`{ record, name, type,
+        value, ttl, priority? }`). Wire to `cloudflare-dns-record` entities
+        via templated members or read with `get-records`.
+
+      ## Actions
+      - `get-info` — fetch current domain + status from Resend
+      - `get-records` — print just the records[] block
+      - `verify` — trigger Resend to re-poll DNS and update status
+    version-hash: b991eef2ce2c
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for the Resend API key; defaults to `resend-api-token`
+    name:
+      type: string
+      description: 'Domain name to register (e.g., "mail.example.com")'
+    region:
+      type: string
+      enum:
+        - us-east-1
+        - eu-west-1
+        - sa-east-1
+        - ap-northeast-1
+      description: Resend sending region
+    custom_return_path:
+      type: string
+      description: 'Custom return-path subdomain (default: "send")'
+    open_tracking:
+      type: boolean
+      description: Enable open tracking
+    click_tracking:
+      type: boolean
+      description: Enable click tracking
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Resend domain id (UUID)
+    name:
+      type: string
+      description: Domain name mirror
+    status:
+      type: string
+      description: not_started | pending | verified | failed | temporary_failure
+    region:
+      type: string
+      description: Sending region
+    records:
+      type: array
+      items:
+        type: object
+        properties:
+          record:
+            type: string
+          name:
+            type: string
+          type:
+            type: string
+          value:
+            type: string
+          ttl:
+            type: string
+          status:
+            type: string
+          priority:
+            type: number
+        additionalProperties: false
+      description: DNS records the operator must install (returned by Resend)
+    dkim_name:
+      type: string
+      description: DKIM record name (relative to apex zone)
+    dkim_value:
+      type: string
+      description: DKIM TXT record value (the public key string)
+    spf_mx_name:
+      type: string
+      description: SPF MX record name (relative to apex zone)
+    spf_mx_value:
+      type: string
+      description: SPF MX record target hostname
+    spf_mx_priority:
+      type: number
+      description: 'SPF MX record priority (e.g., 10)'
+    spf_txt_name:
+      type: string
+      description: SPF TXT record name (relative to apex zone)
+    spf_txt_value:
+      type: string
+      description: SPF TXT record value
+  lifecycle:
+    sync: <<< resend-domain-sync.js
+    get-info: ''
+    get-records: ''
+    verify: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - resend/resend-base

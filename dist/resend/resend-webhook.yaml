@@ -1,0 +1,72 @@
+namespace: resend
+resend-webhook:
+  defines: entity
+  metadata:
+    name: ResendWebhook
+    description: |-
+      Resend Webhook entity.
+      Subscribes a target URL to Resend delivery events and stores the
+      returned signing secret in a Monk secret. Adopts existing webhooks by
+      endpoint URL. Updates events via PATCH. Delete removes the webhook.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `resend-api-token`).
+      - Writes: `signing_secret_ref` (defaults to `resend-webhook-secret`).
+
+      ## Actions
+      - `get-info` — fetch the webhook record from Resend
+    version-hash: b991eef2ce2c
+  schema:
+    secret_ref:
+      type: string
+      description: Optional secret reference for the Resend API key; defaults to `resend-api-token`
+    endpoint:
+      type: string
+      description: Target URL Resend will POST events to
+    events:
+      type: array
+      items:
+        type: string
+      description: |-
+        Event types to subscribe to (e.g., "email.sent",
+        "email.bounced", "email.delivered", "email.complained",
+        "email.opened", "email.clicked")
+    signing_secret_ref:
+      type: string
+      description: |-
+        Monk secret name to write the signing secret to.
+        Default: `resend-webhook-secret`.
+    required:
+      - endpoint
+      - events
+  state-schema:
+    existing:
+      type: boolean
+      description: Resource existed before this entity created it
+    id:
+      type: string
+      description: Resend webhook id
+    endpoint:
+      type: string
+      description: Endpoint URL mirror
+    signing_secret_ref:
+      type: string
+      description: Where the signing secret was written
+    applied_events:
+      type: array
+      items:
+        type: string
+      description: Events the webhook is subscribed to
+  lifecycle:
+    sync: <<< resend-webhook-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 6
+  requires:
+    - monkec/base
+    - cli
+    - secret
+    - resend/resend-base

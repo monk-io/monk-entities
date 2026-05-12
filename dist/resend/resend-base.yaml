@@ -1,0 +1,7 @@
+namespace: resend
+
+resend-base:
+  defines: module
+  metadata:
+    version-hash: b991eef2ce2c
+  source: <<< resend-base.js
