@@ -57,8 +57,8 @@ my-project:
 - `name`: Project name
 - `region`: Project region
 - `status`: Project status
-- `createdAt`: Creation timestamp
-- `lastUpdated`: Last update timestamp
+- `created_at`: Creation timestamp
+- `last_updated`: Last update timestamp
 
 **Actions:**
 - `getProject`: Get current project info
@@ -73,7 +73,7 @@ Manages a branch within a Neon project.
 dev-branch:
   defines: neon/branch
   secret_ref: neon-api-key
-  projectId: project-id-123456
+  project_id: project-id-123456
   name: dev
   permitted-secrets:
     neon-api-key: true
@@ -81,21 +81,21 @@ dev-branch:
 
 **Configuration:**
 - `secret_ref`: Secret name containing the Neon API key
-- `projectId`: Project ID this branch belongs to
+- `project_id`: Project ID this branch belongs to
 - `name`: (optional) Branch name
-- `parentId`: (optional) Parent branch ID
-- `parentLsn`: (optional) Point-in-time LSN to branch from
+- `parent_id`: (optional) Parent branch ID
+- `parent_lsn`: (optional) Point-in-time LSN to branch from
 
 **State:**
 - `id`: Branch ID
 - `name`: Branch name
-- `currentState`: Branch state
-- `parentId`: Parent branch ID
-- `parentLsn`: Parent LSN
-- `createdAt`: Creation timestamp
-- `updatedAt`: Last update timestamp
-- `logicalSize`: Logical size in MB
-- `physicalSize`: Physical size in MB
+- `current_state`: Branch state
+- `parent_id`: Parent branch ID
+- `parent_lsn`: Parent LSN
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
+- `logical_size`: Logical size in MB
+- `physical_size`: Physical size in MB
 
 **Actions:**
 - `getBranch`: Get current branch info
@@ -108,35 +108,35 @@ Manages compute resources for a Neon branch. A compute is required to connect to
 dev-compute:
   defines: neon/compute
   secret_ref: neon-api-key
-  projectId: project-id-123456
-  branchId: branch-id-123456
+  project_id: project-id-123456
+  branch_id: branch-id-123456
   type: read_write
-  minCu: 1
-  maxCu: 2
-  poolerEnabled: true
+  min_cu: 1
+  max_cu: 2
+  pooler_enabled: true
   permitted-secrets:
     neon-api-key: true
 ```
 
 **Configuration:**
 - `secret_ref`: Secret name containing the Neon API key
-- `projectId`: Project ID this compute belongs to
-- `branchId`: Branch ID this compute belongs to
+- `project_id`: Project ID this compute belongs to
+- `branch_id`: Branch ID this compute belongs to
 - `type`: (optional) Compute type - "read_write" or "read_only", defaults to "read_write"
-- `minCu`: (optional) Minimum compute units for autoscaling, defaults to 1
-- `maxCu`: (optional) Maximum compute units for autoscaling, defaults to 1
-- `poolerEnabled`: (optional) Enable connection pooling, defaults to false
-- `poolerMode`: (optional) Pooler mode - "transaction" or "session", defaults to "transaction"
+- `min_cu`: (optional) Minimum compute units for autoscaling, defaults to 1
+- `max_cu`: (optional) Maximum compute units for autoscaling, defaults to 1
+- `pooler_enabled`: (optional) Enable connection pooling, defaults to false
+- `pooler_mode`: (optional) Pooler mode - "transaction" or "session", defaults to "transaction"
 
 **State:**
 - `id`: Compute ID
 - `host`: Compute hostname for connections
-- `proxyHost`: Proxy hostname for connections
-- `currentState`: Current compute state
-- `pendingState`: Pending state if transitioning
-- `createdAt`: Creation timestamp
-- `updatedAt`: Last update timestamp
-- `lastActive`: Last active timestamp
+- `proxy_host`: Proxy hostname for connections
+- `current_state`: Current compute state
+- `pending_state`: Pending state if transitioning
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
+- `last_active`: Last active timestamp
 - `disabled`: Whether compute is disabled
 
 **Actions:**
@@ -151,27 +151,27 @@ Manages database roles within a Neon branch.
 app-user:
   defines: neon/role
   secret_ref: neon-api-key
-  projectId: project-id-123456
-  branchId: branch-id-123456
+  project_id: project-id-123456
+  branch_id: branch-id-123456
   name: app_user
-  canLogin: true
+  can_login: true
   permitted-secrets:
     neon-api-key: true
 ```
 
 **Configuration:**
 - `secret_ref`: Secret name containing the Neon API key
-- `projectId`: Project ID this role belongs to
-- `branchId`: Branch ID this role belongs to
+- `project_id`: Project ID this role belongs to
+- `branch_id`: Branch ID this role belongs to
 - `name`: Role name
-- `canLogin`: (optional) Whether the role can login, defaults to true
+- `can_login`: (optional) Whether the role can login, defaults to true
 
 **State:**
 - `name`: Role name
 - `password`: Generated password
 - `protected`: Whether role is protected
-- `createdAt`: Creation timestamp
-- `updatedAt`: Last update timestamp
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
 
 **Actions:**
 - `resetPassword`: Reset the role's password
@@ -197,7 +197,7 @@ my-neon-project:
 dev-branch:
   defines: neon/branch
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
   name: dev
   permitted-secrets:
     neon-api-key: true
@@ -217,12 +217,12 @@ dev-branch:
 dev-compute:
   defines: neon/compute
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
-  branchId: <- connection-target("branch") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
+  branch_id: <- connection-target("branch") entity-state get-member("id")
   type: read_write
-  minCu: 1
-  maxCu: 2
-  poolerEnabled: true
+  min_cu: 1
+  max_cu: 2
+  pooler_enabled: true
   permitted-secrets:
     neon-api-key: true
   services:
@@ -245,8 +245,8 @@ dev-compute:
 app-user:
   defines: neon/role
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
-  branchId: <- connection-target("branch") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
+  branch_id: <- connection-target("branch") entity-state get-member("id")
   name: app_user
   permitted-secrets:
     neon-api-key: true

@@ -104,12 +104,7 @@ export abstract class AWSDynamoDBEntity<
                 }
 
                 if (attempt < maxAttempts) {
-                    // Implement proper delay using busy wait like other entities
-                    const delayMs = delaySeconds * 1000;
-                    const start = Date.now();
-                    while (Date.now() - start < delayMs) {
-                        // Busy wait
-                    }
+                    sleep(delaySeconds * 1000);
                 }
             } catch (error) {
                 if (error instanceof Error && error.message.includes("ResourceNotFoundException")) {

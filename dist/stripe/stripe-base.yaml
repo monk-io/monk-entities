@@ -1,7 +1,0 @@
-namespace: stripe
-
-stripe-base:
-  defines: module
-  metadata:
-    version-hash: c326f768f517
-  source: <<< stripe-base.js

@@ -1,7 +1,0 @@
-namespace: aws-s3
-
-common:
-  defines: module
-  metadata:
-    version-hash: 3bd4cf1a41ec
-  source: <<< common.js

@@ -808,10 +808,7 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
         
         while (jobStatus.status?.state !== 'DONE' && attempts < maxAttempts) {
           // Wait 2 seconds between checks
-          const start = Date.now();
-          while (Date.now() - start < 2000) {
-            // busy wait
-          }
+          sleep(2000);
           
           jobStatus = this.get(`${this.apiUrl}/jobs/${jobId}`);
           attempts++;
@@ -1133,10 +1130,7 @@ export class BigQuery extends GcpEntity<BigQueryDefinition, BigQueryState> {
         
         while (jobStatus.status?.state !== 'DONE' && attempts < maxAttempts) {
           // Wait 2 seconds between checks
-          const start = Date.now();
-          while (Date.now() - start < 2000) {
-            // busy wait
-          }
+          sleep(2000);
           
           jobStatus = this.get(`${this.apiUrl}/jobs/${jobId}`);
           attempts++;

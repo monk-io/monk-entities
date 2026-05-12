@@ -291,14 +291,9 @@ export abstract class RedisCloudEntity<
             }
 
             // Wait before next check
-            const currentTime = Date.now();
-            const elapsed = currentTime - startTime;
+            const elapsed = Date.now() - startTime;
             if (elapsed + DEFAULT_POLLING_INTERVAL < timeout) {
-                // Simple delay implementation
-                const endTime = currentTime + DEFAULT_POLLING_INTERVAL;
-                while (Date.now() < endTime) {
-                    // Busy wait - not ideal but works in this environment
-                }
+                sleep(DEFAULT_POLLING_INTERVAL);
             } else {
                 break;
             }

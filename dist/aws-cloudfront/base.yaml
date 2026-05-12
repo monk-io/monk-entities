@@ -1,7 +1,0 @@
-namespace: aws-cloudfront
-
-base:
-  defines: module
-  metadata:
-    version-hash: f0c2778826f1
-  source: <<< base.js

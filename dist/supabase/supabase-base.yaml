@@ -1,7 +1,0 @@
-namespace: supabase
-
-supabase-base:
-  defines: module
-  metadata:
-    version-hash: db65b125f79b
-  source: <<< supabase-base.js

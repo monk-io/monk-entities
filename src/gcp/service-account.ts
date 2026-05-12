@@ -310,8 +310,7 @@ export class ServiceAccount extends GcpEntity<ServiceAccountDefinition, ServiceA
                 cli.output(
                     `setIamPolicy attempt ${attempt}/${maxAttempts} hit propagation race, retrying in ${backoffMs / 1000}s...`,
                 );
-                const until = Date.now() + backoffMs;
-                while (Date.now() < until) { /* busy wait — entity runtime lacks setTimeout */ }
+                sleep(backoffMs);
             }
         }
     }

@@ -1,7 +1,0 @@
-namespace: aws-sqs
-
-common:
-  defines: module
-  metadata:
-    version-hash: 33b2a7968a99
-  source: <<< common.js

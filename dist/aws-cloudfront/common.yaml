@@ -1,7 +1,0 @@
-namespace: aws-cloudfront
-
-common:
-  defines: module
-  metadata:
-    version-hash: 81d5872b9074
-  source: <<< common.js

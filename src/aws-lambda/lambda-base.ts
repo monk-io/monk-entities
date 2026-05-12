@@ -339,10 +339,7 @@ export abstract class AWSLambdaEntity<
                 }
 
                 // Wait 5 seconds before next attempt
-                const start = Date.now();
-                while (Date.now() - start < 5000) {
-                    // Simple busy wait since we don't have a proper sleep function
-                }
+                sleep(5000);
             } catch (error) {
                 if (attempt === maxAttempts - 1) {
                     throw error;

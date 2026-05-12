@@ -100,22 +100,37 @@ export abstract class NeonEntity<
         try {
             const fullUrl = `${this.baseUrl}${path}`;
             cli.output(`🔧 Making ${method} request to: ${fullUrl}`);
-            
+
             if (body) {
                 cli.output(`📦 Request body: ${JSON.stringify(body, null, 2)}`);
             }
 
-            const response = this.httpClient.request(method as any, path, { 
-                body,
-                headers: {
-                    "Authorization": `Bearer ${this.apiKey}`,
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
+            const maxLockedAttempts = 10;
+            const lockedDelayMs = 5000;
+            let lockedAttempts = 0;
+            let response: any;
+
+            while (true) {
+                response = this.httpClient.request(method as any, path, {
+                    body,
+                    headers: {
+                        "Authorization": `Bearer ${this.apiKey}`,
+                        "Accept": "application/json",
+                        "Content-Type": "application/json",
+                    }
+                });
+
+                cli.output(`📡 Response status: ${response.statusCode}`);
+
+                if (response.statusCode !== 423 || lockedAttempts >= maxLockedAttempts) {
+                    break;
                 }
-            });
-            
-            cli.output(`📡 Response status: ${response.statusCode}`);
-            
+
+                lockedAttempts++;
+                cli.output(`🔒 Neon returned 423 (conflicting operations in progress); retrying ${lockedAttempts}/${maxLockedAttempts} in ${lockedDelayMs / 1000}s...`);
+                sleep(lockedDelayMs);
+            }
+
             if (!response.ok) {
                 cli.output(`❌ Error response body: ${response.data}`);
                 throw new Error(`Neon API error: ${response.statusCode} ${response.status} - ${response.data}`);
@@ -173,18 +188,18 @@ export abstract class NeonEntity<
     /**
      * Helper method to wait for operations to complete
      */
-    protected waitForOperation(projectId: string, operationId: string, maxAttempts: number = 40, delayMs: number = 2000): void {
-        if (!operationId) return;
+    protected waitForOperation(project_id: string, operation_id: string, maxAttempts: number = 40, delayMs: number = 2000): void {
+        if (!operation_id) return;
 
         let attempts = 0;
 
         while (attempts < maxAttempts) {
             try {
-                const operationData = this.makeRequest("GET", `/projects/${projectId}/operations/${operationId}`);
+                const operationData = this.makeRequest("GET", `/projects/${project_id}/operations/${operation_id}`);
                 
                 if (operationData.operation) {
                     if (operationData.operation.status === "finished" || operationData.operation.status === "completed") {
-                        cli.output(`✅ Operation ${operationId} completed successfully`);
+                        cli.output(`✅ Operation ${operation_id} completed successfully`);
                         return;
                     }
                     
@@ -198,28 +213,24 @@ export abstract class NeonEntity<
 
             attempts++;
             if (attempts < maxAttempts) {
-                cli.output(`⏳ Waiting for operation ${operationId} to complete... (attempt ${attempts}/${maxAttempts})`);
-                // Simple delay
-                const start = Date.now();
-                while (Date.now() - start < delayMs) {
-                    // Busy wait
-                }
+                cli.output(`⏳ Waiting for operation ${operation_id} to complete... (attempt ${attempts}/${maxAttempts})`);
+                sleep(delayMs);
             }
         }
 
-        throw new Error(`Operation ${operationId} did not complete within ${maxAttempts * delayMs / 1000} seconds`);
+        throw new Error(`Operation ${operation_id} did not complete within ${maxAttempts * delayMs / 1000} seconds`);
     }
 
     /**
      * Helper method to wait for multiple operations to complete
      */
-    protected waitForOperations(projectId: string, operationIds: string[], maxAttempts: number = 40, delayMs: number = 2000): void {
-        if (!operationIds || operationIds.length === 0) return;
+    protected waitForOperations(project_id: string, operation_ids: string[], maxAttempts: number = 40, delayMs: number = 2000): void {
+        if (!operation_ids || operation_ids.length === 0) return;
 
-        cli.output(`⏳ Waiting for ${operationIds.length} operations to complete...`);
+        cli.output(`⏳ Waiting for ${operation_ids.length} operations to complete...`);
         
-        for (const operationId of operationIds) {
-            this.waitForOperation(projectId, operationId, maxAttempts, delayMs);
+        for (const operation_id of operation_ids) {
+            this.waitForOperation(project_id, operation_id, maxAttempts, delayMs);
         }
     }
 

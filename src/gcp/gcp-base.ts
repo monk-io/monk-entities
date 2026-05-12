@@ -263,11 +263,7 @@ export abstract class GcpEntity<
 
             attempts++;
             if (attempts < maxAttempts) {
-                // Simple delay using busy wait (Goja doesn't have setTimeout)
-                const start = Date.now();
-                while (Date.now() - start < delayMs) {
-                    // Busy wait
-                }
+                sleep(delayMs);
             }
         }
 

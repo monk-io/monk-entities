@@ -11,48 +11,48 @@ export interface NeonComputeDefinition extends NeonEntityDefinition {
      * Project ID that this compute belongs to
      * @description The Neon project ID (format: project-name-123456)
      */
-    projectId: string;
+    project_id: string;
 
     /**
      * Branch ID that this compute belongs to
      * @description The Neon branch ID (format: br-name-123456)
      */
-    branchId: string;
+    branch_id: string;
 
     /**
      * Type of compute
      * @description Whether this is a read-write or read-only compute
      * @default read_write
      */
-    computeType?: "read_write" | "read_only";
+    compute_type?: "read_write" | "read_only";
 
     /**
      * Minimum compute size in vCPUs
      * @description Minimum compute units for autoscaling
      * @default 1
      */
-    minCu?: number;
+    min_cu?: number;
 
     /**
      * Maximum compute size in vCPUs
      * @description Maximum compute units for autoscaling
      * @default 1
      */
-    maxCu?: number;
+    max_cu?: number;
 
     /**
      * Whether to enable connection pooling
      * @description Enable connection pooler for the compute
      * @default false
      */
-    poolerEnabled?: boolean;
+    pooler_enabled?: boolean;
 
     /**
      * Connection pooler mode
      * @description Mode for the connection pooler
      * @default transaction
      */
-    poolerMode?: "transaction" | "session";
+    pooler_mode?: "transaction" | "session";
 }
 
 /**
@@ -76,40 +76,40 @@ export interface NeonComputeState extends NeonEntityState {
      * Proxy hostname
      * @description Proxy hostname for connecting to the compute
      */
-    proxyHost?: string;
+    proxy_host?: string;
 
     /**
      * Current state
      * @description Current state of the compute (active, idle, etc)
      */
-    currentState?: string;
+    current_state?: string;
 
     /**
      * Pending state
      * @description Pending state if compute is transitioning
      */
-    pendingState?: string;
+    pending_state?: string;
 
     /**
      * Creation timestamp
      * @description When the compute was created
      * @format date-time
      */
-    createdAt?: string;
+    created_at?: string;
 
     /**
      * Last update timestamp
      * @description When the compute was last updated
      * @format date-time
      */
-    updatedAt?: string;
+    updated_at?: string;
 
     /**
      * Last active timestamp
      * @description When the compute was last active
      * @format date-time
      */
-    lastActive?: string;
+    last_active?: string;
 
     /**
      * Whether compute is disabled
@@ -121,7 +121,7 @@ export interface NeonComputeState extends NeonEntityState {
      * Operation ID for tracking compute creation
      * @description ID of the operation that created the compute
      */
-    operationId?: string;
+    operation_id?: string;
 }
 
 /**
@@ -146,17 +146,17 @@ export interface NeonComputeState extends NeonEntityState {
 export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState> {
     
     protected getEntityName(): string {
-        return `Neon Compute for branch ${this.definition.branchId} in project ${this.definition.projectId}`;
+        return `Neon Compute for branch ${this.definition.branch_id} in project ${this.definition.project_id}`;
     }
 
     private findExistingEndpoint(): any {
         try {
-            const endpointsResponse = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints`);
+            const endpointsResponse = this.makeRequest("GET", `/projects/${this.definition.project_id}/endpoints`);
             
             if (endpointsResponse.endpoints && endpointsResponse.endpoints.length > 0) {
                 return endpointsResponse.endpoints.find((endpoint: any) => 
-                    endpoint.branch_id === this.definition.branchId && 
-                    endpoint.type === (this.definition.computeType || "read_write")
+                    endpoint.branch_id === this.definition.branch_id && 
+                    endpoint.type === (this.definition.compute_type || "read_write")
                 );
             }
             return null;
@@ -173,29 +173,29 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
             this.state.existing = true;
             this.state.id = existingEndpoint.id;
             this.state.host = existingEndpoint.host;
-            this.state.currentState = existingEndpoint.current_state;
+            this.state.current_state = existingEndpoint.current_state;
             this.state.disabled = existingEndpoint.disabled;
-            this.state.createdAt = existingEndpoint.created_at;
-            this.state.updatedAt = existingEndpoint.updated_at;
-            this.state.proxyHost = existingEndpoint.proxy_host;
-            this.state.lastActive = existingEndpoint.last_active;
-            this.state.pendingState = existingEndpoint.pending_state;
-            cli.output(`✅ Using existing endpoint: ${existingEndpoint.id} for branch ${this.definition.branchId}`);
+            this.state.created_at = existingEndpoint.created_at;
+            this.state.updated_at = existingEndpoint.updated_at;
+            this.state.proxy_host = existingEndpoint.proxy_host;
+            this.state.last_active = existingEndpoint.last_active;
+            this.state.pending_state = existingEndpoint.pending_state;
+            cli.output(`✅ Using existing endpoint: ${existingEndpoint.id} for branch ${this.definition.branch_id}`);
             return;
         }
 
         const endpointData = {
             endpoint: {
-                type: this.definition.computeType || "read_write",
-                branch_id: this.definition.branchId,
+                type: this.definition.compute_type || "read_write",
+                branch_id: this.definition.branch_id,
                 settings: {
                     compute: {
-                        min_cu: this.definition.minCu || 1,
-                        max_cu: this.definition.maxCu || 1
+                        min_cu: this.definition.min_cu || 1,
+                        max_cu: this.definition.max_cu || 1
                     },
                     pooler: {
-                        enabled: this.definition.poolerEnabled || false,
-                        mode: this.definition.poolerMode || "transaction"
+                        enabled: this.definition.pooler_enabled || false,
+                        mode: this.definition.pooler_mode || "transaction"
                     }
                 }
             }
@@ -203,27 +203,27 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
 
         const response = this.makeRequest(
             "POST",
-            `/projects/${this.definition.projectId}/endpoints`,
+            `/projects/${this.definition.project_id}/endpoints`,
             endpointData
         );
 
         const endpoint = response.endpoint;
         this.state.id = endpoint.id;
         this.state.host = endpoint.host;
-        this.state.currentState = endpoint.current_state;
+        this.state.current_state = endpoint.current_state;
         this.state.disabled = endpoint.disabled;
-        this.state.createdAt = endpoint.created_at;
-        this.state.updatedAt = endpoint.updated_at;
-        this.state.proxyHost = endpoint.proxy_host;
-        this.state.lastActive = endpoint.last_active;
-        this.state.pendingState = endpoint.pending_state;
-        this.state.operationId = response.operations?.[0]?.id;
+        this.state.created_at = endpoint.created_at;
+        this.state.updated_at = endpoint.updated_at;
+        this.state.proxy_host = endpoint.proxy_host;
+        this.state.last_active = endpoint.last_active;
+        this.state.pending_state = endpoint.pending_state;
+        this.state.operation_id = response.operations?.[0]?.id;
     }
 
     override start(): void {
         // Wait for compute operations to complete
-        if (this.state.operationId) {
-            this.waitForOperation(this.definition.projectId, this.state.operationId);
+        if (this.state.operation_id) {
+            this.waitForOperation(this.definition.project_id, this.state.operation_id);
         }
     }
 
@@ -237,14 +237,14 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
         
         const response = this.makeRequest(
             "POST",
-            `/projects/${this.definition.projectId}/endpoints/${this.state.id}/restart`
+            `/projects/${this.definition.project_id}/endpoints/${this.state.id}/restart`
         );
 
         cli.output(`✅ Compute restart initiated`);
         
         // Update operation ID if provided
         if (response.operations && response.operations.length > 0) {
-            this.state.operationId = response.operations[0].id;
+            this.state.operation_id = response.operations[0].id;
         }
     }
 
@@ -254,7 +254,7 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
             throw new Error("Compute ID not available");
         }
 
-        const endpoint = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints/${this.state.id}`);
+        const endpoint = this.makeRequest("GET", `/projects/${this.definition.project_id}/endpoints/${this.state.id}`);
         cli.output(`Compute: ${JSON.stringify(endpoint, null, 2)}`);
     }
 
@@ -264,7 +264,7 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
             return;
         }
 
-        this.deleteResource(`/projects/${this.definition.projectId}/endpoints/${this.state.id}`, `Compute ${this.state.id}`);
+        this.deleteResource(`/projects/${this.definition.project_id}/endpoints/${this.state.id}`, `Compute ${this.state.id}`);
     }
 
     override checkReadiness(): boolean {
@@ -274,7 +274,7 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
 
         // Check if compute is ready by getting its current status
         try {
-            const endpoint = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints/${this.state.id}`);
+            const endpoint = this.makeRequest("GET", `/projects/${this.definition.project_id}/endpoints/${this.state.id}`);
             const isReady = endpoint.endpoint && endpoint.endpoint.current_state === "active";
             
             if (isReady) {
@@ -295,7 +295,7 @@ export class Compute extends NeonEntity<NeonComputeDefinition, NeonComputeState>
             throw new Error("Compute ID not available");
         }
         try {
-            const endpoint = this.makeRequest("GET", `/projects/${this.definition.projectId}/endpoints/${this.state.id}`);
+            const endpoint = this.makeRequest("GET", `/projects/${this.definition.project_id}/endpoints/${this.state.id}`);
             const state = endpoint.endpoint?.current_state as string | undefined;
             if (state === "active" || state === "idle") {
                 return true;
