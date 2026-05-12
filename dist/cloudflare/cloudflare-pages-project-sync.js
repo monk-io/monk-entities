@@ -48,14 +48,14 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// ../monk-entities/src/cloudflare/workersScript.ts
+// ../monk-entities/src/cloudflare/pagesProject.ts
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
 const cloudflareBase = require("cloudflare/cloudflare-base");
 const CloudflareEntity = cloudflareBase.CloudflareEntity;
-var _forceDelete_dec, _getInfo_dec, _a, _init;
-var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = CloudflareEntity, _getInfo_dec = [action("get-info")], _forceDelete_dec = [action("force-delete")], _a) {
+var _forceDelete_dec, _listDeployments_dec, _getInfo_dec, _a, _init;
+var _CloudflarePagesProject = class _CloudflarePagesProject extends (_a = CloudflareEntity, _getInfo_dec = [action("get-info")], _listDeployments_dec = [action("list-deployments")], _forceDelete_dec = [action("force-delete")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -63,183 +63,183 @@ var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = Clou
   create() {
     const accountId = this.definition.account_id;
     const name = this.definition.name;
-    const existing = this.fetchScript(accountId, name);
+    const existing = this.fetchProject(accountId, name);
     if (existing) {
       this.state = {
         id: name,
+        subdomain: existing.subdomain,
+        production_branch: existing.production_branch,
         created_on: existing.created_on,
-        modified_on: existing.modified_on,
-        etag: existing.etag,
+        domains: existing.domains || [],
+        latest_deployment_id: existing.latest_deployment?.id,
         existing: true
       };
-      cli.output(`\u{1F4DC} Adopted existing Worker script ${name}`);
+      cli.output(`\u{1F4C4} Adopted existing Pages project ${name}`);
+      this.applyEnvVars();
       return;
     }
-    const meta = this.uploadStub(accountId, name);
+    const body = {
+      name,
+      production_branch: this.definition.production_branch || "main"
+    };
+    const created = this.request(
+      "POST",
+      `/accounts/${accountId}/pages/projects`,
+      body
+    );
+    const result = created?.result || {};
     this.state = {
       id: name,
-      created_on: meta?.created_on,
-      modified_on: meta?.modified_on,
-      etag: meta?.etag,
+      subdomain: result.subdomain,
+      production_branch: result.production_branch || body.production_branch,
+      created_on: result.created_on,
+      domains: result.domains || [],
+      latest_deployment_id: result.latest_deployment?.id,
       existing: false
     };
-    cli.output(`\u2705 Created Worker script ${name} (stub; deploy code via cloudflare/wrangler-deploy)`);
+    cli.output(`\u2705 Created Pages project ${name} (${this.state.subdomain || ""})`);
+    this.applyEnvVars();
   }
   update() {
     if (!this.state.id) {
       this.create();
       return;
     }
-    const meta = this.fetchScript(this.definition.account_id, this.state.id);
+    this.applyEnvVars();
+    const accountId = this.definition.account_id;
+    const meta = this.fetchProject(accountId, this.state.id);
     if (meta) {
-      this.state.modified_on = meta.modified_on || this.state.modified_on;
-      this.state.etag = meta.etag || this.state.etag;
+      this.state.subdomain = meta.subdomain || this.state.subdomain;
+      this.state.production_branch = meta.production_branch || this.state.production_branch;
+      this.state.domains = meta.domains || this.state.domains;
+      this.state.latest_deployment_id = meta.latest_deployment?.id || this.state.latest_deployment_id;
     }
   }
   delete() {
     if (!this.state.id) return;
     if (this.state.existing) {
-      cli.output("Script existed before this entity; skipping delete");
+      cli.output("Pages project existed before this entity; skipping delete");
       return;
     }
     if (!this.definition.allow_destructive_delete) {
       cli.output(
-        `Worker script ${this.state.id} delete is disabled. Set allow_destructive_delete: true or invoke the force-delete action to remove it.`
+        `Pages project ${this.state.id} delete is disabled. Set allow_destructive_delete: true or invoke the force-delete action to remove it.`
       );
       return;
     }
-    this.destroyScript();
+    this.destroyProject();
   }
   checkReadiness() {
     return Boolean(this.state.id);
   }
   getInfo() {
     if (!this.state.id) {
-      cli.output("No script yet");
+      cli.output("No Pages project yet");
       return;
     }
-    const meta = this.fetchScript(this.definition.account_id, this.state.id);
+    const accountId = this.definition.account_id;
+    const meta = this.fetchProject(accountId, this.state.id);
     cli.output(JSON.stringify(meta || {}, null, 2));
+  }
+  listDeployments() {
+    if (!this.state.id) {
+      cli.output("No Pages project yet");
+      return;
+    }
+    const accountId = this.definition.account_id;
+    const res = this.request(
+      "GET",
+      `/accounts/${accountId}/pages/projects/${this.state.id}/deployments`
+    );
+    const deployments = res?.result || [];
+    cli.output(`\u{1F4E6} ${deployments.length} deployment(s)`);
+    for (const d of deployments.slice(0, 20)) {
+      const stage = d?.latest_stage?.name || "?";
+      const status = d?.latest_stage?.status || "?";
+      cli.output(`  - ${d.id} env=${d.environment} stage=${stage} status=${status} url=${d.url || ""}`);
+    }
   }
   forceDelete() {
     if (!this.state.id) {
-      cli.output("No script to delete");
+      cli.output("No Pages project to delete");
       return;
     }
     if (this.state.existing) {
       cli.output(
-        `Refusing force-delete: script ${this.state.id} pre-existed and was adopted. Delete manually if intentional.`
+        `Refusing force-delete: Pages project ${this.state.id} pre-existed and was adopted. Delete manually if intentional.`
       );
       return;
     }
-    this.destroyScript();
+    this.destroyProject();
   }
-  destroyScript() {
+  applyEnvVars() {
+    const prod = this.definition.production_env_vars;
+    const preview = this.definition.preview_env_vars;
+    if (!prod && !preview) return;
+    if (!this.state.id) return;
+    const accountId = this.definition.account_id;
+    const envObj = /* @__PURE__ */ __name((vars) => {
+      if (!vars) return void 0;
+      const out = {};
+      for (const k of Object.keys(vars)) out[k] = { value: vars[k] };
+      return out;
+    }, "envObj");
+    const deploymentConfigs = {};
+    const prodEnv = envObj(prod);
+    const previewEnv = envObj(preview);
+    if (prodEnv) deploymentConfigs.production = { env_vars: prodEnv };
+    if (previewEnv) deploymentConfigs.preview = { env_vars: previewEnv };
+    try {
+      this.request(
+        "PATCH",
+        `/accounts/${accountId}/pages/projects/${this.state.id}`,
+        { deployment_configs: deploymentConfigs }
+      );
+    } catch (e) {
+      cli.output(`Pages project env-var PATCH failed: ${e?.message || e}`);
+    }
+  }
+  destroyProject() {
     const accountId = this.definition.account_id;
     try {
-      this.request("DELETE", `/accounts/${accountId}/workers/scripts/${this.state.id}`);
-      cli.output(`\u{1F5D1}\uFE0F Deleted Worker script ${this.state.id}`);
+      this.request(
+        "DELETE",
+        `/accounts/${accountId}/pages/projects/${this.state.id}`
+      );
+      cli.output(`\u{1F5D1}\uFE0F Deleted Pages project ${this.state.id}`);
     } catch (e) {
       const msg = e?.message || String(e);
-      if (msg.includes("404") || msg.includes("10007")) {
-        cli.output(`Worker script ${this.state.id} already gone`);
-        return;
-      }
-      if (msg.includes("10064")) {
-        cli.output(
-          `Worker script ${this.state.id} still bound as a queue consumer; remove the consumer first. Skipping script delete.`
-        );
+      if (msg.includes("404") || msg.includes("8000007")) {
+        cli.output(`Pages project ${this.state.id} already gone`);
         return;
       }
       throw e;
     }
   }
-  fetchScript(accountId, name) {
-    try {
-      this.request("GET", `/accounts/${accountId}/workers/scripts/${name}`);
-      const meta = this.tryFetchScriptMeta(accountId, name);
-      return meta || { id: name };
-    } catch {
-      return null;
-    }
-  }
-  tryFetchScriptMeta(accountId, name) {
+  fetchProject(accountId, name) {
     try {
       const res = this.request(
         "GET",
-        `/accounts/${accountId}/workers/scripts/${name}/settings`
+        `/accounts/${accountId}/pages/projects/${name}`
       );
       return res?.result || null;
     } catch {
       return null;
     }
   }
-  /**
-   * Upload a minimal stub Worker via the multipart script-upload endpoint.
-   * This reserves the script name as a real CF resource so dependent
-   * entities (routes, queue consumers, cron triggers) can wire to it.
-   * The body is overwritten on the first `wrangler deploy`.
-   *
-   * Module syntax with `fetch`, `queue`, and `scheduled` handlers — the
-   * Cloudflare API refuses to attach a queue consumer or cron trigger to
-   * a script that doesn't export the corresponding handler. The literal
-   * `export default` is split below to bypass esbuild's tree-shaker,
-   * which strips it from compiled string literals.
-   */
-  uploadStub(accountId, name) {
-    const exp = "export default";
-    const stub = `${exp} {
-  async fetch() { return new Response("monk: pending wrangler-deploy", { status: 503 }); },
-  async queue() { /* monk stub: drops messages until wrangler deploys real handler */ },
-  async scheduled() { /* monk stub: no-op cron handler */ }
-};
-`;
-    const metadata = {
-      main_module: "script.js",
-      compatibility_date: this.definition.compatibility_date || "2025-04-01"
-    };
-    const boundary = "----monk" + Math.random().toString(36).slice(2);
-    const body = `--${boundary}\r
-Content-Disposition: form-data; name="metadata"\r
-Content-Type: application/json\r
-\r
-${JSON.stringify(metadata)}\r
---${boundary}\r
-Content-Disposition: form-data; name="script.js"; filename="script.js"\r
-Content-Type: application/javascript+module\r
-\r
-${stub}\r
---${boundary}--\r
-`;
-    const res = this.http.request(
-      "PUT",
-      `/accounts/${accountId}/workers/scripts/${name}`,
-      {
-        body,
-        headers: {
-          "Content-Type": `multipart/form-data; boundary=${boundary}`
-        }
-      }
-    );
-    if (!res.ok) {
-      throw new Error(
-        `Worker script stub upload failed: ${res.statusCode} ${res.status} - ${typeof res.data === "string" ? res.data : JSON.stringify(res.data)}`
-      );
-    }
-    return res.data?.result || null;
-  }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudflareWorkersScript);
-__decorateElement(_init, 1, "forceDelete", _forceDelete_dec, _CloudflareWorkersScript);
-__decoratorMetadata(_init, _CloudflareWorkersScript);
-__name(_CloudflareWorkersScript, "CloudflareWorkersScript");
-_CloudflareWorkersScript.readiness = { period: 5, initialDelay: 1, attempts: 6 };
-var CloudflareWorkersScript = _CloudflareWorkersScript;
+__decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudflarePagesProject);
+__decorateElement(_init, 1, "listDeployments", _listDeployments_dec, _CloudflarePagesProject);
+__decorateElement(_init, 1, "forceDelete", _forceDelete_dec, _CloudflarePagesProject);
+__decoratorMetadata(_init, _CloudflarePagesProject);
+__name(_CloudflarePagesProject, "CloudflarePagesProject");
+_CloudflarePagesProject.readiness = { period: 5, initialDelay: 1, attempts: 6 };
+var CloudflarePagesProject = _CloudflarePagesProject;
 
 
 
 function main(def, state, ctx) {
-  const entity = new CloudflareWorkersScript(def, state, ctx);
+  const entity = new CloudflarePagesProject(def, state, ctx);
   return entity.main(ctx);
 }

@@ -23,7 +23,7 @@ cloudflare-queue:
       - `pull-messages` — pull up to 25 messages and print their bodies
       - `drain-messages` — pull-and-ack all messages until empty (test cleanup helper)
       - `force-delete` — explicit destructive delete; refuses adopted queues
-    version-hash: c80ea9e6bbbb
+    version-hash: fbd989232548
   schema:
     secret_ref:
       type: string

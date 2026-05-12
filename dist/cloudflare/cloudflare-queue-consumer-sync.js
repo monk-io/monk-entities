@@ -42,14 +42,13 @@ var __decorateElement = (array, flags, name, decorators, target, extra) => {
   }
   return k || __decoratorMetadata(array, target), desc && __defProp(target, name, desc), p ? k ^ 4 ? extra : desc : target;
 };
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
 var __privateIn = (member, obj) => Object(obj) !== obj ? __typeError('Cannot use the "in" operator on this value') : member.has(obj);
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// input/cloudflare/queueConsumer.ts
+// ../monk-entities/src/cloudflare/queueConsumer.ts
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
@@ -210,7 +209,7 @@ __decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudflareQueueConsumer);
 __decorateElement(_init, 1, "listConsumers", _listConsumers_dec, _CloudflareQueueConsumer);
 __decoratorMetadata(_init, _CloudflareQueueConsumer);
 __name(_CloudflareQueueConsumer, "CloudflareQueueConsumer");
-__publicField(_CloudflareQueueConsumer, "readiness", { period: 5, initialDelay: 1, attempts: 6 });
+_CloudflareQueueConsumer.readiness = { period: 5, initialDelay: 1, attempts: 6 };
 var CloudflareQueueConsumer = _CloudflareQueueConsumer;
 
 

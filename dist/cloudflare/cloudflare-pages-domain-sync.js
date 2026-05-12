@@ -48,139 +48,155 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// ../monk-entities/src/cloudflare/workersCronTrigger.ts
+// ../monk-entities/src/cloudflare/pagesDomain.ts
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
 const cloudflareBase = require("cloudflare/cloudflare-base");
 const CloudflareEntity = cloudflareBase.CloudflareEntity;
-var _apply_dec, _getSchedulesAction_dec, _a, _init;
-var _CloudflareWorkersCronTrigger = class _CloudflareWorkersCronTrigger extends (_a = CloudflareEntity, _getSchedulesAction_dec = [action("get-schedules")], _apply_dec = [action("apply")], _a) {
+var _forceDelete_dec, _retryValidation_dec, _getInfo_dec, _a, _init;
+var _CloudflarePagesDomain = class _CloudflarePagesDomain extends (_a = CloudflareEntity, _getInfo_dec = [action("get-info")], _retryValidation_dec = [action("retry-validation")], _forceDelete_dec = [action("force-delete")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
   }
   create() {
-    const accountId = this.definition.account_id;
-    const scriptName = this.definition.script_name;
-    const desired = (this.definition.crons || []).slice();
-    const current = this.getSchedules(accountId, scriptName);
-    const currentList = (current || []).map((s) => s.cron).filter(Boolean);
-    if (currentList.length > 0 && this.sameSet(currentList, desired)) {
+    const existing = this.fetchDomain();
+    if (existing) {
       this.state = {
-        id: `${accountId}/${scriptName}`,
-        applied_crons: currentList,
+        id: this.definition.domain,
+        status: existing.status,
+        verification_data: existing.verification_data,
+        created_on: existing.created_on,
         existing: true
       };
-      cli.output(
-        `\u23F0 Adopted existing cron schedule on ${scriptName}: [${currentList.join(", ")}]`
-      );
+      cli.output(`\u{1F310} Adopted existing Pages domain ${this.definition.domain}`);
       return;
     }
-    this.putSchedules(accountId, scriptName, desired);
+    const { account_id, project_name, domain } = this.definition;
+    const created = this.request(
+      "POST",
+      `/accounts/${account_id}/pages/projects/${project_name}/domains`,
+      { name: domain }
+    );
+    const result = created?.result || {};
     this.state = {
-      id: `${accountId}/${scriptName}`,
-      applied_crons: desired.slice(),
+      id: domain,
+      status: result.status,
+      verification_data: result.verification_data,
+      created_on: result.created_on,
       existing: false
     };
-    cli.output(
-      `\u2705 Applied ${desired.length} cron(s) on ${scriptName}: [${desired.join(", ")}]`
-    );
+    cli.output(`\u2705 Attached Pages domain ${domain} to ${project_name}`);
   }
   update() {
     if (!this.state.id) {
       this.create();
       return;
     }
-    const accountId = this.definition.account_id;
-    const scriptName = this.definition.script_name;
-    const desired = (this.definition.crons || []).slice();
-    if (this.state.applied_crons && this.sameSet(this.state.applied_crons, desired)) {
-      return;
+    const meta = this.fetchDomain();
+    if (meta) {
+      this.state.status = meta.status || this.state.status;
+      this.state.verification_data = meta.verification_data || this.state.verification_data;
     }
-    this.putSchedules(accountId, scriptName, desired);
-    this.state.applied_crons = desired.slice();
   }
   delete() {
     if (!this.state.id) return;
     if (this.state.existing) {
-      cli.output("Cron schedule existed before this entity; skipping delete");
+      cli.output("Pages domain existed before this entity; skipping delete");
       return;
     }
-    const accountId = this.definition.account_id;
-    const scriptName = this.definition.script_name;
+    if (!this.definition.allow_destructive_delete) {
+      cli.output(
+        `Pages domain ${this.state.id} delete is disabled. Set allow_destructive_delete: true or invoke the force-delete action to detach it.`
+      );
+      return;
+    }
+    this.detachDomain();
+  }
+  checkReadiness() {
+    if (!this.state.id) return false;
+    const meta = this.fetchDomain();
+    if (!meta) return false;
+    this.state.status = meta.status || this.state.status;
+    return this.state.status === "active";
+  }
+  getInfo() {
+    if (!this.state.id) {
+      cli.output("No Pages domain yet");
+      return;
+    }
+    const meta = this.fetchDomain();
+    cli.output(JSON.stringify(meta || {}, null, 2));
+  }
+  retryValidation() {
+    if (!this.state.id) {
+      cli.output("No Pages domain yet");
+      return;
+    }
+    const { account_id, project_name } = this.definition;
+    const res = this.request(
+      "PATCH",
+      `/accounts/${account_id}/pages/projects/${project_name}/domains/${this.state.id}`,
+      {}
+    );
+    cli.output(JSON.stringify(res?.result || {}, null, 2));
+  }
+  forceDelete() {
+    if (!this.state.id) {
+      cli.output("No Pages domain to delete");
+      return;
+    }
+    if (this.state.existing) {
+      cli.output(
+        `Refusing force-delete: Pages domain ${this.state.id} pre-existed and was adopted.`
+      );
+      return;
+    }
+    this.detachDomain();
+  }
+  detachDomain() {
+    const { account_id, project_name } = this.definition;
     try {
-      this.putSchedules(accountId, scriptName, []);
-      cli.output(`\u{1F5D1}\uFE0F Cleared cron schedule on ${scriptName}`);
+      this.request(
+        "DELETE",
+        `/accounts/${account_id}/pages/projects/${project_name}/domains/${this.state.id}`
+      );
+      cli.output(`\u{1F5D1}\uFE0F Detached Pages domain ${this.state.id} from ${project_name}`);
     } catch (e) {
       const msg = e?.message || String(e);
-      if (msg.includes("404") || msg.includes("10007")) {
-        cli.output(`Script ${scriptName} already gone; nothing to clear`);
+      if (msg.includes("404")) {
+        cli.output(`Pages domain ${this.state.id} already gone`);
         return;
       }
       throw e;
     }
   }
-  checkReadiness() {
-    return Boolean(this.state.id);
-  }
-  getSchedulesAction() {
-    const accountId = this.definition.account_id;
-    const scriptName = this.definition.script_name;
-    const schedules = this.getSchedules(accountId, scriptName);
-    cli.output(JSON.stringify(schedules || [], null, 2));
-  }
-  apply() {
-    const accountId = this.definition.account_id;
-    const scriptName = this.definition.script_name;
-    const desired = (this.definition.crons || []).slice();
-    this.putSchedules(accountId, scriptName, desired);
-    this.state.applied_crons = desired.slice();
-    cli.output(`\u2705 Re-applied cron schedule on ${scriptName}`);
-  }
-  getSchedules(accountId, scriptName) {
+  fetchDomain() {
+    const { account_id, project_name, domain } = this.definition;
     try {
       const res = this.request(
         "GET",
-        `/accounts/${accountId}/workers/scripts/${scriptName}/schedules`
+        `/accounts/${account_id}/pages/projects/${project_name}/domains/${domain}`
       );
-      const result = res?.result;
-      if (Array.isArray(result)) return result;
-      if (Array.isArray(result?.schedules)) return result.schedules;
-      return [];
+      return res?.result || null;
     } catch {
-      return [];
+      return null;
     }
-  }
-  putSchedules(accountId, scriptName, crons) {
-    const body = crons.map((c) => ({ cron: c }));
-    this.request(
-      "PUT",
-      `/accounts/${accountId}/workers/scripts/${scriptName}/schedules`,
-      body
-    );
-  }
-  sameSet(a, b) {
-    if (a.length !== b.length) return false;
-    const sa = [...a].sort();
-    const sb = [...b].sort();
-    for (let i = 0; i < sa.length; i++) {
-      if (sa[i] !== sb[i]) return false;
-    }
-    return true;
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 1, "getSchedulesAction", _getSchedulesAction_dec, _CloudflareWorkersCronTrigger);
-__decorateElement(_init, 1, "apply", _apply_dec, _CloudflareWorkersCronTrigger);
-__decoratorMetadata(_init, _CloudflareWorkersCronTrigger);
-__name(_CloudflareWorkersCronTrigger, "CloudflareWorkersCronTrigger");
-_CloudflareWorkersCronTrigger.readiness = { period: 5, initialDelay: 1, attempts: 6 };
-var CloudflareWorkersCronTrigger = _CloudflareWorkersCronTrigger;
+__decorateElement(_init, 1, "getInfo", _getInfo_dec, _CloudflarePagesDomain);
+__decorateElement(_init, 1, "retryValidation", _retryValidation_dec, _CloudflarePagesDomain);
+__decorateElement(_init, 1, "forceDelete", _forceDelete_dec, _CloudflarePagesDomain);
+__decoratorMetadata(_init, _CloudflarePagesDomain);
+__name(_CloudflarePagesDomain, "CloudflarePagesDomain");
+_CloudflarePagesDomain.readiness = { period: 10, initialDelay: 2, attempts: 12 };
+var CloudflarePagesDomain = _CloudflarePagesDomain;
 
 
 
 function main(def, state, ctx) {
-  const entity = new CloudflareWorkersCronTrigger(def, state, ctx);
+  const entity = new CloudflarePagesDomain(def, state, ctx);
   return entity.main(ctx);
 }

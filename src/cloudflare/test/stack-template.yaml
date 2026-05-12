@@ -195,6 +195,42 @@ consumer:
         - cloudflare-test/dlq
       timeout: 60
 
+pages-project:
+  defines: cloudflare/cloudflare-pages-project
+  account_id: <- secret("cloudflare-account-id")
+  name: monk-test-pages
+  production_branch: main
+  production_env_vars:
+    MONK_TEST: hello-from-monk
+  # Hermetic test: blow it away on teardown.
+  allow_destructive_delete: true
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+pages-domain:
+  defines: cloudflare/cloudflare-pages-domain
+  account_id: <- secret("cloudflare-account-id")
+  project_name: <- connection-target("project") entity-state get-member("id")
+  domain: pages-test.thisbetterbe.online
+  allow_destructive_delete: true
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  connections:
+    project:
+      runnable: cloudflare-test/pages-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - cloudflare-test/pages-project
+        - cloudflare-test/zone
+      timeout: 60
+
 crons:
   defines: cloudflare/cloudflare-workers-cron-trigger
   account_id: <- secret("cloudflare-account-id")
@@ -230,3 +266,5 @@ stack:
     - cloudflare-test/dlq-puller
     - cloudflare-test/consumer
     - cloudflare-test/crons
+    - cloudflare-test/pages-project
+    - cloudflare-test/pages-domain
