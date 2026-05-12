@@ -12,13 +12,13 @@ export interface NeonRoleDefinition extends NeonEntityDefinition {
      * Project ID that this role belongs to
      * @description The Neon project ID (format: project-name-123456)
      */
-    projectId: string;
+    project_id: string;
 
     /**
      * Branch ID that this role belongs to
      * @description The Neon branch ID (format: br-name-123456)
      */
-    branchId: string;
+    branch_id: string;
 
     /**
      * Role name
@@ -31,14 +31,14 @@ export interface NeonRoleDefinition extends NeonEntityDefinition {
      * @description If false, creates a NOLOGIN role for permission management
      * @default true
      */
-    canLogin?: boolean;
+    can_login?: boolean;
 
     /**
      * Secret name for storing the generated password
      * @description Name of the secret to store the role's password
      * @default app-user-password
      */
-    passwordSecretName?: string;
+    password_secret_name?: string;
 }
 
 /**
@@ -69,20 +69,20 @@ export interface NeonRoleState extends NeonEntityState {
      * @description When the role was created
      * @format date-time
      */
-    createdAt?: string;
+    created_at?: string;
 
     /**
      * Last update timestamp
      * @description When the role was last updated
      * @format date-time
      */
-    updatedAt?: string;
+    updated_at?: string;
 
     /**
      * Operation ID for tracking role creation
      * @description ID of the operation that created the role
      */
-    operationId?: string;
+    operation_id?: string;
 }
 
 /**
@@ -106,33 +106,33 @@ export interface NeonRoleState extends NeonEntityState {
 export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
     
     protected getEntityName(): string {
-        return `Neon Role ${this.definition.name} in branch ${this.definition.branchId}`;
+        return `Neon Role ${this.definition.name} in branch ${this.definition.branch_id}`;
     }
 
     /** Get password secret name */
     private getPasswordSecretName(): string {
-        return this.definition.passwordSecretName || 'app-user-password';
+        return this.definition.password_secret_name || 'app-user-password';
     }
 
     override create(): void {
         const roleData = {
             role: {
                 name: this.definition.name,
-                no_login: !this.definition.canLogin
+                no_login: !this.definition.can_login
             }
         };
 
         const response = this.makeRequest(
             "POST",
-            `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles`,
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles`,
             roleData
         );
 
         const role = response.role;
         this.state.name = role.name;
         this.state.protected = role.protected;
-        this.state.createdAt = role.created_at;
-        this.state.updatedAt = role.updated_at;
+        this.state.created_at = role.created_at;
+        this.state.updated_at = role.updated_at;
         
         if (role.password) {
             secret.set(this.getPasswordSecretName(), role.password);
@@ -140,14 +140,14 @@ export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
         
         // Extract operation ID from operations array
         if (response.operations && response.operations.length > 0) {
-            this.state.operationId = response.operations[0].id;
+            this.state.operation_id = response.operations[0].id;
         }
     }
 
     override start(): void {
         // Wait for role operations to complete
-        if (this.state.operationId) {
-            this.waitForOperation(this.definition.projectId, this.state.operationId);
+        if (this.state.operation_id) {
+            this.waitForOperation(this.definition.project_id, this.state.operation_id);
         }
     }
 
@@ -161,7 +161,7 @@ export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
 
         const response = this.makeRequest(
             "POST",
-            `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}/reset_password`
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles/${this.state.name}/reset_password`
         );
 
         if (response.role && response.role.password) {
@@ -179,7 +179,7 @@ export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
         }
 
         this.deleteResource(
-            `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}`,
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles/${this.state.name}`,
             `Role ${this.state.name}`
         );
     }
@@ -193,7 +193,7 @@ export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
         try {
             const role = this.makeRequest(
                 "GET",
-                `/projects/${this.definition.projectId}/branches/${this.definition.branchId}/roles/${this.state.name}`
+                `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles/${this.state.name}`
             );
             
             if (role.role) {

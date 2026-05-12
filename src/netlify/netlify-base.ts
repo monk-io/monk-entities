@@ -242,11 +242,7 @@ export abstract class NetlifyEntity<
 
             attempts++;
             if (attempts < maxAttempts) {
-                // Wait before next attempt
-                const start = Date.now();
-                while (Date.now() - start < delayMs) {
-                    // Busy wait
-                }
+                sleep(delayMs);
             }
         }
 

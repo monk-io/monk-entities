@@ -1,5 +1,0 @@
-namespace: aws-cognito
-
-common:
-  defines: module
-  source: <<< common.js

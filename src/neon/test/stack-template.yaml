@@ -17,7 +17,7 @@ dev-project:
 dev-branch:
   defines: neon/branch
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
   name: dev
   permitted-secrets:
     neon-api-key: true
@@ -37,11 +37,11 @@ dev-branch:
 dev-role:
   defines: neon/role
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
-  branchId: <- connection-target("branch") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
+  branch_id: <- connection-target("branch") entity-state get-member("id")
   name: app_user
-  canLogin: true
-  passwordSecretName: app-user-password
+  can_login: true
+  password_secret_name: app-user-password
   permitted-secrets:
     neon-api-key: true
     app-user-password: true
@@ -65,10 +65,10 @@ dev-role:
 dev-database:
   defines: neon/database
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
-  branchId: <- connection-target("branch") entity-state get-member("id")
+  project_id: <- connection-target("project") entity-state get-member("id")
+  branch_id: <- connection-target("branch") entity-state get-member("id")
   name: testdb
-  ownerName: <- connection-target("role") entity-state get-member("name")
+  owner_name: <- connection-target("role") entity-state get-member("name")
   permitted-secrets:
     neon-api-key: true
   services:
@@ -95,13 +95,13 @@ dev-database:
 dev-compute:
   defines: neon/compute
   secret_ref: neon-api-key
-  projectId: <- connection-target("project") entity-state get-member("id")
-  branchId: <- connection-target("branch") entity-state get-member("id")
-  computeType: "read_write"
-  minCu: 1
-  maxCu: 2
-  poolerEnabled: true
-  poolerMode: "transaction"
+  project_id: <- connection-target("project") entity-state get-member("id")
+  branch_id: <- connection-target("branch") entity-state get-member("id")
+  compute_type: "read_write"
+  min_cu: 1
+  max_cu: 2
+  pooler_enabled: true
+  pooler_mode: "transaction"
   permitted-secrets:
     neon-api-key: true
   services:

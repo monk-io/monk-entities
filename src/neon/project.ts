@@ -62,14 +62,14 @@ export interface NeonProjectState extends NeonEntityState {
      * @description When the project was created
      * @format date-time
      */
-    createdAt?: string;
+    created_at?: string;
 
     /**
      * Last update timestamp
      * @description When the project was last updated
      * @format date-time
      */
-    lastUpdated?: string;
+    last_updated?: string;
 
     /**
      * Project status
@@ -81,7 +81,7 @@ export interface NeonProjectState extends NeonEntityState {
      * Operation ID for tracking project creation
      * @description ID of the operation that created the project
      */
-    operationId?: string;
+    operation_id?: string;
 }
 
 /**
@@ -131,9 +131,9 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
             this.state.name = existingProject.name;
             this.state.status = existingProject.status;
             this.state.region = existingProject.region;
-            this.state.createdAt = existingProject.created_at;
-            this.state.lastUpdated = existingProject.updated_at;
-            this.state.operationId = undefined;
+            this.state.created_at = existingProject.created_at;
+            this.state.last_updated = existingProject.updated_at;
+            this.state.operation_id = undefined;
             cli.output(`✅ Using existing project: ${existingProject.name} (${existingProject.id})`);
             return;
         }
@@ -153,23 +153,23 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
         this.state.name = project.name;
         this.state.status = project.status;
         this.state.region = project.region;
-        this.state.createdAt = project.created_at;
-        this.state.lastUpdated = project.updated_at;
+        this.state.created_at = project.created_at;
+        this.state.last_updated = project.updated_at;
         
         // Handle operations array - check if it exists and has elements
         if (response.operations && Array.isArray(response.operations) && response.operations.length > 0) {
-            this.state.operationId = response.operations[0].id;
-            cli.output(`📋 Project creation operation ID: ${this.state.operationId}`);
+            this.state.operation_id = response.operations[0].id;
+            cli.output(`📋 Project creation operation ID: ${this.state.operation_id}`);
         } else {
             cli.output(`ℹ️ No operations returned from project creation`);
-            this.state.operationId = undefined;
+            this.state.operation_id = undefined;
         }
     }
 
     override start(): void {
         // Wait for project operations to complete
-        if (this.state.operationId) {
-            this.waitForOperation(this.state.id!, this.state.operationId);
+        if (this.state.operation_id) {
+            this.waitForOperation(this.state.id!, this.state.operation_id);
         }
     }
 
@@ -249,16 +249,16 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
         }
 
         const branchName = args?.name || `branch-${Date.now()}`;
-        const parentId = args?.parent_id;
-        const parentLsn = args?.parent_lsn;
+        const parent_id = args?.parent_id;
+        const parent_lsn = args?.parent_lsn;
 
         cli.output(`🌿 Creating branch '${branchName}' in project ${this.state.name}...`);
 
         const branchData = {
             branch: {
                 name: branchName,
-                parent_id: parentId,
-                parent_lsn: parentLsn
+                parent_id: parent_id,
+                parent_lsn: parent_lsn
             },
             endpoints: [
                 {
@@ -289,10 +289,10 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
         }
 
         // If we have an operation ID, check operation status first
-        if (this.state.operationId) {
+        if (this.state.operation_id) {
             try {
-                cli.output(`🔍 Checking project operation status for ID: ${this.state.operationId}`);
-                const operationData = this.makeRequest("GET", `/projects/${this.state.id}/operations/${this.state.operationId}`);
+                cli.output(`🔍 Checking project operation status for ID: ${this.state.operation_id}`);
+                const operationData = this.makeRequest("GET", `/projects/${this.state.id}/operations/${this.state.operation_id}`);
                 
                 cli.output(`📊 Operation response structure: ${JSON.stringify(operationData, null, 2)}`);
                 
@@ -317,7 +317,7 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
                     if (operation.status === "completed" || operation.status === "finished") {
                         cli.output(`✅ Project operation completed successfully: ${operation.status}`);
                         // Clear operation ID since it's done
-                        this.state.operationId = undefined;
+                        this.state.operation_id = undefined;
                     } else {
                         cli.output(`⚠️ Project operation in unknown state: ${operation.status}`);
                         return false;
@@ -325,12 +325,12 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
                 } else {
                     cli.output(`⚠️ No operation data found in response`);
                     // If we can't find operation data, clear the operation ID and check project directly
-                    this.state.operationId = undefined;
+                    this.state.operation_id = undefined;
                 }
             } catch (error) {
                 cli.output(`⚠️ Error checking project operation status: ${error}`);
                 // If we can't check operation status, clear operation ID and fall back to GET request
-                this.state.operationId = undefined;
+                this.state.operation_id = undefined;
             }
         } else {
             cli.output(`ℹ️ No operation ID for project, checking accessibility directly`);
@@ -347,8 +347,8 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
                 // Update state with latest data
                 this.state.name = projectData.project.name;
                 this.state.region = projectData.project.region_id;
-                this.state.createdAt = projectData.project.created_at;
-                this.state.lastUpdated = projectData.project.updated_at;
+                this.state.created_at = projectData.project.created_at;
+                this.state.last_updated = projectData.project.updated_at;
                 this.state.status = "active";
                 return true;
             }
@@ -376,7 +376,7 @@ export class Project extends NeonEntity<NeonProjectDefinition, NeonProjectState>
         this.state.name = project.project.name;
         this.state.status = project.project.status;
         this.state.region = project.project.region;
-        this.state.lastUpdated = project.project.updated_at;
+        this.state.last_updated = project.project.updated_at;
         
         cli.output(`✅ Project ${this.state.name} updated successfully`);
     }

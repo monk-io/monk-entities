@@ -1,7 +1,0 @@
-namespace: aws-iam
-
-base:
-  defines: module
-  metadata:
-    version-hash: 5844b24a6101
-  source: <<< base.js

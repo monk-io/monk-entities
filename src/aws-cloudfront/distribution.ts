@@ -369,21 +369,14 @@ export class CloudFrontDistribution extends AWSCloudFrontEntity<CloudFrontDistri
                 
                 if (attempts < maxAttempts) {
 // Debug removed Status is '${status}', waiting ${intervalSeconds}s before next check...`);
-                    // Simple sleep implementation
-                    const start = Date.now();
-                    while (Date.now() - start < intervalSeconds * 1000) {
-                        // Busy wait - not ideal but works for our use case
-                    }
+                    sleep(intervalSeconds * 1000);
                 }
-                
+
             } catch (error) {
 // Debug removed Error during deployment wait:`, error);
                 if (attempts < maxAttempts) {
 // Debug removed Retrying in ${intervalSeconds}s...`);
-                    const start = Date.now();
-                    while (Date.now() - start < intervalSeconds * 1000) {
-                        // Busy wait
-                    }
+                    sleep(intervalSeconds * 1000);
                 } else {
                     throw error;
                 }
