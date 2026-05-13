@@ -151,6 +151,36 @@ export class Role extends NeonEntity<NeonRoleDefinition, NeonRoleState> {
         }
     }
 
+    protected override isIdempotentUpdateEnabled(): boolean {
+        // Roles have no PATCH/PUT endpoint, so the only useful work in update()
+        // is re-syncing the password secret. Run it on every update, even when
+        // the role's Definition hasn't changed.
+        return false;
+    }
+
+    override update(): void {
+        if (!this.state.name) {
+            throw new Error("Role name not available for update");
+        }
+        this.syncPasswordSecret();
+    }
+
+    private syncPasswordSecret(): void {
+        const secretName = this.getPasswordSecretName();
+
+        const response = this.makeRequest(
+            "GET",
+            `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles/${this.state.name}/reveal_password`
+        );
+
+        if (!response || !response.password) {
+            throw new Error(`Neon reveal_password returned no password for role ${this.state.name}`);
+        }
+
+        secret.set(secretName, response.password);
+        cli.output(`✅ Password secret '${secretName}' synced for role ${this.state.name}`);
+    }
+
     @action("Reset role password")
     resetPassword(_args?: Args): void {
         if (!this.state.name) {

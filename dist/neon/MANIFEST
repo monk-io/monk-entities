@@ -1,7 +1,7 @@
 REPO neon
-VERSION_HASH 1381865b4e5f
+VERSION_HASH 57ecad3450b6
 DESCRIPTION Serverless Postgres with branching.
 HOSTING managed
 TAGS neon,postgres,database
-LOAD branch.yaml project.yaml common.yaml role.yaml database.yaml neon-base.yaml compute.yaml
-RESOURCES branch-sync.js project-sync.js common.js database-sync.js role-sync.js compute-sync.js neon-base.js
+LOAD project.yaml role.yaml branch.yaml common.yaml neon-base.yaml database.yaml compute.yaml
+RESOURCES branch-sync.js neon-base.js compute-sync.js role-sync.js project-sync.js common.js database-sync.js

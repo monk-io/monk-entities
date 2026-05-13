@@ -101,6 +101,33 @@ tests:
     expect:
       exitCode: 0
 
+  # ---- Role update / reveal_password resync ----
+
+  - name: "Corrupt the role password secret to simulate loss/rename"
+    action: "secret"
+    secrets:
+      global:
+        app-user-password: "wrong-password-should-be-overwritten"
+    expect:
+      exitCode: 0
+
+  - name: "Update stack — role update() should re-sync password secret via reveal_password"
+    action: "update"
+    target: "neon-test-stack/dev-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Verify password secret was overwritten (no longer the bogus value)"
+    action: "wait-command"
+    target: "monk secrets get -g app-user-password"
+    waitFor:
+      timeout: 5000
+      pollInterval: 500
+    expect:
+      exitCode: 0
+      notOutput:
+        - "wrong-password-should-be-overwritten"
+
 cleanup:
   - name: "Delete complete Neon stack"
     action: "delete"

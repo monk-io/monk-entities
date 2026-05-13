@@ -21,7 +21,7 @@ compute:
       Works with:
       - `neon/project` - The project containing this endpoint
       - `neon/branch` - The branch this endpoint connects to
-    version-hash: 1381865b4e5f
+    version-hash: 57ecad3450b6
   schema:
     secret_ref:
       type: string

@@ -20,7 +20,7 @@ role:
       Works with:
       - `neon/project` - The project containing this role
       - `neon/branch` - The branch this role exists on
-    version-hash: 1381865b4e5f
+    version-hash: 57ecad3450b6
   schema:
     secret_ref:
       type: string

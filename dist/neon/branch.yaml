@@ -22,7 +22,7 @@ branch:
       - `neon/project` - The parent project containing this branch
       - `neon/database` - Create databases on this branch
       - `neon/compute` - Configure compute endpoints for the branch
-    version-hash: 1381865b4e5f
+    version-hash: 57ecad3450b6
   schema:
     secret_ref:
       type: string
