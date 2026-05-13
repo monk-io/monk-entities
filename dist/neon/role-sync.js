@@ -48,7 +48,7 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
-// input/neon/role.ts
+// ../monk-entities/src/neon/role.ts
 const base = require("monkec/base");
 const action = base.action;
 const neonBase = require("neon/neon-base");
@@ -96,6 +96,27 @@ var _Role = class _Role extends (_a = NeonEntity, _resetPassword_dec = [action("
     if (this.state.operation_id) {
       this.waitForOperation(this.definition.project_id, this.state.operation_id);
     }
+  }
+  isIdempotentUpdateEnabled() {
+    return false;
+  }
+  update() {
+    if (!this.state.name) {
+      throw new Error("Role name not available for update");
+    }
+    this.syncPasswordSecret();
+  }
+  syncPasswordSecret() {
+    const secretName = this.getPasswordSecretName();
+    const response = this.makeRequest(
+      "GET",
+      `/projects/${this.definition.project_id}/branches/${this.definition.branch_id}/roles/${this.state.name}/reveal_password`
+    );
+    if (!response || !response.password) {
+      throw new Error(`Neon reveal_password returned no password for role ${this.state.name}`);
+    }
+    secret.set(secretName, response.password);
+    cli.output(`\u2705 Password secret '${secretName}' synced for role ${this.state.name}`);
   }
   resetPassword(_args) {
     if (!this.state.name) {

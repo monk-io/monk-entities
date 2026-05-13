@@ -22,7 +22,7 @@ project:
       - `neon/branch` - Create database branches for dev/test environments
       - `neon/database` - Create databases within the project
       - `neon/role` - Create database users/roles (writes password secret)
-    version-hash: 1381865b4e5f
+    version-hash: 57ecad3450b6
   schema:
     secret_ref:
       type: string
