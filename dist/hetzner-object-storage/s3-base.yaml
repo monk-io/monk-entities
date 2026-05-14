@@ -1,0 +1,7 @@
+namespace: hetzner-object-storage
+
+s3-base:
+  defines: module
+  metadata:
+    version-hash: 7f4b7b6b4d01
+  source: <<< s3-base.js

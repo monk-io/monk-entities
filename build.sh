@@ -7,7 +7,7 @@ set -e
 
 # Default modules if none specified.
 # No quotes around expansion to allow word splitting for the default value.
-modules=(${@:-monkec monk-bridge monk-endpoints mongodb-atlas neon netlify vercel aws-dynamo-db aws-s3 aws-sqs aws-iam aws-lambda aws-rds digitalocean-spaces digitalocean-database digitalocean-domains digitalocean-agent digitalocean-container-registry cloudflare aws-api-gateway aws-ec2 aws-cloudfront aws-ses aws-sns aws-neptune aws-glue-schema-registry aws-route53 digitalocean-monitoring stripe azure-cosmosdb azure-storage-account azure-eventhubs azure-servicebus supabase gcp clerk workos resend})
+modules=(${@:-monkec monk-bridge monk-endpoints mongodb-atlas neon netlify vercel aws-dynamo-db aws-s3 aws-sqs aws-iam aws-lambda aws-rds digitalocean-spaces digitalocean-database digitalocean-domains digitalocean-agent digitalocean-container-registry cloudflare aws-api-gateway aws-ec2 aws-cloudfront aws-ses aws-sns aws-neptune aws-glue-schema-registry aws-route53 digitalocean-monitoring stripe azure-cosmosdb azure-storage-account azure-eventhubs azure-servicebus supabase gcp clerk workos resend hetzner-dns hetzner-object-storage})
 
 # Sanity check: when running the full default build (no module args), make
 # sure every `dist/<name>` listed in the top-level MANIFEST also appears in
