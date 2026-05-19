@@ -1,0 +1,4 @@
+REPO hetzner-storage-box
+DESCRIPTION Managed Hetzner Storage Box via Hetzner Cloud API.
+HOSTING managed
+TAGS hetzner,storage,storage-box,backup,sftp,webdav,samba

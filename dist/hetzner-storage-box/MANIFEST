@@ -1,0 +1,7 @@
+REPO hetzner-storage-box
+VERSION_HASH 8672e7ed4073
+DESCRIPTION Managed Hetzner Storage Box via Hetzner Cloud API.
+HOSTING managed
+TAGS hetzner,storage,storage-box,backup,sftp,webdav,samba
+LOAD common.yaml storage-box.yaml
+RESOURCES storage-box-sync.js common.js

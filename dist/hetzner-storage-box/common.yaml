@@ -1,0 +1,7 @@
+namespace: hetzner-storage-box
+
+common:
+  defines: module
+  metadata:
+    version-hash: 8672e7ed4073
+  source: <<< common.js

@@ -1,0 +1,36 @@
+namespace: hetzner-storage-box-example
+
+# -----------------------------------------------------------------------------
+# Hetzner Storage Box
+# Creates a Storage Box via the Hetzner Cloud API.
+#
+# Storage box types: bx11 (1TB), bx21 (2TB), bx31 (5TB), bx41 (10TB), bx61 (20TB)
+# Locations:        fsn1 (Falkenstein), nbg1 (Nuremberg), hel1 (Helsinki)
+#
+# Prerequisites:
+#   monk cluster providers  →  verify Hetzner provider is configured
+# -----------------------------------------------------------------------------
+my-box:
+  defines: hetzner-storage-box/storage-box
+  name: monk-storage-box
+  storage_box_type: bx11
+  location: fsn1
+  password: "Monk2024!T3stBox"
+  ssh: true
+  samba: false
+  webdav: false
+  external_reachability: false
+  services:
+    data:
+      protocol: custom
+
+# Usage:
+# 1) monk load dist/hetzner-storage-box/MANIFEST
+# 2) monk load src/hetzner-storage-box/example.yaml
+# 3) monk run hetzner-storage-box-example/my-box
+# 4) monk do  hetzner-storage-box-example/my-box/info
+# 5) monk do  hetzner-storage-box-example/my-box/list-snapshots
+# 6) monk do  hetzner-storage-box-example/my-box/create-snapshot --label=my-snapshot
+# 7) monk do  hetzner-storage-box-example/my-box/reset-password --password=NewPass456!
+# 8) monk do  hetzner-storage-box-example/my-box/list-subaccounts
+# 9) monk delete hetzner-storage-box-example/my-box

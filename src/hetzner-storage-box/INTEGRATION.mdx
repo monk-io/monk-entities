@@ -1,0 +1,60 @@
+---
+title: Hetzner Storage Box
+description: Managed Hetzner Storage Box for persistent file storage via SFTP, WebDAV, Samba, and rsync.
+website_url: https://www.hetzner.com/storage/storage-box
+docs_url: https://docs.hetzner.com/storage/storage-box/
+primary_category: storage
+tags: [hetzner, storage, storage-box, sftp, backup]
+hosting_models: [managed]
+---
+
+## What is this integration?
+
+Hetzner Storage Box is a managed network storage product that provides persistent file storage accessible via SFTP, SCP, Samba/CIFS, WebDAV, and rsync. It is separate from Hetzner Cloud servers and managed through the Hetzner Robot API.
+
+## What Monk manages
+
+- Storage Box lifecycle (create, update, delete)
+- Access protocol settings (SSH/SFTP, Samba, WebDAV, external reachability)
+- Sub-accounts with isolated home directories
+- Snapshots
+
+## Credentials
+
+- `hetzner-robot-token`: Hetzner Robot API token. Generate one in the [Robot panel](https://robot.hetzner.com/preferences/index) under **Settings → API token**.
+
+> Storage Boxes use the Robot API (`api.hetzner.com`), not the Cloud API (`api.hetzner.cloud`). Configure the Monk Hetzner provider with your Robot credentials.
+
+## Links
+
+- Provider docs: https://docs.hetzner.com/storage/storage-box/
+- Robot API reference: https://docs.hetzner.com/robot/storage-box/api/storage-box-api/
+- Storage box types and pricing: https://www.hetzner.com/storage/storage-box
+
+## Template
+
+```yaml
+namespace: my-storage
+
+box:
+  defines: hetzner-storage-box/storage-box
+  name: my-backup-box
+  storage_box_type: bx11
+  location: fsn1
+  password: ChangeMe123!
+  ssh: true
+  samba: false
+  webdav: false
+  services:
+    data:
+      protocol: custom
+```
+
+Run:
+
+```bash
+monk load dist/hetzner-storage-box/MANIFEST
+monk load src/hetzner-storage-box/example.yaml
+monk run -l hetzner-storage-box-example/my-box
+monk do  hetzner-storage-box-example/my-box/info
+```
