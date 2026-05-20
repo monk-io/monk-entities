@@ -101,7 +101,21 @@ export class SpacesKeys extends MonkEntity<DOSpacesKeysDefinition, DOSpacesKeysS
         this.state.id = undefined;
         this.state.access_key = undefined;
         this.state.existing = false;
+
+        // Clear secrets so dependent entities immediately get an explicit
+        // "missing credentials" error instead of a silent 403 from DO.
+        secret.set("do-spaces-access-key", "");
+        secret.set("do-spaces-secret-key", "");
         cli.output(`Deleted Spaces key`);
+    }
+
+    override update(): void {
+        if (this.state.id) {
+            cli.output(`Spaces key already exists (${this.state.access_key}), skipping update`);
+            return;
+        }
+        // State lost — recreate the key.
+        this.create();
     }
 
     override checkReadiness(): boolean { return !!this.state.id; }
