@@ -62,7 +62,16 @@ var _SpacesKeys = class _SpacesKeys extends MonkEntity {
     this.state.id = void 0;
     this.state.access_key = void 0;
     this.state.existing = false;
+    secret.set("do-spaces-access-key", "");
+    secret.set("do-spaces-secret-key", "");
     cli.output(`Deleted Spaces key`);
+  }
+  update() {
+    if (this.state.id) {
+      cli.output(`Spaces key already exists (${this.state.access_key}), skipping update`);
+      return;
+    }
+    this.create();
   }
   checkReadiness() {
     return !!this.state.id;
