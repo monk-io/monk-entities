@@ -1,0 +1,99 @@
+namespace: netlify
+form:
+  defines: entity
+  metadata:
+    name: Form
+    description: |-
+      Netlify Form entity.
+      Manages form submissions for Netlify sites.
+      Forms collect user submissions from static HTML forms.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Netlify API token (defaults to `netlify-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Form ID
+      - `state.name` - Form name
+      - `state.submission_count` - Number of submissions
+
+      ## Composing with Other Entities
+      Works with:
+      - `netlify/site` - The site containing this form
+    version-hash: bda3452f3b74
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: |-
+        Secret Reference for Netlify API authentication
+        Defaults to "default-netlify-pat" if not provided
+    site_id:
+      type: string
+      description: The Netlify site ID that contains the form
+    name:
+      type: string
+      description: Name of the form to manage
+    required:
+      - site_id
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Unique identifier for the form
+    site_id:
+      type: string
+      description: The site this form belongs to
+    name:
+      type: string
+      description: Name of the form
+    paths:
+      type: array
+      items:
+        type: string
+      description: Paths where the form is located
+    submission_count:
+      type: number
+      description: Number of submissions to this form
+    fields:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          type:
+            type: string
+        required:
+          - name
+          - type
+        additionalProperties: false
+      description: Fields defined in the form
+    created_at:
+      type: string
+      format: date-time
+      description: When the form was created
+  lifecycle:
+    sync: <<< form-sync.js
+    get-form: ''
+    list-submissions: ''
+    get-submission: ''
+    mark-submission-spam: ''
+    mark-submission-ham: ''
+    delete-submission: ''
+    list-all-forms: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - netlify/netlify-base
+    - monkec/base
+    - cli

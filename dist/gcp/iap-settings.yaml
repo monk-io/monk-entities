@@ -1,0 +1,255 @@
+namespace: gcp
+iap-settings:
+  defines: entity
+  metadata:
+    name: IapSettings
+    description: |-
+      GCP IAP Settings entity. Applies IAP settings (access and application) to an
+      existing IAP-protected resource. The resource must already exist — this entity only modifies
+      settings via PATCH. On delete, prior settings (if any) are restored; otherwise settings are
+      cleared.
+
+      ## Required Permissions
+      - `iap.settings.get`
+      - `iap.settings.update`
+      - `resourcemanager.projects.get` (resolves project number)
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.resource_name` — full IAP resource path
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/iap-oauth-client` — supply client_id + secret into `access_settings.oauth_settings`
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    target_kind:
+      type: string
+      enum:
+        - app-engine
+        - app-engine-service
+        - compute
+        - compute-regional
+        - cloud-run
+        - project
+        - organization
+        - folder
+        - raw
+      description: Kind of IAP-protected resource. Selects which target_* fields apply.
+    app_id:
+      type: string
+      description: 'App Engine application ID (for target_kind: app-engine, app-engine-service)'
+    app_engine_service:
+      type: string
+      description: 'App Engine service name (for target_kind: app-engine-service)'
+    backend_service:
+      type: string
+      description: 'Compute Engine backend service ID (for target_kind: compute, compute-regional)'
+    region:
+      type: string
+      description: 'GCP region (for target_kind: compute-regional, cloud-run)'
+    cloud_run_service:
+      type: string
+      description: 'Cloud Run service name (for target_kind: cloud-run)'
+    organization_id:
+      type: string
+      description: 'Organization numeric ID (for target_kind: organization)'
+    folder_id:
+      type: string
+      description: 'Folder numeric ID (for target_kind: folder)'
+    resource_path:
+      type: string
+      description: 'Verbatim IAP resource path (for target_kind: raw)'
+    access_settings:
+      type: object
+      properties:
+        oauth_settings:
+          type: object
+          properties:
+            client_id:
+              type: string
+              description: 'OAuth 2.0 client ID (e.g., from gcp/iap-oauth-client state.client_id)'
+            client_secret:
+              type: string
+              description: OAuth 2.0 client secret value (plaintext — prefer reading from Monk secret in template)
+            login_hint:
+              type: string
+              description: Domain hint to show on the OAuth consent screen (hd parameter)
+            programmatic_clients:
+              type: array
+              items:
+                type: string
+              description: List of OAuth client IDs permitted programmatic access to this IAP resource
+          additionalProperties: false
+          description: OAuth 2.0 settings for IAP's own sign-in flow
+        cors_settings:
+          type: object
+          properties:
+            allow_http_options:
+              type: boolean
+              description: Allow HTTP OPTIONS calls to skip authentication
+          additionalProperties: false
+          description: CORS behavior for IAP-protected resources
+        reauth_settings:
+          type: object
+          properties:
+            method:
+              type: string
+              enum:
+                - LOGIN
+                - SECURE_KEY
+                - ENROLLED_SECOND_FACTORS
+              description: 'Reauthentication method: LOGIN, SECURE_KEY, or ENROLLED_SECOND_FACTORS'
+            max_age:
+              type: string
+              description: 'Reauthentication session lifetime, e.g., "3600s"'
+            policy_type:
+              type: string
+              enum:
+                - MINIMUM
+                - DEFAULT
+              description: 'Policy type: MINIMUM or DEFAULT'
+          additionalProperties: false
+          description: Reauthentication policy
+        allowed_domains_settings:
+          type: object
+          properties:
+            domains:
+              type: array
+              items:
+                type: string
+              description: List of trusted domains (email addresses must match one of these)
+            enable:
+              type: boolean
+              description: Enable the allowed-domains check
+          additionalProperties: false
+          description: Allowed-domains restriction
+        gcip_settings:
+          type: object
+          properties:
+            tenant_ids:
+              type: array
+              items:
+                type: string
+              description: GCIP tenant IDs
+            login_page_uri:
+              type: string
+              description: URI of the login page for GCIP tenants
+          additionalProperties: false
+          description: GCIP configuration for third-party identity providers
+        identity_sources:
+          type: array
+          items:
+            type: string
+            enum:
+              - WORKFORCE_IDENTITY_FEDERATION
+              - IDENTITY_SOURCE_UNSPECIFIED
+          description: Identity source precedence
+      additionalProperties: false
+      description: Access-related IAP settings
+    application_settings:
+      type: object
+      properties:
+        access_denied_page_settings:
+          type: object
+          properties:
+            access_denied_page_uri:
+              type: string
+              description: URI to redirect to when access is denied
+            generate_troubleshooting_uri:
+              type: boolean
+              description: Enable troubleshooting URL generation on the denied page
+            remediation_token_generation_enabled:
+              type: boolean
+              description: Enable remediation token generation
+          additionalProperties: false
+          description: Access-denied page behavior
+        cookie_domain:
+          type: string
+          description: Cookie domain for IAP-issued cookies
+        attribute_propagation_settings:
+          type: object
+          properties:
+            output_credentials:
+              type: array
+              items:
+                type: string
+                enum:
+                  - HEADER
+                  - JWT
+                  - RCTOKEN
+              description: 'Where propagated attributes should be placed: HEADER, JWT, or RCTOKEN'
+            expression:
+              type: string
+              description: CEL expression returning the list of attributes to propagate
+            enable:
+              type: boolean
+              description: Whether attribute propagation is enabled
+          additionalProperties: false
+          description: Attribute propagation to backend
+        csm_settings:
+          type: object
+          properties:
+            rctoken_aud:
+              type: string
+              description: Audience claim set in the generated RCToken
+          additionalProperties: false
+          description: Service Mesh (CSM) RCToken settings
+      additionalProperties: false
+      description: Application-related IAP settings
+    required:
+      - target_kind
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: Full IAP-protected resource path
+    prior_settings:
+      type: object
+      additionalProperties:
+        description: Snapshot of prior settings for restore on delete
+      description: Snapshot of prior settings for restore on delete
+    project_number:
+      type: string
+      description: Cached project number (resolved from project ID)
+  lifecycle:
+    sync: <<< iap-settings-sync.js
+    get-info: ''
+    show-raw: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 3
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/iap-common

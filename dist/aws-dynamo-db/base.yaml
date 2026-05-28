@@ -1,0 +1,7 @@
+namespace: aws-dynamo-db
+
+base:
+  defines: module
+  metadata:
+    version-hash: 611fbaf4bb52
+  source: <<< base.js

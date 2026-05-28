@@ -1,0 +1,7 @@
+namespace: neon
+
+neon-base:
+  defines: module
+  metadata:
+    version-hash: b9e9da8541b6
+  source: <<< neon-base.js

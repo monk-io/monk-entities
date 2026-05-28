@@ -1,0 +1,14 @@
+REPO aws-sns
+VERSION_HASH 91dd11d9bb0e
+namespace: aws-sns
+topic:
+  defines: entity
+  source: topic.yaml
+sns-topic:
+  defines: entity
+  source: sns-topic.yaml
+sns-subscription:
+  defines: entity
+  source: sns-subscription.yaml
+LOAD sns-topic.yaml sns-base.yaml base.yaml common.yaml sns-subscription.yaml
+RESOURCES common.js sns-topic-sync.js sns-subscription-sync.js sns-base.js base.js

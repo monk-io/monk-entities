@@ -1,0 +1,93 @@
+namespace: mongodb-atlas
+user:
+  defines: entity
+  metadata:
+    name: User
+    description: |-
+      MongoDB Atlas Database User entity.
+      Creates and manages MongoDB Atlas database users for cluster authentication.
+      Supports role-based access control with database and collection-level permissions.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
+      - Writes: secret name from `password_secret_ref` property - Database user password (if specified)
+
+      ## State Fields for Composition
+      - `state.username` - Database username
+      - `state.database` - Authentication database
+
+      ## Composing with Other Entities
+      Works with:
+      - `mongodb-atlas/project` - The parent project for this user
+      - `mongodb-atlas/cluster` - Use this user to connect to clusters
+    version-hash: 5a1f44169805
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      description: Database username
+    project_id:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Project ID where the user will be created
+    password_secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for user password
+    role:
+      type: string
+      description: Database role for the user
+      default: readWriteAnyDatabase
+    required:
+      - secret_ref
+      - name
+      - project_id
+      - password_secret_ref
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    name:
+      type: string
+      description: Username
+    project_id:
+      type: string
+      description: Project ID
+    database_name:
+      type: string
+      description: Database name (always "admin" for Atlas)
+    roles:
+      type: array
+      items:
+        type: object
+        properties:
+          databaseName:
+            type: string
+          roleName:
+            type: string
+        required:
+          - databaseName
+          - roleName
+        additionalProperties: false
+      description: User roles
+  lifecycle:
+    sync: <<< user-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - mongodb-atlas/atlas-base
+    - secret
+    - cli

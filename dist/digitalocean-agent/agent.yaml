@@ -1,0 +1,201 @@
+namespace: digitalocean-agent
+agent:
+  defines: entity
+  metadata:
+    name: Agent
+    description: |-
+      DigitalOcean Agent entity.
+      Creates and manages DigitalOcean AI agents (GenAI platform).
+      Agents provide AI-powered assistants with custom knowledge bases.
+
+      ## Secrets
+      - Reads: none (authenticated via DigitalOcean provider)
+      - Writes: none (Agent API key available in `state.endpoint_api_key`)
+
+      ## State Fields for Composition
+      - `state.id` - Agent ID
+      - `state.endpoint` - Agent API endpoint URL
+      - `state.endpoint_api_key` - Agent API key for invocations
+
+      ## Composing with Other Entities
+      DigitalOcean agents are standalone AI services.
+    version-hash: 33aa45e32ffe
+  schema:
+    name:
+      type: string
+      description: Agent display name
+    instruction:
+      type: string
+      description: System instruction for the agent
+    model_uuid:
+      type: string
+      description: Model UUID to use (or provide model_id/inference_name instead)
+    model_id:
+      anyOf:
+        - type: string
+          enum:
+            - OpenAI GPT-oss-120b
+            - OpenAI GPT-oss-20b
+            - Llama 3.3 Instruct (70B)
+            - Llama 3.1 Instruct (8B)
+            - DeepSeek R1 Distill Llama 70B
+            - Anthropic Claude Opus 4
+            - Anthropic Claude Sonnet 4
+            - Anthropic Claude 3.7 Sonnet
+            - Anthropic Claude 3.5 Haiku
+            - Anthropic Claude 3 Opus
+            - OpenAI GPT-5
+            - OpenAI GPT-4.1
+            - OpenAI o3
+            - OpenAI GPT-4o
+            - OpenAI GPT-4o mini
+            - OpenAI o1
+            - OpenAI o3 mini
+            - OpenAI GPT-5 Mini
+            - OpenAI GPT-5 Nano
+            - OpenAI GPT Image 1
+            - Qwen3 32B
+            - Mistral Nemo Instruct
+            - GTE Large EN v1.5
+            - Fal Fast SDXL
+            - Fal Flux Schnell
+            - Fal Stable Audio 2.5
+            - Fal ElevenLabs TTS Multilingual v2
+            - Multi QA MPNet Base Dot v1
+            - All MiniLM L6 v2
+            - Anthropic Claude 4.5 Haiku
+            - Anthropic Claude 4.1 Opus
+            - Anthropic Claude 4.5 Sonnet
+            - Anthropic Claude Opus 4.5
+        - type: string
+      description: 'Human-readable model identifier, e.g. "OpenAI GPT-4o" (resolved to UUID). Custom values also accepted.'
+    inference_name:
+      anyOf:
+        - type: string
+          enum:
+            - OpenAI GPT-oss-120b
+            - OpenAI GPT-oss-20b
+            - Llama 3.3 Instruct (70B)
+            - Llama 3.1 Instruct (8B)
+            - DeepSeek R1 Distill Llama 70B
+            - Anthropic Claude Opus 4
+            - Anthropic Claude Sonnet 4
+            - Anthropic Claude 3.7 Sonnet
+            - Anthropic Claude 3.5 Haiku
+            - Anthropic Claude 3 Opus
+            - OpenAI GPT-5
+            - OpenAI GPT-4.1
+            - OpenAI o3
+            - OpenAI GPT-4o
+            - OpenAI GPT-4o mini
+            - OpenAI o1
+            - OpenAI o3 mini
+            - OpenAI GPT-5 Mini
+            - OpenAI GPT-5 Nano
+            - OpenAI GPT Image 1
+            - Qwen3 32B
+            - Mistral Nemo Instruct
+            - GTE Large EN v1.5
+            - Fal Fast SDXL
+            - Fal Flux Schnell
+            - Fal Stable Audio 2.5
+            - Fal ElevenLabs TTS Multilingual v2
+            - Multi QA MPNet Base Dot v1
+            - All MiniLM L6 v2
+            - Anthropic Claude 4.5 Haiku
+            - Anthropic Claude 4.1 Opus
+            - Anthropic Claude 4.5 Sonnet
+            - Anthropic Claude Opus 4.5
+        - type: string
+      description: Inference name (alias to model_id). Custom values also accepted.
+    project_id:
+      type: string
+      description: Optional project id
+    knowledge_base_uuids:
+      type: array
+      items:
+        type: string
+      description: 'Knowledge base UUIDs (alias: knowledge_base_uuid)'
+    guardrail_uuids:
+      type: array
+      items:
+        type: string
+      description: Guardrail UUIDs
+    tags:
+      type: array
+      items:
+        type: string
+      description: Optional tags
+    region:
+      type: string
+      description: Region slug where the agent lives (e.g. tor1)
+    provide_citations:
+      type: boolean
+      description: Whether to include citations in responses
+    retrieval_method:
+      type: string
+      description: Retrieval method type
+    k:
+      type: number
+      description: Number of documents to retrieve (k)
+    temperature:
+      type: number
+      description: Sampling temperature
+    top_p:
+      type: number
+      description: Nucleus sampling top_p
+    max_tokens:
+      type: number
+      description: Max tokens to generate
+    wait_ready:
+      type: boolean
+      description: 'If true, wait for readiness after create/update (default: true)'
+    wait_timeout_sec:
+      type: number
+      description: 'Total seconds to wait for readiness (default: 120)'
+    wait_interval_sec:
+      type: number
+      description: 'Poll interval seconds while waiting (default: 5)'
+    public_endpoint:
+      type: boolean
+      description: Make the agent endpoint public (attempt during deploy)
+    publish:
+      type: boolean
+      description: Publish deployment publicly by default (alias to public_endpoint)
+    required:
+      - name
+      - instruction
+  state-schema:
+    id:
+      type: string
+    status:
+      type: string
+    endpoint:
+      type: string
+    existing:
+      type: boolean
+    endpoint_api_key:
+      type: string
+  lifecycle:
+    sync: <<< agent-sync.js
+    get: ''
+    set-guardrails: ''
+    set-knowledge-bases: ''
+    create-api-key: ''
+    revoke-api-key: ''
+    delete-api-key: ''
+    list-api-keys: ''
+    deploy: ''
+    make-public: ''
+    models: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - cli
+    - monkec/base
+    - cloud/digitalocean

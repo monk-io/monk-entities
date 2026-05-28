@@ -1,0 +1,130 @@
+namespace: gcp
+identity-platform-tenant:
+  defines: entity
+  metadata:
+    name: IdentityPlatformTenant
+    description: |-
+      GCP Identity Platform tenant entity.
+      Creates and manages Identity Platform tenants for multi-tenant user isolation.
+      Each tenant has its own user pool, sign-in settings, and identity provider
+      configurations, enabling SaaS applications to isolate users per customer.
+
+      ## Required Permissions
+      - `identitytoolkit.tenants.create` — create tenants
+      - `identitytoolkit.tenants.get` — read tenant details
+      - `identitytoolkit.tenants.list` — list tenants
+      - `identitytoolkit.tenants.update` — update tenant settings
+      - `identitytoolkit.tenants.delete` — delete tenants
+
+      Or use the predefined role: `roles/identityplatform.admin`
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.tenant_id` — Tenant ID, used by IdP config entities to scope providers to a tenant
+      - `state.resource_name` — Full resource name for API operations
+      - `state.display_name` — Human-readable tenant name
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/identity-platform-config` — Must have allow_tenants: true
+      - `gcp/identity-platform-oauth-idp-config` — Configure OIDC providers per tenant
+      - `gcp/identity-platform-default-idp-config` — Configure social providers per tenant
+      - `gcp/identity-platform-inbound-saml-config` — Configure SAML providers per tenant
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    display_name:
+      type: string
+      description: Human-readable display name for the tenant.
+    allow_password_signup:
+      type: boolean
+      description: Allow email/password sign-up for this tenant.
+    enable_email_link_signin:
+      type: boolean
+      description: Enable email link (passwordless) sign-in.
+    enable_anonymous_user:
+      type: boolean
+      description: Enable anonymous users for this tenant.
+    disable_auth:
+      type: boolean
+      description: Disable all authentication for this tenant.
+    mfa_state:
+      type: string
+      enum:
+        - DISABLED
+        - ENABLED
+        - MANDATORY
+      description: 'Multi-factor authentication state: DISABLED, ENABLED, or MANDATORY.'
+    mfa_enabled_providers:
+      type: array
+      items:
+        type: string
+      description: 'MFA providers to enable (e.g., PHONE_SMS).'
+    autodelete_anonymous_users:
+      type: boolean
+      description: Automatically delete anonymous user accounts.
+    required:
+      - display_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: 'Full resource name of the tenant (projects/{project}/tenants/{tenant}).'
+    tenant_id:
+      type: string
+      description: The tenant ID (extracted from resource name).
+    display_name:
+      type: string
+      description: Human-readable display name.
+    allow_password_signup:
+      type: boolean
+      description: Whether email/password sign-up is allowed.
+    enable_email_link_signin:
+      type: boolean
+      description: Whether email link sign-in is enabled.
+    enable_anonymous_user:
+      type: boolean
+      description: Whether anonymous users are enabled.
+    disable_auth:
+      type: boolean
+      description: Whether authentication is disabled.
+  lifecycle:
+    sync: <<< identity-platform-tenant-sync.js
+    get-info: ''
+    list-tenants: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

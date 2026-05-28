@@ -1,0 +1,83 @@
+namespace: gcp
+iap-brand:
+  defines: entity
+  metadata:
+    name: IapBrand
+    description: |-
+      GCP IAP OAuth Brand entity. Adopts the existing OAuth brand of the project so
+      other IAP entities (iap-oauth-client) can reference it. The brand itself is NOT created by this
+      entity — external-audience brands must be created via the Cloud Console (APIs & Services →
+      OAuth consent screen). Attempting to run this entity on a project without a brand produces a
+      clear error.
+
+      ## Required Permissions
+      - `clientauthconfig.brands.list` — find existing brand
+      - `clientauthconfig.brands.get` — read brand metadata
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.brand_id` — consumed by `gcp/iap-oauth-client` to create OAuth clients under this brand
+      - `state.brand_name` — full resource name
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/iap-oauth-client` — brand_id is required input for OAuth client creation
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    brand_name:
+      type: string
+      description: 'Full brand resource name (projects/{projectNumber}/brands/{brandId})'
+    brand_id:
+      type: string
+      description: Brand identifier (trailing segment of the resource name)
+    application_title:
+      type: string
+      description: Application title shown on the OAuth consent screen
+    support_email:
+      type: string
+      description: Support email shown on the OAuth consent screen
+    org_internal_only:
+      type: boolean
+      description: Whether this brand is restricted to users inside the G Suite organization only
+  lifecycle:
+    sync: <<< iap-brand-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 3
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/iap-common

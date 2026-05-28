@@ -1,0 +1,117 @@
+namespace: gcp
+cloud-dns-zone:
+  defines: entity
+  metadata:
+    name: CloudDnsZone
+    description: |-
+      GCP Cloud DNS Managed Zone entity. Creates and manages DNS zones
+      for hosting DNS records in Google Cloud DNS.
+
+      ## Required Permissions
+      - `dns.managedZones.create` — create zones
+      - `dns.managedZones.get` — check existence and readiness
+      - `dns.managedZones.update` — update zone configuration
+      - `dns.managedZones.delete` — delete zones
+      - `dns.resourceRecordSets.list` — list record sets (list-record-sets action)
+      - `monitoring.timeSeries.list` — cost estimation metrics
+      - `cloudbilling.services.list` — cost estimation pricing
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.zone_id` — server-generated zone ID
+      - `state.name_servers` — assigned nameservers, useful for domain registrar configuration
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/cloud-dns-record-set` — create DNS records in this zone
+      - `gcp/service-usage` — enable `dns.googleapis.com` API
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: 'Zone name (1-63 characters: lowercase letters, digits, or dashes)'
+    dns_name:
+      type: string
+      description: 'DNS name for the zone with trailing dot (e.g., "example.com.")'
+    zone_description:
+      type: string
+      description: Human-readable description of the zone (up to 1024 characters)
+    visibility:
+      type: string
+      enum:
+        - public
+        - private
+      description: 'Zone visibility: "public" (internet-accessible) or "private" (VPC-only). Default: "public"'
+    dnssec_enabled:
+      type: boolean
+      description: Enable DNSSEC for the zone
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: Labels to apply to the zone
+      description: Labels to apply to the zone
+    networks:
+      type: array
+      items:
+        type: string
+      description: 'VPC network self-links for private zone visibility (e.g., "projects/my-project/global/networks/my-vpc")'
+    logging_enabled:
+      type: boolean
+      description: Enable Cloud DNS query logging
+    required:
+      - name
+      - dns_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    zone_id:
+      type: string
+      description: Server-generated zone ID
+    name_servers:
+      type: array
+      items:
+        type: string
+      description: Assigned DNS nameservers for the zone
+  lifecycle:
+    sync: <<< cloud-dns-zone-sync.js
+    get-info: ''
+    list-record-sets: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

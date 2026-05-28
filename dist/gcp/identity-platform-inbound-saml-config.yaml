@@ -1,0 +1,140 @@
+namespace: gcp
+identity-platform-inbound-saml-config:
+  defines: entity
+  metadata:
+    name: IdentityPlatformInboundSamlConfig
+    description: |-
+      GCP Identity Platform SAML 2.0 identity provider configuration entity.
+      Creates and manages inbound SAML configurations for enterprise SSO integration.
+      Supports both project-level and tenant-scoped configurations.
+
+      ## Required Permissions
+      - `firebaseauth.configs.get` — read SAML configurations
+      - `firebaseauth.configs.update` — create, update, and delete SAML configurations
+
+      Or use the predefined role: `roles/identityplatform.admin`
+
+      ## Secrets
+      - Reads: none (authenticated via GCP provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.config_id` — Config ID for reference
+      - `state.resource_name` — Full resource name for API operations
+      - `state.enabled` — Whether the provider is currently enabled
+      - `state.idp_entity_id` — IdP entity ID
+      - `state.sp_entity_id` — SP entity ID
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/identity-platform-tenant` — Scope provider to a tenant via tenant_id
+      - `gcp/identity-platform-config` — Project-level configuration
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: |-
+        Config ID for this SAML provider (e.g., saml.my-provider).
+        Must start with "saml." prefix.
+    tenant_id:
+      type: string
+      description: |-
+        Tenant ID to scope this config to a specific tenant.
+        Omit for project-level configuration.
+    display_name:
+      type: string
+      description: Human-readable display name for this SAML provider.
+    enabled:
+      type: boolean
+      description: Whether users can sign in with this provider.
+    idp_entity_id:
+      type: string
+      description: SAML entity ID of the identity provider.
+    sso_url:
+      type: string
+      description: URL to send SAML AuthnRequest to (IdP SSO URL).
+    sign_request:
+      type: boolean
+      description: Whether to sign outbound SAML requests.
+    idp_certificates:
+      type: array
+      items:
+        type: string
+      description: |-
+        PEM-encoded x509 certificates from the identity provider.
+        Used to verify SAML assertions.
+    sp_entity_id:
+      type: string
+      description: SAML entity ID of this service provider (your application).
+    callback_uri:
+      type: string
+      description: Callback URI where the IdP sends SAML responses.
+    required:
+      - name
+      - idp_entity_id
+      - sso_url
+      - idp_certificates
+      - sp_entity_id
+      - callback_uri
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    resource_name:
+      type: string
+      description: Full resource name of the config.
+    config_id:
+      type: string
+      description: The config ID.
+    display_name:
+      type: string
+      description: Human-readable display name.
+    enabled:
+      type: boolean
+      description: Whether this provider is enabled.
+    idp_entity_id:
+      type: string
+      description: SAML entity ID of the identity provider.
+    sp_entity_id:
+      type: string
+      description: SAML entity ID of the service provider.
+    sp_certificates:
+      type: string
+      description: Server-generated SP certificates (output only).
+  lifecycle:
+    sync: <<< identity-platform-inbound-saml-config-sync.js
+    get-info: ''
+    enable: ''
+    disable: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

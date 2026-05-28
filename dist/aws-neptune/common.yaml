@@ -1,0 +1,7 @@
+namespace: aws-neptune
+
+common:
+  defines: module
+  metadata:
+    version-hash: 5b09e3d50f6e
+  source: <<< common.js

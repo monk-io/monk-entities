@@ -1,0 +1,71 @@
+namespace: clerk
+domain:
+  defines: entity
+  metadata:
+    name: Domain
+    description: |-
+      Clerk Domain entity.
+      Creates and manages custom domains for Clerk instances.
+      Custom domains allow using your own domain for authentication pages.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Clerk secret API key
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.domain_id` - Clerk domain ID
+      - `state.name` - Domain name
+      - `state.verification_status` - Domain verification status
+
+      ## Composing with Other Entities
+      Works with:
+      - `clerk/credentials` - Shares API credentials
+    version-hash: e0d4d7e68911
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Clerk secret API key (sk_test_... or sk_live_...)
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: 'Domain name to register (e.g., auth.example.com)'
+    domain_id:
+      type: string
+      description: 'Optional: adopt existing domain by ID'
+    is_satellite:
+      type: boolean
+      description: Whether this is a satellite domain
+    proxy_url:
+      type: string
+      description: Proxy URL for the domain (if using proxy mode)
+    required:
+      - secret_ref
+      - name
+      - is_satellite
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    domain_id:
+      type: string
+      description: Clerk domain ID
+    name:
+      type: string
+      description: Domain name
+    verification_status:
+      type: string
+      description: Verification status
+  lifecycle:
+    sync: <<< domain-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - clerk/clerk-base
+    - cli

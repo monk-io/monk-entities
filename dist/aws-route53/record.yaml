@@ -1,0 +1,131 @@
+namespace: aws-route53
+record:
+  defines: entity
+  metadata:
+    name: Record
+    description: |-
+      AWS Route 53 DNS Record entity.
+      Creates and manages DNS record sets within a hosted zone. Supports all standard
+      record types (A, AAAA, CNAME, MX, TXT, etc.), alias records, and routing policies
+      (weighted, latency, failover, geolocation, multi-value answer).
+
+      ## Required Permissions
+      - `route53:ChangeResourceRecordSets` — create, update (UPSERT), and delete records
+      - `route53:ListResourceRecordSets` — check if record exists, fetch for delete
+      - `route53:GetChange` — poll change propagation status
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.zone_id` - Hosted zone ID containing this record
+      - `state.record_name` - FQDN with trailing dot
+      - `state.record_type` - Record type (A, CNAME, etc.)
+      - `state.record_values` - Current record values
+      - `state.set_identifier` - Set identifier for routing policies
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-route53/hosted-zone` - Parent zone (wire zone_id via connection-target)
+      - `aws-route53/health-check` - Associate health check for failover routing
+    version-hash: d7df84da8f83
+  schema:
+    region:
+      type: string
+      description: AWS region (used for signing; Route 53 is a global service)
+    zone_id:
+      type: string
+      description: Hosted zone ID (without /hostedzone/ prefix)
+    record_name:
+      type: string
+      description: 'Record name (FQDN, e.g., www.example.com)'
+    record_type:
+      type: string
+      description: 'DNS record type (A, AAAA, CNAME, MX, TXT, etc.)'
+    ttl:
+      type: number
+      description: TTL in seconds (required for non-alias records)
+    record_values:
+      type: array
+      items:
+        type: string
+      description: 'Record values (e.g., IP addresses, CNAME targets)'
+    alias_dns_name:
+      type: string
+      description: Alias target DNS name (for alias records)
+    alias_hosted_zone_id:
+      type: string
+      description: Alias target hosted zone ID (for alias records)
+    alias_evaluate_target_health:
+      type: boolean
+      description: Whether to evaluate target health for alias records
+    weight:
+      type: number
+      description: Routing policy weight (for weighted routing)
+    set_identifier:
+      type: string
+      description: Set identifier (required for weighted/latency/failover/geo routing)
+    failover:
+      type: string
+      description: 'Failover type: PRIMARY or SECONDARY'
+    latency_region:
+      type: string
+      description: Region for latency-based routing
+    health_check_id:
+      type: string
+      description: Health check ID to associate
+    multi_value_answer:
+      type: boolean
+      description: Whether this is a multi-value answer record
+    required:
+      - region
+      - zone_id
+      - record_name
+      - record_type
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource pre-existed before this entity managed it
+    zone_id:
+      type: string
+      description: Hosted zone ID
+    record_name:
+      type: string
+      description: Fully qualified record name
+    record_type:
+      type: string
+      description: Record type
+    record_values:
+      type: array
+      items:
+        type: string
+      description: Current record values
+    set_identifier:
+      type: string
+      description: Set identifier for routing policies
+    ttl:
+      type: number
+      description: Current TTL
+    is_alias:
+      type: boolean
+      description: Whether this is an alias record
+    required:
+      - existing
+  lifecycle:
+    sync: <<< record-sync.js
+    get-record-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
+      attempts: 15
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - aws-route53/route53-base
+    - cli
+    - aws-route53/common

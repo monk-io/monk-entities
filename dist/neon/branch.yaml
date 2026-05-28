@@ -1,0 +1,121 @@
+namespace: neon
+branch:
+  defines: entity
+  metadata:
+    name: Branch
+    description: |-
+      Neon Branch entity.
+      Creates and manages Neon database branches for development and testing.
+      Branches provide instant, copy-on-write database clones from a parent branch.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Neon API key (defaults to `neon-api-key`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Branch ID
+      - `state.name` - Branch name
+      - `state.endpoints` - Connection endpoints for the branch
+
+      ## Composing with Other Entities
+      Works with:
+      - `neon/project` - The parent project containing this branch
+      - `neon/database` - Create databases on this branch
+      - `neon/compute` - Configure compute endpoints for the branch
+    version-hash: b9e9da8541b6
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for Neon API authentication
+    project-id:
+      type: string
+      description: 'The Neon project ID (format: project-name-123456)'
+    name:
+      type: string
+      description: Custom name for the branch
+    parent-id:
+      type: string
+      description: 'The ID of the parent branch (format: br-name-123456)'
+    parent-lsn:
+      type: string
+      description: Log Sequence Number to create branch from
+    required:
+      - secret_ref
+      - projectId
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    id:
+      type: string
+      description: Unique identifier for the branch
+    name:
+      type: string
+      description: Current name of the branch
+    parentId:
+      type: string
+      description: ID of the parent branch
+    parentLsn:
+      type: string
+      description: Log Sequence Number the branch was created from
+    currentState:
+      type: string
+      description: 'Branch state (init, ready, etc)'
+    createdAt:
+      type: string
+      format: date-time
+      description: When the branch was created
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the branch was last updated
+    logicalSize:
+      type: number
+      description: Logical size of the branch data
+    physicalSize:
+      type: number
+      description: Physical size of the branch data
+    operationIds:
+      type: array
+      items:
+        type: string
+      description: Array of operation IDs that need to complete
+    pendingState:
+      type: string
+      description: Pending state of the branch
+    endpoints:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          type:
+            type: string
+          state:
+            type: string
+          host:
+            type: string
+        required:
+          - id
+          - type
+          - state
+          - host
+        additionalProperties: false
+      description: Information about the branch endpoints
+  lifecycle:
+    sync: <<< branch-sync.js
+    get-branch-details: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 2
+      attempts: 20
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - neon/neon-base
+    - cli

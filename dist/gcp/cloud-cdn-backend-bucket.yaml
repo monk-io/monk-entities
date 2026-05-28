@@ -1,0 +1,173 @@
+namespace: gcp
+cloud-cdn-backend-bucket:
+  defines: entity
+  metadata:
+    name: CloudCdnBackendBucket
+    description: |-
+      Manages a Compute Engine backend bucket with Cloud CDN enabled.
+      Serves static content from a GCS bucket through Google's global CDN edge network.
+      Supports cache mode configuration, TTLs, signed URLs, negative caching,
+      cache key policies, and response compression.
+
+      ## Required Permissions
+      - `compute.backendBuckets.create` — create backend buckets
+      - `compute.backendBuckets.get` — check backend bucket status
+      - `compute.backendBuckets.update` — update backend buckets
+      - `compute.backendBuckets.delete` — delete backend buckets
+      - `compute.globalOperations.get` — poll long-running operations
+      - `monitoring.timeSeries.list` — cost estimation metrics
+      - `cloudbilling.services.list` — cost estimation pricing
+
+      ## Secrets
+      - Reads: none (authenticated via gcp provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Numeric backend bucket ID
+      - `state.self_link` - Full resource URL for use in URL maps
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/cloud-storage` — GCS bucket that serves as the origin
+      - `gcp/service-usage` — enable compute.googleapis.com API
+    version-hash: ae950f2450df
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: 'Backend bucket name (1-63 chars, lowercase letters, digits, dashes)'
+    bucket_name:
+      type: string
+      description: GCS bucket name to serve content from
+    enable_cdn:
+      type: boolean
+      description: Enable Cloud CDN for this backend bucket
+    cache_mode:
+      type: string
+      enum:
+        - USE_ORIGIN_HEADERS
+        - FORCE_CACHE_ALL
+        - CACHE_ALL_STATIC
+      description: Cache mode controlling how caching decisions are made
+    default_ttl:
+      type: number
+      description: 'Default TTL in seconds when origin has no valid TTL (default: 3600)'
+    max_ttl:
+      type: number
+      description: 'Maximum TTL cap in seconds (default: 86400)'
+    client_ttl:
+      type: number
+      description: Client/browser-side TTL in seconds
+    negative_caching:
+      type: boolean
+      description: Enable caching of error responses
+    negative_caching_policies:
+      type: array
+      items:
+        type: object
+        properties:
+          code:
+            type: number
+            description: 'HTTP status code to cache (e.g., 300, 301, 404, 410, 501)'
+          ttl:
+            type: number
+            description: TTL in seconds for this status code (max 1800)
+        required:
+          - code
+          - ttl
+        additionalProperties: false
+      description: Per-status-code negative caching TTL policies
+    serve_while_stale:
+      type: number
+      description: 'Seconds to serve stale content while revalidating (default: 86400)'
+    request_coalescing:
+      type: boolean
+      description: Collapse concurrent cache fill requests for the same key
+    signed_url_cache_max_age_sec:
+      type: number
+      description: Max age in seconds for signed URL cached responses
+    cache_key_include_http_headers:
+      type: array
+      items:
+        type: string
+      description: HTTP headers to include in the cache key
+    cache_key_include_named_cookies:
+      type: array
+      items:
+        type: string
+      description: Named cookies to include in the cache key
+    bypass_cache_on_request_headers:
+      type: array
+      items:
+        type: string
+      description: Request headers that trigger cache bypass (up to 5)
+    backend_bucket_description:
+      type: string
+      description: Human-readable description
+    custom_response_headers:
+      type: array
+      items:
+        type: string
+      description: 'Custom response headers to add (e.g., "X-Cache-Status:{cdn_cache_status}")'
+    compression_mode:
+      type: string
+      enum:
+        - AUTOMATIC
+        - DISABLED
+      description: Response compression mode
+    security_policy:
+      type: string
+      description: |-
+        Self-link of a Cloud Armor security policy to attach as the
+        edge security policy. The policy must be of type CLOUD_ARMOR_EDGE
+        (backend buckets only accept edge policies). Pass an empty string to
+        detach.
+    required:
+      - name
+      - bucket_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    id:
+      type: string
+      description: Server-generated numeric ID
+    self_link:
+      type: string
+      description: Full resource self-link URL
+  lifecycle:
+    sync: <<< cloud-cdn-backend-bucket-sync.js
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - gcp/gcp-base
+    - cli
+    - gcp/common

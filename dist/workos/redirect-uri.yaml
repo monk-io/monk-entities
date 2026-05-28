@@ -1,0 +1,57 @@
+namespace: workos
+redirect-uri:
+  defines: entity
+  metadata:
+    name: RedirectUri
+    description: |-
+      WorkOS Redirect URI entity.
+      Registers a redirect URI for AuthKit authentication flows.
+      AuthKit requires redirect URIs to be registered before they can be used in OAuth callbacks.
+      Note: http://localhost URIs are only allowed in Sandbox (test) environments.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - WorkOS API key
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.redirect_uri_id` - WorkOS redirect URI ID (ruri_...)
+      - `state.uri` - The registered redirect URI
+
+      ## Composing with Other Entities
+      Works with:
+      - `workos/credentials` - Shares API credentials
+    version-hash: 989ef547a790
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing WorkOS API key (sk_test_... or sk_production_...)
+    uri:
+      type: string
+      minLength: 1
+      description: 'The redirect URI to register (e.g. http://localhost:3000/callback)'
+    required:
+      - secret_ref
+      - uri
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    redirect_uri_id:
+      type: string
+      description: WorkOS redirect URI ID (ruri_...)
+    uri:
+      type: string
+      description: The registered redirect URI
+  lifecycle:
+    sync: <<< redirect-uri-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - workos/workos-base
+    - cli

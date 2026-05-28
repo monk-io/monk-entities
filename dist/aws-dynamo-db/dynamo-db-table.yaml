@@ -1,0 +1,285 @@
+namespace: aws-dynamo-db
+dynamo-db-table:
+  defines: entity
+  metadata:
+    name: DynamoDBTable
+    description: |-
+      AWS DynamoDB Table entity.
+      Creates and manages Amazon DynamoDB tables for serverless NoSQL database storage.
+      Supports on-demand and provisioned billing, global/local secondary indexes, and streams.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.table_name` - Table name for SDK operations
+      - `state.table_arn` - Table ARN for IAM policies and cross-service access
+      - `state.table_status` - Current table status (ACTIVE, CREATING, etc.)
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-iam/role` - Grant table access to Lambda functions or other services
+      - `aws-lambda/function` - Read/write data from serverless functions
+    version-hash: e1a77cac3ab3
+  schema:
+    region:
+      type: string
+      description: AWS region for the DynamoDB table
+    table_name:
+      type: string
+      minLength: 3
+      maxLength: 255
+      pattern: '^[a-zA-Z0-9_.-]+$'
+      description: The name of the DynamoDB table
+    attribute_definitions:
+      type: array
+      items:
+        type: object
+        properties:
+          AttributeName:
+            type: string
+          AttributeType:
+            type: string
+            enum:
+              - S
+              - 'N'
+              - B
+        required:
+          - AttributeName
+          - AttributeType
+        additionalProperties: false
+      description: Attribute definitions for the table
+    key_schema:
+      type: array
+      items:
+        type: object
+        properties:
+          AttributeName:
+            type: string
+          KeyType:
+            type: string
+            enum:
+              - HASH
+              - RANGE
+        required:
+          - AttributeName
+          - KeyType
+        additionalProperties: false
+      description: Key schema for the table (hash and range keys)
+    billing_mode:
+      type: string
+      enum:
+        - PROVISIONED
+        - PAY_PER_REQUEST
+      description: Billing mode for the table
+      default: PAY_PER_REQUEST
+    provisioned_throughput:
+      type: object
+      properties:
+        ReadCapacityUnits:
+          type: number
+        WriteCapacityUnits:
+          type: number
+      required:
+        - ReadCapacityUnits
+        - WriteCapacityUnits
+      additionalProperties: false
+      description: Provisioned throughput settings (required if billing_mode is PROVISIONED)
+    global_secondary_indexes:
+      type: array
+      items:
+        type: object
+        properties:
+          IndexName:
+            type: string
+          KeySchema:
+            type: array
+            items:
+              type: object
+              properties:
+                AttributeName:
+                  type: string
+                KeyType:
+                  type: string
+                  enum:
+                    - HASH
+                    - RANGE
+              required:
+                - AttributeName
+                - KeyType
+              additionalProperties: false
+          Projection:
+            type: object
+            properties:
+              ProjectionType:
+                type: string
+                enum:
+                  - ALL
+                  - KEYS_ONLY
+                  - INCLUDE
+              NonKeyAttributes:
+                type: array
+                items:
+                  type: string
+            required:
+              - ProjectionType
+            additionalProperties: false
+          ProvisionedThroughput:
+            type: object
+            properties:
+              ReadCapacityUnits:
+                type: number
+              WriteCapacityUnits:
+                type: number
+            required:
+              - ReadCapacityUnits
+              - WriteCapacityUnits
+            additionalProperties: false
+        required:
+          - IndexName
+          - KeySchema
+          - Projection
+        additionalProperties: false
+      description: Global secondary indexes
+    local_secondary_indexes:
+      type: array
+      items:
+        type: object
+        properties:
+          IndexName:
+            type: string
+          KeySchema:
+            type: array
+            items:
+              type: object
+              properties:
+                AttributeName:
+                  type: string
+                KeyType:
+                  type: string
+                  enum:
+                    - HASH
+                    - RANGE
+              required:
+                - AttributeName
+                - KeyType
+              additionalProperties: false
+          Projection:
+            type: object
+            properties:
+              ProjectionType:
+                type: string
+                enum:
+                  - ALL
+                  - KEYS_ONLY
+                  - INCLUDE
+              NonKeyAttributes:
+                type: array
+                items:
+                  type: string
+            required:
+              - ProjectionType
+            additionalProperties: false
+        required:
+          - IndexName
+          - KeySchema
+          - Projection
+        additionalProperties: false
+      description: Local secondary indexes
+    sse_specification:
+      type: object
+      properties:
+        Enabled:
+          type: boolean
+        SSEType:
+          type: string
+          enum:
+            - AES256
+            - KMS
+        KMSMasterKeyId:
+          type: string
+      additionalProperties: false
+      description: Server-side encryption specification
+    stream_specification:
+      type: object
+      properties:
+        StreamEnabled:
+          type: boolean
+        StreamViewType:
+          type: string
+          enum:
+            - KEYS_ONLY
+            - NEW_IMAGE
+            - OLD_IMAGE
+            - NEW_AND_OLD_IMAGES
+      required:
+        - StreamEnabled
+      additionalProperties: false
+      description: DynamoDB stream configuration
+    table_class:
+      type: string
+      enum:
+        - STANDARD
+        - STANDARD_INFREQUENT_ACCESS
+      description: Table class
+      default: STANDARD
+    deletion_protection_enabled:
+      type: boolean
+      description: Deletion protection enabled
+      default: false
+    point_in_time_recovery_enabled:
+      type: boolean
+      description: Point-in-time recovery enabled
+      default: false
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+      - table_name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the table pre-existed before this entity managed it
+    table_name:
+      type: string
+      description: Table name
+    table_arn:
+      type: string
+      description: Table ARN
+    table_status:
+      type: string
+      description: 'Current table status (e.g., ACTIVE)'
+  lifecycle:
+    sync: <<< dynamo-db-table-sync.js
+    get-table-details: ''
+    put-item: ''
+    get-item: ''
+    delete-item: ''
+    scan-table: ''
+    list-tags: ''
+    get-backup-info: ''
+    create-snapshot: ''
+    list-snapshots: ''
+    describe-snapshot: ''
+    delete-snapshot: ''
+    restore: ''
+    get-restore-status: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 30
+    liveness:
+      period: 300
+  requires:
+    - aws-dynamo-db/dynamo-db-base
+    - cli
+    - cloud/aws
+    - aws-dynamo-db/common

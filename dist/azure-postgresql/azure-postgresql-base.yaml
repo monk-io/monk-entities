@@ -1,0 +1,7 @@
+namespace: azure-postgresql
+
+azure-postgresql-base:
+  defines: module
+  metadata:
+    version-hash: 9064afb19a2f
+  source: <<< azure-postgresql-base.js

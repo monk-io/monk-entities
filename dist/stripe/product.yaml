@@ -1,0 +1,80 @@
+namespace: stripe
+product:
+  defines: entity
+  metadata:
+    name: Product
+    description: |-
+      Stripe Product entity.
+      Creates and manages Stripe products for billing and subscriptions.
+      Products represent goods or services available for purchase.
+
+      ## Secrets
+      - Reads: secret name from `secret_ref` property - Stripe API key (defaults to `stripe-api-key`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.product_id` - Stripe product ID (prod_...)
+      - `state.name` - Product name
+
+      ## Referencing Product from Price
+      ```yaml
+      product:
+        defines: stripe/product
+        name: My SaaS Product
+        services:
+          data:
+            protocol: custom
+
+      price:
+        defines: stripe/price
+        connections:
+          product:
+            target: my-namespace/product
+            service: data
+        product_id: <- connection-target("product") entity-state get-member("product_id")
+        currency: usd
+        unit_amount: 2900
+        recurring_interval: month
+      ```
+
+      ## Composing with Other Entities
+      Works with:
+      - `stripe/price` - Create prices for this product
+    version-hash: c326f768f517
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Secret name storing Stripe secret API key (sk_test_... or sk_live_...)
+    name:
+      type: string
+    product_id:
+      type: string
+    product_description:
+      type: string
+    metadata:
+      type: object
+      additionalProperties:
+        type: string
+    required:
+      - secret_ref
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    product_id:
+      type: string
+    name:
+      type: string
+  lifecycle:
+    sync: <<< product-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - stripe/stripe-base
+    - cli

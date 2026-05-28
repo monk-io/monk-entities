@@ -1,0 +1,7 @@
+namespace: digitalocean-domains
+
+common:
+  defines: module
+  metadata:
+    version-hash: 4065e6f21fd4
+  source: <<< common.js

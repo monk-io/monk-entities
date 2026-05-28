@@ -1,0 +1,7 @@
+namespace: aws-route53
+
+route53-base:
+  defines: module
+  metadata:
+    version-hash: d7df84da8f83
+  source: <<< route53-base.js

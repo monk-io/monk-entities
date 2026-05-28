@@ -1,0 +1,54 @@
+namespace: aws-cognito
+identity-provider:
+  defines: entity
+  metadata:
+    name: IdentityProvider
+  schema:
+    region:
+      type: string
+      description: AWS region where the Cognito resources will be managed
+    user_pool_id:
+      type: string
+    provider_name:
+      type: string
+    provider_type:
+      type: string
+      enum:
+        - SAML
+        - OIDC
+        - Facebook
+        - Google
+        - LoginWithAmazon
+        - SignInWithApple
+    provider_details:
+      type: object
+      additionalProperties:
+        type: string
+    attribute_mapping:
+      type: object
+      additionalProperties:
+        type: string
+    idp_identifiers:
+      type: array
+      items:
+        type: string
+    required:
+      - region
+      - user_pool_id
+      - provider_name
+      - provider_type
+      - provider_details
+  lifecycle:
+    sync: <<< identity-provider-sync.js
+    get-provider-info: ''
+    test-provider-config: ''
+    list-providers: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-cognito/cognito-base
+    - monkec/base
+    - cli

@@ -1,0 +1,7 @@
+namespace: aws-rds
+
+lite-base:
+  defines: module
+  metadata:
+    version-hash: bb1c2adf7b5b
+  source: <<< lite-base.js
