@@ -8,7 +8,7 @@ project-iam-binding:
       Decoupled from the entity that owns the identity, so you can grant roles
       to any principal type and clean up individual grants without touching the
       identity itself.
-    version-hash: '26548e489472'
+    version-hash: ae950f2450df
   schema:
     project:
       type: string

@@ -45,7 +45,7 @@ firebase-hosting-site:
       ## Composing with Other Entities
       - `gcp/firebase-hosting-channel` - Create preview channels
       - `gcp/service-usage` - Enable firebasehosting.googleapis.com
-    version-hash: '26548e489472'
+    version-hash: ae950f2450df
   schema:
     project:
       type: string

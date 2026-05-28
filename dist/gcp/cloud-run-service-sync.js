@@ -258,9 +258,7 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
       if (terminal.includes(status)) {
         throw new Error(`Cloud Build failed (${status}). Logs: ${build.logUrl || "n/a"}`);
       }
-      const start = Date.now();
-      while (Date.now() - start < delayMs) {
-      }
+      sleep(delayMs);
     }
     throw new Error(`Cloud Build ${buildId} did not complete within ${maxAttempts * delayMs / 1e3}s`);
   }
