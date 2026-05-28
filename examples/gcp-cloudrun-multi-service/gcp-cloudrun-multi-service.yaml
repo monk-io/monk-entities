@@ -1,0 +1,382 @@
+# GCP Cloud Run — Multi-Service Production Demo
+#
+# A production-ready stack demonstrating the full Cloud Run capability set:
+#
+#   Browser
+#     │
+#     ▼
+#   Frontend  (Cloud Run service, pre-built Docker image)  ← scale-to-zero, 1 CPU
+#     │ browser → API_URL (wired from entity state)
+#     ▼
+#   API       (Cloud Run service, pre-built Docker image)  ← scale-to-zero, 1 CPU
+#     ├─► Cloud SQL Postgres (tasks table)
+#     └─► Cloud Storage bucket (quick CSV export)
+#
+#   Batch Export Job (Cloud Run Job, pre-built image)     ← on-demand batch processing
+#     ├─► Cloud SQL Postgres
+#     └─► Cloud Storage bucket
+#
+# Key patterns demonstrated:
+#   1. Service-to-service URL wiring: frontend.env_vars.API_URL ← api.state.url
+#   2. Different scaling profiles side-by-side (comments on each service)
+#   3. Cloud Run Job for batch workloads vs long-running services
+#   4. Source deploy (blob_name) for services via Cloud Build + Google Cloud Buildpacks
+#   5. Shared service account with least-privilege IAM roles
+#   6. Auto-generated DB password via password_secret → Monk secret
+#
+# Prerequisites:
+#   sudo monk cluster provider add -p gcp
+#   Build and push the job Docker image to Artifact Registry first (see README).
+#   API and frontend deploy from source — no Docker registry needed for those.
+#
+# Deploy:
+#   sudo monk load dist/gcp/MANIFEST
+#   sudo monk load examples/gcp-cloudrun-multi-service/MANIFEST
+#   sudo monk run -t TAG gcp-cloudrun-multi-service/stack
+#
+# Cloud SQL takes 8–15 min; Cloud Run services deploy in ~1 min with pre-built images.
+
+namespace: gcp-cloudrun-multi-service
+
+# =============================================================================
+# 1. Enable required GCP APIs
+# =============================================================================
+
+enable-apis:
+  defines: gcp/service-usage
+  apis:
+    - run.googleapis.com
+    - sqladmin.googleapis.com
+    - storage.googleapis.com
+    - iam.googleapis.com
+    - cloudbuild.googleapis.com
+    - artifactregistry.googleapis.com
+
+# =============================================================================
+# 2. Shared runtime service account
+#    Both Cloud Run services and the Cloud Run Job run as this identity.
+#    Roles follow least-privilege: only what each workload needs.
+# =============================================================================
+
+app-sa:
+  defines: gcp/service-account
+  name: cloudrun-multi-runner
+  display_name: Cloud Run multi-service demo SA
+  account_description: Shared runtime identity for API service, frontend service, and export job
+  roles:
+    - roles/cloudsql.client        # connect to Cloud SQL instances
+    - roles/storage.objectAdmin    # read/write GCS objects (for export)
+    - roles/run.invoker            # allow services to call other Cloud Run services
+    - roles/logging.logWriter      # write structured logs to Cloud Logging
+  services:
+    service-account:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/enable-apis
+      timeout: 300
+
+# =============================================================================
+# 3. Cloud Storage bucket — stores CSV exports produced by the batch job
+# =============================================================================
+
+exports-bucket:
+  defines: gcp/cloud-storage
+  # Bucket names are globally unique — bump the suffix if you get a conflict
+  name: monk-cloudrun-multi-exports-1
+  location: US
+  storage_class: STANDARD
+  labels:
+    environment: example
+    owner: monk-example
+  services:
+    bucket:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/enable-apis
+      timeout: 300
+
+# =============================================================================
+# 4. Cloud SQL Postgres — persistent task storage
+#    Note: allow_all opens 0.0.0.0/0 for demo simplicity.
+#    Production: use Cloud SQL Auth Proxy sidecar or VPC private IP.
+# =============================================================================
+
+postgres:
+  defines: gcp/cloud-sql-instance
+  # Instance names cannot be reused for ~1 week after deletion — bump suffix on redeploy
+  name: monk-cloudrun-multi-db-1
+  database_version: POSTGRES_15
+  tier: db-f1-micro
+  region: us-central1
+  storage_size_gb: 10
+  allow_all: true
+  deletion_protection: false
+  availability_type: ZONAL
+  services:
+    instance:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/enable-apis
+      timeout: 300
+
+task-database:
+  defines: gcp/cloud-sql-database
+  instance: <- connection-target("instance") entity get-member("name")
+  name: taskdb
+  charset: UTF8
+  services:
+    database:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-cloudrun-multi-service/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/postgres
+      timeout: 900
+
+task-db-user:
+  defines: gcp/cloud-sql-user
+  instance: <- connection-target("instance") entity get-member("name")
+  name: taskuser
+  # password_secret names the Monk secret where a random password is stored
+  # and also auto-injected into the DB_PASSWORD env var below
+  password_secret: cloudrun-multi-db-password
+  permitted-secrets:
+    cloudrun-multi-db-password: true
+  services:
+    user:
+      protocol: custom
+  connections:
+    instance:
+      runnable: gcp-cloudrun-multi-service/postgres
+      service: instance
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/postgres
+        - gcp-cloudrun-multi-service/task-database
+      timeout: 900
+
+# =============================================================================
+# 5. API — Cloud Run service (source deploy via blob_name)
+#
+#    Scaling profile:
+#      min_instances: 0  → scale-to-zero when idle (cost-efficient for APIs
+#                          with bursty traffic; accepts ~1s cold-start latency)
+#      max_instances: 5  → cap spend during load spikes
+#      concurrency: 80   → default Cloud Run concurrency (good for I/O-bound)
+#      cpu_idle: true    → CPU throttled between requests (default, request billing)
+#
+#    Source deploy: blob_name uploads api/ to GCS, Cloud Build uses
+#    gcr.io/k8s-skaffold/pack + gcr.io/buildpacks/builder:v1 to build
+#    and push an image to Artifact Registry — same pipeline as
+#    `gcloud run deploy --source`. No Dockerfile or registry push needed.
+# =============================================================================
+
+api:
+  defines: gcp/cloud-run-service
+  name: cloudrun-multi-api
+  location: us-central1
+  blob_name: api
+  port: 8080
+  cpu: "1"
+  memory: 512Mi
+  min_instances: 0
+  max_instances: 5
+  concurrency: 80
+  # cpu_idle: true  (default) — CPU throttled when not handling requests
+  timeout_seconds: 60
+  allow_unauthenticated: true
+  service_account: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    component: api
+    owner: monk-example
+  env_vars:
+    DB_HOST: <- connection-target("db-instance") entity-state get-member("address")
+    DB_PORT: "5432"
+    DB_NAME: taskdb
+    DB_USER: taskuser
+    DB_PASSWORD: <- secret("cloudrun-multi-db-password")
+    BUCKET_NAME: <- connection-target("bucket") entity-state get-member("name")
+  permitted-secrets:
+    cloudrun-multi-db-password: true
+  connections:
+    sa:
+      runnable: gcp-cloudrun-multi-service/app-sa
+      service: service-account
+    db-instance:
+      runnable: gcp-cloudrun-multi-service/postgres
+      service: instance
+    db-user:
+      runnable: gcp-cloudrun-multi-service/task-db-user
+      service: user
+    bucket:
+      runnable: gcp-cloudrun-multi-service/exports-bucket
+      service: bucket
+  services:
+    api:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/postgres
+        - gcp-cloudrun-multi-service/task-database
+        - gcp-cloudrun-multi-service/task-db-user
+        - gcp-cloudrun-multi-service/exports-bucket
+        - gcp-cloudrun-multi-service/app-sa
+      timeout: 1200
+
+# =============================================================================
+# 6. Frontend — Cloud Run service (source deploy, blob_name: frontend)
+#
+#    Scaling profile:
+#      min_instances: 0  → scale-to-zero (frontend cold-starts are less
+#                          noticeable than API cold-starts for static pages)
+#      max_instances: 3  → light-weight Node server, low concurrency needed
+#      cpu: "1"          → Cloud Run requires cpu >= 1 when concurrency > 1
+#      memory: 256Mi     → minimal — pure Node.js, no heavy in-process work
+#
+#    Service-to-service URL wiring:
+#      API_URL is resolved from the api Cloud Run service's state.url at
+#      deploy time — the frontend never hard-codes the API endpoint.
+# =============================================================================
+
+frontend:
+  defines: gcp/cloud-run-service
+  name: cloudrun-multi-frontend
+  location: us-central1
+  blob_name: frontend
+  port: 3000
+  # Cloud Run requires cpu >= 1 when concurrency > 1.
+  # Use "0.5" only if you also set concurrency: 1 (single-request serving).
+  cpu: "1"
+  memory: 256Mi
+  min_instances: 0
+  max_instances: 3
+  concurrency: 80
+  timeout_seconds: 30
+  allow_unauthenticated: true
+  service_account: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    component: frontend
+    owner: monk-example
+  env_vars:
+    # ← Service-to-service URL wiring: frontend Cloud Run gets the API's
+    #   HTTPS endpoint from entity state, injected at deploy time.
+    API_URL: <- connection-target("api") entity-state get-member("url")
+  connections:
+    sa:
+      runnable: gcp-cloudrun-multi-service/app-sa
+      service: service-account
+    api:
+      runnable: gcp-cloudrun-multi-service/api
+      service: api
+  services:
+    frontend:
+      protocol: custom
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/api
+        - gcp-cloudrun-multi-service/app-sa
+      timeout: 600
+
+# =============================================================================
+# 7. Batch Export Job — Cloud Run Job (pre-built Docker image)
+#
+#    Cloud Run Jobs differences vs Services:
+#      • Runs to completion (exit 0 = success, non-zero = failure + retry)
+#      • No HTTP server — no port or ingress
+#      • Triggered on-demand or by Cloud Scheduler (not continuous)
+#      • max_retries: 1 — retry once on transient failure
+#      • No concurrency, min/max_instances — job-specific parameters
+#
+#    Trigger:
+#      sudo monk do gcp-cloudrun-multi-service/batch-export-job/execute
+#
+#    Monitor executions:
+#      sudo monk do gcp-cloudrun-multi-service/batch-export-job/get-executions
+# =============================================================================
+
+batch-export-job:
+  defines: gcp/cloud-run-job
+  name: cloudrun-multi-export-job
+  location: us-central1
+  # Pre-built image: Cloud Run Jobs require an image URI (blob_name not supported).
+  # Cloud Run only accepts images from gcr.io, docker.pkg.dev, or docker.io —
+  # not from Azure Container Registry or other external registries.
+  # Build and push to Artifact Registry before first deploy — see README.
+  # Image must be in gcr.io, docker.pkg.dev, or docker.io — Azure CR is not supported.
+  # Replace YOUR_PROJECT with your GCP project ID.
+  # See README "Build Job Image" section for push instructions.
+  image: us-central1-docker.pkg.dev/monk-tests/cloud-run-source-deploy/gcp-cloudrun-multi-service-job:latest  # Replace monk-tests with your GCP project ID
+  cpu: "1"
+  memory: 512Mi
+  timeout_seconds: 300
+  max_retries: 1
+  task_count: 1
+  service_account: <- connection-target("sa") entity-state get-member("email")
+  labels:
+    environment: example
+    component: export-job
+    owner: monk-example
+  env_vars:
+    DB_HOST: <- connection-target("db-instance") entity-state get-member("address")
+    DB_PORT: "5432"
+    DB_NAME: taskdb
+    DB_USER: taskuser
+    DB_PASSWORD: <- secret("cloudrun-multi-db-password")
+    BUCKET_NAME: <- connection-target("bucket") entity-state get-member("name")
+  permitted-secrets:
+    cloudrun-multi-db-password: true
+  connections:
+    sa:
+      runnable: gcp-cloudrun-multi-service/app-sa
+      service: service-account
+    db-instance:
+      runnable: gcp-cloudrun-multi-service/postgres
+      service: instance
+    bucket:
+      runnable: gcp-cloudrun-multi-service/exports-bucket
+      service: bucket
+  depends:
+    wait-for:
+      runnables:
+        - gcp-cloudrun-multi-service/postgres
+        - gcp-cloudrun-multi-service/task-database
+        - gcp-cloudrun-multi-service/task-db-user
+        - gcp-cloudrun-multi-service/exports-bucket
+        - gcp-cloudrun-multi-service/app-sa
+      timeout: 1200
+
+# =============================================================================
+# Deploy everything
+# =============================================================================
+# sudo monk run -t TAG gcp-cloudrun-multi-service/stack
+#
+# After deploy, open the frontend URL shown in:
+#   sudo monk describe local/gcp-cloudrun-multi-service/frontend | grep url
+
+stack:
+  defines: group
+  members:
+    - gcp-cloudrun-multi-service/enable-apis
+    - gcp-cloudrun-multi-service/app-sa
+    - gcp-cloudrun-multi-service/exports-bucket
+    - gcp-cloudrun-multi-service/postgres
+    - gcp-cloudrun-multi-service/task-database
+    - gcp-cloudrun-multi-service/task-db-user
+    - gcp-cloudrun-multi-service/api
+    - gcp-cloudrun-multi-service/frontend
+    - gcp-cloudrun-multi-service/batch-export-job

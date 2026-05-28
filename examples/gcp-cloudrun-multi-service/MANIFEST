@@ -1,0 +1,4 @@
+REPO gcp-cloudrun-multi-service
+LOAD gcp-cloudrun-multi-service.yaml
+BLOBS api:api/
+BLOBS frontend:frontend/
