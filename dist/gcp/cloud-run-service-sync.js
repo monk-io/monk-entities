@@ -60,8 +60,10 @@ const http = require("http");
 const blobs = require("blobs");
 const common = require("gcp/common");
 const CLOUD_RUN_API_URL = common.CLOUD_RUN_API_URL;
+const ARTIFACT_REGISTRY_API_URL = common.ARTIFACT_REGISTRY_API_URL;
 const extractPriceFromSku = common.extractPriceFromSku;
 const parseMemoryMb = common.parseMemoryMb;
+var CLOUD_BUILD_API_URL = "https://cloudbuild.googleapis.com/v1";
 var _costs_dec, _getCostEstimate_dec, _denyUnauthenticated_dec, _allowUnauthenticated_dec, _getRevisions_dec, _getInfo_dec, _a, _init;
 var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_dec = [action("get-info")], _getRevisions_dec = [action("get-revisions")], _allowUnauthenticated_dec = [action("allow-unauthenticated")], _denyUnauthenticated_dec = [action("deny-unauthenticated")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
@@ -89,7 +91,7 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
   }
   /**
    * Upload blob source code to GCS for source-based deployment.
-   * Returns { bucket, object } for use in sourceCode.cloudStorageSource.
+   * Returns { bucket, object } for use with Cloud Build source deploy.
    */
   uploadBlobSource() {
     const blobName = this.definition.blob_name;
@@ -153,12 +155,15 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     if (this.definition.image && this.definition.blob_name) {
       throw new Error("Cannot set both 'image' and 'blob_name' \u2014 use one or the other");
     }
-    let sourceRef = null;
+    let resolvedImage;
     if (this.definition.blob_name) {
-      sourceRef = this.uploadBlobSource();
+      const sourceRef = this.uploadBlobSource();
+      resolvedImage = this.buildImageFromSource(sourceRef);
+    } else {
+      resolvedImage = this.definition.image;
     }
     const container = {
-      image: this.definition.image || "scratch",
+      image: resolvedImage,
       ports: [{ containerPort: this.definition.port ?? 8080 }],
       resources: {
         limits: {
@@ -182,15 +187,6 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
     }
     if (this.definition.container_args) {
       container.args = this.definition.container_args;
-    }
-    if (sourceRef) {
-      container.sourceCode = {
-        cloudStorageSource: {
-          bucket: sourceRef.bucket,
-          object: sourceRef.object
-        }
-      };
-      container.baseImageUri = this.definition.base_image || `${this.definition.location}-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22`;
     }
     const template = {
       containers: [container],
@@ -231,6 +227,86 @@ var _CloudRunService = class _CloudRunService extends (_a = GcpEntity, _getInfo_
   waitForServiceOperation(operationName) {
     const operationUrl = `${CLOUD_RUN_API_URL}/${operationName}`;
     return this.waitForOperation(operationUrl, 120, 1e4);
+  }
+  /** Returns the Artifact Registry image URI for a source-built service. */
+  buildImageUri() {
+    return `${this.definition.location}-docker.pkg.dev/${this.projectId}/cloud-run-source-deploy/${this.definition.name}:latest`;
+  }
+  /** Ensure the cloud-run-source-deploy AR Docker repo exists, creating it if needed. */
+  ensureArtifactRegistryRepo() {
+    const repoId = "cloud-run-source-deploy";
+    const repoUrl = `${ARTIFACT_REGISTRY_API_URL}/projects/${this.projectId}/locations/${this.definition.location}/repositories/${repoId}`;
+    if (this.checkResourceExists(repoUrl)) return;
+    cli.output(`Creating Artifact Registry repo: ${repoId}`);
+    const createUrl = `${ARTIFACT_REGISTRY_API_URL}/projects/${this.projectId}/locations/${this.definition.location}/repositories?repositoryId=${repoId}`;
+    this.post(createUrl, {
+      format: "DOCKER",
+      description: "Cloud Run source deployments"
+    });
+  }
+  /** Poll a Cloud Build build until SUCCESS or a terminal failure state. */
+  waitForCloudBuild(buildId) {
+    const buildUrl = `${CLOUD_BUILD_API_URL}/projects/${this.projectId}/locations/${this.definition.location}/builds/${buildId}`;
+    const terminal = ["SUCCESS", "FAILURE", "INTERNAL_ERROR", "TIMEOUT", "CANCELLED"];
+    const maxAttempts = 120;
+    const delayMs = 1e4;
+    for (let i = 0; i < maxAttempts; i++) {
+      const build = this.get(buildUrl);
+      const status = build.status || "QUEUED";
+      cli.output(`Cloud Build ${buildId}: ${status} (${i + 1}/${maxAttempts})`);
+      if (status === "SUCCESS") return;
+      if (terminal.includes(status)) {
+        throw new Error(`Cloud Build failed (${status}). Logs: ${build.logUrl || "n/a"}`);
+      }
+      const start = Date.now();
+      while (Date.now() - start < delayMs) {
+      }
+    }
+    throw new Error(`Cloud Build ${buildId} did not complete within ${maxAttempts * delayMs / 1e3}s`);
+  }
+  /**
+   * Build a Docker image from blob source using Cloud Build + Google Cloud Buildpacks.
+   * Matches what `gcloud run deploy --source` does:
+   *   upload source → submit Cloud Build with buildpack builder → wait → return image URI.
+   */
+  buildImageFromSource(sourceRef) {
+    this.ensureArtifactRegistryRepo();
+    const imageUri = this.buildImageUri();
+    const buildUrl = `${CLOUD_BUILD_API_URL}/projects/${this.projectId}/locations/${this.definition.location}/builds`;
+    const buildBody = {
+      source: {
+        storageSource: {
+          bucket: sourceRef.bucket,
+          object: sourceRef.object
+        }
+      },
+      steps: [
+        {
+          // pack CLI invokes Google Cloud Buildpacks to auto-detect and build
+          // the runtime (Node.js/Python/Go/Java) from the source code.
+          // The builder runs npm install and sets the correct CMD entrypoint.
+          name: "gcr.io/k8s-skaffold/pack",
+          args: [
+            "build",
+            imageUri,
+            "--builder",
+            "gcr.io/buildpacks/builder:v1"
+          ]
+        }
+      ],
+      images: [imageUri],
+      options: { logging: "CLOUD_LOGGING_ONLY" }
+    };
+    cli.output(`Submitting Cloud Build for source deploy (image: ${imageUri})...`);
+    const buildOp = this.post(buildUrl, buildBody);
+    const buildId = buildOp?.metadata?.build?.id;
+    if (!buildId) {
+      throw new Error(`Cloud Build submission returned no build ID: ${JSON.stringify(buildOp)}`);
+    }
+    cli.output(`Cloud Build started: ${buildId}`);
+    this.waitForCloudBuild(buildId);
+    cli.output(`Cloud Build complete \u2014 image: ${imageUri}`);
+    return imageUri;
   }
   create() {
     const existing = this.getService();

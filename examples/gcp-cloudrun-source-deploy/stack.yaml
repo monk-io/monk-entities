@@ -10,7 +10,6 @@ hello-service:
   name: monk-test-source-deploy
   location: us-central1
   blob_name: helloworld
-  command: ["node", "index.js"]
   port: 8080
   cpu: "1"
   memory: 512Mi
