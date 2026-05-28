@@ -449,8 +449,7 @@ export class CloudRunService extends GcpEntity<CloudRunServiceDefinition, CloudR
                 throw new Error(`Cloud Build failed (${status}). Logs: ${build.logUrl || "n/a"}`);
             }
 
-            const start = Date.now();
-            while (Date.now() - start < delayMs) { /* spin */ }
+            sleep(delayMs);
         }
 
         throw new Error(`Cloud Build ${buildId} did not complete within ${maxAttempts * delayMs / 1000}s`);

@@ -33,7 +33,7 @@ identity-platform-tenant:
       - `gcp/identity-platform-oauth-idp-config` — Configure OIDC providers per tenant
       - `gcp/identity-platform-default-idp-config` — Configure social providers per tenant
       - `gcp/identity-platform-inbound-saml-config` — Configure SAML providers per tenant
-    version-hash: '26548e489472'
+    version-hash: ae950f2450df
   schema:
     project:
       type: string

@@ -31,7 +31,7 @@ cloud-run-service:
       Works with:
       - `gcp/service-usage` — enable run.googleapis.com API
       - `gcp/service-account` — custom service account for the service
-    version-hash: '26548e489472'
+    version-hash: ae950f2450df
   schema:
     project:
       type: string
@@ -111,11 +111,6 @@ cloud-run-service:
         Name of the blob containing source code to deploy.
         When set, the source is zipped, uploaded to GCS, and Cloud Run builds the image automatically.
         Cannot be used together with image.
-    base_image:
-      type: string
-      description: |-
-        Base image for source-based deployment (e.g., us-central1-docker.pkg.dev/serverless-runtimes/google-24-full/runtimes/nodejs22).
-        Only used when blob_name is set. If omitted, Cloud Run auto-detects the runtime.
     port:
       type: number
       description: Container port (default 8080)
