@@ -30,7 +30,7 @@ cloudflare-pages-project:
       - `get-info` — fetch project record
       - `list-deployments` — list recent deployments
       - `force-delete` — explicit destructive delete; refuses adopted projects
-    version-hash: fbd989232548
+    version-hash: d7d2468bd293
   schema:
     secret_ref:
       type: string

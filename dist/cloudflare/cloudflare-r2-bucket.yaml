@@ -6,8 +6,8 @@ cloudflare-r2-bucket:
     description: |-
       Cloudflare R2 Bucket entity.
       Detects-then-creates an R2 bucket in the given account. Adopts pre-existing
-      buckets by name. delete() is a no-op by default; opt in with
-      `allow_destructive_delete: true` or call the `force-delete` action.
+      buckets by name. delete() destroys the bucket by default; set
+      `allow_destructive_delete: false` to make delete a no-op.
 
       ## Secrets
       - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
@@ -21,7 +21,7 @@ cloudflare-r2-bucket:
       ## Actions
       - `get-info` - Fetch bucket metadata
       - `force-delete` - Explicit destructive delete (refuses if state.existing)
-    version-hash: fbd989232548
+    version-hash: d7d2468bd293
   schema:
     secret_ref:
       type: string
@@ -49,8 +49,8 @@ cloudflare-r2-bucket:
       description: Storage class; defaults to Standard
     allow_destructive_delete:
       type: boolean
-      description: 'If true, delete() will destroy the bucket. Defaults to false (no-op delete).'
-      default: false
+      description: 'If true, delete() will destroy the bucket. Defaults to true.'
+      default: true
     required:
       - account_id
       - name

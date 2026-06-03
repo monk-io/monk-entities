@@ -16,7 +16,7 @@ cloudflare-custom-hostname-fallback-origin:
 
       ## Actions
       - `get-info` — fetch current fallback origin record
-    version-hash: fbd989232548
+    version-hash: d7d2468bd293
   schema:
     secret_ref:
       type: string

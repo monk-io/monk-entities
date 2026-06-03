@@ -30,16 +30,32 @@ mkdir -p "$OUTPUT_DIR_ABS"
 BASENAME="$(basename "$INPUT_DIR_ABS")"
 
 if [ "$1" = "test" ]; then
-  # For test, we need to mount the socket and token
-  # on linux we may also need to use sudo ./monkec.sh to access the socket
-  exec podman run --pull newer -ti --rm \
-    -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
-    -v "$MONK_SOCKET:/root/.monk/monkd.sock" \
-    -v "$MONK_TOKEN_FOLDER:/root/.monk/" \
-    -e INPUT_DIR="/monkec/input/$BASENAME" \
-    -e OUTPUT_DIR="/monkec/output/" \
-    -w "/monkec" \
-    "$MONKEC_IMAGE" "$@"
+  # For test, we need access to monkd. Supports two modes:
+  #   TCP:    MONK_SOCKET=tcp://127.0.0.1:2137 — uses host network, no socket mount
+  #   Unix:   MONK_SOCKET=/var/lib/monkd/monkd.sock — mounts socket into container
+  case "$MONK_SOCKET" in
+    tcp://*)
+      exec podman run --pull newer -ti --rm \
+        --network host \
+        -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
+        -v "$MONK_TOKEN_FOLDER:/root/.monk/" \
+        -e INPUT_DIR="/monkec/input/$BASENAME" \
+        -e OUTPUT_DIR="/monkec/output/" \
+        -e MONK_SOCKET="$MONK_SOCKET" \
+        -w "/monkec" \
+        "$MONKEC_IMAGE" "$@"
+      ;;
+    *)
+      exec podman run --pull newer -ti --rm \
+        -v "$INPUT_DIR_ABS:/monkec/input/$BASENAME" \
+        -v "$MONK_SOCKET:/root/.monk/monkd.sock" \
+        -v "$MONK_TOKEN_FOLDER:/root/.monk/" \
+        -e INPUT_DIR="/monkec/input/$BASENAME" \
+        -e OUTPUT_DIR="/monkec/output/" \
+        -w "/monkec" \
+        "$MONKEC_IMAGE" "$@"
+      ;;
+  esac
 else
   # For compile command and others
   # you can go inside the container with ./.monkec.sh sh

@@ -21,7 +21,7 @@ cloudflare-dns-record:
       ## Composing with Other Entities
       Works with:
       - `cloudflare/dns-zone` - The parent zone containing this record
-    version-hash: fbd989232548
+    version-hash: d7d2468bd293
   schema:
     secret_ref:
       type: string

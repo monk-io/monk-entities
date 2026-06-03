@@ -44,6 +44,9 @@ sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --test-file test/stack-inte
 
 # Watch mode
 sudo INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --watch
+
+# TCP socket (monkd running on localhost, no sudo needed)
+MONK_SOCKET=tcp://127.0.0.1:2137 INPUT_DIR=./src/mongodb-atlas/ ./monkec.sh test --verbose
 ```
 
 ## Developing New Entities

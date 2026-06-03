@@ -116,11 +116,10 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
       cli.output("Bucket existed before this entity; skipping delete");
       return;
     }
-    if (!this.definition.allow_destructive_delete) {
-      cli.output(
-        `R2 bucket ${this.state.id} delete is disabled. Set allow_destructive_delete: true or invoke the force-delete action to remove it.`
+    if (this.definition.allow_destructive_delete === false) {
+      throw new Error(
+        `R2 bucket ${this.state.id} delete is disabled. Remove allow_destructive_delete: false or invoke the force-delete action to remove it.`
       );
-      return;
     }
     this.destroyBucket();
   }

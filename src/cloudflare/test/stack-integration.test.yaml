@@ -204,6 +204,10 @@ tests:
         - "Sent message"
         - "monk-test"
 
+  - name: Wait for DLQ message propagation
+    action: sleep
+    duration: 3000
+
   - name: Pull message from DLQ
     action: action
     target: cloudflare-test/dlq
