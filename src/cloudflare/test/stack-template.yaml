@@ -71,8 +71,6 @@ bucket:
   account_id: <- secret("cloudflare-account-id")
   name: monk-r2-test-bucket
   storage_class: Standard
-  # Tests need cleanup to actually destroy the bucket.
-  allow_destructive_delete: true
   permitted-secrets:
     cloudflare-api-token: true
     cloudflare-account-id: true
@@ -85,9 +83,6 @@ worker:
   account_id: <- secret("cloudflare-account-id")
   name: monk-test-worker
   compatibility_date: "2025-04-01"
-  # Tests need to be hermetic: allow destructive delete so cleanup wipes
-  # the Worker from the account when the stack is torn down.
-  allow_destructive_delete: true
   permitted-secrets:
     cloudflare-api-token: true
     cloudflare-account-id: true

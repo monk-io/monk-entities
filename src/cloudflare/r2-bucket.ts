@@ -18,8 +18,8 @@ export interface CloudflareR2BucketDefinition extends CloudflareEntityDefinition
   /** @description Storage class; defaults to Standard */
   storage_class?: "Standard" | "InfrequentAccess";
   /**
-   * @description If true, delete() will destroy the bucket. Defaults to false (no-op delete).
-   * @default false
+   * @description If true, delete() will destroy the bucket. Defaults to true.
+   * @default true
    */
   allow_destructive_delete?: boolean;
 }
@@ -44,8 +44,8 @@ export interface CloudflareR2BucketState extends CloudflareEntityState {
 /**
  * @description Cloudflare R2 Bucket entity.
  * Detects-then-creates an R2 bucket in the given account. Adopts pre-existing
- * buckets by name. delete() is a no-op by default; opt in with
- * `allow_destructive_delete: true` or call the `force-delete` action.
+ * buckets by name. delete() destroys the bucket by default; set
+ * `allow_destructive_delete: false` to make delete a no-op.
  *
  * ## Secrets
  * - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
@@ -127,12 +127,11 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
       cli.output("Bucket existed before this entity; skipping delete");
       return;
     }
-    if (!this.definition.allow_destructive_delete) {
-      cli.output(
-        `R2 bucket ${this.state.id} delete is disabled. Set allow_destructive_delete: true ` +
+    if (this.definition.allow_destructive_delete === false) {
+      throw new Error(
+        `R2 bucket ${this.state.id} delete is disabled. Remove allow_destructive_delete: false ` +
           `or invoke the force-delete action to remove it.`
       );
-      return;
     }
     this.destroyBucket();
   }
