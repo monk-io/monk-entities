@@ -17,8 +17,8 @@ export interface CloudflareWorkersScriptDefinition extends CloudflareEntityDefin
   /** @description Optional ISO date for the initial stub (e.g. "2025-04-01") */
   compatibility_date?: string;
   /**
-   * @description If true, delete() destroys the script. Default false (no-op).
-   * @default false
+   * @description If true, delete() destroys the script. Defaults to true.
+   * @default true
    */
   allow_destructive_delete?: boolean;
 }
@@ -30,6 +30,8 @@ export interface CloudflareWorkersScriptDefinition extends CloudflareEntityDefin
 export interface CloudflareWorkersScriptState extends CloudflareEntityState {
   /** @description Worker name; canonical identifier (mirrors definition.name) */
   id?: string;
+  /** @description Full workers.dev URL: https://{name}.{account-subdomain}.workers.dev */
+  url?: string;
   /** @description ISO-8601 timestamp the script was created */
   created_on?: string;
   /** @description ISO-8601 timestamp of last modification */
@@ -55,10 +57,9 @@ export interface CloudflareWorkersScriptState extends CloudflareEntityState {
  *   and to `workers-route` as `script_name`.
  *
  * ## Delete posture
- * Like cloudflare-r2-bucket: delete is a no-op unless
- * `allow_destructive_delete: true` is set in the definition or the
- * `force-delete` action is invoked. Adopted scripts (`state.existing = true`)
- * are never deleted.
+ * delete() destroys the script by default. Set `allow_destructive_delete: false`
+ * to make delete a no-op, or use the `force-delete` action for an explicit
+ * one-shot removal. Adopted scripts (`state.existing = true`) are never deleted.
  *
  * ## Actions
  * - `get-info` — fetch script metadata from Cloudflare
@@ -78,6 +79,7 @@ export class CloudflareWorkersScript extends CloudflareEntity<
     if (existing) {
       this.state = {
         id: name,
+        url: this.workersDevUrl(accountId, name),
         created_on: existing.created_on,
         modified_on: existing.modified_on,
         etag: existing.etag,
@@ -90,6 +92,7 @@ export class CloudflareWorkersScript extends CloudflareEntity<
     const meta = this.uploadStub(accountId, name);
     this.state = {
       id: name,
+      url: this.workersDevUrl(accountId, name),
       created_on: meta?.created_on,
       modified_on: meta?.modified_on,
       etag: meta?.etag,
@@ -117,12 +120,11 @@ export class CloudflareWorkersScript extends CloudflareEntity<
       cli.output("Script existed before this entity; skipping delete");
       return;
     }
-    if (!this.definition.allow_destructive_delete) {
-      cli.output(
-        `Worker script ${this.state.id} delete is disabled. Set allow_destructive_delete: true ` +
+    if (this.definition.allow_destructive_delete === false) {
+      throw new Error(
+        `Worker script ${this.state.id} delete is disabled. Remove allow_destructive_delete: false ` +
           `or invoke the force-delete action to remove it.`
       );
-      return;
     }
     this.destroyScript();
   }
@@ -181,6 +183,17 @@ export class CloudflareWorkersScript extends CloudflareEntity<
       }
       throw e;
     }
+  }
+
+  private workersDevUrl(accountId: string, name: string): string {
+    try {
+      const res = this.request<any>("GET", `/accounts/${accountId}/workers/subdomain`);
+      const subdomain = res?.result?.subdomain;
+      if (subdomain) return `https://${name}.${subdomain}.workers.dev`;
+    } catch {
+      // fall through to best-effort URL
+    }
+    return `https://${name}.workers.dev`;
   }
 
   private fetchScript(accountId: string, name: string): any | null {

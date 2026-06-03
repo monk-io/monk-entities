@@ -54,6 +54,7 @@ tests:
       output:
         - "cloudflare-test/worker"
         - "monk-test-worker"
+        - "workers.dev"
 
   - name: Describe Workers route state
     action: describe
