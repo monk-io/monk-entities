@@ -20,8 +20,10 @@ INPUT_DIR=./src/<package>/ OUTPUT_DIR=./dist/<package>/ ./monkec.sh compile
 # Build all packages
 ./build.sh
 
-# Run integration tests (requires sudo for daemon socket)
+# Run integration tests — Unix socket (requires sudo)
 sudo INPUT_DIR=./src/<package>/ ./monkec.sh test --verbose
+# Run integration tests — TCP (monkd on localhost, no sudo needed)
+MONK_SOCKET=tcp://127.0.0.1:2137 INPUT_DIR=./src/<package>/ ./monkec.sh test --verbose
 
 # Monk CLI (requires sudo, use -l for local)
 sudo monk load dist/<package>/MANIFEST

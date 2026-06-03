@@ -53,7 +53,6 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
   static readonly readiness = { period: 10, initialDelay: 2, attempts: 30 };
 
   override create(): void {
-    // Try to find existing zone by name
     const existing = this.findZoneByName(this.definition.name);
     if (existing) {
       this.state.id = existing.id;
@@ -62,10 +61,10 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
       this.state.name = this.definition.name;
       return;
     }
-    // Skip creation in this package; rely on detection-only pattern
-    this.state.existing = false;
-    this.state.name = this.definition.name;
-    return;
+    throw new Error(
+      `Zone "${this.definition.name}" not found in this Cloudflare account. ` +
+        `This entity only adopts existing zones — create the zone in Cloudflare first.`
+    );
   }
 
   override update(): void {
@@ -83,7 +82,7 @@ export class CloudflareDNSZone extends CloudflareEntity<CloudflareDNSZoneDefinit
   }
 
   override checkReadiness(): boolean {
-    if (!this.state.id) return true;
+    if (!this.state.id) return false;
     try {
       const res = this.request<any>("GET", `/zones/${this.state.id}`);
       const zone = res?.result;

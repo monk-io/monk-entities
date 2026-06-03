@@ -68,6 +68,7 @@ var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = Clou
     if (existing) {
       this.state = {
         id: name,
+        url: this.workersDevUrl(accountId, name),
         created_on: existing.created_on,
         modified_on: existing.modified_on,
         etag: existing.etag,
@@ -79,6 +80,7 @@ var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = Clou
     const meta = this.uploadStub(accountId, name);
     this.state = {
       id: name,
+      url: this.workersDevUrl(accountId, name),
       created_on: meta?.created_on,
       modified_on: meta?.modified_on,
       etag: meta?.etag,
@@ -103,11 +105,10 @@ var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = Clou
       cli.output("Script existed before this entity; skipping delete");
       return;
     }
-    if (!this.definition.allow_destructive_delete) {
-      cli.output(
-        `Worker script ${this.state.id} delete is disabled. Set allow_destructive_delete: true or invoke the force-delete action to remove it.`
+    if (this.definition.allow_destructive_delete === false) {
+      throw new Error(
+        `Worker script ${this.state.id} delete is disabled. Remove allow_destructive_delete: false or invoke the force-delete action to remove it.`
       );
-      return;
     }
     this.destroyScript();
   }
@@ -154,6 +155,15 @@ var _CloudflareWorkersScript = class _CloudflareWorkersScript extends (_a = Clou
       }
       throw e;
     }
+  }
+  workersDevUrl(accountId, name) {
+    try {
+      const res = this.request("GET", `/accounts/${accountId}/workers/subdomain`);
+      const subdomain = res?.result?.subdomain;
+      if (subdomain) return `https://${name}.${subdomain}.workers.dev`;
+    } catch {
+    }
+    return `https://${name}.workers.dev`;
   }
   fetchScript(accountId, name) {
     try {

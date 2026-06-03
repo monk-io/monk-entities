@@ -18,7 +18,7 @@ cloudflare-workers-cron-trigger:
       ## Actions
       - `get-schedules` — list current schedules from Cloudflare
       - `apply` — re-apply the configured cron list (useful after script swap)
-    version-hash: fbd989232548
+    version-hash: d7d2468bd293
   schema:
     secret_ref:
       type: string
