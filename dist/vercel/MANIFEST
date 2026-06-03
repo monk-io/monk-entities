@@ -3,5 +3,5 @@ VERSION_HASH 0e6146e82788
 DESCRIPTION Frontend hosting and deploys.
 HOSTING managed
 TAGS vercel,hosting,deploy
-LOAD project.yaml vercel-base.yaml common.yaml deployment.yaml
-RESOURCES project-sync.js common.js vercel-base.js deployment-sync.js
+LOAD common.yaml project.yaml deployment.yaml vercel-base.yaml
+RESOURCES project-sync.js deployment-sync.js common.js vercel-base.js

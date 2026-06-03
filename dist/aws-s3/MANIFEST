@@ -4,4 +4,4 @@ DESCRIPTION Object storage on AWS.
 HOSTING managed
 TAGS aws,storage,s3,object-storage
 LOAD common.yaml s3-base.yaml s3-bucket.yaml
-RESOURCES common.js s3-base.js s3-bucket-sync.js
+RESOURCES s3-base.js common.js s3-bucket-sync.js

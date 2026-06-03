@@ -23,7 +23,7 @@ cloudflare-pages-domain:
       - `get-info` — fetch current binding record
       - `retry-validation` — re-run Cloudflare's validation checks
       - `force-delete` — explicit destructive delete (refuses adopted bindings)
-    version-hash: d7d2468bd293
+    version-hash: 8375ba12a194
   schema:
     secret_ref:
       type: string

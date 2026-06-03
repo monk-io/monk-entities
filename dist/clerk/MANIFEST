@@ -3,5 +3,5 @@ VERSION_HASH e0d4d7e68911
 DESCRIPTION Organizations, domains, JWT templates, and OAuth applications.
 HOSTING managed
 TAGS clerk,authentication,identity
-LOAD domain.yaml o-auth-application.yaml clerk-base.yaml jwt-template.yaml organization.yaml credentials.yaml
-RESOURCES jwt-template-sync.js organization-sync.js credentials-sync.js o-auth-application-sync.js clerk-base.js domain-sync.js
+LOAD domain.yaml organization.yaml jwt-template.yaml o-auth-application.yaml credentials.yaml clerk-base.yaml
+RESOURCES credentials-sync.js o-auth-application-sync.js clerk-base.js organization-sync.js domain-sync.js jwt-template-sync.js

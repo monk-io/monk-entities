@@ -70,9 +70,9 @@ var _CloudflareDNSZone = class _CloudflareDNSZone extends (_a = CloudflareEntity
       this.state.name = this.definition.name;
       return;
     }
-    this.state.existing = false;
-    this.state.name = this.definition.name;
-    return;
+    throw new Error(
+      `Zone "${this.definition.name}" not found in this Cloudflare account. This entity only adopts existing zones \u2014 create the zone in Cloudflare first.`
+    );
   }
   update() {
     if (!this.state.id) {
@@ -85,7 +85,7 @@ var _CloudflareDNSZone = class _CloudflareDNSZone extends (_a = CloudflareEntity
     return;
   }
   checkReadiness() {
-    if (!this.state.id) return true;
+    if (!this.state.id) return false;
     try {
       const res = this.request("GET", `/zones/${this.state.id}`);
       const zone = res?.result;

@@ -19,7 +19,7 @@ cloudflare-workers-route:
 
       ## Actions
       - `get-info` — fetch the route record
-    version-hash: d7d2468bd293
+    version-hash: 8375ba12a194
   schema:
     secret_ref:
       type: string
