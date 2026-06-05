@@ -43,8 +43,7 @@ var import_http = __toESM(require("http"));
 var import_secret = __toESM(require("secret"));
 var import_crypto = __toESM(require("crypto"));
 var BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
-var API_VERSION = "application/vnd.atlas.2023-01-01+json";
-var API_VERSION_2025 = "application/vnd.atlas.2025-03-12+json";
+var API_VERSION = "application/vnd.atlas.2025-03-12+json";
 function getToken(secretRef) {
   const now = /* @__PURE__ */ new Date();
   let cachedToken;
@@ -152,13 +151,12 @@ var MongoDBAtlasEntity = class extends import_base.MonkEntity {
    */
   makeRequest(method, path, body) {
     try {
-      const apiVersion = this.isClusterRequest(path) ? API_VERSION_2025 : API_VERSION;
       const headers = {
-        "Accept": apiVersion,
+        "Accept": API_VERSION,
         "Authorization": "Bearer " + this.apiToken
       };
       if (method.toUpperCase() !== "GET") {
-        headers["Content-Type"] = apiVersion;
+        headers["Content-Type"] = API_VERSION;
       }
       const response = this.httpClient.request(method, path, {
         body,
@@ -206,14 +204,20 @@ var MongoDBAtlasEntity = class extends import_base.MonkEntity {
       this.makeRequest("DELETE", path);
       import_cli.default.output(`Successfully deleted ${resourceName}`);
     } catch (error) {
+      if (this.isResourceGoneError(error)) {
+        import_cli.default.output(`${resourceName} already deleted (not found), treating as success`);
+        return;
+      }
       throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
   /**
-   * Check if the request path is for cluster operations
+   * Detect "resource already gone" errors so deletes can be idempotent.
+   * Covers HTTP 404, Atlas *_NOT_FOUND error codes, and "does not exist" messages.
    */
-  isClusterRequest(path) {
-    return path.includes("/clusters") || path.includes("/accessList");
+  isResourceGoneError(error) {
+    const msg = (error instanceof Error ? error.message : String(error)).toUpperCase();
+    return msg.includes(" 404") || msg.includes("NOT_FOUND") || msg.includes("NOT FOUND") || msg.includes("DOES NOT EXIST");
   }
 };
 // Annotate the CommonJS export names for ESM import in node:

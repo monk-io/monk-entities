@@ -6,7 +6,7 @@ cluster:
     description: |-
       MongoDB Atlas Cluster entity.
       Creates and manages MongoDB Atlas database clusters for document storage.
-      Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
+      Supports M0 (free tier), FLEX (Flex cluster), and M10+ (dedicated) cluster tiers.
 
       ## Secrets
       - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
@@ -21,7 +21,7 @@ cluster:
       Works with:
       - `mongodb-atlas/user` - Create database users with role-based access
       - `mongodb-atlas/project` - The parent project containing the cluster
-    version-hash: 3ac5fe00117f
+    version-hash: 7c000a825997
   schema:
     secret_ref:
       type: string
@@ -52,8 +52,7 @@ cluster:
       type: string
       enum:
         - M0
-        - M2
-        - M5
+        - FLEX
         - M10
         - M20
         - M30
@@ -61,7 +60,10 @@ cluster:
         - M50
         - M60
         - M80
-      description: Instance size/tier
+      description: |-
+        Instance size/tier. M0 = free (shared/TENANT), FLEX = Flex cluster
+        (replaces the retired M2/M5 shared tiers), M10+ = dedicated. M2/M5 reached
+        End-of-Life on 2026-01-22 and are no longer creatable via the Atlas API.
     allow_ips:
       type: array
       items:

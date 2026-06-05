@@ -31,7 +31,6 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var common_exports = {};
 __export(common_exports, {
   API_VERSION: () => API_VERSION,
-  API_VERSION_2025: () => API_VERSION_2025,
   BASE_URL: () => BASE_URL,
   getOrganization: () => getOrganization,
   getToken: () => getToken
@@ -41,8 +40,7 @@ var import_http = __toESM(require("http"));
 var import_secret = __toESM(require("secret"));
 var import_crypto = __toESM(require("crypto"));
 var BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
-var API_VERSION = "application/vnd.atlas.2023-01-01+json";
-var API_VERSION_2025 = "application/vnd.atlas.2025-03-12+json";
+var API_VERSION = "application/vnd.atlas.2025-03-12+json";
 function getToken(secretRef) {
   const now = /* @__PURE__ */ new Date();
   let cachedToken;
@@ -129,7 +127,6 @@ function getOrganization(name, bearerToken) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   API_VERSION,
-  API_VERSION_2025,
   BASE_URL,
   getOrganization,
   getToken

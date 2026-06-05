@@ -35,7 +35,7 @@ This entity allows you to:
 | **Check Status** | `monk do ns/cluster/get-restore-status job_id="xxx"` | Monitor restore progress |
 | **List Jobs** | `monk do ns/cluster/list-restore-jobs` | View all restore jobs |
 
-**Requirements:** M10+ cluster (dedicated). M0/M2/M5 shared tiers do not support backup API.
+**Requirements:** M10+ cluster (dedicated). M0 (free) and FLEX clusters do not support the on-demand backup API.
 
 **⚠️ Important:** Restore operations make the cluster **READ-ONLY** until complete.
 
@@ -108,7 +108,7 @@ interface ClusterDefinition {
   project_id: string;           // Project ID
   provider: "AWS" | "GCP" | "AZURE";  // Cloud provider
   region: string;               // Cloud region
-  instance_size: "M0" | "M2" | "M5" | "M10" | "M20" | "M30" | "M40" | "M50" | "M60" | "M80";
+  instance_size: "M0" | "FLEX" | "M10" | "M20" | "M30" | "M40" | "M50" | "M60" | "M80";
   allow_ips?: string[];         // IP addresses allowed to access
 }
 ```
@@ -242,7 +242,7 @@ MongoDB Atlas clusters (M10 and higher) support on-demand backup snapshots via c
 
 **⚠️ Important Backup Limitations:**
 - **M0 Free clusters:** No backup API support. Use `mongodump`/`mongorestore` for manual backups
-- **M2/M5 clusters:** Being migrated to Flex clusters (as of February 2025)
+- **FLEX clusters:** Replaced the retired M2/M5 shared tiers (M2/M5 reached End-of-Life 2026-01-22). Receive automatic snapshots; not managed via these on-demand actions
 - **Flex clusters:** Automatic daily snapshots (cannot be disabled)
 - **M10+ clusters:** Full Cloud Backup support with on-demand snapshots via API
 - **During restore:** Cluster becomes read-only until restore completes
@@ -553,7 +553,7 @@ The test configuration (`test/test-mongodb.yaml`) includes:
 ### Instance Sizes
 
 - **M0**: Free tier (512 MB storage, shared CPU)
-- **M2/M5**: Shared clusters
+- **FLEX**: Flex cluster — modern low-traffic tier replacing the retired M2/M5 shared clusters
 - **M10+**: Dedicated clusters with increasing resources
 
 ### Cloud Providers and Regions

@@ -1,6 +1,6 @@
 import { MonkEntity } from "monkec/base";
 import { HttpClient } from "monkec/http-client";
-import { API_VERSION, API_VERSION_2025, BASE_URL, getToken } from "./common.ts";
+import { API_VERSION, BASE_URL, getToken } from "./common.ts";
 import cli from "cli";
 
 /**
@@ -89,17 +89,15 @@ export abstract class MongoDBAtlasEntity<
      */
     protected makeRequest(method: string, path: string, body?: any): any {
         try {
-            const apiVersion = this.isClusterRequest(path) ? API_VERSION_2025 : API_VERSION;
-            
             const headers: Record<string, string> = {
-                "Accept": apiVersion,
+                "Accept": API_VERSION,
                 "Authorization": "Bearer " + this.apiToken,
             };
-            
+
             if (method.toUpperCase() !== 'GET') {
-                headers["Content-Type"] = apiVersion;
+                headers["Content-Type"] = API_VERSION;
             }
-            
+
             const response = this.httpClient.request(method as any, path, { 
                 body,
                 headers
@@ -156,16 +154,25 @@ export abstract class MongoDBAtlasEntity<
             this.makeRequest("DELETE", path);
             cli.output(`Successfully deleted ${resourceName}`);
         } catch (error) {
+            // Idempotent delete: if the resource (or its parent group) is already gone,
+            // treat it as success rather than failing the teardown.
+            if (this.isResourceGoneError(error)) {
+                cli.output(`${resourceName} already deleted (not found), treating as success`);
+                return;
+            }
             throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
     /**
-     * Check if the request path is for cluster operations
+     * Detect "resource already gone" errors so deletes can be idempotent.
+     * Covers HTTP 404, Atlas *_NOT_FOUND error codes, and "does not exist" messages.
      */
-    private isClusterRequest(path: string): boolean {
-        return path.includes('/clusters') || path.includes('/accessList');
+    protected isResourceGoneError(error: unknown): boolean {
+        const msg = (error instanceof Error ? error.message : String(error)).toUpperCase();
+        return msg.includes(" 404")
+            || msg.includes("NOT_FOUND")
+            || msg.includes("NOT FOUND")
+            || msg.includes("DOES NOT EXIST");
     }
-
-    
-} 
+}

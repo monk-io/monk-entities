@@ -33,9 +33,11 @@ export interface ClusterDefinition extends MongoDBAtlasEntityDefinition {
     region: string;
 
     /**
-     * @description Instance size/tier
+     * @description Instance size/tier. M0 = free (shared/TENANT), FLEX = Flex cluster
+     * (replaces the retired M2/M5 shared tiers), M10+ = dedicated. M2/M5 reached
+     * End-of-Life on 2026-01-22 and are no longer creatable via the Atlas API.
      */
-    instance_size: "M0" | "M2" | "M5" | "M10" | "M20" | "M30" | "M40" | "M50" | "M60" | "M80";
+    instance_size: "M0" | "FLEX" | "M10" | "M20" | "M30" | "M40" | "M50" | "M60" | "M80";
 
     /**
      * @description Array of IP addresses allowed to access the cluster
@@ -73,7 +75,7 @@ export interface ClusterState extends MongoDBAtlasEntityState {
 /**
  * @description MongoDB Atlas Cluster entity.
  * Creates and manages MongoDB Atlas database clusters for document storage.
- * Supports M0 (free tier), M2/M5 (shared), and M10+ (dedicated) cluster tiers.
+ * Supports M0 (free tier), FLEX (Flex cluster), and M10+ (dedicated) cluster tiers.
  * 
  * ## Secrets
  * - Reads: secret name from `secret_ref` property - MongoDB Atlas service account credentials JSON
@@ -108,18 +110,67 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         return this.definition.name;
     }
 
-    /**
-     * Check if the cluster tier is a shared tier (M0, M2, M5)
-     * Shared tiers use "TENANT" provider, dedicated tiers use direct provider name
-     */
-    private isSharedTier(): boolean {
-        const sharedTiers = ["M0", "M2", "M5"];
-        return sharedTiers.includes(this.definition.instance_size);
+    /** Free tier (M0) — created on the /clusters endpoint with the TENANT provider. */
+    private isFreeTier(): boolean {
+        return this.definition.instance_size === "M0";
     }
 
-    /** Create a new MongoDB Atlas cluster */
+    /** Flex tier — created on the dedicated /flexClusters endpoint. */
+    private isFlexTier(): boolean {
+        return this.definition.instance_size === "FLEX";
+    }
+
+    /** Dedicated tier (M10+) — created on the /clusters endpoint with a direct provider. */
+    private isDedicatedTier(): boolean {
+        return !this.isFreeTier() && !this.isFlexTier();
+    }
+
+    /** Collection path for this cluster's tier (Flex uses a separate endpoint). */
+    private clustersCollectionPath(): string {
+        const base = `/groups/${this.definition.project_id}`;
+        return this.isFlexTier() ? `${base}/flexClusters` : `${base}/clusters`;
+    }
+
+    /** Resource path for this specific cluster. */
+    private clusterResourcePath(): string {
+        return `${this.clustersCollectionPath()}/${this.definition.name}`;
+    }
+
+    /** Create a new MongoDB Atlas cluster (Flex, free, or dedicated). */
     override create(): void {
-        // Build region config based on cluster tier
+        if (this.isFlexTier()) {
+            this.createFlexCluster();
+        } else {
+            this.createClusterResource();
+        }
+
+        // Configure IP access list if provided (applies to all tiers)
+        if (this.definition.allow_ips && this.definition.allow_ips.length > 0) {
+            this.configureIPAccessList();
+        }
+    }
+
+    /** Create a Flex cluster via the /flexClusters endpoint. */
+    private createFlexCluster(): void {
+        const body: Record<string, unknown> = {
+            "name": this.definition.name,
+            "providerSettings": {
+                "backingProviderName": this.definition.provider,
+                "regionName": this.definition.region
+            }
+        };
+
+        const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
+
+        this.state = {
+            // Flex clusters are identified by name; fall back to name if no id is returned.
+            id: resObj.id || resObj.name || this.definition.name,
+            name: resObj.name || this.definition.name
+        };
+    }
+
+    /** Create a free (M0/TENANT) or dedicated (M10+) cluster via the /clusters endpoint. */
+    private createClusterResource(): void {
         const regionConfig: Record<string, unknown> = {
             "electableSpecs": {
                 "instanceSize": this.definition.instance_size,
@@ -128,9 +179,8 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             "regionName": this.definition.region
         };
 
-        // Shared tiers (M0, M2, M5) use TENANT provider
-        // Dedicated tiers (M10+) use direct provider name
-        if (this.isSharedTier()) {
+        // M0 (free) uses the TENANT provider; dedicated tiers use the direct provider name.
+        if (this.isFreeTier()) {
             regionConfig.providerName = "TENANT";
             regionConfig.backingProviderName = this.definition.provider;
         } else {
@@ -148,23 +198,17 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             ]
         };
 
-        // Enable Cloud Backup for dedicated clusters (M10+)
-        // This is required for backup API operations
-        if (!this.isSharedTier()) {
+        // Enable Cloud Backup for dedicated clusters (M10+); required for backup API operations.
+        if (this.isDedicatedTier()) {
             body.backupEnabled = true;
         }
 
-        const resObj = this.makeRequest("POST", `/groups/${this.definition.project_id}/clusters`, body);
+        const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
 
         this.state = {
             id: resObj.id,
             name: resObj.name
         };
-
-        // Configure IP access list if provided
-        if (this.definition.allow_ips && this.definition.allow_ips.length > 0) {
-            this.configureIPAccessList();
-        }
     }
 
     /** Configure IP access list for the cluster */
@@ -192,12 +236,12 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         }
 
         // Check current cluster state
-        const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
-        
+        const clusterData = this.checkResourceExists(this.clusterResourcePath());
+
         if (clusterData) {
             this.state = {
                 ...this.state,
-                id: clusterData.id,
+                id: clusterData.id || this.state.id,
                 name: clusterData.name,
                 connection_standard: clusterData.connectionStrings?.standard,
                 connection_srv: clusterData.connectionStrings?.standardSrv
@@ -211,7 +255,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             return;
         }
 
-        this.deleteResource(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`, "Cluster");
+        this.deleteResource(this.clusterResourcePath(), "Cluster");
     }
 
     override checkReadiness(): boolean {
@@ -219,8 +263,8 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             return false;
         }
 
-        const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
-        
+        const clusterData = this.checkResourceExists(this.clusterResourcePath());
+
         if (!clusterData) {
             return false;
         }
@@ -236,7 +280,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
     }
 
     override checkLiveness(): boolean {
-        const clusterData = this.checkResourceExists(`/groups/${this.definition.project_id}/clusters/${this.definition.name}`);
+        const clusterData = this.checkResourceExists(this.clusterResourcePath());
         if (!clusterData) {
             throw new Error(`Cluster ${this.definition.name} not found`);
         }
@@ -257,10 +301,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
      * Backups are only available for M10+ (dedicated) clusters
      */
     private validateBackupSupport(): void {
-        if (this.isSharedTier()) {
+        if (!this.isDedicatedTier()) {
             throw new Error(
-                `Backup operations are not supported for shared cluster tier ${this.definition.instance_size}. ` +
-                `Backups require a dedicated cluster (M10 or higher).`
+                `Backup operations are not supported for cluster tier ${this.definition.instance_size}. ` +
+                `On-demand backups require a dedicated cluster (M10 or higher). ` +
+                `Flex clusters receive automatic snapshots that are not managed via these actions.`
             );
         }
     }
@@ -297,8 +342,8 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             cli.output(`   Provider: ${this.definition.provider}`);
             cli.output(`   Region: ${this.definition.region}`);
             
-            const backupSupported = !this.isSharedTier();
-            cli.output(`   Backup Supported: ${backupSupported ? '✅ Yes (M10+)' : '❌ No (shared tier)'}`);
+            const backupSupported = this.isDedicatedTier();
+            cli.output(`   Backup Supported: ${backupSupported ? '✅ Yes (M10+)' : '❌ No (M0/Flex)'}`);
             
             if (clusterData.backupEnabled !== undefined) {
                 cli.output(`   Backup Enabled: ${clusterData.backupEnabled ? '✅ Yes' : '❌ No'}`);
@@ -306,7 +351,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             
             if (!backupSupported) {
                 cli.output(`\n⚠️  Note: Backups require a dedicated cluster (M10 or higher).`);
-                cli.output(`   Current tier ${this.definition.instance_size} is a shared tier.`);
+                cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
             } else {
                 cli.output(`\n📋 To create a manual snapshot:`);
                 cli.output(`   monk do namespace/cluster create-snapshot`);
