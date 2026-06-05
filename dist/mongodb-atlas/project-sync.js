@@ -76,62 +76,76 @@ var _Project = class _Project extends MongoDBAtlasEntity {
     return true;
   }
   /**
-   * Wait for all cluster deletions to complete by polling the API
+   * Count active clusters across both the standard and flex endpoints.
+   */
+  countActiveClusters() {
+    let total = 0;
+    for (const collection of _Project.CLUSTER_COLLECTIONS) {
+      try {
+        const response = this.makeRequest("GET", `/groups/${this.state.id}/${collection}`);
+        if (response && response.results) {
+          total += response.results.length;
+        }
+      } catch (_error) {
+      }
+    }
+    return total;
+  }
+  /**
+   * Wait for all cluster deletions (standard + flex) to complete by polling the API
    */
   waitForClusterDeletions() {
     const maxAttempts = 30;
     let attempts = 0;
     while (attempts < maxAttempts) {
-      try {
-        const clustersResponse = this.makeRequest("GET", `/groups/${this.state.id}/clusters`);
-        if (!clustersResponse || !clustersResponse.results || clustersResponse.results.length === 0) {
-          cli.output("All clusters have been deleted successfully");
-          return;
-        }
-        const remainingClusters = clustersResponse.results.length;
-        cli.output(`Still waiting for ${remainingClusters} cluster(s) to be deleted... (attempt ${attempts + 1}/${maxAttempts})`);
-        attempts++;
-        if (attempts >= maxAttempts) {
-          cli.output("Warning: Timeout waiting for cluster deletions. Proceeding with project deletion anyway.");
-          break;
-        }
-        sleep(1e4);
-      } catch (error) {
-        cli.output(`Warning: Error checking cluster deletion status: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const remaining = this.countActiveClusters();
+      if (remaining === 0) {
+        cli.output("All clusters have been deleted successfully");
+        return;
+      }
+      cli.output(`Still waiting for ${remaining} cluster(s) to be deleted... (attempt ${attempts + 1}/${maxAttempts})`);
+      attempts++;
+      if (attempts >= maxAttempts) {
+        cli.output("Warning: Timeout waiting for cluster deletions. Proceeding with project deletion anyway.");
         break;
       }
+      sleep(1e4);
     }
   }
   /**
-   * Delete all clusters in the project before deleting the project itself
-   * This prevents the 409 error when trying to delete a project with active clusters
+   * Delete all clusters (standard + flex) in the project before deleting the project itself.
+   * This prevents the 409 CANNOT_CLOSE_GROUP_ACTIVE_ATLAS_CLUSTERS error.
    */
   deleteAllClustersInProject() {
     if (this.state.existing) {
       cli.output("Project wasn't created by this entity, skipping cluster cleanup");
       return;
     }
-    try {
-      cli.output("Checking for active clusters in project before deletion...");
-      const clustersResponse = this.makeRequest("GET", `/groups/${this.state.id}/clusters`);
-      if (clustersResponse && clustersResponse.results && clustersResponse.results.length > 0) {
-        cli.output(`Found ${clustersResponse.results.length} active cluster(s) in project. Deleting them first...`);
-        for (const cluster of clustersResponse.results) {
+    cli.output("Checking for active clusters in project before deletion...");
+    let deletedAny = false;
+    for (const collection of _Project.CLUSTER_COLLECTIONS) {
+      try {
+        const response = this.makeRequest("GET", `/groups/${this.state.id}/${collection}`);
+        const clusters = response && response.results ? response.results : [];
+        for (const cluster of clusters) {
+          deletedAny = true;
           try {
-            cli.output(`Deleting cluster: ${cluster.name}`);
-            this.makeRequest("DELETE", `/groups/${this.state.id}/clusters/${cluster.name}`);
+            cli.output(`Deleting ${collection} cluster: ${cluster.name}`);
+            this.makeRequest("DELETE", `/groups/${this.state.id}/${collection}/${cluster.name}`);
             cli.output(`Successfully deleted cluster: ${cluster.name}`);
           } catch (error) {
             cli.output(`Warning: Failed to delete cluster ${cluster.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
           }
         }
-        cli.output("Waiting for cluster deletions to complete...");
-        this.waitForClusterDeletions();
-      } else {
-        cli.output("No active clusters found in project");
+      } catch (error) {
+        cli.output(`Warning: Failed to list ${collection} in project: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
-    } catch (error) {
-      cli.output(`Warning: Failed to check/delete clusters in project: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+    if (deletedAny) {
+      cli.output("Waiting for cluster deletions to complete...");
+      this.waitForClusterDeletions();
+    } else {
+      cli.output("No active clusters found in project");
     }
   }
 };
@@ -151,6 +165,11 @@ __publicField(_Project, "readiness", {
   attempts: 12
   // max attempts (12 × 10s = 2 min)
 });
+/**
+ * Cluster collections that can hold active clusters blocking group deletion.
+ * Flex clusters live under a separate endpoint from dedicated/free clusters.
+ */
+__publicField(_Project, "CLUSTER_COLLECTIONS", ["clusters", "flexClusters"]);
 var Project = _Project;
 
 

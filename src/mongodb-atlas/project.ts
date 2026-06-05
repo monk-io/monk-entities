@@ -173,45 +173,58 @@ export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState>
     }
 
     /**
-     * Wait for all cluster deletions to complete by polling the API
+     * Cluster collections that can hold active clusters blocking group deletion.
+     * Flex clusters live under a separate endpoint from dedicated/free clusters.
+     */
+    private static readonly CLUSTER_COLLECTIONS = ["clusters", "flexClusters"];
+
+    /**
+     * Count active clusters across both the standard and flex endpoints.
+     */
+    private countActiveClusters(): number {
+        let total = 0;
+        for (const collection of Project.CLUSTER_COLLECTIONS) {
+            try {
+                const response = this.makeRequest("GET", `/groups/${this.state.id}/${collection}`);
+                if (response && response.results) {
+                    total += response.results.length;
+                }
+            } catch (_error) {
+                // Endpoint may be unavailable; ignore and rely on the other collection.
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Wait for all cluster deletions (standard + flex) to complete by polling the API
      */
     private waitForClusterDeletions(): void {
         const maxAttempts = 30; // Wait up to 5 minutes (30 * 10 seconds)
         let attempts = 0;
-        
+
         while (attempts < maxAttempts) {
-            try {
-                const clustersResponse = this.makeRequest("GET", `/groups/${this.state.id}/clusters`);
-                
-                if (!clustersResponse || !clustersResponse.results || clustersResponse.results.length === 0) {
-                    cli.output("All clusters have been deleted successfully");
-                    return;
-                }
-                
-                const remainingClusters = clustersResponse.results.length;
-                cli.output(`Still waiting for ${remainingClusters} cluster(s) to be deleted... (attempt ${attempts + 1}/${maxAttempts})`);
-                
-                // Wait 10 seconds before next check
-                // Note: In Goja runtime, we don't have setTimeout, so we'll use a simple delay
-                attempts++;
-                
-                if (attempts >= maxAttempts) {
-                    cli.output("Warning: Timeout waiting for cluster deletions. Proceeding with project deletion anyway.");
-                    break;
-                }
-                
-                sleep(10000);
-                
-            } catch (error) {
-                cli.output(`Warning: Error checking cluster deletion status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const remaining = this.countActiveClusters();
+            if (remaining === 0) {
+                cli.output("All clusters have been deleted successfully");
+                return;
+            }
+
+            cli.output(`Still waiting for ${remaining} cluster(s) to be deleted... (attempt ${attempts + 1}/${maxAttempts})`);
+            attempts++;
+
+            if (attempts >= maxAttempts) {
+                cli.output("Warning: Timeout waiting for cluster deletions. Proceeding with project deletion anyway.");
                 break;
             }
+
+            sleep(10000);
         }
     }
 
     /**
-     * Delete all clusters in the project before deleting the project itself
-     * This prevents the 409 error when trying to delete a project with active clusters
+     * Delete all clusters (standard + flex) in the project before deleting the project itself.
+     * This prevents the 409 CANNOT_CLOSE_GROUP_ACTIVE_ATLAS_CLUSTERS error.
      */
     private deleteAllClustersInProject(): void {
         if (this.state.existing) {
@@ -219,36 +232,36 @@ export class Project extends MongoDBAtlasEntity<ProjectDefinition, ProjectState>
             return;
         }
 
-        try {
-            cli.output("Checking for active clusters in project before deletion...");
-            
-            // Get all clusters in the project
-            const clustersResponse = this.makeRequest("GET", `/groups/${this.state.id}/clusters`);
-            
-            if (clustersResponse && clustersResponse.results && clustersResponse.results.length > 0) {
-                cli.output(`Found ${clustersResponse.results.length} active cluster(s) in project. Deleting them first...`);
-                
-                // Delete each cluster
-                for (const cluster of clustersResponse.results) {
+        cli.output("Checking for active clusters in project before deletion...");
+        let deletedAny = false;
+
+        for (const collection of Project.CLUSTER_COLLECTIONS) {
+            try {
+                const response = this.makeRequest("GET", `/groups/${this.state.id}/${collection}`);
+                const clusters = (response && response.results) ? response.results : [];
+
+                for (const cluster of clusters) {
+                    deletedAny = true;
                     try {
-                        cli.output(`Deleting cluster: ${cluster.name}`);
-                        this.makeRequest("DELETE", `/groups/${this.state.id}/clusters/${cluster.name}`);
+                        cli.output(`Deleting ${collection} cluster: ${cluster.name}`);
+                        this.makeRequest("DELETE", `/groups/${this.state.id}/${collection}/${cluster.name}`);
                         cli.output(`Successfully deleted cluster: ${cluster.name}`);
                     } catch (error) {
                         cli.output(`Warning: Failed to delete cluster ${cluster.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
                         // Continue with other clusters even if one fails
                     }
                 }
-                
-                // Wait for cluster deletions to complete by polling
-                cli.output("Waiting for cluster deletions to complete...");
-                this.waitForClusterDeletions();
-            } else {
-                cli.output("No active clusters found in project");
+            } catch (error) {
+                cli.output(`Warning: Failed to list ${collection} in project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                // Continue with the other collection / project deletion attempt
             }
-        } catch (error) {
-            cli.output(`Warning: Failed to check/delete clusters in project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            // Continue with project deletion attempt even if cluster cleanup fails
+        }
+
+        if (deletedAny) {
+            cli.output("Waiting for cluster deletions to complete...");
+            this.waitForClusterDeletions();
+        } else {
+            cli.output("No active clusters found in project");
         }
     }
 }

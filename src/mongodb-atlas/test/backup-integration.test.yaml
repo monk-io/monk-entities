@@ -3,7 +3,7 @@ description: "Integration test for MongoDB Atlas backup operations using standar
 timeout: 1200000
 
 # NOTE: This test requires a dedicated cluster (M10 or higher) to run backup operations.
-# Shared tier clusters (M0, M2, M5) do not support the backup API.
+# M0 (free) and FLEX clusters do not support the on-demand backup API.
 
 secrets:
   global:

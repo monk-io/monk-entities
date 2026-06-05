@@ -3,8 +3,9 @@ import secret from "secret";
 import crypto from "crypto";
 
 export const BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
-export const API_VERSION = "application/vnd.atlas.2023-01-01+json";
-export const API_VERSION_2025 = "application/vnd.atlas.2025-03-12+json";
+// Single pinned resource version for all endpoints. 2025-03-12 is the current
+// version and is required for Flex cluster endpoints (introduced 2024-11-13).
+export const API_VERSION = "application/vnd.atlas.2025-03-12+json";
 
 /**
  * Get MongoDB Atlas OAuth2 Bearer token from service account credentials
