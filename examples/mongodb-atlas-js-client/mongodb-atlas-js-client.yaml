@@ -1,0 +1,157 @@
+# MongoDB Atlas + Node.js client
+# Provisions an Atlas project, an M0 (free-tier) cluster, and a database user,
+# then runs a Node app that connects with the official mongodb driver and
+# performs insert/read/count operations on a loop.
+#
+# Flow: project -> cluster (connection_srv) + user (username/password) -> client app
+#
+# Prerequisites:
+#   - MongoDB Atlas service-account credentials in secret `mongodb-atlas-token`
+#     (format clientId:clientSecret)
+#   - An Atlas organization name (set `organization` below)
+
+namespace: mongodb-atlas-js-client
+
+# === Infrastructure ===
+
+# Atlas project (group) that contains the cluster and user.
+atlas-project:
+  defines: mongodb-atlas/project
+  name: monk-atlas-demo-project
+  organization: Monk # <-- replace with your Atlas organization name
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  tags:
+    Environment: example
+    Owner: monk-example
+
+# M0 free-tier cluster. Swap instance_size to FLEX or M10 for paid tiers.
+atlas-cluster:
+  defines: mongodb-atlas/cluster
+  name: monk-atlas-demo-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_EAST_1
+  instance_size: M0
+  secret_ref: mongodb-atlas-token
+  allow_ips:
+    - 0.0.0.0/0 # demo only — restrict to known IPs in real use
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-js-client/atlas-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-js-client/atlas-project
+      timeout: 120
+  tags:
+    Environment: example
+    Owner: monk-example
+
+# Database user the app authenticates with. Password is generated into
+# secret `mongodb-app-password` if not already present.
+atlas-user:
+  defines: mongodb-atlas/user
+  name: monk-app-user
+  # readWriteAnyDatabase: the user entity applies roles on the `admin` auth DB,
+  # so a cross-database write role is needed to use app databases like monkdemo.
+  role: readWriteAnyDatabase
+  project_id: <- connection-target("project") entity-state get-member("id")
+  secret_ref: mongodb-atlas-token
+  password_secret_ref: mongodb-app-password
+  permitted-secrets:
+    mongodb-atlas-token: true
+    mongodb-app-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-js-client/atlas-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-js-client/atlas-project
+      timeout: 120
+  tags:
+    Environment: example
+    Owner: monk-example
+
+# === Client Application ===
+
+# Node app that connects to the cluster using the user's credentials and
+# runs a continuous insert/read/count demo against monkdemo.events.
+atlas-client:
+  defines: runnable
+  permitted-secrets:
+    mongodb-app-password: true
+  connections:
+    cluster:
+      runnable: mongodb-atlas-js-client/atlas-cluster
+      service: data
+    user:
+      runnable: mongodb-atlas-js-client/atlas-user
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-js-client/atlas-cluster
+        - mongodb-atlas-js-client/atlas-user
+      timeout: 900
+  variables:
+    # SRV connection string from the cluster entity (no credentials).
+    mongodb_connection_string:
+      env: MONGODB_CONNECTION_STRING
+      value: <- connection-target("cluster") entity-state get-member("connection_srv")
+      type: string
+    # Username from the user entity definition.
+    mongodb_username:
+      env: MONGODB_USERNAME
+      value: <- connection-target("user") entity get-member("name")
+      type: string
+    # Password from the secret the user entity wrote.
+    mongodb_password:
+      env: MONGODB_PASSWORD
+      value: <- secret("mongodb-app-password")
+      type: string
+    mongodb_database:
+      env: MONGODB_DATABASE
+      value: monkdemo
+      type: string
+    mongodb_collection:
+      env: MONGODB_COLLECTION
+      value: events
+      type: string
+    operation_interval_ms:
+      env: OPERATION_INTERVAL_MS
+      value: "5000"
+      type: string
+    max_operations:
+      env: MAX_OPERATIONS
+      value: "0"
+      type: string
+  containers:
+    client:
+      image: monkimages.azurecr.io/mongodb-atlas-js-client:latest
+
+# === Deploy Everything ===
+
+# Deploy: monk load mongodb-atlas-js-client.yaml && monk run -l mongodb-atlas-js-client/stack
+stack:
+  defines: group
+  members:
+    - mongodb-atlas-js-client/atlas-project
+    - mongodb-atlas-js-client/atlas-cluster
+    - mongodb-atlas-js-client/atlas-user
+    - mongodb-atlas-js-client/atlas-client
