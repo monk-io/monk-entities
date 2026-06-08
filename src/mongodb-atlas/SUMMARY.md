@@ -22,9 +22,12 @@
 - Non-billable → no cost actions.
 
 ## Test Results
-- Integration: **8/8 steps passed** (~20s) — create (CIDR `192.0.2.0/24`), readiness,
-  `get-info`, `list-entries`, graceful delete. CIDR `/` URL-encoding path verified.
+- Integration: **13/13 steps passed** — CIDR (`192.0.2.0/24`) + plain-IP (`203.0.113.10`)
+  entries, readiness, `get-info`, `list-entries`, group update/reconcile (exercises the
+  entry's delete+recreate path), negative validation (two values set → "Only one of"),
+  graceful delete. CIDR `/` URL-encoding path verified.
 - No orphaned Atlas resources after teardown.
+- Not live-tested: `aws_security_group` entries (require an active VPC peering connection).
 
 ## Gotchas Confirmed
 - CIDR entries require URL-encoding the `/` in GET/DELETE paths (`encodeURIComponent`).
