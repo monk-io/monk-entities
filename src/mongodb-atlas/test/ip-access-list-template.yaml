@@ -1,0 +1,42 @@
+namespace: mongodb-atlas-acl-test
+
+# Project that owns the IP access list
+acl-project:
+  defines: mongodb-atlas/project
+  name: monkec-acl-test-project
+  organization: Monk
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+
+# A single IP access list entry. Uses the RFC 5737 TEST-NET-1 documentation
+# range (192.0.2.0/24) — a CIDR block, which exercises the "/" URL-encoding path.
+acl-entry:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: <- connection-target("project") entity-state get-member("id")
+  cidr_block: 192.0.2.0/24
+  comment: "monkec integration test"
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-acl-test/acl-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-acl-test/acl-project
+      timeout: 120
+
+acl-stack:
+  defines: group
+  members:
+    - mongodb-atlas-acl-test/acl-project
+    - mongodb-atlas-acl-test/acl-entry

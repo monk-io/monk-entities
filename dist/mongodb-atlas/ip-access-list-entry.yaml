@@ -1,0 +1,90 @@
+namespace: mongodb-atlas
+ip-access-list-entry:
+  defines: entity
+  metadata:
+    name: IpAccessListEntry
+    description: |-
+      Manages a single entry in a MongoDB Atlas project's IP access list.
+      The IP access list is the network gate for a project: Atlas rejects all client
+      connections except from listed IP addresses, CIDR blocks, or AWS security groups.
+      Each entity instance manages one entry (keyed by its value) with full lifecycle —
+      unlike the cluster entity's `allow_ips`, entries are reconciled and removed on delete.
+
+      ## Required Permissions
+      Service account / API key must have the Project Owner role on the target project
+      (covers add, list, get, and remove access list entry operations).
+
+      ## Secrets
+      - Reads: secret named by `secret_ref` - MongoDB Atlas service account credentials
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.entry_value` - the IP/CIDR/security-group value managed by this entry
+      - `state.project_id` - the project the entry belongs to
+
+      ## Composing with Other Entities
+      Works with:
+      - `mongodb-atlas/project` - the project whose access list this entry belongs to
+      - `mongodb-atlas/cluster` - grants the network access clusters in the project rely on
+    version-hash: ec2c81091c4c
+  schema:
+    secret_ref:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Secret Reference for MongoDB Atlas API authentication
+    project_id:
+      type: string
+      minLength: 1
+      maxLength: 24
+      description: Project (group) ID the access list entry belongs to
+    ip_address:
+      type: string
+      description: Single IP address to allow (mutually exclusive with cidr_block / aws_security_group)
+    cidr_block:
+      type: string
+      description: 'CIDR block to allow, e.g. "10.0.0.0/24" (mutually exclusive with ip_address / aws_security_group)'
+    aws_security_group:
+      type: string
+      description: 'AWS security group ID to allow, e.g. "sg-0123abcd" (requires an active VPC peering connection)'
+    comment:
+      type: string
+      maxLength: 80
+      description: Optional human-readable note stored on the entry
+    delete_after:
+      type: string
+      description: Optional ISO-8601 timestamp after which Atlas automatically removes the entry (time-boxed access)
+    required:
+      - secret_ref
+      - project_id
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    project_id:
+      type: string
+      description: Project (group) ID the entry belongs to
+    entry_value:
+      type: string
+      description: 'The entry value (IP address, CIDR block, or AWS security group ID)'
+    kind:
+      type: string
+      description: 'Kind of entry: "ip", "cidr", or "sg"'
+    comment:
+      type: string
+      description: Comment stored on the entry
+  lifecycle:
+    sync: <<< ip-access-list-entry-sync.js
+    get-info: ''
+    list-entries: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 6
+    liveness:
+      period: 300
+  requires:
+    - mongodb-atlas/atlas-base
+    - monkec/base
+    - cli
