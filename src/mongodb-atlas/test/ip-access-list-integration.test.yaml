@@ -26,18 +26,19 @@ tests:
     expect:
       exitCode: 0
 
-  - name: "Wait for access list entry readiness"
+  - name: "Wait for CIDR entry readiness"
     action: "wait"
     target: "mongodb-atlas-acl-test/acl-entry"
     waitFor:
       condition: "ready"
       timeout: 120000
 
-  - name: "Verify entry status"
-    action: "describe"
-    target: "mongodb-atlas-acl-test/acl-entry"
-    expect:
-      exitCode: 0
+  - name: "Wait for IP entry readiness"
+    action: "wait"
+    target: "mongodb-atlas-acl-test/acl-entry-ip"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
 
   - name: "get-info shows the CIDR entry"
     action: "do"
@@ -47,17 +48,58 @@ tests:
       contains:
         - "192.0.2.0/24"
 
-  - name: "list-entries shows the project access list"
+  - name: "get-info shows the IP entry"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry-ip/get-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "203.0.113.10"
+
+  - name: "list-entries shows both entries"
     action: "do"
     target: "mongodb-atlas-acl-test/acl-entry/list-entries"
     expect:
       exitCode: 0
       contains:
         - "192.0.2.0/24"
+        - "203.0.113.10"
+
+  # update() has no single-entry PATCH — it deletes and recreates. Group members
+  # can't be updated individually, so reconcile the whole group; the entry must
+  # remain present afterward.
+  - name: "Update (reconcile) the access list stack"
+    action: "update"
+    target: "mongodb-atlas-acl-test/acl-stack"
+    expect:
+      exitCode: 0
+
+  - name: "CIDR entry still present after update"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/get-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "192.0.2.0/24"
+
+  # Negative case: an entry with two values set must fail validation before any API call.
+  - name: "Reject entry with multiple values set"
+    action: "run"
+    target: "mongodb-atlas-acl-test/acl-entry-bad"
+    expect:
+      exitCode: 1
+      contains:
+        - "Only one of"
 
 cleanup:
   - name: "Delete access list stack"
     action: "delete"
     target: "mongodb-atlas-acl-test/acl-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Delete invalid entry (best effort)"
+    action: "delete"
+    target: "mongodb-atlas-acl-test/acl-entry-bad"
     expect:
       exitCode: 0

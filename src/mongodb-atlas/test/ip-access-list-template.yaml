@@ -12,8 +12,7 @@ acl-project:
     data:
       protocol: custom
 
-# A single IP access list entry. Uses the RFC 5737 TEST-NET-1 documentation
-# range (192.0.2.0/24) — a CIDR block, which exercises the "/" URL-encoding path.
+# CIDR entry — RFC 5737 TEST-NET-1 (192.0.2.0/24). Exercises the "/" URL-encoding path.
 acl-entry:
   defines: mongodb-atlas/ip-access-list-entry
   project_id: <- connection-target("project") entity-state get-member("id")
@@ -35,8 +34,43 @@ acl-entry:
         - mongodb-atlas-acl-test/acl-project
       timeout: 120
 
+# Single IP entry — RFC 5737 TEST-NET-3 (203.0.113.10). Exercises the plain-IP path.
+acl-entry-ip:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: <- connection-target("project") entity-state get-member("id")
+  ip_address: 203.0.113.10
+  comment: "monkec integration test ip"
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-acl-test/acl-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-acl-test/acl-project
+      timeout: 120
+
+# Invalid entry — two values set at once. Used for the negative validation test.
+# Not part of acl-stack; deployed individually and expected to fail. Uses a dummy
+# project_id because validation throws before any API call is made.
+acl-entry-bad:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: "000000000000000000000000"
+  ip_address: 203.0.113.20
+  cidr_block: 198.51.100.0/24
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+
 acl-stack:
   defines: group
   members:
     - mongodb-atlas-acl-test/acl-project
     - mongodb-atlas-acl-test/acl-entry
+    - mongodb-atlas-acl-test/acl-entry-ip
