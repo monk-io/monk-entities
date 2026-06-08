@@ -147,6 +147,32 @@ interface UserState {
 }
 ```
 
+### 4. IP Access List Entry
+
+Manages a single entry in a project's IP access list (the network gate — Atlas
+rejects connections from non-listed sources). One entity instance = one entry,
+with full create/update/delete lifecycle (unlike the cluster's `allow_ips`, which
+is created once and never reconciled or removed).
+
+**Definition Interface:**
+```typescript
+interface IpAccessListEntryDefinition {
+  secret_ref: string;            // Secret reference for API token
+  project_id: string;            // Project (group) ID
+  ip_address?: string;           // exactly one of these three:
+  cidr_block?: string;           //   single IP / CIDR block / AWS security group
+  aws_security_group?: string;
+  comment?: string;              // optional note
+  delete_after?: string;         // optional ISO-8601 auto-expiry (time-boxed access)
+}
+```
+
+**Actions:** `get-info`, `list-entries`.
+
+**Required permissions:** the service account / API key must hold the **Project
+Owner** role on the target project (covers add / list / get / remove access list
+entry operations). No cost actions — IP access list entries are free.
+
 ## Usage Examples
 
 ### Basic Example

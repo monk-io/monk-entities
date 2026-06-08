@@ -1,0 +1,63 @@
+name: "MongoDB Atlas IP Access List Integration Test"
+description: "Lifecycle + actions for the mongodb-atlas/ip-access-list-entry entity"
+timeout: 300000
+
+secrets:
+  global:
+    mongodb-atlas-token: "$MONGODB_ATLAS_TOKEN"
+
+setup:
+  - name: "Load compiled MongoDB Atlas entities"
+    action: "load"
+    target: "dist/input/mongodb-atlas/MANIFEST"
+    expect:
+      exitCode: 0
+
+  - name: "Load IP access list test template"
+    action: "load"
+    target: "ip-access-list-template.yaml"
+    expect:
+      exitCode: 0
+
+tests:
+  - name: "Deploy access list stack"
+    action: "run"
+    target: "mongodb-atlas-acl-test/acl-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for access list entry readiness"
+    action: "wait"
+    target: "mongodb-atlas-acl-test/acl-entry"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
+
+  - name: "Verify entry status"
+    action: "describe"
+    target: "mongodb-atlas-acl-test/acl-entry"
+    expect:
+      exitCode: 0
+
+  - name: "get-info shows the CIDR entry"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/get-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "192.0.2.0/24"
+
+  - name: "list-entries shows the project access list"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/list-entries"
+    expect:
+      exitCode: 0
+      contains:
+        - "192.0.2.0/24"
+
+cleanup:
+  - name: "Delete access list stack"
+    action: "delete"
+    target: "mongodb-atlas-acl-test/acl-stack"
+    expect:
+      exitCode: 0
