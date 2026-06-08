@@ -6,7 +6,7 @@
 - [x] Implement — `ip-access-list.ts` (`IpAccessListEntry`), compiled clean (4 entities)
 - [x] Tests — `ip-access-list-template.yaml` + `ip-access-list-integration.test.yaml` (8 steps)
 - [x] Integration test — 8/8 passed (~20s), CIDR URL-encoding + actions + graceful delete verified, no orphans
-- [ ] PR
+- [x] PR — #216
 - [ ] Merged
 - [ ] (deferred) user-role per-database scoping enhancement — captured below, not yet implemented
 
