@@ -1,0 +1,3 @@
+REPO redshift
+LOAD redshift.yml example.yml
+RESOURCES redshift.js
