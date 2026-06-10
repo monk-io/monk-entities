@@ -1,0 +1,29 @@
+namespace: gcp
+
+cloud-pub-sub:
+  defines: entity
+  schema:
+    required: [ "name" ]
+    name:
+      type: string
+    settings:
+      enconding:
+        type: string
+      first-revision-id:
+        type: string
+      last-revision-id:
+        type: string
+    message-retention-duration:
+      type: string
+    retention-acknowledgement-period:
+      type: string
+  requires:
+    - cloud/gcp
+  lifecycle:
+    sync: <<< pubsub.js
+    update: ""
+    recreate: ""
+    get: ""
+    create-subscription: ""
+    delete-subscription: ""
+    get-subscription: ""
