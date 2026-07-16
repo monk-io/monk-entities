@@ -1,0 +1,24 @@
+namespace: aws
+
+internet-gateway:
+  defines: entity
+  schema:
+    required: [ name, region]
+    vpc-id:
+      type: string
+    name:
+      type: string
+    region:
+      type: string
+  requires:
+    - cloud/aws
+  lifecycle:
+    sync: <<< internet-gateway.js
+    update: ""
+    recreate: ""
+    get: ""
+  checks:
+    readiness:
+      code: ""
+      period: 40
+      attempts: 15

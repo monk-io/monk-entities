@@ -1,0 +1,7 @@
+namespace: aws
+
+my-internet-gateway:
+  defines: aws/internet-gateway
+  region: eu-north-1
+  vpc-id: vpc-01168d00939cc61fa
+  name: my-igw-1
