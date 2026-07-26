@@ -1,0 +1,14 @@
+namespace: upstash-example
+
+vector:
+  defines: templates/local/upstash-vector/cluster
+  auth_token_secret: upstash-auth-token
+  email_secret: upstash-email
+  name: "my-vector-db"
+  region: "eu-west-1"
+  similarity_function: "COSINE"
+  dimension_count: 1536
+  permitted-secrets:
+    upstash-auth-token: true
+    upstash-email: true
+

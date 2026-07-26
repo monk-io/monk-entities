@@ -1,0 +1,3 @@
+REPO monk-upstash-redis
+LOAD upstash-vector.yaml
+RESOURCES upstash-vector-sync.js
