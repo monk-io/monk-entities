@@ -1,0 +1,73 @@
+namespace: supabase
+
+branch:
+  defines: entity
+  schema:
+    required: ["secret_ref", "project_id", "name"]
+    secret_ref:
+      type: string
+    project_id:
+      type: string
+    name:
+      type: string
+    slug:
+      description: Resource identifier (Branch ID) OPTIONAL, if specified, all management will be delegated to supabase dashboard
+      type: string
+    git_branch:
+      type: string
+    persistent:
+      type: boolean
+    region:
+      default: us-east-1
+      enum:
+        - us-east-1
+        - us-east-2
+        - us-west-1
+        - us-west-2
+        - ap-east-1
+        - ap-southeast-1
+        - ap-northeast-1
+        - ap-northeast-2
+        - ap-southeast-2
+        - eu-west-1
+        - eu-west-2
+        - eu-west-3
+        - eu-north-1
+        - eu-central-1
+        - eu-central-2
+        - ca-central-1
+        - ap-south-1
+        - sa-east-1
+    desired_instance_size:
+      default: micro
+      enum:
+        - micro
+        - small
+        - medium
+        - large
+        - xlarge
+        - 2xlarge
+        - 4xlarge
+        - 8xlarge
+        - 12xlarge
+        - 16xlarge
+    release_channel:
+      default: ga
+      enum:
+        - internal
+        - alpha
+        - beta
+        - ga
+        - withdrawn
+        - preview
+    postgres_engine:
+      default: 15
+      enum:
+        - 15
+        - 17-oriole
+  lifecycle:
+    sync: <<< branch-sync.js
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 2
