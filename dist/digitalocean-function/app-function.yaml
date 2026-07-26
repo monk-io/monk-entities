@@ -1,0 +1,159 @@
+namespace: digitalocean-function
+app-function:
+  defines: entity
+  metadata:
+    name: AppFunction
+  schema:
+    app_name:
+      type: string
+    component_name:
+      type: string
+    github_repo:
+      type: string
+    github_branch:
+      type: string
+    source_dir:
+      type: string
+    environment_slug:
+      type: string
+    instance_count:
+      type: number
+    instance_size_slug:
+      type: string
+    api_token_secret_ref:
+      type: string
+    routes:
+      type: array
+      items:
+        type: object
+        properties:
+          path:
+            type: string
+          preserve_path_prefix:
+            type: boolean
+        additionalProperties: false
+    envs:
+      type: array
+      items:
+        type: object
+        properties:
+          key:
+            type: string
+          value:
+            type: string
+          scope:
+            type: string
+            enum:
+              - RUN_TIME
+              - BUILD_TIME
+              - RUN_AND_BUILD_TIME
+          type:
+            type: string
+            enum:
+              - GENERAL
+              - SECRET
+        required:
+          - key
+        additionalProperties: false
+    log_destinations:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          datadog:
+            type: object
+            properties:
+              endpoint:
+                type: string
+              api_key_secret_ref:
+                type: string
+            required:
+              - endpoint
+              - api_key_secret_ref
+            additionalProperties: false
+          logtail:
+            type: object
+            properties:
+              token_secret_ref:
+                type: string
+            required:
+              - token_secret_ref
+            additionalProperties: false
+        required:
+          - name
+        additionalProperties: false
+    github_deploy_on_push:
+      type: boolean
+    build_command:
+      type: string
+    run_command:
+      type: string
+    cpu_kind:
+      type: string
+      enum:
+        - shared
+        - dedicated
+    alerts:
+      type: array
+      items:
+        type: object
+        properties:
+          rule:
+            type: string
+            enum:
+              - DEPLOYMENT_FAILED
+              - DOMAIN_FAILED
+              - FUNCTIONS_ACTIVATION_COUNT
+              - FUNCTIONS_AVERAGE_DURATION_MS
+              - FUNCTIONS_ERROR_RATE_PER_MINUTE
+          disabled:
+            type: boolean
+        required:
+          - rule
+        additionalProperties: false
+    domains:
+      type: array
+      items:
+        type: object
+        properties:
+          domain:
+            type: string
+          type:
+            type: string
+            enum:
+              - DEFAULT
+              - PRIMARY
+              - ALIAS
+          wildcard:
+            type: boolean
+          zone:
+            type: string
+          minimum_tls_version:
+            type: string
+        required:
+          - domain
+        additionalProperties: false
+    region:
+      type: string
+    required:
+      - app_name
+      - component_name
+      - github_repo
+  lifecycle:
+    sync: <<< app-function-sync.js
+    info: ''
+    url: ''
+    logs: ''
+    deploy: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 20
+  requires:
+    - digitalocean-function/base
+    - monkec/base
+    - cli
+    - digitalocean-function/common

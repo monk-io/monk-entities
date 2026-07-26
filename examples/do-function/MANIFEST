@@ -1,0 +1,3 @@
+REPO do-function-example
+LOAD example.yaml
+BLOBS example-python-function:example-python-function/

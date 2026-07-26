@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  do-function-deployer:
+    build: .
+    environment:
+      # Required: DigitalOcean API token
+      - DO_API_TOKEN=${DO_API_TOKEN}
+      
+      # Required: Function name
+      - FUNCTION_NAME=${FUNCTION_NAME:-hello-world}
+      
+      # Optional: Namespace (default: "default")
+      - NAMESPACE_NAME=${NAMESPACE_NAME:-default}
+      
+      # Optional: Runtime (default: "python:3.9")
+      - RUNTIME=${RUNTIME:-python:3.9}
+      
+      # Optional: Memory limit in MB (default: "128")
+      - MEMORY=${MEMORY:-128}
+      
+      # Optional: Timeout in seconds (default: "30")
+      - TIMEOUT=${TIMEOUT:-30}
+      
+      # Optional: Environment variables as JSON string
+      # Example: '{"NODE_ENV":"production","API_KEY":"secret"}'
+      - ENVIRONMENT_VARS=${ENVIRONMENT_VARS:-}
+      
+      # Optional: Exit after deployment (default: "false")
+      - DEPLOY_ONLY=${DEPLOY_ONLY:-false}
+      
+      # Optional: Delete function instead of deploying (default: "false")
+      - DELETE_FUNCTION=${DELETE_FUNCTION:-false}
+      
+      # Optional: Post-delete script
+      - POST_DELETE=${POST_DELETE:-}
+    
+    volumes:
+      # Mount your function code to /functions (Python example - most reliable)
+      - ./example-python-function:/functions:ro
+      
+      # Optional: Mount custom project.yml if you have one
+      # - ./project.yml:/functions/project.yml:ro
+    
+    # Keep container running for debugging unless DEPLOY_ONLY=true
+    stdin_open: true
+    tty: true
+
+  # Dedicated delete service - simpler to use
+  delete-function:
+    build: .
+    environment:
+      - DO_API_TOKEN=${DO_API_TOKEN}
+      - FUNCTION_NAME=${FUNCTION_NAME}
+      - NAMESPACE_NAME=${NAMESPACE_NAME:-default}
+      - POST_DELETE=${POST_DELETE:-}
+    command: ["/app/delete.sh"]
+    restart: "no"
