@@ -23,3 +23,9 @@ podman manifest rm monkimages.azurecr.io/netlify-build:24
 podman manifest create monkimages.azurecr.io/netlify-build:24
 podman build --build-arg NODE_VERSION=24 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:24 .
 podman manifest push monkimages.azurecr.io/netlify-build:24
+
+podman rmi monkimages.azurecr.io/netlify-build:26
+podman manifest rm monkimages.azurecr.io/netlify-build:26
+podman manifest create monkimages.azurecr.io/netlify-build:26
+podman build --build-arg NODE_VERSION=26 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:26 .
+podman manifest push monkimages.azurecr.io/netlify-build:26
