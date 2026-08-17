@@ -25,8 +25,8 @@ deploy:
     node-version:
       env: NODE_VERSION
       type: string
-      value: 20
-      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24. Pick node version based on the project requirements, or leave unset for default (20).
+      value: 24
+      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24, 26. Pick node version based on the project requirements, or leave unset for default (24).
     site-id:
       env: NETLIFY_SITE_ID
       type: string

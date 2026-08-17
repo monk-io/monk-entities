@@ -6,7 +6,8 @@ deploy:
     default-vercel-token: true
   containers:
     deploy:
-      image: monkimages.azurecr.io/example-vercel-build:latest
+      image: monkimages.azurecr.io/vercel-build
+      image-tag: <- $node-version
       restart: no
       bash: /tmp/init.sh
 #      paths:
@@ -22,6 +23,11 @@ deploy:
         vercel link --cwd $DEPLOY_DIR --yes --project $VERCEL_PROJECT -t $VERCEL_TOKEN
         echo "y\n" | vercel deploy --cwd $DEPLOY_DIR --prod --public --yes -t $VERCEL_TOKEN
   variables:
+    node-version:
+      env: NODE_VERSION
+      type: string
+      value: 24
+      description: The Node.js version to use for the build environment. One of 18, 20, 22, 24, 26. Pick node version based on the project requirements, or leave unset for default (24).
     project:
       env: VERCEL_PROJECT
       type: string
