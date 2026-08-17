@@ -3,5 +3,5 @@ VERSION_HASH b991eef2ce2c
 DESCRIPTION Transactional email - domains, API keys, webhooks.
 HOSTING managed
 TAGS resend,email,transactional
-LOAD resend-domain.yaml resend-webhook.yaml resend-api-key.yaml resend-base.yaml
-RESOURCES resend-base.js resend-webhook-sync.js resend-domain-sync.js resend-api-key-sync.js
+LOAD resend-webhook.yaml resend-base.yaml resend-domain.yaml resend-api-key.yaml
+RESOURCES resend-api-key-sync.js resend-webhook-sync.js resend-domain-sync.js resend-base.js

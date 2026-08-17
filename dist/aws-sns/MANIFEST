@@ -10,5 +10,5 @@ sns-topic:
 sns-subscription:
   defines: entity
   source: sns-subscription.yaml
-LOAD common.yaml sns-topic.yaml sns-base.yaml sns-subscription.yaml
-RESOURCES common.js sns-subscription-sync.js sns-base.js sns-topic-sync.js
+LOAD sns-subscription.yaml common.yaml sns-topic.yaml sns-base.yaml
+RESOURCES common.js sns-base.js sns-topic-sync.js sns-subscription-sync.js
