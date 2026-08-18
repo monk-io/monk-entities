@@ -264,13 +264,22 @@ export class HttpClient {
       );
     }
 
-    // Build the request
-    const request = {
+    // Build the request.
+    //
+    // `body` is omitted entirely when undefined rather than passed as an undefined value:
+    // the Goja runtime marshals `body: undefined` into the literal string "undefined", so a
+    // bodyless GET or DELETE would still send a 9-byte body. Lenient APIs ignore it, but a
+    // spec-validating one rejects the request outright (RunPod v2 answers 422 "GET request
+    // body for '/v2/…' is not declared"). prepareBody() already returns undefined to mean
+    // "send nothing" — this makes the request object honor that.
+    const request: Record<string, any> = {
       method: normalizedMethod,
       headers,
-      body,
       timeout: options.timeout || this.options.timeout,
     };
+    if (body !== undefined) {
+      request.body = body;
+    }
 
     // Make the request using the appropriate builtin method
     let response: HttpResponse;
