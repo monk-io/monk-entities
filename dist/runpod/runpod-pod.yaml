@@ -1,0 +1,181 @@
+namespace: runpod
+runpod-pod:
+  defines: entity
+  metadata:
+    name: RunpodPod
+    description: |-
+      RunPod pod — a persistent GPU or CPU container instance for training,
+      inference, or interactive development. Billed hourly while running.
+
+      ## Required Permissions
+      A RunPod API key with read/write access to the account. RunPod does not offer
+      scoped API keys, so the key grants full account access. The cost actions additionally
+      read `GET /v2/catalog/gpus` and `GET /v2/billing/pods`.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `runpod-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Pod ID; used by pod actions and billing lookups
+      - `state.ports` - Runtime port list, each `{ip, private, public, type}` — the handle for
+        building connection URLs to services on the pod. Populated once the pod is running.
+      - `state.ssh_command` - Ready-to-use direct SSH command when `22/tcp` is exposed
+      - `state.data_center` - Data center the pod landed in
+      - `state.pod_status` - Lifecycle state; `RUNNING` means the container is live
+
+      ## Composing with Other Entities
+      Works with:
+      - `runpod/runpod-network-volume` - wire `network_volume_id` to the volume's `state.id`
+        and `data_center_ids` to its `state.data_center`; a volume only attaches inside its
+        own data center
+      - `runpod/runpod-template` - wire `template_id` to the template's `state.id` to inherit
+        image, ports, and env
+    version-hash: 2e02e9389aae
+  schema:
+    secret_ref:
+      type: string
+      description: Secret reference holding the RunPod API key. Defaults to `runpod-api-token`.
+    name:
+      type: string
+      description: Pod name. Used to adopt a pre-existing pod.
+    image:
+      type: string
+      description: 'Container image, e.g. `runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04`. Required unless `template_id` is set.'
+    gpu_type_id:
+      type: string
+      description: 'GPU catalog ID from `GET /v2/catalog/gpus`, e.g. `NVIDIA GeForce RTX 4090`. Immutable after creation.'
+    gpu_count:
+      type: number
+      description: Number of GPUs to attach (minimum 1). Defaults to 1 for GPU pods.
+    cpu_flavor_id:
+      type: string
+      description: 'CPU flavor ID from `GET /v2/catalog/cpus`, e.g. `cpu3c`. Immutable after creation.'
+    vcpu_count:
+      type: number
+      description: vCPU count for CPU pods. Minimum 2 and must be a power of two. Immutable after creation.
+    cloud:
+      type: string
+      enum:
+        - SECURE
+        - COMMUNITY
+      description: 'Cloud tier: SECURE is RunPod-owned hardware, COMMUNITY is community-hosted. Defaults to SECURE.'
+    disk:
+      type: number
+      description: Ephemeral container disk size in GB. Wiped on pod restart.
+    args:
+      type: string
+      description: Container entrypoint arguments
+    ports:
+      type: array
+      items:
+        type: string
+      description: 'Exposed ports in `port/protocol` form, e.g. `["8888/http", "22/tcp"]`'
+    env:
+      type: object
+      additionalProperties:
+        type: string
+        description: Environment variables passed to the container
+      description: Environment variables passed to the container
+    network_volume_id:
+      type: string
+      description: Network volume ID to mount. The volume must live in one of `data_center_ids`. Immutable after creation.
+    network_volume_path:
+      type: string
+      description: Mount path for the network volume. Defaults to `/runpod-volume`.
+    persistent_disk_size:
+      type: number
+      description: 'Host-local persistent disk in GB (minimum 10). Mutually exclusive with `network_volume_id`, and rejected on CPU pods. Prefer a network volume for data you cannot recreate.'
+    persistent_disk_path:
+      type: string
+      description: Mount path for the host-local persistent disk. Defaults to `/workspace`.
+    template_id:
+      type: string
+      description: Template ID to inherit container config from. Explicit fields here override the template.
+    registry_id:
+      type: string
+      description: Container registry credential ID for pulling private images
+    data_center_ids:
+      type: array
+      items:
+        type: string
+      description: Preferred data center IDs. Must include the network volume's data center when mounting one.
+    allowed_cuda_versions:
+      type: array
+      items:
+        type: string
+      description: 'Acceptable CUDA versions as `major.minor`, e.g. `["12.8"]`. CPU pods ignore this.'
+    min_cuda_version:
+      type: string
+      description: Minimum acceptable CUDA version as `major.minor`
+    start_jupyter:
+      type: boolean
+      description: Inject a generated JUPYTER_PASSWORD to start JupyterLab. Expose `8888/http` to reach it.
+    start_ssh:
+      type: boolean
+      description: Inject PUBLIC_KEY from the account's registered SSH keys. Needs `22/tcp` in ports for direct SSH.
+    locked:
+      type: boolean
+      description: Prevent the pod from being stopped or reset. Applied on update only — RunPod does not accept it at create time.
+    global_networking:
+      type: boolean
+      description: Enable global networking. Limited availability.
+    allow_destructive_delete:
+      type: boolean
+      description: 'When false, delete() refuses to terminate the pod. Defaults to true.'
+    required:
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: True when the resource already existed and was adopted rather than created
+    id:
+      type: string
+      description: Pod ID assigned by RunPod
+    name:
+      type: string
+      description: Pod name
+    pod_status:
+      type: string
+      description: 'Current lifecycle state: PROVISIONING, STARTING, RUNNING, EXITED, ERROR, TERMINATED'
+    ports:
+      type: array
+      description: 'Exposed ports as reported at runtime, each `{ip, private, public, type}`. Empty until the pod is running.'
+    ssh_command:
+      type: string
+      description: 'Ready-to-use direct SSH command, when the pod exposes 22/tcp'
+    cost_per_hr:
+      type: number
+      description: Current hourly cost in USD; 0 while the pod is stopped or terminated
+    data_center:
+      type: string
+      description: Data center the pod was placed in
+    available_actions:
+      type: array
+      items:
+        type: string
+      description: 'Pod state transitions currently valid, as advertised by the API'
+    gpu_type_id:
+      type: string
+      description: GPU type actually assigned
+    created_at:
+      type: string
+      description: Creation timestamp
+  lifecycle:
+    sync: <<< runpod-pod-sync.js
+    restart: ''
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 60
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - runpod/runpod-base
+    - runpod/common
+    - cli

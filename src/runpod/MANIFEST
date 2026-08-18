@@ -1,0 +1,4 @@
+REPO runpod
+DESCRIPTION GPU cloud compute — pods, network volumes, and templates on RunPod.
+HOSTING managed
+TAGS runpod,gpu,ml,ai,compute,storage

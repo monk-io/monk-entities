@@ -1,0 +1,7 @@
+namespace: runpod
+
+common:
+  defines: module
+  metadata:
+    version-hash: 2e02e9389aae
+  source: <<< common.js
