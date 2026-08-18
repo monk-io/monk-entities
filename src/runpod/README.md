@@ -158,6 +158,7 @@ anything in `env` as public to the account.
 | `runpod-pod` | `restart` | Restart the pod |
 | `runpod-pod` | `force-terminate` | Terminate the pod regardless of how it was acquired — the escape hatch for an adopted pod teardown declined to remove |
 | `runpod-pod` | `get-info` | Full pod detail as JSON |
+| `runpod-pod` | `get-console-url` | RunPod console URL for this pod (for logs — see "No log action" below) |
 | `runpod-pod` | `get-cost-estimate` | Human-readable monthly cost breakdown |
 | `runpod-pod` | `costs` | Monthly cost as billing JSON |
 | `runpod-network-volume` | `get-info` | Volume detail as JSON |
@@ -191,7 +192,11 @@ lifecycle (`monk run`), not callable via `monk do`; it also creates the pod if n
 
 `GET /v2/pods/{id}/logs` is a **Server-Sent Events stream** that stays open indefinitely.
 monkec's `HttpClient` is request/response, so an action wrapping it never returns and hangs the
-lifecycle job (verified against a live pod). Use `runpodctl` or the RunPod console for logs.
+lifecycle job (verified against a live pod). Use `runpodctl` or the RunPod console for logs —
+`get-console-url` builds that console link for you (pure string construction, no API call, so
+it can't hang) rather than trying to consume the stream. If the job image itself can cooperate,
+having it tee its own log to a file and mirror that elsewhere (object storage, etc.) works too —
+see `examples/runpod-cross-region-training` for that pattern.
 
 ## Cost estimation
 

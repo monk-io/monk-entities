@@ -1,5 +1,5 @@
 REPO runpod
-VERSION_HASH 5a153a4ba51e
+VERSION_HASH 095ef42d343c
 DESCRIPTION GPU cloud compute — pods, network volumes, and templates on RunPod.
 HOSTING managed
 TAGS runpod,gpu,ml,ai,compute,storage

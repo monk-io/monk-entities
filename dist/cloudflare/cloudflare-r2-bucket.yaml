@@ -9,6 +9,11 @@ cloudflare-r2-bucket:
       buckets by name. delete() destroys the bucket by default; set
       `allow_destructive_delete: false` to make delete a no-op.
 
+      `jurisdiction` must match the bucket's actual jurisdiction (fixed permanently at
+      creation) — Cloudflare scopes bucket names per jurisdiction, not just per account,
+      so pointing this at the wrong jurisdiction won't error, it'll silently miss the
+      real bucket and create an empty duplicate under the same name instead.
+
       ## Secrets
       - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
         `Workers R2 Storage:Edit` permission.
@@ -16,12 +21,14 @@ cloudflare-r2-bucket:
 
       ## State Fields for Composition
       - `state.id` - Bucket name; pass to S3 SDK consumers as the bucket key
-      - `state.endpoint` - `https://{account_id}.r2.cloudflarestorage.com`
+      - `state.endpoint` - `https://{account_id}.r2.cloudflarestorage.com`, or
+        `https://{account_id}.{jurisdiction}.r2.cloudflarestorage.com` when `jurisdiction`
+        is set to anything other than "default"
 
       ## Actions
       - `get-info` - Fetch bucket metadata
       - `force-delete` - Explicit destructive delete (refuses if state.existing)
-    version-hash: 8375ba12a194
+    version-hash: ec22f41cd276
   schema:
     secret_ref:
       type: string
@@ -47,6 +54,19 @@ cloudflare-r2-bucket:
         - Standard
         - InfrequentAccess
       description: Storage class; defaults to Standard
+    jurisdiction:
+      type: string
+      enum:
+        - default
+        - eu
+        - fedramp
+      description: |-
+        Data-residency jurisdiction, fixed permanently at bucket creation.
+        Cloudflare scopes bucket names per jurisdiction, not just per account — a bucket
+        created under "eu" is invisible to (and name-independent from) a same-named
+        bucket under "default", so this must match the jurisdiction the bucket actually
+        lives in or every call here will silently miss it and create a duplicate instead.
+      default: default
     allow_destructive_delete:
       type: boolean
       description: 'If true, delete() will destroy the bucket. Defaults to true.'
@@ -73,6 +93,9 @@ cloudflare-r2-bucket:
     storage_class:
       type: string
       description: Active storage class
+    jurisdiction:
+      type: string
+      description: 'Active jurisdiction, echoed back by Cloudflare'
   lifecycle:
     sync: <<< cloudflare-r2-bucket-sync.js
     get-info: ''

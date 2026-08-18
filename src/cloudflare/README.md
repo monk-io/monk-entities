@@ -168,9 +168,16 @@ interface CloudflareR2BucketDefinition {
   name: string;              // bucket name (3-63 chars, S3-compatible)
   location_hint?: "wnam" | "enam" | "weur" | "eeur" | "apac";
   storage_class?: "Standard" | "InfrequentAccess";
-  allow_destructive_delete?: boolean; // default false; delete() is a no-op unless true
+  jurisdiction?: "default" | "eu" | "fedramp"; // fixed permanently at creation; default "default"
+  allow_destructive_delete?: boolean; // default true; set false to make delete() a no-op
 }
 ```
+
+`jurisdiction` matters even on an existing bucket you're only adopting: Cloudflare scopes
+bucket names per jurisdiction, not just per account, and the management API needs a
+matching `cf-r2-jurisdiction` header to see a non-default-jurisdiction bucket at all. Get
+it wrong and this entity won't error — it'll silently miss the real bucket and create an
+empty duplicate under the same name in the jurisdiction you did ask for.
 
 State:
 
@@ -181,6 +188,7 @@ interface CloudflareR2BucketState {
   created_on?: string;
   location?: string;
   storage_class?: string;
+  jurisdiction?: string;
   existing?: boolean;
 }
 ```
@@ -191,7 +199,7 @@ Actions:
 
 Token scope: `Workers R2 Storage:Edit`.
 
-Deletion policy: `delete()` is a no-op unless `allow_destructive_delete: true` is set in the definition. Adopted buckets (`state.existing = true`) are never deleted.
+Deletion policy: `delete()` destroys the bucket by default; set `allow_destructive_delete: false` to make it a no-op. Adopted buckets (`state.existing = true`) are never deleted regardless.
 
 ### `cloudflare-workers-script`
 
