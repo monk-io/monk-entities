@@ -18,6 +18,15 @@ export interface CloudflareR2BucketDefinition extends CloudflareEntityDefinition
   /** @description Storage class; defaults to Standard */
   storage_class?: "Standard" | "InfrequentAccess";
   /**
+   * @description Data-residency jurisdiction, fixed permanently at bucket creation.
+   * Cloudflare scopes bucket names per jurisdiction, not just per account — a bucket
+   * created under "eu" is invisible to (and name-independent from) a same-named
+   * bucket under "default", so this must match the jurisdiction the bucket actually
+   * lives in or every call here will silently miss it and create a duplicate instead.
+   * @default "default"
+   */
+  jurisdiction?: "default" | "eu" | "fedramp";
+  /**
    * @description If true, delete() will destroy the bucket. Defaults to true.
    * @default true
    */
@@ -39,6 +48,8 @@ export interface CloudflareR2BucketState extends CloudflareEntityState {
   location?: string;
   /** @description Active storage class */
   storage_class?: string;
+  /** @description Active jurisdiction, echoed back by Cloudflare */
+  jurisdiction?: string;
 }
 
 /**
@@ -47,6 +58,11 @@ export interface CloudflareR2BucketState extends CloudflareEntityState {
  * buckets by name. delete() destroys the bucket by default; set
  * `allow_destructive_delete: false` to make delete a no-op.
  *
+ * `jurisdiction` must match the bucket's actual jurisdiction (fixed permanently at
+ * creation) — Cloudflare scopes bucket names per jurisdiction, not just per account,
+ * so pointing this at the wrong jurisdiction won't error, it'll silently miss the
+ * real bucket and create an empty duplicate under the same name instead.
+ *
  * ## Secrets
  * - Reads: `secret_ref` (defaults to `cloudflare-api-token`) — needs
  *   `Workers R2 Storage:Edit` permission.
@@ -54,7 +70,9 @@ export interface CloudflareR2BucketState extends CloudflareEntityState {
  *
  * ## State Fields for Composition
  * - `state.id` - Bucket name; pass to S3 SDK consumers as the bucket key
- * - `state.endpoint` - `https://{account_id}.r2.cloudflarestorage.com`
+ * - `state.endpoint` - `https://{account_id}.r2.cloudflarestorage.com`, or
+ *   `https://{account_id}.{jurisdiction}.r2.cloudflarestorage.com` when `jurisdiction`
+ *   is set to anything other than "default"
  *
  * ## Actions
  * - `get-info` - Fetch bucket metadata
@@ -71,10 +89,11 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
     if (existing) {
       this.state = {
         id: name,
-        endpoint: this.endpointFor(accountId),
+        endpoint: this.endpointFor(accountId, existing.jurisdiction),
         created_on: existing.creation_date || existing.created_on,
         location: existing.location,
         storage_class: existing.storage_class,
+        jurisdiction: existing.jurisdiction,
         existing: true,
       };
       cli.output(`📦 Adopted existing R2 bucket ${name}`);
@@ -85,15 +104,22 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
     if (this.definition.location_hint) payload.locationHint = this.definition.location_hint;
     if (this.definition.storage_class) payload.storageClass = this.definition.storage_class;
 
-    const created = this.request<any>("POST", `/accounts/${accountId}/r2/buckets`, payload);
+    const created = this.request<any>(
+      "POST",
+      `/accounts/${accountId}/r2/buckets`,
+      payload,
+      this.jurisdictionHeaders()
+    );
     const result = created?.result || {};
+    const jurisdiction = result.jurisdiction || this.definition.jurisdiction || "default";
 
     this.state = {
       id: name,
-      endpoint: this.endpointFor(accountId),
+      endpoint: this.endpointFor(accountId, jurisdiction),
       created_on: result.creation_date || result.created_on,
       location: result.location,
       storage_class: result.storage_class || this.definition.storage_class || "Standard",
+      jurisdiction,
       existing: false,
     };
     cli.output(`✅ Created R2 bucket ${name}`);
@@ -108,13 +134,19 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
     // Refresh metadata so state stays consistent with provider.
     try {
       const accountId = this.definition.account_id;
-      const info = this.request<any>("GET", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+      const info = this.request<any>(
+        "GET",
+        `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+        undefined,
+        this.jurisdictionHeaders()
+      );
       const r = info?.result;
       if (r) {
         this.state.location = r.location || this.state.location;
         this.state.storage_class = r.storage_class || this.state.storage_class;
         this.state.created_on = r.creation_date || r.created_on || this.state.created_on;
-        this.state.endpoint = this.endpointFor(accountId);
+        this.state.jurisdiction = r.jurisdiction || this.state.jurisdiction;
+        this.state.endpoint = this.endpointFor(accountId, this.state.jurisdiction);
       }
     } catch {
       // ignore refresh errors; keep prior state
@@ -147,7 +179,12 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
       return;
     }
     const accountId = this.definition.account_id;
-    const res = this.request<any>("GET", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+    const res = this.request<any>(
+      "GET",
+      `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+      undefined,
+      this.jurisdictionHeaders()
+    );
     cli.output(JSON.stringify(res?.result || {}, null, 2));
   }
 
@@ -170,7 +207,12 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
   private destroyBucket(): void {
     const accountId = this.definition.account_id;
     try {
-      this.request("DELETE", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+      this.request(
+        "DELETE",
+        `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+        undefined,
+        this.jurisdictionHeaders()
+      );
       cli.output(`🗑️ Deleted R2 bucket ${this.state.id}`);
     } catch (e: any) {
       const msg = e?.message || String(e);
@@ -184,13 +226,28 @@ export class CloudflareR2Bucket extends CloudflareEntity<CloudflareR2BucketDefin
     }
   }
 
-  private endpointFor(accountId: string): string {
+  private endpointFor(accountId: string, jurisdiction?: string): string {
+    // Jurisdiction-restricted buckets live on a jurisdiction-qualified hostname, not
+    // just the default one — https://developers.cloudflare.com/r2/buckets/data-location/
+    if (jurisdiction && jurisdiction !== "default") {
+      return `https://${accountId}.${jurisdiction}.r2.cloudflarestorage.com`;
+    }
     return `https://${accountId}.r2.cloudflarestorage.com`;
+  }
+
+  private jurisdictionHeaders(): Record<string, string> | undefined {
+    const j = this.definition.jurisdiction;
+    return j && j !== "default" ? { "cf-r2-jurisdiction": j } : undefined;
   }
 
   private findBucket(accountId: string, name: string): any | null {
     try {
-      const res = this.request<any>("GET", `/accounts/${accountId}/r2/buckets/${name}`);
+      const res = this.request<any>(
+        "GET",
+        `/accounts/${accountId}/r2/buckets/${name}`,
+        undefined,
+        this.jurisdictionHeaders()
+      );
       return res?.result || null;
     } catch {
       return null;

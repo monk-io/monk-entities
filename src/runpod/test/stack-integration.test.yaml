@@ -146,9 +146,19 @@ tests:
       output:
         - "monk-test-pod"
 
+  - name: Get pod console URL
+    action: action
+    target: runpod-test/test-pod
+    actionName: get-console-url
+    expect:
+      exitCode: 0
+      output:
+        - "https://www.runpod.io/console/pods/"
+
   # There is deliberately no log step: `GET /v2/pods/{id}/logs` is a Server-Sent
   # Events stream that never closes, so an action wrapping it hangs until killed.
-  # The entity exposes no `get-logs` action for that reason.
+  # The entity exposes no `get-logs` action for that reason — get-console-url above
+  # is the safe alternative: pure string construction, no API call, can't hang.
 
   # A running pod reports a live `cost` value, so this exercises the primary
   # rate path rather than the catalog fallback.

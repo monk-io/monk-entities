@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /tmp/rclone.deb /var/lib/apt/lists/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY sync-to-external-storage.sh /usr/local/bin/sync-to-external-storage.sh
-COPY warm-from-external-storage.sh /usr/local/bin/warm-from-external-storage.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/sync-to-external-storage.sh \
-      /usr/local/bin/warm-from-external-storage.sh
+COPY sync-to-path.sh /usr/local/bin/sync-to-path.sh
+COPY warm-from-path.sh /usr/local/bin/warm-from-path.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/sync-to-path.sh \
+      /usr/local/bin/warm-from-path.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

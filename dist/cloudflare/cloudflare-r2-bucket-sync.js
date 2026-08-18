@@ -68,10 +68,11 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
     if (existing) {
       this.state = {
         id: name,
-        endpoint: this.endpointFor(accountId),
+        endpoint: this.endpointFor(accountId, existing.jurisdiction),
         created_on: existing.creation_date || existing.created_on,
         location: existing.location,
         storage_class: existing.storage_class,
+        jurisdiction: existing.jurisdiction,
         existing: true
       };
       cli.output(`\u{1F4E6} Adopted existing R2 bucket ${name}`);
@@ -80,14 +81,21 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
     const payload = { name };
     if (this.definition.location_hint) payload.locationHint = this.definition.location_hint;
     if (this.definition.storage_class) payload.storageClass = this.definition.storage_class;
-    const created = this.request("POST", `/accounts/${accountId}/r2/buckets`, payload);
+    const created = this.request(
+      "POST",
+      `/accounts/${accountId}/r2/buckets`,
+      payload,
+      this.jurisdictionHeaders()
+    );
     const result = created?.result || {};
+    const jurisdiction = result.jurisdiction || this.definition.jurisdiction || "default";
     this.state = {
       id: name,
-      endpoint: this.endpointFor(accountId),
+      endpoint: this.endpointFor(accountId, jurisdiction),
       created_on: result.creation_date || result.created_on,
       location: result.location,
       storage_class: result.storage_class || this.definition.storage_class || "Standard",
+      jurisdiction,
       existing: false
     };
     cli.output(`\u2705 Created R2 bucket ${name}`);
@@ -99,13 +107,19 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
     }
     try {
       const accountId = this.definition.account_id;
-      const info = this.request("GET", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+      const info = this.request(
+        "GET",
+        `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+        void 0,
+        this.jurisdictionHeaders()
+      );
       const r = info?.result;
       if (r) {
         this.state.location = r.location || this.state.location;
         this.state.storage_class = r.storage_class || this.state.storage_class;
         this.state.created_on = r.creation_date || r.created_on || this.state.created_on;
-        this.state.endpoint = this.endpointFor(accountId);
+        this.state.jurisdiction = r.jurisdiction || this.state.jurisdiction;
+        this.state.endpoint = this.endpointFor(accountId, this.state.jurisdiction);
       }
     } catch {
     }
@@ -132,7 +146,12 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
       return;
     }
     const accountId = this.definition.account_id;
-    const res = this.request("GET", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+    const res = this.request(
+      "GET",
+      `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+      void 0,
+      this.jurisdictionHeaders()
+    );
     cli.output(JSON.stringify(res?.result || {}, null, 2));
   }
   forceDelete() {
@@ -151,7 +170,12 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
   destroyBucket() {
     const accountId = this.definition.account_id;
     try {
-      this.request("DELETE", `/accounts/${accountId}/r2/buckets/${this.state.id}`);
+      this.request(
+        "DELETE",
+        `/accounts/${accountId}/r2/buckets/${this.state.id}`,
+        void 0,
+        this.jurisdictionHeaders()
+      );
       cli.output(`\u{1F5D1}\uFE0F Deleted R2 bucket ${this.state.id}`);
     } catch (e) {
       const msg = e?.message || String(e);
@@ -162,12 +186,24 @@ var _CloudflareR2Bucket = class _CloudflareR2Bucket extends (_a = CloudflareEnti
       throw e;
     }
   }
-  endpointFor(accountId) {
+  endpointFor(accountId, jurisdiction) {
+    if (jurisdiction && jurisdiction !== "default") {
+      return `https://${accountId}.${jurisdiction}.r2.cloudflarestorage.com`;
+    }
     return `https://${accountId}.r2.cloudflarestorage.com`;
+  }
+  jurisdictionHeaders() {
+    const j = this.definition.jurisdiction;
+    return j && j !== "default" ? { "cf-r2-jurisdiction": j } : void 0;
   }
   findBucket(accountId, name) {
     try {
-      const res = this.request("GET", `/accounts/${accountId}/r2/buckets/${name}`);
+      const res = this.request(
+        "GET",
+        `/accounts/${accountId}/r2/buckets/${name}`,
+        void 0,
+        this.jurisdictionHeaders()
+      );
       return res?.result || null;
     } catch {
       return null;

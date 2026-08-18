@@ -48,13 +48,67 @@
 #
 # Prerequisites (see README.md for full detail):
 #   - Secret `runpod-api-token` (existing convention across this package)
-#   - Secrets `r2-access-key-id` / `r2-secret-access-key`
+#   - Secrets `cloudflare-api-token` (Workers R2 Storage:Edit) / `cloudflare-account-id`
+#     — bucket-data/bucket-runs below use these to create-or-adopt the two R2 buckets
+#   - Secrets `r2-access-key-id` / `r2-secret-access-key` — the separate S3-compatible
+#     pair the pods actually use to read/write objects; Cloudflare's API can't mint
+#     these, so they're still created by hand in the dashboard
 #   - The job image built from job/Dockerfile, pushed public (RunPod's registry auth
 #     only supports Docker Hub / ECR credentials, and only public images need none of
 #     that at all — this deployment uses a public Docker Hub image)
 #   - A small dummy dataset object already uploaded to the data bucket (README "Phase 0")
 
 namespace: runpod-cross-region-training
+
+# === Cloudflare R2 buckets: source of truth for dataset + checkpoints/manifest ===
+#
+# Bucket lifecycle only. CloudflareR2Bucket talks to Cloudflare's REST API (needs
+# secrets `cloudflare-api-token` with Workers R2 Storage:Edit, and
+# `cloudflare-account-id`) to create-or-adopt the bucket itself. jurisdiction: eu is
+# required, not cosmetic — these buckets were created under R2's EU jurisdiction
+# (fixed permanently at creation), and Cloudflare scopes bucket names PER JURISDICTION,
+# not just per account: querying without the matching jurisdiction finds nothing and
+# silently creates an empty duplicate under the same name instead of adopting the real
+# one. (Caught live, 2026-08-18 — see git history for the two throwaway default-
+# jurisdiction buckets this produced before jurisdiction support was added.)
+# It does NOT manage
+# the R2 S3-compatible access-key pair the pods use to read/write objects
+# (`r2-access-key-id` / `r2-secret-access-key` below) — Cloudflare's API has no
+# endpoint to mint those, so that pair is still created by hand in the dashboard (see
+# README Prerequisites). Both are in the `stack` teardown group below, for consistency
+# with the volumes/pods, but `monk delete --force stack` never actually destroys them:
+# these are adopted, pre-existing buckets (state.existing = true), and delete() on an
+# adopted bucket is always a no-op — regardless of `allow_destructive_delete` — and the
+# `force-delete` action explicitly refuses adopted buckets too. There is no path to
+# deleting these through this entity; use the Cloudflare dashboard/API directly if you
+# actually want them gone.
+bucket-data:
+  defines: cloudflare/cloudflare-r2-bucket
+  account_id: <- secret("cloudflare-account-id")
+  name: monk-training-data
+  storage_class: Standard
+  jurisdiction: eu
+  allow_destructive_delete: false
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
+
+bucket-runs:
+  defines: cloudflare/cloudflare-r2-bucket
+  account_id: <- secret("cloudflare-account-id")
+  name: monk-training-runs
+  storage_class: Standard
+  jurisdiction: eu
+  allow_destructive_delete: false
+  permitted-secrets:
+    cloudflare-api-token: true
+    cloudflare-account-id: true
+  services:
+    data:
+      protocol: custom
 
 # === EU-RO-1: warm cache + GPU trainer ===
 
@@ -97,12 +151,14 @@ gpu-pod-eu-ro-1:
   env:
     ROLE: gpu-a
     EXP: exp-entities-e2e-01
-    DATA_BUCKET: monk-training-data
-    RUNS_BUCKET: monk-training-runs
+    DATA_BUCKET: <- connection-target("data_bucket") entity-state get-member("id")
+    RUNS_BUCKET: <- connection-target("runs_bucket") entity-state get-member("id")
     RCLONE_CONFIG_R2_TYPE: s3
     RCLONE_CONFIG_R2_PROVIDER: Cloudflare
     RCLONE_CONFIG_R2_REGION: auto
-    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    # Both buckets live in the same account+jurisdiction, so either connection's
+    # endpoint would be identical; data_bucket is just the one picked.
+    RCLONE_CONFIG_R2_ENDPOINT: <- connection-target("data_bucket") entity-state get-member("endpoint")
     # RunPod returns `env` in full to any holder of the account's API key — acceptable
     # for this throwaway demo, not for production. Production should use scoped
     # per-bucket R2 tokens or presigned URLs instead of putting them in `env`.
@@ -112,10 +168,119 @@ gpu-pod-eu-ro-1:
     volume:
       runnable: runpod-cross-region-training/volume-eu-ro-1
       service: data
+    data_bucket:
+      runnable: runpod-cross-region-training/bucket-data
+      service: data
+    runs_bucket:
+      runnable: runpod-cross-region-training/bucket-runs
+      service: data
   depends:
     wait-for:
       runnables:
         - runpod-cross-region-training/volume-eu-ro-1
+        - runpod-cross-region-training/bucket-data
+        - runpod-cross-region-training/bucket-runs
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+    r2-access-key-id: true
+    r2-secret-access-key: true
+
+# Alternative to gpu-pod-eu-ro-1 for training images that can't fork a background
+# process: BACKGROUND_SYNC=false skips the sync sidecar entirely, so checkpoints +
+# manifest land on volume-eu-ro-1 only. Pair with sync-out-pod-eu-ro-1 below to push
+# them to R2 afterward. See README "Alternative: no background process in the GPU
+# pod". Run this INSTEAD OF gpu-pod-eu-ro-1, not alongside it.
+gpu-pod-eu-ro-1-no-sidecar:
+  defines: runpod/runpod-pod
+  name: monk-hybrid-gpu-eu-ro-1-no-sidecar
+  image: imanachyn/runpod-hybrid-job:latest
+  gpu_type_id: NVIDIA L4
+  gpu_count: 1
+  disk: 10
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  network_volume_path: /workspace
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  env:
+    ROLE: gpu-a
+    BACKGROUND_SYNC: "false"
+    EXP: exp-entities-e2e-01
+    DATA_BUCKET: <- connection-target("data_bucket") entity-state get-member("id")
+    RUNS_BUCKET: <- connection-target("runs_bucket") entity-state get-member("id")
+    RCLONE_CONFIG_R2_TYPE: s3
+    RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+    RCLONE_CONFIG_R2_REGION: auto
+    # Both buckets live in the same account+jurisdiction, so either connection's
+    # endpoint would be identical; data_bucket is just the one picked.
+    RCLONE_CONFIG_R2_ENDPOINT: <- connection-target("data_bucket") entity-state get-member("endpoint")
+    RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
+    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
+  connections:
+    volume:
+      runnable: runpod-cross-region-training/volume-eu-ro-1
+      service: data
+    data_bucket:
+      runnable: runpod-cross-region-training/bucket-data
+      service: data
+    runs_bucket:
+      runnable: runpod-cross-region-training/bucket-runs
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-cross-region-training/volume-eu-ro-1
+        - runpod-cross-region-training/bucket-data
+        - runpod-cross-region-training/bucket-runs
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+    r2-access-key-id: true
+    r2-secret-access-key: true
+
+# Run after gpu-pod-eu-ro-1-no-sidecar's phase_complete and its deletion: pushes
+# volume-eu-ro-1's checkpoint dir + manifest to R2 in one shot (ROLE=sync-out), then
+# idles. Confirm phase_complete, then delete this pod too.
+sync-out-pod-eu-ro-1:
+  defines: runpod/runpod-pod
+  name: monk-hybrid-sync-out-eu-ro-1
+  image: imanachyn/runpod-hybrid-job:latest
+  cpu_flavor_id: cpu3c
+  vcpu_count: 2
+  disk: 10
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  network_volume_path: /workspace
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  env:
+    ROLE: sync-out
+    EXP: exp-entities-e2e-01
+    DATA_BUCKET: <- connection-target("data_bucket") entity-state get-member("id")
+    RUNS_BUCKET: <- connection-target("runs_bucket") entity-state get-member("id")
+    RCLONE_CONFIG_R2_TYPE: s3
+    RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+    RCLONE_CONFIG_R2_REGION: auto
+    # Both buckets live in the same account+jurisdiction, so either connection's
+    # endpoint would be identical; data_bucket is just the one picked.
+    RCLONE_CONFIG_R2_ENDPOINT: <- connection-target("data_bucket") entity-state get-member("endpoint")
+    RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
+    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
+  connections:
+    volume:
+      runnable: runpod-cross-region-training/volume-eu-ro-1
+      service: data
+    data_bucket:
+      runnable: runpod-cross-region-training/bucket-data
+      service: data
+    runs_bucket:
+      runnable: runpod-cross-region-training/bucket-runs
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-cross-region-training/volume-eu-ro-1
+        - runpod-cross-region-training/bucket-data
+        - runpod-cross-region-training/bucket-runs
       timeout: 120
   permitted-secrets:
     runpod-api-token: true
@@ -159,22 +324,32 @@ warmer-pod-us-il-1:
   env:
     ROLE: warm-b
     EXP: exp-entities-e2e-01
-    DATA_BUCKET: monk-training-data
-    RUNS_BUCKET: monk-training-runs
+    DATA_BUCKET: <- connection-target("data_bucket") entity-state get-member("id")
+    RUNS_BUCKET: <- connection-target("runs_bucket") entity-state get-member("id")
     RCLONE_CONFIG_R2_TYPE: s3
     RCLONE_CONFIG_R2_PROVIDER: Cloudflare
     RCLONE_CONFIG_R2_REGION: auto
-    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    # Both buckets live in the same account+jurisdiction, so either connection's
+    # endpoint would be identical; data_bucket is just the one picked.
+    RCLONE_CONFIG_R2_ENDPOINT: <- connection-target("data_bucket") entity-state get-member("endpoint")
     RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
     RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
   connections:
     volume:
       runnable: runpod-cross-region-training/volume-us-il-1
       service: data
+    data_bucket:
+      runnable: runpod-cross-region-training/bucket-data
+      service: data
+    runs_bucket:
+      runnable: runpod-cross-region-training/bucket-runs
+      service: data
   depends:
     wait-for:
       runnables:
         - runpod-cross-region-training/volume-us-il-1
+        - runpod-cross-region-training/bucket-data
+        - runpod-cross-region-training/bucket-runs
       timeout: 120
   permitted-secrets:
     runpod-api-token: true
@@ -203,22 +378,32 @@ gpu-pod-us-il-1:
   env:
     ROLE: gpu-b
     EXP: exp-entities-e2e-01
-    DATA_BUCKET: monk-training-data
-    RUNS_BUCKET: monk-training-runs
+    DATA_BUCKET: <- connection-target("data_bucket") entity-state get-member("id")
+    RUNS_BUCKET: <- connection-target("runs_bucket") entity-state get-member("id")
     RCLONE_CONFIG_R2_TYPE: s3
     RCLONE_CONFIG_R2_PROVIDER: Cloudflare
     RCLONE_CONFIG_R2_REGION: auto
-    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    # Both buckets live in the same account+jurisdiction, so either connection's
+    # endpoint would be identical; data_bucket is just the one picked.
+    RCLONE_CONFIG_R2_ENDPOINT: <- connection-target("data_bucket") entity-state get-member("endpoint")
     RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
     RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
   connections:
     volume:
       runnable: runpod-cross-region-training/volume-us-il-1
       service: data
+    data_bucket:
+      runnable: runpod-cross-region-training/bucket-data
+      service: data
+    runs_bucket:
+      runnable: runpod-cross-region-training/bucket-runs
+      service: data
   depends:
     wait-for:
       runnables:
         - runpod-cross-region-training/volume-us-il-1
+        - runpod-cross-region-training/bucket-data
+        - runpod-cross-region-training/bucket-runs
       timeout: 120
   permitted-secrets:
     runpod-api-token: true
@@ -234,8 +419,12 @@ gpu-pod-us-il-1:
 stack:
   defines: group
   members:
+    - runpod-cross-region-training/bucket-data
+    - runpod-cross-region-training/bucket-runs
     - runpod-cross-region-training/volume-eu-ro-1
     - runpod-cross-region-training/volume-us-il-1
     - runpod-cross-region-training/gpu-pod-eu-ro-1
+    - runpod-cross-region-training/gpu-pod-eu-ro-1-no-sidecar
+    - runpod-cross-region-training/sync-out-pod-eu-ro-1
     - runpod-cross-region-training/warmer-pod-us-il-1
     - runpod-cross-region-training/gpu-pod-us-il-1

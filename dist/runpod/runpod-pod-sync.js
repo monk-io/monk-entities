@@ -57,8 +57,8 @@ const common = require("runpod/common");
 const toApiBody = common.toApiBody;
 const HOURS_PER_MONTH = common.HOURS_PER_MONTH;
 const cli = require("cli");
-var _costs_dec, _getCostEstimate_dec, _getInfo_dec, _restart_dec, _forceTerminate_dec, _a, _init;
-var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_dec = [action("force-terminate")], _restart_dec = [action("restart")], _getInfo_dec = [action("get-info")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
+var _costs_dec, _getCostEstimate_dec, _getConsoleUrl_dec, _getInfo_dec, _restart_dec, _forceTerminate_dec, _a, _init;
+var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_dec = [action("force-terminate")], _restart_dec = [action("restart")], _getInfo_dec = [action("get-info")], _getConsoleUrl_dec = [action("get-console-url")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -240,6 +240,13 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
     }
     const info = this.makeRequest("GET", `/pods/${this.state.id}`);
     cli.output(JSON.stringify(info, null, 2));
+  }
+  getConsoleUrl(_args) {
+    if (!this.state.id) {
+      cli.output("Pod not created yet");
+      return;
+    }
+    cli.output(`https://www.runpod.io/console/pods/${this.state.id}`);
   }
   getCostEstimate(_args) {
     const rate = this.hourlyRate();
@@ -548,6 +555,7 @@ _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "forceTerminate", _forceTerminate_dec, _RunpodPod);
 __decorateElement(_init, 1, "restart", _restart_dec, _RunpodPod);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _RunpodPod);
+__decorateElement(_init, 1, "getConsoleUrl", _getConsoleUrl_dec, _RunpodPod);
 __decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _RunpodPod);
 __decorateElement(_init, 1, "costs", _costs_dec, _RunpodPod);
 __decoratorMetadata(_init, _RunpodPod);
