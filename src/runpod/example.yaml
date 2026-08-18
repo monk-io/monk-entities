@@ -1,0 +1,78 @@
+namespace: runpod-example
+
+# A reusable container config. Templates cost nothing on their own — the pod bills.
+pytorch-template:
+  defines: runpod/runpod-template
+  name: monk-pytorch-template
+  image: runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+  disk: 20
+  # Templates take only a host-local persistent mount, and size and path are
+  # required together. Network volumes attach on the pod, not the template.
+  persistent_disk_size: 50
+  persistent_disk_path: /workspace
+  ports:
+    - 8888/http
+    - 22/tcp
+  env:
+    JUPYTER_ENABLE: "1"
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Persistent storage that survives pod termination. Datacenter-scoped: only pods in
+# EU-FR-1 can mount this volume, which is why the pod below pins the same data center.
+#
+# Not every data center offers network volumes, and those that do offer only certain
+# tiers — check `networkVolumeTypes` in GET /v2/catalog/datacenters before changing
+# either field. EU-FR-1 supports HIGH_PERFORMANCE; EU-RO-1, for example, is
+# STANDARD-only and would reject this tier.
+training-data:
+  defines: runpod/runpod-network-volume
+  name: monk-training-data
+  size: 100
+  data_center: EU-FR-1
+  volume_type: HIGH_PERFORMANCE
+  # Deleting a volume destroys its data — opt in explicitly before letting a stack
+  # teardown remove it.
+  allow_destructive_delete: false
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# A GPU pod that mounts the volume above. Billed hourly for as long as it runs.
+#
+# Unlike the volume, this pod leaves allow_destructive_delete at its default of true:
+# a `monk delete` terminates the pod, which is what stops the hourly billing. Compute
+# is disposable, the volume's data is not — hence the asymmetry.
+trainer:
+  defines: runpod/runpod-pod
+  name: monk-trainer
+  image: runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+  gpu_type_id: NVIDIA GeForce RTX 4090
+  gpu_count: 1
+  disk: 40
+  ports:
+    - 8888/http
+    - 22/tcp
+  env:
+    WANDB_MODE: offline
+  # A volume only attaches inside its own data center, so both fields are wired from
+  # the volume's state rather than hardcoded independently.
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  connections:
+    volume:
+      runnable: runpod-example/training-data
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-example/training-data
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
