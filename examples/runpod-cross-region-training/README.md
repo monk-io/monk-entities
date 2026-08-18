@@ -12,10 +12,14 @@ validation launched pods directly against RunPod's **v1** API so it could pass t
 as a `dockerStartCmd` array. This package's `runpod-pod` entity is **v2-only** — v2's
 `args` field is a single string, and a real multi-line command sent through it silently
 crash-loops (measured — no diagnostics, just repeated restarts). So instead of passing
-the job script as pod arguments, it's baked into a small custom image's `ENTRYPOINT`
-(`job/`), and the pod is driven entirely by `env` vars (`ROLE`, bucket names, R2
-credentials). Functionally identical; just built the way this package's entities
-actually support it.
+the job script as pod arguments, it's baked into a small custom image (`job/`), and the
+pod is driven entirely by `env` vars (`ROLE`, bucket names, R2 credentials). The image
+has two scripts: `entrypoint.sh` (the `ENTRYPOINT`, dispatches on `ROLE`) and
+`sync-to-external-storage.sh`, launched by it in the background to watch the checkpoint
+directory and upload to R2 — kept separate so a real training command could replace
+the toy training loop in `entrypoint.sh` without also having to reimplement the upload
+protocol. Functionally identical to the original validation; just built the way this
+package's entities actually support it.
 
 **Status: run live end to end, 2026-08-18, through these entities.** All three phases
 completed with the expected `phase_complete` / `CACHE_HIT_*` / `volumeB_integrity OK`
@@ -266,11 +270,12 @@ rclone cat r2:monk-training-runs/exp-entities-e2e-01/logs/gpu-a.log \
   --s3-region auto
 ```
 
-Swap `gpu-a` for `warm-b` / `gpu-b` for the other phases. Only `gpu-a`'s log updates
-continuously while the pod runs (its background uploader loop calls `sync_log` every
-~3s); `warm-b` and `gpu-b` only write their log to R2 once, at the very end, so a 404
-on those two just means the phase hasn't finished yet — retry in a few seconds rather
-than assuming something's wrong.
+Swap `gpu-a` for `warm-b` / `gpu-b` for the other phases. `gpu-a` and `gpu-b`'s logs
+update continuously while their pod runs (each launches `sync-to-external-storage.sh`
+in the background, which mirrors the log every ~3s alongside uploading checkpoints);
+`warm-b` only writes its log to R2 once, at the very end, so a 404 on that one just
+means the phase hasn't finished yet — retry in a few seconds rather than assuming
+something's wrong.
 
 Alternatively, `monk describe` shows `state.ssh_command` once a pod exposes port
 `22/tcp` (this example's pods don't, to keep the image minimal) — or use the RunPod

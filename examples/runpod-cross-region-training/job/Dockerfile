@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /tmp/rclone.deb /var/lib/apt/lists/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY sync-to-external-storage.sh /usr/local/bin/sync-to-external-storage.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/sync-to-external-storage.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

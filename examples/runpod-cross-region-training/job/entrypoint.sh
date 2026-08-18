@@ -7,6 +7,12 @@
 # field because v2's `args` is a single string appended to the entrypoint — a real
 # multi-line script sent through it silently crash-loops (see the example README).
 #
+# The checkpoint-upload-and-manifest logic lives in a separate script,
+# sync-to-external-storage.sh, launched in the background here rather than embedded
+# inline. That's what lets a real training command replace the toy training loop below
+# without also having to reimplement the sync protocol — the sidecar only needs
+# checkpoints written atomically into CKPT_DIR and a drain-file signal on completion.
+#
 # Two buckets, not one bucket with two prefixes: R2 tokens used for this are
 # bucket-scoped, not prefix-scoped, so a single bucket wouldn't isolate dataset (read)
 # traffic from runs (write) traffic.
@@ -27,6 +33,7 @@ CK="$V/runs/$EXP/ckpt"
 LOGDIR="$V/runs/$EXP/logs"
 mkdir -p "$V/data" "$CK" "$LOGDIR"
 LOG="$LOGDIR/$ROLE.log"
+DRAIN="/tmp/drain-$ROLE"
 
 say(){ echo "### $*" | tee -a "$LOG"; }
 res(){ printf 'RESULT: %-30s %s\n' "$1" "$2" | tee -a "$LOG"; }
@@ -37,6 +44,15 @@ RC=(rclone --s3-no-check-bucket --retries 3 --contimeout 20s --timeout 90s)
 
 # Log survives the pod: mirrored to R2 so the operator can read it without SSH.
 sync_log(){ "${RC[@]}" copyto "$LOG" "r2:$RUNS/$EXP/logs/$ROLE.log" 2>/dev/null; }
+
+# Launches sync-to-external-storage.sh in the background for the current CKPT_DIR/log,
+# using $1 as the dataset hash to embed in manifest writes. Sets $SYNC_PID.
+start_sync(){
+  RUNS_BUCKET="$RUNS" EXP="$EXP" DATASET_SHA256="$1" CKPT_DIR="$CK" LOG_FILE="$LOG" \
+    DRAIN_FILE="$DRAIN" SYNC_INTERVAL=3 \
+    /usr/local/bin/sync-to-external-storage.sh &
+  SYNC_PID=$!
+}
 
 pull_manifest(){ "${RC[@]}" copyto "r2:$RUNS/$EXP/manifest.json" /tmp/m.json 2>/dev/null; }
 # Flatten before parsing: pretty-printed JSON's `"step": 60` (with a space) reads as the
@@ -64,28 +80,11 @@ gpu-a)
   DH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
   res "dataset_sha256" "${DH:0:16}…"
 
-  say "--- train, checkpoint to VOLUME, upload to R2 in background ---"
-  (
-    P=""
-    while true; do
-      L=$(ls -1 "$CK"/step-*.bin 2>/dev/null | sort -V | tail -1)
-      if [ -n "$L" ] && [ "$L" != "$P" ]; then
-        st=$(basename "$L" .bin); st=${st#step-}
-        if "${RC[@]}" copyto "$L" "r2:$RUNS/$EXP/ckpt/$(basename "$L")" \
-            --s3-upload-concurrency 8 --s3-chunk-size 16M 2>/dev/null; then
-          jq -n --arg s "$st" --arg k "$EXP/ckpt/$(basename "$L")" --arg d "$DH" \
-            '{step:($s|tonumber),checkpoint:$k,dataset_sha256:$d}' > /tmp/m.json
-          "${RC[@]}" copyto /tmp/m.json "r2:$RUNS/$EXP/manifest.json" 2>/dev/null \
-            && echo "SYNC: $(basename "$L") + manifest -> R2" | tee -a "$LOG"
-          P="$L"
-        fi
-      fi
-      [ -f /tmp/drain ] && { echo "SYNC: drained" | tee -a "$LOG"; exit 0; }
-      sync_log
-      sleep 3
-    done
-  ) & SP=$!
+  say "--- train, checkpoint to VOLUME; sync-to-external-storage.sh uploads in the background ---"
+  start_sync "$DH"
 
+  # This loop stands in for the real training command. It only has to write
+  # checkpoints atomically into $CK — the sidecar above handles everything else.
   for s in $(seq 1 60); do
     sleep 0.3
     if (( s % 20 == 0 )); then
@@ -94,7 +93,7 @@ gpu-a)
       echo "TRAIN: ckpt at step $s" | tee -a "$LOG"
     fi
   done
-  touch /tmp/drain; wait "$SP"
+  touch "$DRAIN"; wait "$SYNC_PID"
   res "volA_holds" "$(ls "$CK" | tr '\n' ' ')"
   res "phase_complete" "gpu-a reached step 60 — confirm the RESULT lines above, then delete this pod"
   ;;
@@ -159,20 +158,18 @@ gpu-b)
     res "CACHE_HIT_checkpoint" "NO — not on volume, would need R2"
   fi
 
-  say "--- continue training past step $MS ---"
+  say "--- continue training past step $MS; sync-to-external-storage.sh uploads in the background ---"
+  start_sync "$GH"
+
   for s in $(seq $((MS + 1)) $((MS + 40))); do
     sleep 0.3
     if (( s % 20 == 0 )); then
       { echo "exp=$EXP step=$s data=$GH"; head -c 8388608 /dev/zero; } > "$CK/.tmp"
       sync; mv "$CK/.tmp" "$CK/step-$(printf '%06d' "$s").bin"
-      "${RC[@]}" copyto "$CK/step-$(printf '%06d' "$s").bin" \
-        "r2:$RUNS/$EXP/ckpt/step-$(printf '%06d' "$s").bin" --s3-upload-concurrency 8 2>/dev/null
-      jq -n --arg s "$s" --arg k "$EXP/ckpt/step-$(printf '%06d' "$s").bin" --arg d "$GH" \
-        '{step:($s|tonumber),checkpoint:$k,dataset_sha256:$d}' > /tmp/m2.json
-      "${RC[@]}" copyto /tmp/m2.json "r2:$RUNS/$EXP/manifest.json" 2>/dev/null \
-        && echo "SYNC: step $s -> R2" | tee -a "$LOG"
+      echo "TRAIN: ckpt at step $s" | tee -a "$LOG"
     fi
   done
+  touch "$DRAIN"; wait "$SYNC_PID"
   res "phase_complete" "gpu-b reached step $((MS + 40)) — confirm CACHE_HIT lines above, then delete this pod"
   ;;
 
