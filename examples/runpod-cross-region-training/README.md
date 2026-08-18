@@ -14,11 +14,16 @@ as a `dockerStartCmd` array. This package's `runpod-pod` entity is **v2-only** �
 crash-loops (measured — no diagnostics, just repeated restarts). So instead of passing
 the job script as pod arguments, it's baked into a small custom image (`job/`), and the
 pod is driven entirely by `env` vars (`ROLE`, bucket names, R2 credentials). The image
-has two scripts: `entrypoint.sh` (the `ENTRYPOINT`, dispatches on `ROLE`) and
-`sync-to-external-storage.sh`, launched by it in the background to watch the checkpoint
-directory and upload to R2 — kept separate so a real training command could replace
-the toy training loop in `entrypoint.sh` without also having to reimplement the upload
-protocol. Functionally identical to the original validation; just built the way this
+has three scripts, split so the general (reusable) parts don't carry this demo's
+test-specific assertions: `entrypoint.sh` (the `ENTRYPOINT`, dispatches on `ROLE`, and
+owns everything specific to validating this example — hash checks, `RESULT`-formatted
+output); `sync-to-external-storage.sh`, launched by it in the background on the GPU
+roles to watch the checkpoint directory and upload new files + advance the manifest;
+and `warm-from-external-storage.sh`, called by the CPU warmer role to pull the
+manifest and download the dataset + checkpoint it references — read-only, no manifest
+writes. Both helpers take their config via `env` vars and know nothing about training;
+a real job image could reuse them unchanged behind a real training/inference command.
+Functionally identical to the original validation; just built the way this
 package's entities actually support it.
 
 **Status: run live end to end, 2026-08-18, through these entities.** All three phases

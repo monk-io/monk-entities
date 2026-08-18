@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY sync-to-external-storage.sh /usr/local/bin/sync-to-external-storage.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/sync-to-external-storage.sh
+COPY warm-from-external-storage.sh /usr/local/bin/warm-from-external-storage.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/sync-to-external-storage.sh \
+      /usr/local/bin/warm-from-external-storage.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

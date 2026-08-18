@@ -101,19 +101,20 @@ gpu-a)
 # ─────────────────────────────────────────────── region B, CPU: warm the cache
 warm-b)
   res "nproc" "$(nproc)"
-  if ! pull_manifest; then
+
+  # The download side (pull manifest, fetch dataset + checkpoint) lives in
+  # warm-from-external-storage.sh — generic enough for any warmer. What's left here
+  # is specific to validating this demo: comparing the downloaded dataset's hash
+  # against what the manifest claims.
+  t0=$(date +%s)
+  if ! DATA_BUCKET="$DATA" RUNS_BUCKET="$RUNS" EXP="$EXP" DATA_DIR="$V/data" CKPT_DIR="$CK" \
+      MANIFEST_FILE=/tmp/m.json /usr/local/bin/warm-from-external-storage.sh 2>&1 | tee -a "$LOG"; then
     res "manifest" "MISSING — run the gpu-a phase first"
     sync_log; exec sleep infinity
   fi
+  t1=$(date +%s)
   MS=$(get step); MC=$(get checkpoint); MD=$(get dataset_sha256)
   res "manifest" "step=$MS ckpt=$MC"
-
-  say "--- warm volume B: dataset ---"
-  t0=$(date +%s)
-  "${RC[@]}" copy "r2:$DATA/$EXP-dataset" "$V/data" --transfers 16 2>&1 | tail -1 | tee -a "$LOG"
-  say "--- warm volume B: latest checkpoint ---"
-  "${RC[@]}" copyto "r2:$RUNS/$MC" "$CK/$(basename "$MC")" 2>&1 | tail -1 | tee -a "$LOG"
-  t1=$(date +%s)
   res "warm_took" "$((t1 - t0))s"
 
   GH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
