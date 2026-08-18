@@ -375,7 +375,16 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
     // stays open indefinitely, so a request/response HttpClient never returns and the action
     // hangs the lifecycle job until it is killed (verified against a live pod). Consuming it
     // needs an SSE client monkec does not provide. Use `runpodctl` or the RunPod console for
-    // logs instead.
+    // logs instead — get-console-url below gets you there in one step.
+
+    @action("get-console-url")
+    getConsoleUrl(_args?: Args): void {
+        if (!this.state.id) {
+            cli.output("Pod not created yet");
+            return;
+        }
+        cli.output(`https://www.runpod.io/console/pods/${this.state.id}`);
+    }
 
     @action("get-cost-estimate")
     getCostEstimate(_args?: Args): void {
