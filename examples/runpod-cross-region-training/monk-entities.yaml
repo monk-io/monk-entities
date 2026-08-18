@@ -1,0 +1,241 @@
+# RunPod Cross-Region Training Handoff
+#
+# Reproduces, with this repo's own runpod-pod and runpod-network-volume entities, a
+# training run that starts in one region and resumes in another without re-pulling bulk
+# data from origin storage. Validated live end to end (three phases, two continents,
+# ~$0.03) using raw scripts before these entities existed — see the README for the full
+# story and how this stack differs from that validation.
+#
+# Architecture: Cloudflare R2 is the source of truth. Each active region keeps a RunPod
+# network volume as a disposable warm cache. Checkpoints go straight to R2 — never only
+# to the volume, since a volume is datacenter-pinned and can't serve a run that resumes
+# elsewhere. The manifest write on R2 is the commit point.
+#
+#   region EU-RO-1                                    region US-IL-1
+#   ┌───────────────────────┐                         ┌──────────────────┐
+#   │ gpu-pod-eu-ro-1        │-- checkpoints+manifest->│ R2 (source of    │
+#   │ warms volume-eu-ro-1   │                         │ truth)           │
+#   │ from R2, trains,       │<-- dataset (once) ------│                  │
+#   │ checkpoints to         │                         └────────┬─────────┘
+#   │ volume-eu-ro-1 + R2    │                                  │
+#   └───────────────────────┘                          reads manifest, warms
+#                                                        volume-us-il-1 from R2
+#                                                                 │
+#                                                        ┌────────▼──────────────┐
+#                                                        │ warmer-pod-us-il-1     │
+#                                                        │ ($0.06/hr)             │
+#                                                        │ warms volume-us-il-1,  │
+#                                                        │ verifies, exits        │
+#                                                        └────────┬──────────────┘
+#                                                                 │ volume-us-il-1 now warm
+#                                                        ┌────────▼──────────────┐
+#                                                        │ gpu-pod-us-il-1        │
+#                                                        │ reads dataset +        │
+#                                                        │ checkpoint FROM        │
+#                                                        │ volume-us-il-1 (cache  │
+#                                                        │ hit, no R2 pull),      │
+#                                                        │ resumes training       │
+#                                                        └────────────────────────┘
+#
+# This is inherently sequential across time, NOT a single `monk run` of everything —
+# see README.md "Run sequence" for the exact per-phase monk run/delete order. Do not
+# `monk run` the `stack` group below; it exists only to make final teardown a single
+# command once every phase has been confirmed and its pod deleted.
+#
+# R2 uses two buckets, not one bucket with two prefixes: the access tokens used here are
+# bucket-scoped, not prefix-scoped, so a single bucket wouldn't isolate dataset (read)
+# traffic from runs (write) traffic.
+#
+# Prerequisites (see README.md for full detail):
+#   - Secret `runpod-api-token` (existing convention across this package)
+#   - Secrets `r2-access-key-id` / `r2-secret-access-key`
+#   - The job image built from job/Dockerfile, pushed public (RunPod's registry auth
+#     only supports Docker Hub / ECR credentials, and only public images need none of
+#     that at all — this deployment uses a public Docker Hub image)
+#   - A small dummy dataset object already uploaded to the data bucket (README "Phase 0")
+
+namespace: runpod-cross-region-training
+
+# === EU-RO-1: warm cache + GPU trainer ===
+
+volume-eu-ro-1:
+  defines: runpod/runpod-network-volume
+  name: monk-hybrid-volume-eu-ro-1
+  size: 10
+  data_center: EU-RO-1
+  volume_type: STANDARD
+  # This is a throwaway demo run end to end in one sitting — unlike a production
+  # cache, teardown should actually delete it.
+  allow_destructive_delete: true
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Run this alone first: `monk run -l runpod-cross-region-training/gpu-pod-eu-ro-1`.
+# Warms volume-eu-ro-1 from R2, trains 60 steps, checkpoints to the volume, background-uploads
+# each checkpoint to R2, then advances the manifest. Watch the log (README "Verify") for
+# `phase_complete`, then delete this pod before moving to the next phase.
+gpu-pod-eu-ro-1:
+  defines: runpod/runpod-pod
+  name: monk-hybrid-gpu-eu-ro-1
+  image: imanachyn/runpod-hybrid-job:latest
+  # GPU stock fluctuates independently per region/type (measured — see the hybrid doc
+  # §6.2). NVIDIA L4 is what actually had stock in EU-RO-1 during this example's own
+  # live run; NVIDIA RTX A4500 (the architecture doc's original pick) did not. Other
+  # region-A alternates worth trying on a "no instances available" error: NVIDIA RTX
+  # PRO 4000 Blackwell, NVIDIA RTX A5000.
+  gpu_type_id: NVIDIA L4
+  gpu_count: 1
+  disk: 10
+  # A volume only attaches inside its own data center.
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  network_volume_path: /workspace
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  env:
+    ROLE: gpu-a
+    EXP: exp-entities-e2e-01
+    DATA_BUCKET: monk-training-data
+    RUNS_BUCKET: monk-training-runs
+    RCLONE_CONFIG_R2_TYPE: s3
+    RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+    RCLONE_CONFIG_R2_REGION: auto
+    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    # RunPod returns `env` in full to any holder of the account's API key — acceptable
+    # for this throwaway demo, not for production. Production should use scoped
+    # per-bucket R2 tokens or presigned URLs instead of putting them in `env`.
+    RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
+    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
+  connections:
+    volume:
+      runnable: runpod-cross-region-training/volume-eu-ro-1
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-cross-region-training/volume-eu-ro-1
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+    r2-access-key-id: true
+    r2-secret-access-key: true
+
+# === US-IL-1: warm cache + CPU warmer + GPU resumer ===
+
+volume-us-il-1:
+  defines: runpod/runpod-network-volume
+  name: monk-hybrid-volume-us-il-1
+  size: 10
+  data_center: US-IL-1
+  volume_type: STANDARD
+  allow_destructive_delete: true
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Run second, after gpu-pod-eu-ro-1's phase_complete and its deletion:
+# `monk run -l runpod-cross-region-training/warmer-pod-us-il-1`.
+# Reads the manifest gpu-pod-eu-ro-1 wrote, warms volume-us-il-1's dataset + latest checkpoint from
+# R2, verifies integrity, then idles. Confirm `volumeB_integrity OK`, then delete it.
+warmer-pod-us-il-1:
+  defines: runpod/runpod-pod
+  name: monk-hybrid-warmer-us-il-1
+  image: imanachyn/runpod-hybrid-job:latest
+  # During this example's own live run, US-IL-1 briefly had zero CPU stock across all
+  # four flavors (cpu3c/cpu3g/cpu3m/cpu5c) — resolved after retrying; if it recurs, the
+  # role's logic doesn't care about CPU vs GPU, so substituting a temporary
+  # gpu_type_id/gpu_count still validates the sync flow (see README "Run sequence").
+  cpu_flavor_id: cpu3c
+  vcpu_count: 2
+  disk: 10
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  network_volume_path: /workspace
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  env:
+    ROLE: warm-b
+    EXP: exp-entities-e2e-01
+    DATA_BUCKET: monk-training-data
+    RUNS_BUCKET: monk-training-runs
+    RCLONE_CONFIG_R2_TYPE: s3
+    RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+    RCLONE_CONFIG_R2_REGION: auto
+    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
+    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
+  connections:
+    volume:
+      runnable: runpod-cross-region-training/volume-us-il-1
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-cross-region-training/volume-us-il-1
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+    r2-access-key-id: true
+    r2-secret-access-key: true
+
+# Run third, after warmer-pod-us-il-1's phase_complete and its deletion:
+# `monk run -l runpod-cross-region-training/gpu-pod-us-il-1`.
+# Reads the dataset and latest checkpoint FROM volume-us-il-1 (no R2 pull for bulk data —
+# that's the point of the whole exercise), resumes training past the manifest's step,
+# and advances the manifest again. Confirm the CACHE_HIT lines, then delete this pod.
+gpu-pod-us-il-1:
+  defines: runpod/runpod-pod
+  name: monk-hybrid-gpu-us-il-1
+  image: imanachyn/runpod-hybrid-job:latest
+  # Same stock caveat as gpu-pod-eu-ro-1. NVIDIA RTX 6000 Ada Generation is what had stock in
+  # US-IL-1 during this example's own live run; NVIDIA GeForce RTX 4090 and NVIDIA A40
+  # (both region-B alternates from the architecture doc) did not at that moment.
+  gpu_type_id: NVIDIA RTX 6000 Ada Generation
+  gpu_count: 1
+  disk: 10
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  network_volume_path: /workspace
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  env:
+    ROLE: gpu-b
+    EXP: exp-entities-e2e-01
+    DATA_BUCKET: monk-training-data
+    RUNS_BUCKET: monk-training-runs
+    RCLONE_CONFIG_R2_TYPE: s3
+    RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+    RCLONE_CONFIG_R2_REGION: auto
+    RCLONE_CONFIG_R2_ENDPOINT: https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com
+    RCLONE_CONFIG_R2_ACCESS_KEY_ID: <- secret("r2-access-key-id")
+    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <- secret("r2-secret-access-key")
+  connections:
+    volume:
+      runnable: runpod-cross-region-training/volume-us-il-1
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-cross-region-training/volume-us-il-1
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+    r2-access-key-id: true
+    r2-secret-access-key: true
+
+# === Final teardown only ===
+#
+# Not for `monk run`. After all three phases are confirmed and each pod already
+# deleted individually, use this group for a single teardown command:
+#   monk delete --force runpod-cross-region-training/stack
+# and then verify zero resources remain (README "Cleanup").
+stack:
+  defines: group
+  members:
+    - runpod-cross-region-training/volume-eu-ro-1
+    - runpod-cross-region-training/volume-us-il-1
+    - runpod-cross-region-training/gpu-pod-eu-ro-1
+    - runpod-cross-region-training/warmer-pod-us-il-1
+    - runpod-cross-region-training/gpu-pod-us-il-1
