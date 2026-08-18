@@ -7,7 +7,7 @@ GPU cloud entities for the Monk platform, built on RunPod **REST API v2**
 
 | Entity | Actions | Description |
 |--------|---------|-------------|
-| `runpod/runpod-pod` | `restart`, `get-info`, `get-cost-estimate`, `costs` (+ `start`/`stop` via Monk builtins) | Persistent GPU or CPU container instance. Billed hourly while running. |
+| `runpod/runpod-pod` | `restart`, `get-info`, `get-console-url`, `get-cost-estimate`, `costs` (+ `start`/`stop` via Monk builtins) | Persistent GPU or CPU container instance. Billed hourly while running. |
 | `runpod/runpod-network-volume` | `get-info`, `get-cost-estimate`, `costs` | Persistent, data-center-scoped storage that survives pod termination. |
 | `runpod/runpod-template` | `get-info` | Reusable container configuration. Not billable, so no cost actions. |
 
