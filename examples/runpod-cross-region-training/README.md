@@ -261,6 +261,35 @@ Then:
 sudo monk delete --force runpod-cross-region-training/gpu-pod-us-il-1
 ```
 
+## Re-running a phase (one-time-job semantics)
+
+Each pod is meant to be a one-shot job: do its work, then idle until deleted. If a
+phase failed (e.g. the GPU/CPU stock retry loop above) or you just want to re-run it
+without deleting and recreating the entity, **`sudo monk restart
+<namespace>/<pod-entity>`** does a real stop-then-start power-cycle of the underlying
+RunPod pod — confirmed live (2026-08-18): `startedAt` advances to a fresh timestamp
+while `createdAt` stays put, i.e. RunPod actually reboots the container, which re-runs
+`entrypoint.sh` from scratch with whatever `ROLE`/env it was created with. This is
+generic Monk behavior (`stop()`/`start()` are already implemented on `runpod-pod`),
+not something specific to this example.
+
+This is different from `monk do <pod-entity>/restart`, which maps to RunPod's own
+in-place `restart` action (same container, no reboot) rather than Monk's stop+start —
+prefer `monk restart` when you actually want a fresh run, since a reboot is what
+re-executes the entrypoint.
+
+Two things to know before relying on this:
+- The container disk is wiped on any restart (RunPod's own semantics); the network
+  volume is not, so `warm-b`'s re-download just overwrites what's already there —
+  harmless. `gpu-a`/`gpu-b` restarting means the toy training loop starts over from
+  step 1/`$((MS+1))` again, so a restarted `gpu-a` will overwrite the manifest with
+  the same steps rather than resuming past them — fine for this demo, but not what
+  you'd want from a restart in a real training job.
+- It still restarts the *whole* container, including whatever "training" is
+  in-flight — there's no way to restart just the sync sidecar on its own (see the
+  "No mid-run exec" limitation below); a phase-level restart is the finest granularity
+  RunPod's API offers.
+
 ## Verify
 
 The job image has no way to expose logs through the entity — `GET /pods/{id}/logs` is
@@ -343,3 +372,10 @@ comment in `monk-entities.yaml`, or check `GET /v2/catalog/gpus` / `GET /v2/cata
   `../../src/runpod/pod.ts`). This example uses names unlikely to collide
   (`monk-hybrid-*`); if you do get an unexpected adoption, `monk do .../force-terminate`
   or `allow_destructive_delete: true` clears it.
+- **No mid-run exec.** Checked directly against RunPod's v2 OpenAPI spec
+  (`https://api.runpod.io/v2/openapi.json`): a pod's only lifecycle transitions are
+  `start`/`stop`/`restart`/`terminate` via `POST /pods/{id}/action`, and there is no
+  exec, command, or signal endpoint of any kind. There's no way to trigger "just
+  re-run the sync" inside an already-running pod — the finest granularity available
+  is restarting the whole container (see "Re-running a phase" above), which re-runs
+  `entrypoint.sh` from scratch.
