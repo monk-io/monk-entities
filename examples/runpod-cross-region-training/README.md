@@ -78,6 +78,19 @@ datacenter-pinned — it can't serve a run resuming somewhere else. Checkpoints 
 volume **and** to R2, never only to the volume. The manifest write on R2 is the commit
 point: only after R2 has the checkpoint object does the manifest advance to point at it.
 
+**Same-DC visibility, re-confirmed through these entities (2026-08-18):** a network
+volume is visible to any pod attached to it in its own data center, independent of
+which pod wrote the data — this isn't specific to `gpu-pod-eu-ro-1` reading its own
+writes. Verified directly: `volume-eu-ro-1` was attached to a pod that wrote a marker
+file and was then deleted; a second, entirely separate pod entity was attached to the
+same `network_volume_id` in the same DC afterward and read the file back with zero R2
+involvement (`READ_OK: hello-from-writer-...`). Confirms `network_volume_id` +
+`data_center_ids` wiring on `runpod-pod` does what the architecture doc's raw-script
+validation (§2) found, not just for this specific package's own container restart
+case. A volume attached in a *different* DC than `data_center` is rejected by RunPod's
+API at attach time — that restriction is enforced upstream, not something either
+entity needs to check itself.
+
 **Why this is three separate `monk run` invocations, not one stack:** the handoff is
 inherently sequential across *time* — gpu-pod-eu-ro-1 must finish writing its checkpoint and
 manifest before the warmer starts, and the warmer must finish before gpu-pod-us-il-1 starts.
