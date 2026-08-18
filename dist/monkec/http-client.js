@@ -175,9 +175,11 @@ var HttpClient = class {
     const request = {
       method: normalizedMethod,
       headers,
-      body,
       timeout: options.timeout || this.options.timeout
     };
+    if (body !== void 0) {
+      request.body = body;
+    }
     let response;
     try {
       if (normalizedMethod === "GET") {
