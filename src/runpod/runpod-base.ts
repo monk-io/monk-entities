@@ -6,6 +6,7 @@ import {
     DEFAULT_SECRET_REF,
     getApiToken,
     extractList,
+    listKeyForPath,
     type CatalogGpu,
     type CatalogCpu,
 } from "./common.ts";
@@ -73,9 +74,14 @@ export abstract class RunpodEntity<
         const response = this.httpClient.request(method as any, path, { body, query });
 
         if (!response.ok) {
-            throw new Error(
+            const error = new Error(
                 `RunPod API error (${method} ${path}): ${response.statusCode} — ${this.describeError(response)}`
             );
+            // Carry the status structurally. Classifying by substring is unsafe because the
+            // message embeds the API's error body — a 500 whose body happens to mention "404"
+            // would otherwise be misread as "the resource is gone".
+            (error as any).statusCode = response.statusCode;
+            throw error;
         }
 
         let data = response.data;
@@ -122,13 +128,20 @@ export abstract class RunpodEntity<
         }
     }
 
-    /** True when an error represents a missing resource rather than a real failure. */
+    /**
+     * True when an error represents a missing resource rather than a real failure.
+     *
+     * Keyed off the status code attached by makeRequest(), never off the message text: the
+     * message contains the API's error body, so a 5xx whose body mentions "404" must not be
+     * treated as "gone" — that would turn a transient outage into a silent adopt-or-skip.
+     */
     protected isNotFound(error: unknown): boolean {
-        const message = error instanceof Error ? error.message : String(error);
-        return (
-            message.indexOf("404") !== -1 ||
-            message.toLowerCase().indexOf("not found") !== -1
-        );
+        const status = (error as any)?.statusCode;
+        if (typeof status === "number") return status === 404;
+
+        // Errors raised before a response exists (transport failures) carry no status. Those
+        // are real failures, not missing resources.
+        return false;
     }
 
     /**
@@ -141,7 +154,7 @@ export abstract class RunpodEntity<
         const response = this.findResource(listPath);
         if (!response) return null;
 
-        for (const item of extractList(response)) {
+        for (const item of extractList(response, listKeyForPath(listPath))) {
             if (item && item.name === name) return item;
         }
         return null;
@@ -172,7 +185,7 @@ export abstract class RunpodEntity<
      */
     protected catalogGpus(): CatalogGpu[] {
         try {
-            return extractList(this.makeRequest("GET", "/catalog/gpus")) as CatalogGpu[];
+            return extractList(this.makeRequest("GET", "/catalog/gpus"), "gpus") as CatalogGpu[];
         } catch (error) {
             cli.output(`⚠️  Could not fetch GPU catalog: ${(error as Error).message}`);
             return [];
@@ -193,7 +206,7 @@ export abstract class RunpodEntity<
      */
     protected catalogCpus(): CatalogCpu[] {
         try {
-            return extractList(this.makeRequest("GET", "/catalog/cpus")) as CatalogCpu[];
+            return extractList(this.makeRequest("GET", "/catalog/cpus"), "cpus") as CatalogCpu[];
         } catch (error) {
             cli.output(`⚠️  Could not fetch CPU catalog: ${(error as Error).message}`);
             return [];
@@ -228,42 +241,60 @@ export abstract class RunpodEntity<
     }
 
     /**
-     * Sum the `cost` values across billing records, optionally filtered to one resource ID.
-     * Returns null when there is no usable history.
+     * Billing records belonging to exactly one resource.
+     *
+     * A record **must** carry `idField` matching `id` to be included. Treating a record that
+     * lacks the field as a match would be silently catastrophic: if v2 renames `podId` — a risk
+     * this package explicitly accepts by targeting a beta API — every record in the account
+     * would match, and the cost actions would report **account-wide 30-day spend as this one
+     * resource's cost**. A wrong number that looks plausible is worse than no number, so an
+     * unrecognized shape yields no records and the caller reports "unavailable" instead.
+     */
+    private matchingBillingRecords(billing: any, idField: string, id: string): any[] {
+        const records: any[] = billing?.records || [];
+        const matching = records.filter((r) => r && r[idField] === id);
+
+        if (records.length > 0 && matching.length === 0) {
+            const withField = records.filter((r) => r && r[idField] !== undefined).length;
+            if (withField === 0) {
+                cli.output(
+                    `⚠️  Billing records carry no "${idField}" field — the API shape has changed. ` +
+                    `Refusing to attribute account-wide spend to this resource.`
+                );
+            }
+        }
+        return matching;
+    }
+
+    /**
+     * Sum billing amounts for one resource. Returns null when there is no usable history.
      */
     protected sumBillingRecords(billing: any, idField: string, id: string): number | null {
-        const records: any[] = billing?.records || [];
-        if (records.length === 0) return null;
+        const matching = this.matchingBillingRecords(billing, idField, id);
+        if (matching.length === 0) return null;
 
         let total = 0;
-        let matched = 0;
-        for (const record of records) {
-            if (record[idField] && record[idField] !== id) continue;
+        for (const record of matching) {
             // Records carry component amounts (cpuAmount/diskAmount/gpuAmount, or
             // standardAmount/highPerformanceAmount) plus a `totalAmount` rollup. Use the
             // rollup so a new component category is included automatically.
             const amount = Number(record.totalAmount ?? 0);
-            if (!isNaN(amount)) {
-                total += amount;
-                matched++;
-            }
+            if (!isNaN(amount)) total += amount;
         }
-        return matched > 0 ? total : null;
+        return total;
     }
 
     /**
-     * Count distinct time buckets in a billing response.
+     * Count distinct time buckets for one resource.
      *
      * Not the same as `records.length`: the API returns one record per resource per bucket, so
      * an account with six pods over three days yields eighteen records but three buckets.
      * Dividing a per-resource total by the record count would understate the daily rate.
      */
     protected countBillingBuckets(billing: any, idField: string, id: string): number {
-        const records: any[] = billing?.records || [];
         const seen: string[] = [];
 
-        for (const record of records) {
-            if (record[idField] && record[idField] !== id) continue;
+        for (const record of this.matchingBillingRecords(billing, idField, id)) {
             const bucket = String(record.startTime || "");
             if (bucket && seen.indexOf(bucket) === -1) seen.push(bucket);
         }

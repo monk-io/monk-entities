@@ -35,6 +35,7 @@ __export(common_exports, {
   HOURS_PER_MONTH: () => HOURS_PER_MONTH,
   extractList: () => extractList,
   getApiToken: () => getApiToken,
+  listKeyForPath: () => listKeyForPath,
   toApiBody: () => toApiBody,
   validateVolumeSize: () => validateVolumeSize
 });
@@ -100,13 +101,26 @@ function validateVolumeSize(size) {
   }
   return size;
 }
-function extractList(response) {
+function extractList(response, expectedKey) {
   if (Array.isArray(response)) return response;
   if (!response || typeof response !== "object") return [];
-  for (const key in response) {
-    if (Array.isArray(response[key])) return response[key];
+  if (expectedKey && Array.isArray(response[expectedKey])) {
+    return response[expectedKey];
   }
-  return [];
+  const arrayKeys = [];
+  for (const key in response) {
+    if (Array.isArray(response[key])) arrayKeys.push(key);
+  }
+  if (arrayKeys.length === 1) return response[arrayKeys[0]];
+  if (arrayKeys.length === 0) return [];
+  throw new Error(
+    `Ambiguous RunPod list response: expected "${expectedKey ?? "(unspecified)"}" but found array properties [${arrayKeys.join(", ")}]. Refusing to guess, because a wrong guess here silently reports "nothing exists" and creates a duplicate resource.`
+  );
+}
+function listKeyForPath(path) {
+  const segments = path.split("/").filter((s) => s.length > 0);
+  const last = segments[segments.length - 1] || "";
+  return last.split("-").map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -115,6 +129,7 @@ function extractList(response) {
   HOURS_PER_MONTH,
   extractList,
   getApiToken,
+  listKeyForPath,
   toApiBody,
   validateVolumeSize
 });

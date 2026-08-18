@@ -21,7 +21,7 @@ export interface RunpodTemplateDefinition extends RunpodEntityDefinition {
     disk?: number;
     /** @description Arguments passed to the container entrypoint */
     args?: string;
-    /** @description Environment variables applied to containers created from this template */
+    /** @description Environment variables applied to containers created from this template. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account's API key. */
     env?: Record<string, string>;
     /** @description Exposed ports in `port/protocol` form, e.g. `["8888/http", "22/tcp"]` */
     ports?: string[];

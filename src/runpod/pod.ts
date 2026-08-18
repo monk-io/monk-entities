@@ -33,7 +33,7 @@ export interface RunpodPodDefinition extends RunpodEntityDefinition {
     args?: string;
     /** @description Exposed ports in `port/protocol` form, e.g. `["8888/http", "22/tcp"]` */
     ports?: string[];
-    /** @description Environment variables passed to the container */
+    /** @description Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account's API key. */
     env?: Record<string, string>;
     /** @description Network volume ID to mount. The volume must live in one of `data_center_ids`. Immutable after creation. */
     network_volume_id?: string;
@@ -152,6 +152,10 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             return;
         }
 
+        // Catch a definition that drifted into an invalid compute shape (both gpu and cpu set,
+        // or neither) even though update() does not send compute fields — better a clear error
+        // than a confusing PATCH against a definition that could never be created.
+        this.validateCompute();
         this.warnOnImmutableChanges();
 
         // PATCH accepts only the container-level fields; compute shape is fixed at create time.
@@ -178,13 +182,20 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         cli.output(`✅ Updated pod ${this.state.id}`);
     }
 
+    /**
+     * Terminate the pod.
+     *
+     * For a pod, delete is a **correctness requirement, not cleanup**: a pod that is not
+     * terminated bills indefinitely, and RunPod restarts a pod whose command exits — so a
+     * skipped terminate can also re-run the job. Both failure modes are silent.
+     *
+     * That makes the usual "adopted resources are left alone" rule dangerous here, unlike on a
+     * volume (where it protects data) or a template (which is free). An adopted pod is still a
+     * meter that nobody is watching, so the two escape hatches below are explicit rather than
+     * implied, and the skip path shouts instead of whispering.
+     */
     override delete(): void {
         if (!this.state.id) return;
-
-        if (this.state.existing) {
-            cli.output("Pod pre-existed this entity; skipping delete");
-            return;
-        }
 
         if (this.definition.allow_destructive_delete === false) {
             throw new Error(
@@ -193,7 +204,53 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             );
         }
 
+        // Adopted pod: terminate only on an explicit opt-in, because the pod may be someone
+        // else's. Without the opt-in, make the abandonment impossible to miss.
+        if (this.state.existing && this.definition.allow_destructive_delete !== true) {
+            const rate = this.state.cost_per_hr;
+            const perHour = rate ? `$${rate}/hr` : "an unknown hourly rate";
+            const perMonth = rate ? ` (~$${(rate * HOURS_PER_MONTH).toFixed(2)}/month)` : "";
+            cli.output("");
+            cli.output("=".repeat(72));
+            cli.output(`⚠️  POD LEFT RUNNING AND STILL BILLING: ${this.state.id} (${this.state.name})`);
+            cli.output("=".repeat(72));
+            cli.output(`   This pod was adopted by name, not created here, so it was NOT terminated.`);
+            cli.output(`   It continues to bill at ${perHour}${perMonth} until someone stops it.`);
+            cli.output(`   Status at teardown: ${this.state.pod_status || "unknown"}`);
+            cli.output("");
+            cli.output(`   Terminate it now with either:`);
+            cli.output(`     sudo monk do <namespace>/<entity>/force-terminate`);
+            cli.output(`     curl -X DELETE -H "Authorization: Bearer <key>" \\`);
+            cli.output(`       https://api.runpod.io/v2/pods/${this.state.id}`);
+            cli.output(`   Or set allow_destructive_delete: true to let teardown terminate adopted pods.`);
+            cli.output("=".repeat(72));
+            cli.output("");
+            return;
+        }
+
+        if (this.state.existing) {
+            cli.output(
+                `Terminating adopted pod ${this.state.id} — allow_destructive_delete is explicitly true`
+            );
+        }
+
         this.deleteResource(`/pods/${this.state.id}`, `pod ${this.state.id}`);
+    }
+
+    /**
+     * Terminate the pod regardless of how it was acquired.
+     *
+     * The escape hatch for the adopted-pod case above: an operator who sees the teardown
+     * warning needs one command that stops the meter without editing the template first.
+     */
+    @action("force-terminate")
+    forceTerminate(_args?: Args): void {
+        if (!this.state.id) {
+            cli.output("No pod to terminate");
+            return;
+        }
+        this.deleteResource(`/pods/${this.state.id}`, `pod ${this.state.id}`);
+        this.state.pod_status = "TERMINATED";
     }
 
     override checkReadiness(): boolean {
@@ -234,8 +291,20 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         return true;
     }
 
+    /**
+     * Liveness asks "does the managed resource still exist", not "is it running".
+     *
+     * Deliberately **not** delegated to checkReadiness(): a pod stopped on purpose (via the
+     * `stop` hook) is not dead, and reporting it as not-live would make an intentional stop look
+     * like a fault. Only a terminated or vanished pod is genuinely not live.
+     */
     checkLiveness(): boolean {
-        return this.checkReadiness();
+        if (!this.state.id) return false;
+
+        const pod = this.findResource(`/pods/${this.state.id}`);
+        if (!pod) return false;
+
+        return this.readStatus(pod) !== "TERMINATED";
     }
 
     /**
@@ -364,6 +433,20 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         const rate = this.hourlyRate();
         if (rate === null) {
             this.emitCosts("runpod-pod", "0", "Could not determine hourly rate from pod state or GPU catalog");
+            return;
+        }
+
+        // A stopped pod accrues no compute, so reporting the running rate here would overstate
+        // spend in Monk's billing — this payload is machine-consumed and carries no room for the
+        // "would bill at" caveat that get-cost-estimate prints. Report 0 and say why, so a pod
+        // that spends half its life stopped doesn't read as billing continuously.
+        if (rate.hypothetical) {
+            this.emitCosts(
+                "runpod-pod",
+                "0",
+                `Pod is ${this.state.pod_status || "not running"} and accrues no compute; ` +
+                `it would bill $${(rate.hourly * HOURS_PER_MONTH).toFixed(2)}/month if started`
+            );
             return;
         }
 

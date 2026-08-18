@@ -48,7 +48,7 @@ Default secret name: `runpod-api-token`.
 
 | Entity | Resource | Billable | Paths |
 |---|---|---|---|
-| `runpod/runpod-pod` | Persistent GPU/CPU instance | yes | `GET|POST /v2/pods`, `GET|PATCH|DELETE /v2/pods/{id}`, `POST /v2/pods/{id}/actions`, `GET /v2/pods/{id}/logs` |
+| `runpod/runpod-pod` | Persistent GPU/CPU instance | yes | `GET|POST /v2/pods`, `GET|PATCH|DELETE /v2/pods/{id}`, `POST /v2/pods/{id}/action` |
 | `runpod/runpod-network-volume` | Persistent DC-scoped storage | yes | `GET|POST /v2/network-volumes`, `GET|PATCH|DELETE /v2/network-volumes/{id}` |
 | `runpod/runpod-template` | Reusable Pod config | no | `GET|POST /v2/templates`, `GET|PATCH|DELETE /v2/templates/{id}` |
 
@@ -99,43 +99,60 @@ manually stringified (`rules.md:37`).
 
 ## Entity detail
 
+> ⚠️ The field lists below are the **as-built** definitions, corrected against the live API.
+> The originally planned shapes (which included `interruptible`, `public_ip`, `port_mappings`,
+> `machine_id`, `container_disk_in_gb`, `docker_entrypoint`, `is_serverless`, `readme`, and a
+> `get-logs` action) were wrong — see "Findings from live API testing" for each correction.
+
 ### `runpod-pod`
 
 Definition: `name`, `image`, `gpu_type_id` + `gpu_count` **or** `cpu_flavor_id` + `vcpu_count`,
-`disk`, `ports[]`, `env{}`, `network_volume_id`, `template_id`, `registry_id`,
-`data_center_ids[]`, `allowed_cuda_versions[]`, `interruptible`, `locked`, `global_networking`,
-`secret_ref?`, `allow_destructive_delete?`.
+`cloud`, `disk`, `args`, `ports[]`, `env{}`, `network_volume_id` + `network_volume_path`
+**or** `persistent_disk_size` + `persistent_disk_path`, `template_id`, `registry_id`,
+`data_center_ids[]`, `allowed_cuda_versions[]`, `min_cuda_version`, `start_jupyter`,
+`start_ssh`, `locked`, `global_networking`, `secret_ref?`, `allow_destructive_delete?`.
 
-State: `id`, `pod_status`, `public_ip`, `port_mappings`, `cost_per_hr`, `machine_id`,
-`created_at`, `existing`.
+State: `id`, `name`, `pod_status`, `ports[]`, `ssh_command`, `cost_per_hr`, `data_center`,
+`available_actions[]`, `gpu_type_id`, `created_at`, `existing`.
 
-Readiness: poll `GET /v2/pods/{id}` until status `RUNNING`. Status enum is
-`PROVISIONING | STARTING | RUNNING | EXITED | ERROR | TERMINATED`; fail fast on `ERROR`.
-GPU capacity is not guaranteed, so `attempts` is generous (~60 × 10s).
+Readiness: poll `GET /v2/pods/{id}` until status `RUNNING` **and**, when the definition asked
+for ports, until `runtime.ports` is published — RUNNING arrives before the runtime block exists,
+so a pod can be "running" with no ports and no SSH. Fail loudly on `ERROR`. GPU capacity is not
+guaranteed, so `attempts` is generous (~60 × 10s).
 
-Update: `PATCH` handles `image`, `args`, `disk`, `ports`, `env`, `registry`,
-`globalNetworking`, `locked`, `mounts`, `name`, `templateId`. GPU type, volume size, and
-datacenter are **immutable** — the entity logs that they were ignored rather than silently
-recreating a billable GPU instance.
+Liveness deliberately does **not** delegate to readiness: a pod stopped on purpose is not dead,
+so only a terminated or vanished pod is not live.
 
-Actions: `restart`, `get-info`, `get-logs`, `get-cost-estimate`, `costs`.
+Update: `PATCH` handles `name`, `image`, `args`, `disk`, `ports`, `env`, `registry`,
+`globalNetworking`, `locked`, `mounts`, `templateId`. GPU type, vCPU count, data center, and
+volume attachment are **immutable** — the entity logs that they were ignored rather than
+silently recreating a billable instance.
+
+Actions: `restart`, `force-terminate`, `get-info`, `get-cost-estimate`, `costs`.
 
 Power control rides Monk's **builtin** `start`/`stop` actions rather than custom ones —
 `MonkEntity` dispatches those to the `start()`/`stop()` lifecycle hooks before consulting
 registered `@action` methods (`src/monkec/base.ts:127-135`), so a custom `@action("start")`
-would be shadowed. Both overrides are status-guarded: Monk can invoke `start` right after
-create, when the pod is already provisioning and RunPod would reject the call.
+would be shadowed. Both are status-guarded, and `start()` creates the pod if none exists (Monk
+dispatches `start` on paths where `create()` never ran).
 
-`terminate` is `delete()`; exposing it as an action too would duplicate the lifecycle.
+Delete is a **correctness requirement, not cleanup**: an un-terminated pod bills indefinitely,
+and RunPod restarts a pod whose command exits. An adopted pod is therefore terminated only on
+an explicit `allow_destructive_delete: true`; otherwise teardown prints an unmissable banner
+naming the pod and its hourly rate, and `force-terminate` is the one-command escape hatch.
 
 ### `runpod-network-volume`
 
-Definition: `name`, `size` (10–4096 GB), `data_center` (**required**), `volume_type?`.
+Definition: `name`, `size` (10–4096 GB), `data_center` (**required**), `volume_type?`,
+`allow_destructive_delete?`.
 
-State: `id`, `size`, `data_center`, `volume_type`, `existing`.
+State: `id`, `name`, `size`, `data_center`, `volume_type`, `existing`.
 
 Update: `PATCH` accepts `name` and `size` only, and **size can only grow** — a shrink request
 throws with a clear message rather than being silently dropped.
+
+Not every data center offers network volumes, and those that do offer only certain tiers
+(`networkVolumeTypes` per DC) — `EU-RO-1` is STANDARD-only, for example.
 
 Actions: `get-info`, `get-cost-estimate`, `costs`.
 
@@ -144,11 +161,14 @@ Actions: `get-info`, `get-cost-estimate`, `costs`.
 Reusable container config consumed by pods via `template_id`. Straightforward CRUD with a full
 `PATCH`. Not billable — a template on its own costs nothing — so it gets **no** cost actions.
 
-Definition: `name`, `image`, `container_disk_in_gb`, `docker_entrypoint[]`,
-`docker_start_cmd[]`, `env{}`, `ports[]`, `volume_in_gb`, `volume_mount_path`, `is_serverless`,
-`readme`, `secret_ref?`.
+Definition: `name`, `image`, `disk`, `args`, `env{}`, `ports[]`, `registry`, `category`,
+`persistent_disk_size` + `persistent_disk_path`, `allowed_cuda_versions[]`, `serverless`,
+`public`, `start_jupyter`, `start_ssh`, `secret_ref?`.
 
-State: `id`, `name`, `existing`.
+`start_jupyter` and `start_ssh` default to **true** upstream for templates (false for pods).
+Templates accept only a host-local persistent mount; a `network` mount is rejected.
+
+State: `id`, `name`, `image`, `existing`.
 
 Actions: `get-info`.
 
@@ -170,10 +190,13 @@ Live rates only — no hardcoded tables (`rules.md:176`). Applies to pod and net
 1. **Real GPUs bill by the hour.** Integration tests default to a **CPU pod**
    (`cpu_flavor_id` + `vcpu_count`) — the cheapest thing that still exercises the full
    lifecycle. GPU coverage is one short-lived test on the cheapest catalog GPU.
-2. **Teardown must be bulletproof.** A leaked pod bills until someone notices. Delete is
-   verified in the test suite, and `delete()` tolerates an already-gone resource (404).
-3. **Never `interruptible: true` in tests** — spot pods can be reclaimed mid-run and would
-   make the suite flaky.
+2. **Teardown must be bulletproof.** A leaked pod bills until someone notices, and RunPod
+   restarts a pod whose command exits — so a skipped terminate can also re-run the job. Delete
+   is verified in the suite, tolerates an already-gone resource (404), and refuses to silently
+   abandon an adopted pod (see the delete semantics under `runpod-pod` above).
+3. **Never reuse a pod name across concurrent stacks.** Adoption matches on name, so a
+   collision hands one stack a pod another stack owns — and teardown will then decline to
+   terminate it. (There is no spot/`interruptible` option to worry about: v2 removed it.)
 4. **Network volumes are datacenter-scoped.** A pod can only attach a volume in its own DC, so
    the test template pins `data_center_ids` to the volume's `data_center` explicitly instead of
    relying on `dataCenterPriority: availability`.
@@ -193,7 +216,7 @@ load-bearing details** and cost two failed create attempts.
 
 | Assumption | Reality |
 |---|---|
-| `POST /v2/pods/{id}/actions` | **`/action`, singular** — the plural path 404s |
+| `POST /v2/pods/{id}/action` | **`/action`, singular** — the plural path 404s |
 | Pod has `interruptible` (spot) | **Does not exist in v2 at all** (0 occurrences in the spec) — removed from the Definition |
 | `locked` accepted at create | **PATCH-only.** `unevaluatedProperties: false` means sending it 422s the whole create |
 | Volume attaches via `networkVolumeId` | **`mounts.network[]` = `{volumeId, path}`**, mutually exclusive with `mounts.persistent` = `{size, path}`; `path` has no default |
