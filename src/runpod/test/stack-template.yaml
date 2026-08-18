@@ -1,0 +1,84 @@
+namespace: runpod-test
+
+# ---------------------------------------------------------------------------
+# Catalog IDs below were verified against the live API on 2026-08-17:
+#   GET /v2/catalog/cpus         → cpu3c is the cheapest flavor ($0.03/vCPU/hr)
+#   GET /v2/catalog/datacenters  → EU-RO-1 supports networkVolumeTypes: [STANDARD]
+#
+# Note that not every data center supports network volumes, and those that do
+# support only specific tiers — EU-RO-1 is STANDARD-only, so pairing it with
+# HIGH_PERFORMANCE would be rejected. Re-check if either value is changed:
+#   curl -H "Authorization: Bearer $RUNPOD_API_TOKEN" https://api.runpod.io/v2/catalog/datacenters
+#
+# The pod below deliberately uses CPU compute, not GPU: it exercises the same
+# lifecycle at a fraction of the hourly cost. `interruptible` is left unset —
+# spot capacity can be reclaimed mid-test and would make this suite flaky.
+# ---------------------------------------------------------------------------
+
+# Template — no data center or compute flavor needed, so this validates the
+# package's auth and CRUD path independently of catalog IDs.
+test-template:
+  defines: runpod/runpod-template
+  name: monk-test-template
+  image: runpod/base:1.0.2-ubuntu2404
+  disk: 10
+  ports:
+    - 22/tcp
+  env:
+    MONK_TEST: "1"
+  # Templates default startJupyter/startSsh to true upstream; pin them off so the
+  # test doesn't depend on injected env vars.
+  start_jupyter: false
+  start_ssh: false
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Network volume — smallest allowed size (10 GB) to keep storage cost trivial.
+test-volume:
+  defines: runpod/runpod-network-volume
+  name: monk-test-volume
+  size: 10
+  data_center: EU-RO-1
+  volume_type: STANDARD
+  # The suite must be able to tear this down, so destructive delete stays enabled.
+  allow_destructive_delete: true
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# CPU pod mounting the volume above. Both the volume ID and the data center are
+# wired from the volume's state — a volume only attaches inside its own data
+# center, so hardcoding the two independently would risk a mismatch.
+test-pod:
+  defines: runpod/runpod-pod
+  name: monk-test-pod
+  image: runpod/base:1.0.2-ubuntu2404
+  # Flavor IDs are short group names (cpu3c/cpu3g/cpu3m/cpu5c/…), not size-suffixed
+  # slugs. cpu3c is Compute-Optimized at $0.03/vCPU/hr; 2 is the minimum vCPU count.
+  cpu_flavor_id: cpu3c
+  vcpu_count: 2
+  disk: 10
+  ports:
+    - 22/tcp
+  env:
+    MONK_TEST: "1"
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  data_center_ids:
+    - <- connection-target("volume") entity-state get-member("data_center")
+  allow_destructive_delete: true
+  connections:
+    volume:
+      runnable: runpod-test/test-volume
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-test/test-volume
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
