@@ -40,7 +40,7 @@ the account. The API calls these entities make are:
 
 | Entity | Calls |
 |--------|-------|
-| `runpod-pod` | `GET/POST /v2/pods`, `GET/PATCH/DELETE /v2/pods/{id}`, `POST /v2/pods/{id}/actions`, `GET /v2/pods/{id}/logs`, `GET /v2/catalog/gpus`, `GET /v2/billing/pods` |
+| `runpod-pod` | `GET/POST /v2/pods`, `GET/PATCH/DELETE /v2/pods/{id}`, `POST /v2/pods/{id}/action`, `GET /v2/catalog/gpus`, `GET /v2/catalog/cpus`, `GET /v2/billing/pods` |
 | `runpod-network-volume` | `GET/POST /v2/network-volumes`, `GET/PATCH/DELETE /v2/network-volumes/{id}`, `GET /v2/billing/network-volumes` |
 | `runpod-template` | `GET/POST /v2/templates`, `GET/PATCH/DELETE /v2/templates/{id}` |
 
@@ -60,7 +60,7 @@ The `catalog` and `billing` reads exist only to serve the cost actions.
 | `disk` | number | no | Ephemeral container disk in GB; wiped on restart |
 | `args` | string | no | Container entrypoint arguments |
 | `ports` | string[] | no | `port/protocol`, e.g. `["8888/http", "22/tcp"]` |
-| `env` | map | no | Environment variables |
+| `env` | map | no | Environment variables. **Readable via the API — see the secrets warning below** |
 | `network_volume_id` | string | no | Volume to mount; must live in one of `data_center_ids`. **Immutable** |
 | `network_volume_path` | string | no | Mount path for the volume; defaults to `/runpod-volume` |
 | `persistent_disk_size` | number | no | Host-local disk in GB (min 10). Mutually exclusive with `network_volume_id`; rejected on CPU pods |
@@ -112,7 +112,7 @@ a pod can only mount a volume located in its own data center.
 | `image` | string | yes | Container image |
 | `disk` | number | no | Ephemeral container disk in GB |
 | `args` | string | no | Container entrypoint arguments |
-| `env` | map | no | Environment variables |
+| `env` | map | no | Environment variables. **Readable via the API — see the secrets warning below** |
 | `ports` | string[] | no | `port/protocol` |
 | `registry` | string | no | Container registry credential ID for private images |
 | `category` | `CPU` \| `NVIDIA` \| `AMD` | no | Console grouping only; no effect on hardware or billing. Defaults to NVIDIA |
@@ -129,11 +129,34 @@ Templates accept only a **host-local** persistent mount — a network volume is 
 pod, not the template, and passing one here is rejected. `persistent_disk_size` and
 `persistent_disk_path` must be given together; a partial mount is rejected.
 
+
+## Do not put secrets in `env`
+
+**RunPod returns `env` in full from `GET /v2/pods/{id}` and `GET /v2/templates/{id}`.** Anything
+placed there is readable by every holder of the RunPod API key — and RunPod has no scoped or
+read-only keys, so that is everyone with any access to the account. It is also persisted in the
+template or pod object rather than being consumed once at boot.
+
+Concretely, `env` is the wrong place for R2/S3 credentials, registry passwords, dataset tokens,
+or checkpoint-bucket keys, even though it is the most convenient place to put them. Options that
+do not expose the value through the API:
+
+- Mount credentials from a **network volume** the job reads at startup, keeping them out of the
+  pod and template objects entirely.
+- Use `registry_id` (a container registry credential ID) for private image pulls instead of
+  embedding a registry password in `env`.
+- Have the job fetch short-lived credentials at runtime from your own secret store, passing only
+  a non-secret identifier through `env`.
+
+This entity cannot fix the exposure — the field is part of the pod/template API — so treat
+anything in `env` as public to the account.
+
 ## Actions
 
 | Entity | Action | Description |
 |--------|--------|-------------|
 | `runpod-pod` | `restart` | Restart the pod |
+| `runpod-pod` | `force-terminate` | Terminate the pod regardless of how it was acquired — the escape hatch for an adopted pod teardown declined to remove |
 | `runpod-pod` | `get-info` | Full pod detail as JSON |
 | `runpod-pod` | `get-cost-estimate` | Human-readable monthly cost breakdown |
 | `runpod-pod` | `costs` | Monthly cost as billing JSON |
