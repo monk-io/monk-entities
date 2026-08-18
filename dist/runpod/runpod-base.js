@@ -53,13 +53,26 @@ function getApiToken(secretRef) {
   }
   return token;
 }
-function extractList(response) {
+function extractList(response, expectedKey) {
   if (Array.isArray(response)) return response;
   if (!response || typeof response !== "object") return [];
-  for (const key in response) {
-    if (Array.isArray(response[key])) return response[key];
+  if (expectedKey && Array.isArray(response[expectedKey])) {
+    return response[expectedKey];
   }
-  return [];
+  const arrayKeys = [];
+  for (const key in response) {
+    if (Array.isArray(response[key])) arrayKeys.push(key);
+  }
+  if (arrayKeys.length === 1) return response[arrayKeys[0]];
+  if (arrayKeys.length === 0) return [];
+  throw new Error(
+    `Ambiguous RunPod list response: expected "${expectedKey ?? "(unspecified)"}" but found array properties [${arrayKeys.join(", ")}]. Refusing to guess, because a wrong guess here silently reports "nothing exists" and creates a duplicate resource.`
+  );
+}
+function listKeyForPath(path) {
+  const segments = path.split("/").filter((s) => s.length > 0);
+  const last = segments[segments.length - 1] || "";
+  return last.split("-").map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
 
 // input/runpod/runpodBase.ts
@@ -93,9 +106,11 @@ var RunpodEntity = class extends import_base.MonkEntity {
   makeRequest(method, path, body, query) {
     const response = this.httpClient.request(method, path, { body, query });
     if (!response.ok) {
-      throw new Error(
+      const error = new Error(
         `RunPod API error (${method} ${path}): ${response.statusCode} \u2014 ${this.describeError(response)}`
       );
+      error.statusCode = response.statusCode;
+      throw error;
     }
     let data = response.data;
     if (typeof data === "string" && data.length > 0) {
@@ -137,10 +152,17 @@ var RunpodEntity = class extends import_base.MonkEntity {
       throw error;
     }
   }
-  /** True when an error represents a missing resource rather than a real failure. */
+  /**
+   * True when an error represents a missing resource rather than a real failure.
+   *
+   * Keyed off the status code attached by makeRequest(), never off the message text: the
+   * message contains the API's error body, so a 5xx whose body mentions "404" must not be
+   * treated as "gone" — that would turn a transient outage into a silent adopt-or-skip.
+   */
   isNotFound(error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return message.indexOf("404") !== -1 || message.toLowerCase().indexOf("not found") !== -1;
+    const status = error?.statusCode;
+    if (typeof status === "number") return status === 404;
+    return false;
   }
   /**
    * Find a resource by name in a list endpoint.
@@ -151,7 +173,7 @@ var RunpodEntity = class extends import_base.MonkEntity {
   findByName(listPath, name) {
     const response = this.findResource(listPath);
     if (!response) return null;
-    for (const item of extractList(response)) {
+    for (const item of extractList(response, listKeyForPath(listPath))) {
       if (item && item.name === name) return item;
     }
     return null;
@@ -180,7 +202,7 @@ var RunpodEntity = class extends import_base.MonkEntity {
    */
   catalogGpus() {
     try {
-      return extractList(this.makeRequest("GET", "/catalog/gpus"));
+      return extractList(this.makeRequest("GET", "/catalog/gpus"), "gpus");
     } catch (error) {
       import_cli.default.output(`\u26A0\uFE0F  Could not fetch GPU catalog: ${error.message}`);
       return [];
@@ -199,7 +221,7 @@ var RunpodEntity = class extends import_base.MonkEntity {
    */
   catalogCpus() {
     try {
-      return extractList(this.makeRequest("GET", "/catalog/cpus"));
+      return extractList(this.makeRequest("GET", "/catalog/cpus"), "cpus");
     } catch (error) {
       import_cli.default.output(`\u26A0\uFE0F  Could not fetch CPU catalog: ${error.message}`);
       return [];
@@ -231,36 +253,51 @@ var RunpodEntity = class extends import_base.MonkEntity {
     }
   }
   /**
-   * Sum the `cost` values across billing records, optionally filtered to one resource ID.
-   * Returns null when there is no usable history.
+   * Billing records belonging to exactly one resource.
+   *
+   * A record **must** carry `idField` matching `id` to be included. Treating a record that
+   * lacks the field as a match would be silently catastrophic: if v2 renames `podId` — a risk
+   * this package explicitly accepts by targeting a beta API — every record in the account
+   * would match, and the cost actions would report **account-wide 30-day spend as this one
+   * resource's cost**. A wrong number that looks plausible is worse than no number, so an
+   * unrecognized shape yields no records and the caller reports "unavailable" instead.
    */
-  sumBillingRecords(billing, idField, id) {
+  matchingBillingRecords(billing, idField, id) {
     const records = billing?.records || [];
-    if (records.length === 0) return null;
-    let total = 0;
-    let matched = 0;
-    for (const record of records) {
-      if (record[idField] && record[idField] !== id) continue;
-      const amount = Number(record.totalAmount ?? 0);
-      if (!isNaN(amount)) {
-        total += amount;
-        matched++;
+    const matching = records.filter((r) => r && r[idField] === id);
+    if (records.length > 0 && matching.length === 0) {
+      const withField = records.filter((r) => r && r[idField] !== void 0).length;
+      if (withField === 0) {
+        import_cli.default.output(
+          `\u26A0\uFE0F  Billing records carry no "${idField}" field \u2014 the API shape has changed. Refusing to attribute account-wide spend to this resource.`
+        );
       }
     }
-    return matched > 0 ? total : null;
+    return matching;
   }
   /**
-   * Count distinct time buckets in a billing response.
+   * Sum billing amounts for one resource. Returns null when there is no usable history.
+   */
+  sumBillingRecords(billing, idField, id) {
+    const matching = this.matchingBillingRecords(billing, idField, id);
+    if (matching.length === 0) return null;
+    let total = 0;
+    for (const record of matching) {
+      const amount = Number(record.totalAmount ?? 0);
+      if (!isNaN(amount)) total += amount;
+    }
+    return total;
+  }
+  /**
+   * Count distinct time buckets for one resource.
    *
    * Not the same as `records.length`: the API returns one record per resource per bucket, so
    * an account with six pods over three days yields eighteen records but three buckets.
    * Dividing a per-resource total by the record count would understate the daily rate.
    */
   countBillingBuckets(billing, idField, id) {
-    const records = billing?.records || [];
     const seen = [];
-    for (const record of records) {
-      if (record[idField] && record[idField] !== id) continue;
+    for (const record of this.matchingBillingRecords(billing, idField, id)) {
       const bucket = String(record.startTime || "");
       if (bucket && seen.indexOf(bucket) === -1) seen.push(bucket);
     }

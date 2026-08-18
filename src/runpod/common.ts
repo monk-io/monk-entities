@@ -28,7 +28,7 @@ export type PodStatus =
     | "ERROR"
     | "TERMINATED";
 
-/** Actions accepted by `POST /v2/pods/{id}/actions`. */
+/** Actions accepted by `POST /v2/pods/{id}/action` (singular — the plural path 404s). */
 export type PodAction = "start" | "stop" | "restart" | "terminate";
 
 /** Network volume storage tiers. Omitting it uses the data center default. */
@@ -140,17 +140,46 @@ export function validateVolumeSize(size: number): number {
  * v2 wraps every collection in a single named key rather than a common envelope:
  * `{"pods":[…]}`, `{"networkVolumes":[…]}`, `{"templates":[…]}`, `{"gpus":[…]}`,
  * `{"cpus":[…]}`, `{"dataCenters":[…]}`, and `{"metadata":{…},"records":[…]}` for billing.
- * Rather than hardcoding each name, take the first array-valued property — which is correct
- * for all of them and survives v2 renaming a key while it is still in beta.
+ *
+ * Pass `expectedKey` whenever the caller knows it (see `listKeyForPath`). Falling back to "the
+ * only array present" is safe; falling back to "the first array present" is not, which is why
+ * an ambiguous response throws rather than guessing — see the comment at that branch.
  */
-export function extractList(response: any): any[] {
+export function extractList(response: any, expectedKey?: string): any[] {
     if (Array.isArray(response)) return response;
     if (!response || typeof response !== "object") return [];
 
-    for (const key in response) {
-        if (Array.isArray(response[key])) return response[key];
+    if (expectedKey && Array.isArray(response[expectedKey])) {
+        return response[expectedKey];
     }
-    return [];
+
+    const arrayKeys: string[] = [];
+    for (const key in response) {
+        if (Array.isArray(response[key])) arrayKeys.push(key);
+    }
+
+    if (arrayKeys.length === 1) return response[arrayKeys[0]];
+    if (arrayKeys.length === 0) return [];
+
+    // Multiple arrays and none under the expected key. Guessing is the dangerous option:
+    // picking an empty `errors` array over the real `pods` array reads as "no existing
+    // resource", which makes adoption miss and creates a **duplicate billable pod**. Fail
+    // loudly instead — v2 is beta and the parsing layer is where churn actually lands.
+    throw new Error(
+        `Ambiguous RunPod list response: expected "${expectedKey ?? "(unspecified)"}" but found ` +
+        `array properties [${arrayKeys.join(", ")}]. Refusing to guess, because a wrong guess ` +
+        `here silently reports "nothing exists" and creates a duplicate resource.`
+    );
+}
+
+/**
+ * Envelope key for a list endpoint: v2 names each collection after its own path segment in
+ * camelCase (`/network-volumes` → `networkVolumes`, `/catalog/gpus` → `gpus`).
+ */
+export function listKeyForPath(path: string): string {
+    const segments = path.split("/").filter((s) => s.length > 0);
+    const last = segments[segments.length - 1] || "";
+    return last.split("-").map((part, i) => (i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))).join("");
 }
 
 /**

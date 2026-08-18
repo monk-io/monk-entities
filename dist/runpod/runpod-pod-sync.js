@@ -57,8 +57,8 @@ const common = require("runpod/common");
 const toApiBody = common.toApiBody;
 const HOURS_PER_MONTH = common.HOURS_PER_MONTH;
 const cli = require("cli");
-var _costs_dec, _getCostEstimate_dec, _getInfo_dec, _restart_dec, _a, _init;
-var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [action("restart")], _getInfo_dec = [action("get-info")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
+var _costs_dec, _getCostEstimate_dec, _getInfo_dec, _restart_dec, _forceTerminate_dec, _a, _init;
+var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_dec = [action("force-terminate")], _restart_dec = [action("restart")], _getInfo_dec = [action("get-info")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -86,6 +86,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [ac
       this.create();
       return;
     }
+    this.validateCompute();
     this.warnOnImmutableChanges();
     const body = toApiBody({
       name: this.definition.name,
@@ -103,18 +104,60 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [ac
     this.applyState(updated, this.state.existing);
     cli.output(`\u2705 Updated pod ${this.state.id}`);
   }
+  /**
+   * Terminate the pod.
+   *
+   * For a pod, delete is a **correctness requirement, not cleanup**: a pod that is not
+   * terminated bills indefinitely, and RunPod restarts a pod whose command exits — so a
+   * skipped terminate can also re-run the job. Both failure modes are silent.
+   *
+   * That makes the usual "adopted resources are left alone" rule dangerous here, unlike on a
+   * volume (where it protects data) or a template (which is free). An adopted pod is still a
+   * meter that nobody is watching, so the two escape hatches below are explicit rather than
+   * implied, and the skip path shouts instead of whispering.
+   */
   delete() {
     if (!this.state.id) return;
-    if (this.state.existing) {
-      cli.output("Pod pre-existed this entity; skipping delete");
-      return;
-    }
     if (this.definition.allow_destructive_delete === false) {
       throw new Error(
         `Pod ${this.state.id} delete is disabled. Remove allow_destructive_delete: false to permit termination. Note the pod continues to bill while running.`
       );
     }
+    if (this.state.existing && this.definition.allow_destructive_delete !== true) {
+      const rate = this.state.cost_per_hr;
+      const perHour = rate ? `$${rate}/hr` : "an unknown hourly rate";
+      const perMonth = rate ? ` (~$${(rate * HOURS_PER_MONTH).toFixed(2)}/month)` : "";
+      cli.output("");
+      cli.output("=".repeat(72));
+      cli.output(`\u26A0\uFE0F  POD LEFT RUNNING AND STILL BILLING: ${this.state.id} (${this.state.name})`);
+      cli.output("=".repeat(72));
+      cli.output(`   This pod was adopted by name, not created here, so it was NOT terminated.`);
+      cli.output(`   It continues to bill at ${perHour}${perMonth} until someone stops it.`);
+      cli.output(`   Status at teardown: ${this.state.pod_status || "unknown"}`);
+      cli.output("");
+      cli.output(`   Terminate it now with either:`);
+      cli.output(`     sudo monk do <namespace>/<entity>/force-terminate`);
+      cli.output(`     curl -X DELETE -H "Authorization: Bearer <key>" \\`);
+      cli.output(`       https://api.runpod.io/v2/pods/${this.state.id}`);
+      cli.output(`   Or set allow_destructive_delete: true to let teardown terminate adopted pods.`);
+      cli.output("=".repeat(72));
+      cli.output("");
+      return;
+    }
+    if (this.state.existing) {
+      cli.output(
+        `Terminating adopted pod ${this.state.id} \u2014 allow_destructive_delete is explicitly true`
+      );
+    }
     this.deleteResource(`/pods/${this.state.id}`, `pod ${this.state.id}`);
+  }
+  forceTerminate(_args) {
+    if (!this.state.id) {
+      cli.output("No pod to terminate");
+      return;
+    }
+    this.deleteResource(`/pods/${this.state.id}`, `pod ${this.state.id}`);
+    this.state.pod_status = "TERMINATED";
   }
   checkReadiness() {
     if (!this.state.id) return false;
@@ -135,8 +178,18 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [ac
     }
     return true;
   }
+  /**
+   * Liveness asks "does the managed resource still exist", not "is it running".
+   *
+   * Deliberately **not** delegated to checkReadiness(): a pod stopped on purpose (via the
+   * `stop` hook) is not dead, and reporting it as not-live would make an intentional stop look
+   * like a fault. Only a terminated or vanished pod is genuinely not live.
+   */
   checkLiveness() {
-    return this.checkReadiness();
+    if (!this.state.id) return false;
+    const pod = this.findResource(`/pods/${this.state.id}`);
+    if (!pod) return false;
+    return this.readStatus(pod) !== "TERMINATED";
   }
   /**
    * Power the pod on.
@@ -244,6 +297,14 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [ac
     const rate = this.hourlyRate();
     if (rate === null) {
       this.emitCosts("runpod-pod", "0", "Could not determine hourly rate from pod state or GPU catalog");
+      return;
+    }
+    if (rate.hypothetical) {
+      this.emitCosts(
+        "runpod-pod",
+        "0",
+        `Pod is ${this.state.pod_status || "not running"} and accrues no compute; it would bill $${(rate.hourly * HOURS_PER_MONTH).toFixed(2)}/month if started`
+      );
       return;
     }
     this.emitCosts("runpod-pod", (rate.hourly * HOURS_PER_MONTH).toFixed(2));
@@ -484,6 +545,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _restart_dec = [ac
   }
 };
 _init = __decoratorStart(_a);
+__decorateElement(_init, 1, "forceTerminate", _forceTerminate_dec, _RunpodPod);
 __decorateElement(_init, 1, "restart", _restart_dec, _RunpodPod);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _RunpodPod);
 __decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _RunpodPod);
