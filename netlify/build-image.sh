@@ -1,31 +1,22 @@
 #!/bin/bash
+set -euo pipefail
 
-podman rmi monkimages.azurecr.io/netlify-build:18
-podman manifest rm monkimages.azurecr.io/netlify-build:18
-podman manifest create monkimages.azurecr.io/netlify-build:18
-podman build --build-arg NODE_VERSION=18 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:18 .
-podman manifest push monkimages.azurecr.io/netlify-build:18
+IMAGE=monkimages.azurecr.io/netlify-build
+VERSIONS=(18 20 22 24 26)
 
-podman rmi monkimages.azurecr.io/netlify-build:20
-podman manifest rm monkimages.azurecr.io/netlify-build:20
-podman manifest create monkimages.azurecr.io/netlify-build:20
-podman build --build-arg NODE_VERSION=20 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:20 .
-podman manifest push monkimages.azurecr.io/netlify-build:20
+for version in "${VERSIONS[@]}"; do
+  tag="$IMAGE:$version"
 
-podman rmi monkimages.azurecr.io/netlify-build:22
-podman manifest rm monkimages.azurecr.io/netlify-build:22
-podman manifest create monkimages.azurecr.io/netlify-build:22
-podman build --build-arg NODE_VERSION=22 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:22 .
-podman manifest push monkimages.azurecr.io/netlify-build:22
+  podman rmi "$tag" 2>/dev/null || true
+  podman manifest rm "$tag" 2>/dev/null || true
+  podman manifest create "$tag"
+  podman build --build-arg NODE_VERSION="$version" --platform linux/amd64,linux/arm64 --manifest "$tag" .
 
-podman rmi monkimages.azurecr.io/netlify-build:24
-podman manifest rm monkimages.azurecr.io/netlify-build:24
-podman manifest create monkimages.azurecr.io/netlify-build:24
-podman build --build-arg NODE_VERSION=24 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:24 .
-podman manifest push monkimages.azurecr.io/netlify-build:24
+  count=$(podman manifest inspect "$tag" | grep -c '"platform"')
+  if [ "$count" -eq 0 ]; then
+    echo "refusing to push $tag: local manifest has zero platform entries" >&2
+    exit 1
+  fi
 
-podman rmi monkimages.azurecr.io/netlify-build:26
-podman manifest rm monkimages.azurecr.io/netlify-build:26
-podman manifest create monkimages.azurecr.io/netlify-build:26
-podman build --build-arg NODE_VERSION=26 --platform linux/amd64,linux/arm64 --manifest monkimages.azurecr.io/netlify-build:26 .
-podman manifest push monkimages.azurecr.io/netlify-build:26
+  podman manifest push "$tag"
+done
