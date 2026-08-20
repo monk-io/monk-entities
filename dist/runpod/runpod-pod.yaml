@@ -31,7 +31,7 @@ runpod-pod:
         own data center
       - `runpod/runpod-template` - wire `template_id` to the template's `state.id` to inherit
         image, ports, and env
-    version-hash: 095ef42d343c
+    version-hash: 3267e78683ee
   schema:
     secret_ref:
       type: string

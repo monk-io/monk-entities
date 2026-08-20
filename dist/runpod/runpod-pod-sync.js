@@ -239,7 +239,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
       return;
     }
     const info = this.makeRequest("GET", `/pods/${this.state.id}`);
-    cli.output(JSON.stringify(info, null, 2));
+    cli.output(JSON.stringify(this.redactEnv(info), null, 2));
   }
   getConsoleUrl(_args) {
     if (!this.state.id) {
@@ -537,6 +537,20 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
    * plural `dataCenterIds`). v2 has no `publicIp`, `portMappings`, or `machineId` — those were
    * v1 fields, so reading them would leave state permanently empty.
    */
+  // RunPod returns `env` in full (see the `env` field doc above) — get-info is a
+  // documented sanity-check workflow (README "Verify"), so anything it prints reaches
+  // whatever captures Monk's job output. Keep the keys (useful for diagnosis) but
+  // redact every value; a leaked value is a leaked secret, a leaked key name is not.
+  redactEnv(info) {
+    if (!info || typeof info !== "object" || !info.env || typeof info.env !== "object") {
+      return info;
+    }
+    const redactedEnv = {};
+    for (const key of Object.keys(info.env)) {
+      redactedEnv[key] = "<redacted>";
+    }
+    return { ...info, env: redactedEnv };
+  }
   applyState(pod, existing) {
     this.state.id = pod?.id ?? this.state.id;
     this.state.name = pod?.name ?? this.definition.name;
