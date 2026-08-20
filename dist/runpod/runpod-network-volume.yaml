@@ -24,7 +24,7 @@ runpod-network-volume:
       Works with:
       - `runpod/runpod-pod` - mount this volume by wiring `network_volume_id` to `state.id`
         and `data_center_ids` to `state.data_center`
-    version-hash: 3267e78683ee
+    version-hash: 75552e1130db
   schema:
     secret_ref:
       type: string
