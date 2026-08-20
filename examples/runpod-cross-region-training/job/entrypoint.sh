@@ -180,9 +180,17 @@ warm-b)
 
   say "--- warm volume B: checkpoint + manifest ---"
   tc0=$(date +%s.%N)
-  if ! REMOTE="$REMOTE_RUNS" LOCAL_PATH="$CK" MARKER_FILE="$MANIFEST_FILE" MARKER_NAME=manifest.json \
+  if ! REMOTE="$REMOTE_RUNS" MARKER_FILE="$MANIFEST_FILE" MARKER_NAME=manifest.json \
       /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
     res "manifest" "MISSING — run the gpu-a phase first"
+    sync_log; exec sleep infinity
+  fi
+  MS=$(get step); MC=$(get checkpoint); MD=$(get dataset_sha256); MCH=$(get checkpoint_sha256)
+  # Pull only the checkpoint the manifest names, not the whole run's history — a run with
+  # several retained checkpoints would otherwise warm every one of them just to use the
+  # latest (architecture review finding 2, 2026-08-19).
+  if ! REMOTE="$REMOTE_RUNS/$(basename "$MC")" LOCAL_PATH="$CK" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
+    res "checkpoint" "FAILED to warm $MC from R2"
     sync_log; exec sleep infinity
   fi
   tc1=$(date +%s.%N)
@@ -190,7 +198,6 @@ warm-b)
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.1fs (%.0f MB/s)\n","checkpoint_warm_took",b/1048576,d,(b/1048576)/d}' \
     | tee -a "$LOG"
   t1=$(date +%s.%N)
-  MS=$(get step); MC=$(get checkpoint); MD=$(get dataset_sha256); MCH=$(get checkpoint_sha256)
   res "manifest" "step=$MS ckpt=$MC"
   awk -v a="$t0" -v c="$t1" 'BEGIN{printf "RESULT: %-30s %.1fs\n","warm_took",c-a}' | tee -a "$LOG"
 
