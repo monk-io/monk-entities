@@ -31,7 +31,7 @@ runpod-pod:
         own data center
       - `runpod/runpod-template` - wire `template_id` to the template's `state.id` to inherit
         image, ports, and env
-    version-hash: 3267e78683ee
+    version-hash: 75552e1130db
   schema:
     secret_ref:
       type: string
@@ -75,8 +75,8 @@ runpod-pod:
       type: object
       additionalProperties:
         type: string
-        description: 'Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key.'
-      description: 'Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key.'
+        description: 'Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key. `MONK_RUNPOD_ENTITY_PATH` is reserved — this entity stamps it at create time to prove ownership on a later adoption, overriding any value set here.'
+      description: 'Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key. `MONK_RUNPOD_ENTITY_PATH` is reserved — this entity stamps it at create time to prove ownership on a later adoption, overriding any value set here.'
     network_volume_id:
       type: string
       description: Network volume ID to mount. The volume must live in one of `data_center_ids`. Immutable after creation.
@@ -135,6 +135,9 @@ runpod-pod:
     name:
       type: string
       description: Pod name
+    owned:
+      type: boolean
+      description: 'True when this pod''s env carries this entity''s ownership marker — proof it was created by this entity, even if adopted after a state loss. Only meaningful when `existing` is true; a freshly created pod is trivially owned.'
     pod_status:
       type: string
       description: 'Current lifecycle state: PROVISIONING, STARTING, RUNNING, EXITED, ERROR, TERMINATED'
