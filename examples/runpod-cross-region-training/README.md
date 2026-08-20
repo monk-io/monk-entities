@@ -309,6 +309,14 @@ RESULT: phase_complete                 warm-b done — confirm integrity OK abov
 RESULT: phase_wall_clock               10.1s
 ```
 
+This capture predates a fix (architecture review finding 2, 2026-08-19):
+`warm-b` used to pull every retained checkpoint under the run's R2 prefix, not just the
+one the manifest names — `checkpoint_warm_took` above is really "time to warm all three,"
+and `volumeB_after` lists all three for the same reason. Fixed now: `warm-b` pulls the
+manifest first, then fetches only the single checkpoint it names, so
+`ckpt=[step-000060.bin ]` (one file) is the expected output today, and
+`checkpoint_warm_took` scales with one checkpoint's size, not the whole run's history.
+
 If instead you see `manifest MISSING`, phase 1 didn't finish (or its checkpoint upload
 failed) — check gpu-pod-eu-ro-1's log before continuing.
 
