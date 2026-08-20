@@ -44,9 +44,15 @@ REMOTE_DATA="r2:$DATA/$EXP-dataset"
 REMOTE_RUNS="r2:$RUNS/$EXP"
 
 V=/workspace
+# Keyed by the same $EXP-dataset identity as REMOTE_DATA, not a bare shared directory:
+# two experiments sharing one region's volume (the scenario the hybrid's shared-cache
+# economics depend on — see §2 of the hybrid architecture doc) would otherwise union
+# their datasets into one directory that matches neither manifest (architecture review
+# finding 6, 2026-08-19).
+DATA_DIR="$V/data/$EXP-dataset"
 CK="$V/runs/$EXP/ckpt"
 LOGDIR="$V/runs/$EXP/logs"
-mkdir -p "$V/data" "$CK" "$LOGDIR"
+mkdir -p "$DATA_DIR" "$CK" "$LOGDIR"
 LOG="$LOGDIR/$ROLE.log"
 DRAIN="/tmp/drain-$ROLE"
 # On the volume, not /tmp: a sync-out pod attaching after this one is deleted needs to
@@ -105,16 +111,16 @@ gpu-a)
 
   say "--- warm volume A from R2 (first use) ---"
   t0=$(date +%s.%N)
-  if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tail -2 | tee -a "$LOG"; then
+  if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$DATA_DIR" /usr/local/bin/warm-from-path.sh 2>&1 | tail -2 | tee -a "$LOG"; then
     res "dataset" "FAILED to warm from R2"
     sync_log; exec sleep infinity
   fi
   t1=$(date +%s.%N)
-  B=$(du -sb "$V/data" | cut -f1)
+  B=$(du -sb "$DATA_DIR" | cut -f1)
   awk -v b="$B" -v a="$t0" -v c="$t1" \
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.1fs (%.0f MB/s)\n","volA_warm_from_r2",b/1048576,d,(b/1048576)/d}' \
     | tee -a "$LOG"
-  DH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
+  DH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
   res "dataset_sha256" "${DH:0:16}…"
 
   if [ "$BACKGROUND_SYNC" = "true" ]; then
@@ -169,12 +175,12 @@ warm-b)
   t0=$(date +%s.%N)
   say "--- warm volume B: dataset ---"
   td0=$(date +%s.%N)
-  if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
+  if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$DATA_DIR" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
     res "dataset" "FAILED to warm from R2"
     sync_log; exec sleep infinity
   fi
   td1=$(date +%s.%N)
-  awk -v b="$(du -sb "$V/data" | cut -f1)" -v a="$td0" -v c="$td1" \
+  awk -v b="$(du -sb "$DATA_DIR" | cut -f1)" -v a="$td0" -v c="$td1" \
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.1fs (%.0f MB/s)\n","dataset_warm_took",b/1048576,d,(b/1048576)/d}' \
     | tee -a "$LOG"
 
@@ -201,7 +207,7 @@ warm-b)
   res "manifest" "step=$MS ckpt=$MC"
   awk -v a="$t0" -v c="$t1" 'BEGIN{printf "RESULT: %-30s %.1fs\n","warm_took",c-a}' | tee -a "$LOG"
 
-  GH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
+  GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
   if [ "$GH" = "$MD" ]; then res "volumeB_integrity" "OK matches manifest"; else res "volumeB_integrity" "MISMATCH"; fi
   CKF="$CK/$(basename "$MC")"
   if [ -f "$CKF" ] && [ "$(sha256sum "$CKF" | cut -d' ' -f1)" = "$MCH" ]; then
@@ -209,7 +215,7 @@ warm-b)
   else
     res "checkpointB_integrity" "MISMATCH"
   fi
-  res "volumeB_after" "data=$(ls "$V/data" | wc -l) ckpt=[$(ls "$CK" | tr '\n' ' ')]"
+  res "volumeB_after" "data=$(ls "$DATA_DIR" | wc -l) ckpt=[$(ls "$CK" | tr '\n' ' ')]"
   res "phase_complete" "warm-b done — confirm integrity OK above, then delete this pod"
   ;;
 
@@ -229,9 +235,9 @@ gpu-b)
   res "manifest_says" "step=$MS ckpt=$MC"
 
   say "--- read dataset FROM VOLUME (no R2 pull) ---"
-  res "volume_dataset_files" "$(ls "$V/data" 2>/dev/null | wc -l)"
-  t0=$(date +%s.%N); GH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1); t1=$(date +%s.%N)
-  B=$(du -sb "$V/data" | cut -f1)
+  res "volume_dataset_files" "$(ls "$DATA_DIR" 2>/dev/null | wc -l)"
+  t0=$(date +%s.%N); GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1); t1=$(date +%s.%N)
+  B=$(du -sb "$DATA_DIR" | cut -f1)
   awk -v b="$B" -v a="$t0" -v c="$t1" \
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.2fs (%.0f MB/s)\n","volume_read_rate",b/1048576,d,(b/1048576)/d}' \
     | tee -a "$LOG"
@@ -239,11 +245,11 @@ gpu-b)
     res "CACHE_HIT_dataset" "YES — volume data matches manifest, no R2 pull needed"
   else
     res "CACHE_HIT_dataset" "NO — stale cache ($GH vs $MD), pulling from R2"
-    if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
+    if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$DATA_DIR" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
       res "dataset_fallback" "FAILED to warm from R2"
       sync_log; exec sleep infinity
     fi
-    GH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
+    GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
     if [ "$GH" = "$MD" ]; then
       res "dataset_fallback" "OK — R2 pull now matches manifest"
     else

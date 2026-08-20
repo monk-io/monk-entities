@@ -16,14 +16,15 @@ CKPT_CONTENT="fake-checkpoint-bytes-67890"
 CKH=$(printf '%s' "$CKPT_CONTENT" | sha256sum | cut -d' ' -f1)
 
 # --- Case A: everything already warm on the volume -> no fallback should fire ---
-mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/ws-warm/data" \
+mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/ws-warm/data/t-dataset" \
   "$SCRATCH/ws-warm/runs/t/ckpt"
 printf '%s' "$DS_CONTENT" > "$SCRATCH/fr2-data/t-dataset/shard-00.bin"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/fr2-runs/t/step-000020.bin"
 cat > "$SCRATCH/fr2-runs/t/manifest.json" <<JSON
 {"step":20,"checkpoint":"step-000020.bin","dataset_sha256":"$DH","checkpoint_sha256":"$CKH"}
 JSON
-printf '%s' "$DS_CONTENT" > "$SCRATCH/ws-warm/data/shard-00.bin"
+# Keyed by EXP=t, matching DATA_DIR="$V/data/$EXP-dataset" in entrypoint.sh.
+printf '%s' "$DS_CONTENT" > "$SCRATCH/ws-warm/data/t-dataset/shard-00.bin"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/ws-warm/runs/t/ckpt/step-000020.bin"
 
 OUT_A=$(docker run --rm \
@@ -49,9 +50,9 @@ fi
 echo "PASS (case A: warm cache never triggers a fallback)"
 
 # --- Case B: checkpoint missing from the volume AND from R2 -> must park, not train ---
-mkdir -p "$SCRATCH/fr2-runs-hard/t" "$SCRATCH/ws-hard/data"
+mkdir -p "$SCRATCH/fr2-runs-hard/t" "$SCRATCH/ws-hard/data/t-dataset"
 cp "$SCRATCH/fr2-runs/t/manifest.json" "$SCRATCH/fr2-runs-hard/t/manifest.json"
-printf '%s' "$DS_CONTENT" > "$SCRATCH/ws-hard/data/shard-00.bin"
+printf '%s' "$DS_CONTENT" > "$SCRATCH/ws-hard/data/t-dataset/shard-00.bin"
 # Deliberately do NOT create step-000020.bin under fr2-runs-hard/t -> the object is
 # genuinely absent from "R2" too, so the fallback pull itself must fail.
 

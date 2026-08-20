@@ -12,12 +12,13 @@ IMAGE=${IMAGE:-imanachyn/runpod-hybrid-job:latest}
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
 
-mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/workspace/data"
+mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/workspace/data/t-dataset"
 DS_CONTENT="fake-dataset-shard-content-12345"
 printf '%s' "$DS_CONTENT" > "$SCRATCH/fr2-data/t-dataset/shard-00.bin"
-# Pre-seed /workspace/data with the SAME content so the dataset check is a cache HIT —
-# isolates this test to the checkpoint fallback path.
-printf '%s' "$DS_CONTENT" > "$SCRATCH/workspace/data/shard-00.bin"
+# Pre-seed /workspace/data/t-dataset (keyed by EXP=t, matching DATA_DIR in entrypoint.sh)
+# with the SAME content so the dataset check is a cache HIT — isolates this test to the
+# checkpoint fallback path.
+printf '%s' "$DS_CONTENT" > "$SCRATCH/workspace/data/t-dataset/shard-00.bin"
 DH=$(printf '%s' "$DS_CONTENT" | sha256sum | cut -d' ' -f1)
 CKPT_CONTENT="fake-checkpoint-bytes-67890"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/fr2-runs/t/step-000020.bin"
