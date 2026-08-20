@@ -75,7 +75,7 @@ The `catalog` and `billing` reads exist only to serve the cost actions.
 | `locked` | boolean | no | Prevent stop/reset. **Applied on update only** — RunPod rejects it at create time |
 | `global_networking` | boolean | no | Limited availability |
 | `secret_ref` | string | no | Defaults to `runpod-api-token` |
-| `allow_destructive_delete` | boolean | no | Set `false` to make `delete()` refuse. Defaults to true |
+| `allow_destructive_delete` | boolean | no | Set `false` to make `delete()` refuse. Defaults to true — see the adoption note below |
 
 Exactly one of `gpu_type_id` or `cpu_flavor_id` must be set — the API accepts one compute
 family, never both. There is **no spot/interruptible option**: v2 dropped it entirely, so
@@ -89,6 +89,16 @@ CPU pods) are mutually exclusive — RunPod rejects a pod that requests both.
 `global_networking`, and `template_id`. Changes to GPU type, vCPU count, data center, or
 volume attachment are **logged and ignored** rather than triggering a destroy-and-recreate of
 a billable instance.
+
+**Adoption is by name, and RunPod does not enforce unique names.** `create()` adopts an
+existing pod whose name matches `name` rather than creating a duplicate. To tell "someone
+else's pod that happens to share this name" apart from "my own pod, adopted after this
+entity lost its state," `create()` stamps a `MONK_RUNPOD_ENTITY_PATH` env var (this
+entity's own Monk path) onto every pod it creates. Adopting a pod that carries a matching
+marker is provably safe to terminate — `delete()` does so even without
+`allow_destructive_delete: true`. Adopting a pod without a matching marker keeps the
+default refuse-and-shout behavior, since it may genuinely belong to someone else. This
+value is redacted, like every other `env` value, in `get-info` output.
 
 ## `runpod-network-volume` Configuration
 

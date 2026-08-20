@@ -70,12 +70,16 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
     this.validateCompute();
     const existing = this.findByName("/pods", this.definition.name);
     if (existing) {
-      this.applyState(existing, true);
+      const owned = this.isOwnedByThisEntity(existing);
+      this.applyState(existing, true, owned);
       cli.output(`\u{1F4E6} Adopted existing pod ${existing.id} (${this.definition.name})`);
+      if (owned) {
+        cli.output(`   Ownership marker confirms this entity created it \u2014 delete() can terminate it without allow_destructive_delete: true.`);
+      }
       return;
     }
     const created = this.makeRequest("POST", "/pods", this.buildCreateBody());
-    this.applyState(created, false);
+    this.applyState(created, false, true);
     cli.output(`\u2705 Created pod ${this.state.id} (${this.definition.name})`);
     if (this.state.cost_per_hr) {
       cli.output(`   Billing at $${this.state.cost_per_hr}/hr while running`);
@@ -94,14 +98,14 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
       args: this.definition.args,
       disk: this.definition.disk,
       ports: this.definition.ports,
-      env: this.definition.env,
+      env: this.state.owned ? this.withOwnershipMarker(this.definition.env) : this.definition.env,
       registry: this.definition.registry_id,
       global_networking: this.definition.global_networking,
       locked: this.definition.locked,
       template_id: this.definition.template_id
     });
     const updated = this.makeRequest("PATCH", `/pods/${this.state.id}`, body);
-    this.applyState(updated, this.state.existing);
+    this.applyState(updated, this.state.existing, this.state.owned);
     cli.output(`\u2705 Updated pod ${this.state.id}`);
   }
   /**
@@ -115,6 +119,12 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
    * volume (where it protects data) or a template (which is free). An adopted pod is still a
    * meter that nobody is watching, so the two escape hatches below are explicit rather than
    * implied, and the skip path shouts instead of whispering.
+   *
+   * A third way out needs no escape hatch at all: if the adopted pod's env carries this
+   * entity's own ownership marker (`state.owned`), adoption did not find someone else's pod —
+   * it found this entity's own pod after a state loss. Termination is safe without an
+   * explicit opt-in in that case; requiring one would only recreate the finding 7b bug where
+   * the guardrail meant to prevent a billing leak becomes the leak.
    */
   delete() {
     if (!this.state.id) return;
@@ -123,7 +133,8 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
         `Pod ${this.state.id} delete is disabled. Remove allow_destructive_delete: false to permit termination. Note the pod continues to bill while running.`
       );
     }
-    if (this.state.existing && this.definition.allow_destructive_delete !== true) {
+    const provablyOurs = Boolean(this.state.existing && this.state.owned);
+    if (this.state.existing && !provablyOurs && this.definition.allow_destructive_delete !== true) {
       const rate = this.state.cost_per_hr;
       const perHour = rate ? `$${rate}/hr` : "an unknown hourly rate";
       const perMonth = rate ? ` (~$${(rate * HOURS_PER_MONTH).toFixed(2)}/month)` : "";
@@ -144,7 +155,11 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
       cli.output("");
       return;
     }
-    if (this.state.existing) {
+    if (provablyOurs) {
+      cli.output(
+        `Terminating adopted pod ${this.state.id} \u2014 ownership marker confirms this entity created it`
+      );
+    } else if (this.state.existing) {
       cli.output(
         `Terminating adopted pod ${this.state.id} \u2014 allow_destructive_delete is explicitly true`
       );
@@ -163,7 +178,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
     if (!this.state.id) return false;
     const pod = this.findResource(`/pods/${this.state.id}`);
     if (!pod) return false;
-    this.applyState(pod, this.state.existing);
+    this.applyState(pod, this.state.existing, this.state.owned);
     const status = this.state.pod_status;
     if (status === "ERROR") {
       throw new Error(
@@ -413,7 +428,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
       disk: this.definition.disk,
       args: this.definition.args,
       ports: this.definition.ports,
-      env: this.definition.env,
+      env: this.withOwnershipMarker(this.definition.env),
       template_id: this.definition.template_id,
       registry: this.definition.registry_id,
       data_center_ids: this.definition.data_center_ids,
@@ -551,7 +566,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
     }
     return { ...info, env: redactedEnv };
   }
-  applyState(pod, existing) {
+  applyState(pod, existing, owned) {
     this.state.id = pod?.id ?? this.state.id;
     this.state.name = pod?.name ?? this.definition.name;
     this.state.pod_status = this.readStatus(pod);
@@ -563,6 +578,29 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
     this.state.gpu_type_id = pod?.gpu?.id ?? this.definition.gpu_type_id;
     this.state.created_at = pod?.createdAt ?? this.state.created_at;
     this.state.existing = existing;
+    this.state.owned = owned;
+  }
+  /**
+   * Merge the ownership marker into a user-supplied env map without mutating it.
+   * No-op when `this.path` is unset (e.g. outside a real Monk context) — an entity that
+   * cannot name itself must not claim ownership of anything.
+   */
+  withOwnershipMarker(env) {
+    if (!this.path) return env;
+    return { ...env, [_RunpodPod.OWNERSHIP_ENV_KEY]: this.path };
+  }
+  /**
+   * True when `pod.env` carries this entity's own ownership marker.
+   *
+   * Verified against the RunPod v2 OpenAPI spec (`GET /v2/pods` — `ListPodsResponse` ->
+   * `Pod`, 2026-08-20): list items resolve to the same `Pod` schema as the detail endpoint
+   * and include `env` in full, so this can be checked straight off `findByName`'s result —
+   * no extra `GET /pods/{id}` round trip needed to see it. The same check confirmed neither
+   * `/pods` nor `/network-volumes` takes a cursor/limit parameter today, closing finding 7c
+   * (unverified pagination) without a code change.
+   */
+  isOwnedByThisEntity(pod) {
+    return Boolean(this.path) && pod?.env?.[_RunpodPod.OWNERSHIP_ENV_KEY] === this.path;
   }
 };
 _init = __decoratorStart(_a);
@@ -576,6 +614,14 @@ __decoratorMetadata(_init, _RunpodPod);
 __name(_RunpodPod, "RunpodPod");
 /** GPU capacity is not guaranteed and provisioning is slow — allow ~10 minutes. */
 __publicField(_RunpodPod, "readiness", { period: 10, initialDelay: 5, attempts: 60 });
+/**
+ * Env key stamped with `this.path` at create time so a later adoption can tell "a
+ * foreign pod that happens to share a name" apart from "the pod I created and then
+ * lost state for" (architecture review finding 7, 2026-08-19). `this.path` is Monk's
+ * own entity path (`namespace/entity-name`), stable across state loss and already
+ * unique per instance — no new identity scheme needed.
+ */
+__publicField(_RunpodPod, "OWNERSHIP_ENV_KEY", "MONK_RUNPOD_ENTITY_PATH");
 var RunpodPod = _RunpodPod;
 
 
