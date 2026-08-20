@@ -461,6 +461,32 @@ run `sync-out`, and restart training — an operational cost the default (backgr
 sidecar) flow doesn't have. Pick this flow because your training image can't run a
 background process, not because it seems simpler.
 
+## Recovering a stranded checkpoint
+
+The hybrid architecture doc's own durability argument (§4): a network volume is
+datacenter-pinned, so if a region goes dark before a checkpoint reaches R2 — a region-wide
+outage, or `BACKGROUND_SYNC=false` and nobody happened to run `sync-out` — that checkpoint
+is unreachable from anywhere else until *something in that same region* flushes it.
+Previously the only way to do that was `ROLE=sync-out`, run by an operator who had to
+first notice the stranding by hand (architecture review finding 11, 2026-08-19).
+
+`ROLE=warm-b` now does this automatically as its first step, before pulling anything: if
+the volume it attaches to already has local checkpoint files, it pushes them to R2, then
+compares its local manifest's `step` against R2's and publishes the local one only if it's
+strictly ahead — never backward, so a stale local manifest from an earlier, since-
+superseded attempt can't roll R2's commit point back (that would reopen finding 10, the
+manifest's monotonicity gap, from the fix meant to close finding 11). Checkpoint *files*
+are pushed unconditionally either way — they're additively named (`step-NNNNNN.bin`), so
+pushing one R2 already ignores is harmless.
+
+Practically: once a region's capacity returns, run a `warm-b`-style pod (any pod entity
+with `ROLE=warm-b` and `network_volume_id` pointed at the affected volume — it doesn't
+have to be `warmer-pod-us-il-1` specifically) against it. It self-heals the stranded
+checkpoint and warms in the same pass; `sync-out` remains available as a lighter-weight,
+explicit push when you already know a checkpoint needs flushing and don't need the warm
+side of `warm-b`. This does mean `warm-b`'s R2 token now needs **write** access to the
+runs bucket, not just read — it previously never wrote to R2.
+
 ## Verify
 
 The job image has no way to expose logs through the entity — `GET /pods/{id}/logs` is
@@ -504,6 +530,7 @@ tooling needed. What's measured, and why each one is there:
 | `volume_read_rate` | `gpu-b` | Local volume read rate — the number that matters for "is the cache actually fast" |
 | `SYNC: ... (+X MiB in Ys, Z MB/s)` | any role backgrounding `sync-to-path.sh` | Per-pass volume→R2 upload rate. `(no new data, ...)` passes are idle ticks, not failures |
 | `SYNC: FAILED ...` | any role backgrounding `sync-to-path.sh` | A pass's `copy`/`copyto` call failed — the actual rclone error follows on the same line. Previously this failed silently (see the hybrid architecture doc §6.5, "Diagnostics must not be silenced"); its absence used to be the only signal something was wrong |
+| `flush_orphans` / `flush_manifest` | `warm-b` | Result of the flush-before-warm pass (see "Recovering a stranded checkpoint"). `nothing local to flush` on a fresh volume is normal; `pushed N local checkpoint(s)` or `published local manifest` means this volume had unsynced state from an earlier attempt |
 | `sync_lag_last_checkpoint` | `gpu-a`/`gpu-b` (background flow only) | Wall-clock from "checkpoint written locally" to "confirmed synced to R2" — how far behind the backup can get before you'd lose it to a regional failure |
 | `phase_wall_clock` | every role | Total time for that pod, start to `phase_complete` — the number for cost/time budgeting across phases |
 

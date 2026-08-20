@@ -179,6 +179,61 @@ gpu-a)
 warm-b)
   res "nproc" "$(nproc)"
 
+  # Flush-orphans pass (architecture review finding 11, 2026-08-19): if this volume
+  # already has checkpoint files — because it was attached before, e.g. gpu-a ran here
+  # with BACKGROUND_SYNC=false and nobody ran sync-out, or a region outage stranded a
+  # background sync mid-flight — push them to R2 before pulling anything. This is what
+  # makes warm-b the volume's own recovery path instead of requiring an operator to
+  # notice the stranding and run sync-out by hand. A fresh volume has no local
+  # checkpoints, so this is a no-op there. Needs RUNS_BUCKET write access — see README.
+  say "--- flush any local checkpoint not yet in R2 ---"
+  if [ -n "$(find "$CK" -type f ! -name '.*' -print -quit 2>/dev/null)" ]; then
+    touch "$DRAIN"
+    # No MARKER_FILE here on purpose: sync-to-path.sh would upload this volume's
+    # manifest.json unconditionally, and an unconditional overwrite risks rolling R2's
+    # manifest backward if this volume's local one is stale (architecture review
+    # finding 10 — the manifest has no monotonicity guarantee). Push checkpoint files
+    # only (additive, uniquely named step-NNNNNN.bin — safe to push blindly), then
+    # decide the manifest separately below by comparing step numbers.
+    FLUSH_OUT=$(LOCAL_PATH="$CK" REMOTE="$REMOTE_RUNS" LOG_FILE="$LOG" DRAIN_FILE="$DRAIN" \
+      /usr/local/bin/sync-to-path.sh 2>&1)
+    printf '%s\n' "$FLUSH_OUT" >> "$LOG"
+    rm -f "$DRAIN"
+    # sync-to-path.sh's own loop always exits 0 (it logs "SYNC: FAILED ..." and moves
+    # on rather than propagating failure — see sync-to-path.sh), so a failed flush has
+    # to be detected positively in its output, not from this command's exit status.
+    if printf '%s\n' "$FLUSH_OUT" | grep -q 'SYNC: FAILED'; then
+      res "flush_orphans" "FAILED to push local checkpoint(s) to R2 — see SYNC: FAILED above"
+      sync_log; exec sleep infinity
+    fi
+    res "flush_orphans" "pushed $(ls "$CK" | wc -l) local checkpoint(s) to R2"
+
+    if [ -f "$MANIFEST_FILE" ]; then
+      LOCAL_STEP=$(get step)
+      REMOTE_MANIFEST_TMP="$MANIFEST_FILE.remote-check"
+      if "${RC[@]}" copyto "$REMOTE_RUNS/manifest.json" "$REMOTE_MANIFEST_TMP" 2>/dev/null; then
+        REMOTE_STEP=$(MANIFEST_FILE="$REMOTE_MANIFEST_TMP" get step)
+      else
+        REMOTE_STEP=""
+      fi
+      rm -f "$REMOTE_MANIFEST_TMP"
+      # Publish only if this volume's manifest is strictly ahead of R2's — never let a
+      # stale local commit point clobber a newer one written by a run elsewhere.
+      if [ -z "$REMOTE_STEP" ] || [ "${LOCAL_STEP:-0}" -gt "${REMOTE_STEP:-0}" ]; then
+        if "${RC[@]}" copyto "$MANIFEST_FILE" "$REMOTE_RUNS/manifest.json" 2>/dev/null; then
+          res "flush_manifest" "published local manifest (step=$LOCAL_STEP), R2 had step=${REMOTE_STEP:-none}"
+        else
+          res "flush_manifest" "FAILED to publish local manifest to R2"
+          sync_log; exec sleep infinity
+        fi
+      else
+        res "flush_manifest" "kept R2's manifest (step=$REMOTE_STEP) — local (step=$LOCAL_STEP) is not ahead"
+      fi
+    fi
+  else
+    res "flush_orphans" "nothing local to flush"
+  fi
+
   # The download side (fetch dataset, checkpoint dir, and manifest) lives in
   # warm-from-path.sh — generic enough for any warmer. What's left here is specific
   # to validating this demo: comparing the downloaded dataset's hash against what
