@@ -29,7 +29,10 @@ log(){
   if [ -n "$LOG_FILE" ]; then echo "$1" | tee -a "$LOG_FILE"; else echo "$1"; fi
 }
 sync_log(){
-  [ -n "$LOG_FILE" ] && "${RC[@]}" copyto "$LOG_FILE" "$REMOTE/logs/$(basename "$LOG_FILE")" 2>/dev/null
+  local err
+  if [ -n "$LOG_FILE" ] && ! err=$("${RC[@]}" copyto "$LOG_FILE" "$REMOTE/logs/$(basename "$LOG_FILE")" 2>&1); then
+    echo "SYNC: FAILED log mirror -> $REMOTE/logs/$(basename "$LOG_FILE"): $err" >&2
+  fi
   return 0
 }
 
@@ -43,10 +46,12 @@ sync_log(){
 # since the last pass.
 LAST_SIZE=0
 sync_pass(){
-  local t0 t1 bytes_now delta
+  local t0 t1 bytes_now delta err
   t0=$(date +%s.%N)
-  if "${RC[@]}" copy "$LOCAL_PATH" "$REMOTE" --exclude ".*" \
-      --s3-upload-concurrency 8 --s3-chunk-size 16M 2>/dev/null; then
+  # Measured optimum (hybrid architecture doc §3 correction): 720 MB/s at concurrency
+  # 16 / chunk 32M, vs. 38 MB/s single-stream — an 18x difference, not a rounding choice.
+  if err=$("${RC[@]}" copy "$LOCAL_PATH" "$REMOTE" --exclude ".*" \
+      --s3-upload-concurrency 16 --s3-chunk-size 32M 2>&1); then
     t1=$(date +%s.%N)
     bytes_now=$(find "$LOCAL_PATH" -type f ! -name '.*' -printf '%s\n' 2>/dev/null \
       | awk '{s+=$1} END{print s+0}')
@@ -58,9 +63,14 @@ sync_pass(){
       else printf "SYNC: %s -> %s (no new data, %.1fs)", l, r, d;
     }')"
     if [ -n "$MARKER_FILE" ] && [ -f "$MARKER_FILE" ]; then
-      "${RC[@]}" copyto "$MARKER_FILE" "$REMOTE/$MARKER_NAME" 2>/dev/null \
-        && log "SYNC: marker -> $REMOTE/$MARKER_NAME"
+      if err=$("${RC[@]}" copyto "$MARKER_FILE" "$REMOTE/$MARKER_NAME" 2>&1); then
+        log "SYNC: marker -> $REMOTE/$MARKER_NAME"
+      else
+        log "SYNC: FAILED marker -> $REMOTE/$MARKER_NAME: $err"
+      fi
     fi
+  else
+    log "SYNC: FAILED $LOCAL_PATH -> $REMOTE: $err"
   fi
 }
 

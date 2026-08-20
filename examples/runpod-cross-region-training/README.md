@@ -57,12 +57,17 @@ things worth knowing before you run it yourself:
   every ID this package's own architecture doc listed as "confirmed working" hit "no
   instances available" at least once across this example's live runs. Not a sign
   anything is broken.
-- **The pod runtime appears to shadow its own `rclone` ahead of the image's.** The job
-  image installs rclone 1.75.0 at build time, but pods reported `rclone v1.58.1` (with
-  a "Cloudflare provider not known" warning that rclone tolerated gracefully — copies
-  still succeeded via generic S3-compatible signing). Not fatal here, but if you extend
-  this job image and need a specific rclone feature or provider string, don't assume
-  your `Dockerfile`'s version is what actually runs.
+- **The pod runtime shadows its own `rclone` ahead of the image's — confirmed, not just
+  suspected.** The job image installs rclone 1.75.0 at build time (`docker run --rm
+  --entrypoint rclone imanachyn/runpod-hybrid-job:latest version` on the actual pushed
+  image reports exactly that), but pods reported `rclone v1.58.1` (with a "Cloudflare
+  provider not known" warning that rclone tolerated gracefully — copies still succeeded
+  via generic S3-compatible signing). Not fatal here, but if you extend this job image
+  and need a specific rclone feature or provider string, don't assume your
+  `Dockerfile`'s version is what actually runs. The version is now pinned in the
+  `Dockerfile` (`rclone-current-...` floated; two builds months apart could silently
+  diverge) — pinning doesn't fix the runtime shadowing, but it does make the image's
+  *own* version reproducible.
 
 ## Architecture
 
@@ -490,6 +495,7 @@ tooling needed. What's measured, and why each one is there:
 | `checkpoint_warm_took` | `warm-b` | R2→volume checkpoint-dir transfer rate |
 | `volume_read_rate` | `gpu-b` | Local volume read rate — the number that matters for "is the cache actually fast" |
 | `SYNC: ... (+X MiB in Ys, Z MB/s)` | any role backgrounding `sync-to-path.sh` | Per-pass volume→R2 upload rate. `(no new data, ...)` passes are idle ticks, not failures |
+| `SYNC: FAILED ...` | any role backgrounding `sync-to-path.sh` | A pass's `copy`/`copyto` call failed — the actual rclone error follows on the same line. Previously this failed silently (see the hybrid architecture doc §6.5, "Diagnostics must not be silenced"); its absence used to be the only signal something was wrong |
 | `sync_lag_last_checkpoint` | `gpu-a`/`gpu-b` (background flow only) | Wall-clock from "checkpoint written locally" to "confirmed synced to R2" — how far behind the backup can get before you'd lose it to a regional failure |
 | `phase_wall_clock` | every role | Total time for that pod, start to `phase_complete` — the number for cost/time budgeting across phases |
 
@@ -554,9 +560,12 @@ comment in `monk-entities.yaml`, or check `GET /v2/catalog/gpus` / `GET /v2/cata
   `runpod-container-registry-auth` yet. This example uses a public Docker Hub image to
   skip that step entirely.
 - **`env` is API-readable.** RunPod returns a pod's `env` in full to any holder of the
-  account's API key. The R2 credentials in this example's `env` blocks are fine for a
-  throwaway demo bucket; production should use scoped per-bucket R2 tokens or
-  presigned URLs instead (see the hybrid architecture doc, §8).
+  account's API key — including this package's own `get-info` action, which now
+  redacts `env` *values* (keys only) before printing, but that only closes the leak
+  through Monk's own workflow; the underlying RunPod API still returns everything to
+  anyone holding the account's key. The R2 credentials in this example's `env` blocks
+  are fine for a throwaway demo bucket; production should use scoped per-bucket R2
+  tokens or presigned URLs instead (see the hybrid architecture doc, §8).
 - **Adoption-by-name.** If a pod with the same `name:` already exists in your account,
   the entity adopts it instead of creating a new one, and by default refuses to
   terminate it on delete (to avoid an accidental billing leak — see

@@ -148,8 +148,11 @@ do not expose the value through the API:
 - Have the job fetch short-lived credentials at runtime from your own secret store, passing only
   a non-secret identifier through `env`.
 
-This entity cannot fix the exposure — the field is part of the pod/template API — so treat
-anything in `env` as public to the account.
+This entity cannot fix the exposure — the field is part of the pod/template API, readable by
+anyone holding the account's API key regardless of Monk — so treat anything in `env` as public
+to the account. `get-info` redacts `env` values (keys only) before printing, closing the one
+leak this entity *can* control: its own documented sanity-check workflow dumping them to
+whatever captures Monk's job output.
 
 ## Actions
 
@@ -157,7 +160,7 @@ anything in `env` as public to the account.
 |--------|--------|-------------|
 | `runpod-pod` | `restart` | Restart the pod |
 | `runpod-pod` | `force-terminate` | Terminate the pod regardless of how it was acquired — the escape hatch for an adopted pod teardown declined to remove |
-| `runpod-pod` | `get-info` | Full pod detail as JSON |
+| `runpod-pod` | `get-info` | Full pod detail as JSON, `env` values redacted (keys kept) |
 | `runpod-pod` | `get-console-url` | RunPod console URL for this pod (for logs — see "No log action" below) |
 | `runpod-pod` | `get-cost-estimate` | Human-readable monthly cost breakdown |
 | `runpod-pod` | `costs` | Monthly cost as billing JSON |
