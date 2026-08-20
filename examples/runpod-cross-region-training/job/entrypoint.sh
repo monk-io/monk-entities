@@ -251,7 +251,17 @@ gpu-b)
     res "CACHE_HIT_checkpoint" "YES — $(stat -c%s "$CKF") bytes, hash verified, read locally"
     res "ckpt_header" "$(head -c 80 "$CKF" | tr -d '\0')"
   else
-    res "CACHE_HIT_checkpoint" "NO — missing or hash mismatch, would need R2"
+    res "CACHE_HIT_checkpoint" "NO — missing or hash mismatch, pulling from R2"
+    if ! REMOTE="$REMOTE_RUNS/$(basename "$MC")" LOCAL_PATH="$CK" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
+      res "checkpoint_fallback" "FAILED to warm from R2"
+      sync_log; exec sleep infinity
+    fi
+    if [ -f "$CKF" ] && [ "$(sha256sum "$CKF" | cut -d' ' -f1)" = "$MCH" ]; then
+      res "checkpoint_fallback" "OK — R2 pull now matches manifest"
+    else
+      res "checkpoint_fallback" "FAILED — R2 pull still does not match manifest hash"
+      sync_log; exec sleep infinity
+    fi
   fi
 
   if [ "$BACKGROUND_SYNC" = "true" ]; then
