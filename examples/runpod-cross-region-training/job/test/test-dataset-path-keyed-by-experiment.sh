@@ -14,6 +14,7 @@ JOB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE=${IMAGE:-imanachyn/runpod-hybrid-job:latest}
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
+. "$JOB_DIR/test/lib.sh"
 
 # Experiment t2 already warmed its own dataset onto the shared volume, under whatever
 # path this version of entrypoint.sh uses for a warmed dataset (t2-dataset/ if keyed,
@@ -25,7 +26,11 @@ T2_CONTENT="dataset-two-content"
 mkdir -p "$SCRATCH/fr2-data/t1-dataset" "$SCRATCH/fr2-runs/t1"
 T1_CONTENT="dataset-one-content"
 printf '%s' "$T1_CONTENT" > "$SCRATCH/fr2-data/t1-dataset/shard-00.bin"
-DH=$(printf '%s' "$T1_CONTENT" | sha256sum | cut -d' ' -f1)
+# The manifest's dataset_sha256 is what dataset_hash() will compute once t1's content is
+# warmed into $DATA_DIR ($V/data/t1-dataset) — not a raw content hash (see lib.sh).
+mkdir -p "$SCRATCH/expected/data/t1-dataset"
+printf '%s' "$T1_CONTENT" > "$SCRATCH/expected/data/t1-dataset/shard-00.bin"
+DH=$(compute_dataset_hash "$SCRATCH/expected" "/workspace/data/t1-dataset" "$IMAGE" "$JOB_DIR")
 CKPT_CONTENT="t1-checkpoint-bytes"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/fr2-runs/t1/step-000020.bin"
 CKH=$(printf '%s' "$CKPT_CONTENT" | sha256sum | cut -d' ' -f1)

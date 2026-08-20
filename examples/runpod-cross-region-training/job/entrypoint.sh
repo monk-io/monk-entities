@@ -62,6 +62,17 @@ MANIFEST_FILE="$V/runs/$EXP/manifest.json"
 say(){ echo "### $*" | tee -a "$LOG"; }
 res(){ printf 'RESULT: %-30s %s\n' "$1" "$2" | tee -a "$LOG"; }
 
+# `cat "$dir"/* | sha256sum` hits the shell's ARG_MAX at real shard counts (confirmed:
+# ~150,000 tiny files overflows it) — and because that pipeline's exit status was never
+# checked, the failure was silent: "Argument list too long" on stderr, while stdout still
+# produced the well-known empty-input hash as if that were the dataset's real content
+# (architecture review finding 5, 2026-08-19, the hard-crash half). `find | xargs` batches
+# arguments across as many sha256sum invocations as needed, so it never hits the limit
+# regardless of shard count. This still hashes the whole directory tree on every call — the
+# GPU-critical-path cost and single-shard-invalidates-everything problems finding 5 also
+# raises are NOT fixed here; that needs a per-shard manifest, a separate, larger change.
+dataset_hash(){ find "$1" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1; }
+
 PHASE_T0=$(date +%s.%N)
 say "ROLE=$ROLE exp=$EXP dc=${RUNPOD_DC_ID:-?} $(date -u +%FT%TZ)"
 res "rclone" "$(rclone version | head -1)"
@@ -120,7 +131,7 @@ gpu-a)
   awk -v b="$B" -v a="$t0" -v c="$t1" \
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.1fs (%.0f MB/s)\n","volA_warm_from_r2",b/1048576,d,(b/1048576)/d}' \
     | tee -a "$LOG"
-  DH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
+  DH=$(dataset_hash "$DATA_DIR")
   res "dataset_sha256" "${DH:0:16}…"
 
   if [ "$BACKGROUND_SYNC" = "true" ]; then
@@ -207,7 +218,7 @@ warm-b)
   res "manifest" "step=$MS ckpt=$MC"
   awk -v a="$t0" -v c="$t1" 'BEGIN{printf "RESULT: %-30s %.1fs\n","warm_took",c-a}' | tee -a "$LOG"
 
-  GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
+  GH=$(dataset_hash "$DATA_DIR")
   if [ "$GH" = "$MD" ]; then res "volumeB_integrity" "OK matches manifest"; else res "volumeB_integrity" "MISMATCH"; fi
   CKF="$CK/$(basename "$MC")"
   if [ -f "$CKF" ] && [ "$(sha256sum "$CKF" | cut -d' ' -f1)" = "$MCH" ]; then
@@ -236,7 +247,7 @@ gpu-b)
 
   say "--- read dataset FROM VOLUME (no R2 pull) ---"
   res "volume_dataset_files" "$(ls "$DATA_DIR" 2>/dev/null | wc -l)"
-  t0=$(date +%s.%N); GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1); t1=$(date +%s.%N)
+  t0=$(date +%s.%N); GH=$(dataset_hash "$DATA_DIR"); t1=$(date +%s.%N)
   B=$(du -sb "$DATA_DIR" | cut -f1)
   awk -v b="$B" -v a="$t0" -v c="$t1" \
     'BEGIN{d=c-a; if(d<=0)d=0.001; printf "RESULT: %-30s %.1f MiB in %.2fs (%.0f MB/s)\n","volume_read_rate",b/1048576,d,(b/1048576)/d}' \
@@ -249,7 +260,7 @@ gpu-b)
       res "dataset_fallback" "FAILED to warm from R2"
       sync_log; exec sleep infinity
     fi
-    GH=$(cat "$DATA_DIR"/* | sha256sum | cut -d' ' -f1)
+    GH=$(dataset_hash "$DATA_DIR")
     if [ "$GH" = "$MD" ]; then
       res "dataset_fallback" "OK — R2 pull now matches manifest"
     else

@@ -9,9 +9,9 @@ JOB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE=${IMAGE:-imanachyn/runpod-hybrid-job:latest}
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
+. "$JOB_DIR/test/lib.sh"
 
 DS_CONTENT="fake-dataset-shard-content-12345"
-DH=$(printf '%s' "$DS_CONTENT" | sha256sum | cut -d' ' -f1)
 CKPT_CONTENT="fake-checkpoint-bytes-67890"
 CKH=$(printf '%s' "$CKPT_CONTENT" | sha256sum | cut -d' ' -f1)
 
@@ -20,12 +20,17 @@ mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/ws-warm/d
   "$SCRATCH/ws-warm/runs/t/ckpt"
 printf '%s' "$DS_CONTENT" > "$SCRATCH/fr2-data/t-dataset/shard-00.bin"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/fr2-runs/t/step-000020.bin"
-cat > "$SCRATCH/fr2-runs/t/manifest.json" <<JSON
-{"step":20,"checkpoint":"step-000020.bin","dataset_sha256":"$DH","checkpoint_sha256":"$CKH"}
-JSON
 # Keyed by EXP=t, matching DATA_DIR="$V/data/$EXP-dataset" in entrypoint.sh.
 printf '%s' "$DS_CONTENT" > "$SCRATCH/ws-warm/data/t-dataset/shard-00.bin"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/ws-warm/runs/t/ckpt/step-000020.bin"
+# The manifest's dataset_sha256 is what dataset_hash() computes for the warmed directory,
+# not a raw content hash (see lib.sh) — computed from the already-seeded ws-warm content
+# above, so both case A and case B (which reuses this same manifest) get a real,
+# non-vacuous cache hit on the dataset side.
+DH=$(compute_dataset_hash "$SCRATCH/ws-warm" "/workspace/data/t-dataset" "$IMAGE" "$JOB_DIR")
+cat > "$SCRATCH/fr2-runs/t/manifest.json" <<JSON
+{"step":20,"checkpoint":"step-000020.bin","dataset_sha256":"$DH","checkpoint_sha256":"$CKH"}
+JSON
 
 OUT_A=$(docker run --rm \
   --user "$(id -u):$(id -g)" \

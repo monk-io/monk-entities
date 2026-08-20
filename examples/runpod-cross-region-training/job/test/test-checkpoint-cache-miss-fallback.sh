@@ -11,15 +11,17 @@ JOB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE=${IMAGE:-imanachyn/runpod-hybrid-job:latest}
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
+. "$JOB_DIR/test/lib.sh"
 
 mkdir -p "$SCRATCH/fr2-data/t-dataset" "$SCRATCH/fr2-runs/t" "$SCRATCH/workspace/data/t-dataset"
 DS_CONTENT="fake-dataset-shard-content-12345"
 printf '%s' "$DS_CONTENT" > "$SCRATCH/fr2-data/t-dataset/shard-00.bin"
 # Pre-seed /workspace/data/t-dataset (keyed by EXP=t, matching DATA_DIR in entrypoint.sh)
 # with the SAME content so the dataset check is a cache HIT — isolates this test to the
-# checkpoint fallback path.
+# checkpoint fallback path. The manifest's dataset_sha256 is what dataset_hash() computes
+# for this directory, not a raw content hash (see lib.sh).
 printf '%s' "$DS_CONTENT" > "$SCRATCH/workspace/data/t-dataset/shard-00.bin"
-DH=$(printf '%s' "$DS_CONTENT" | sha256sum | cut -d' ' -f1)
+DH=$(compute_dataset_hash "$SCRATCH/workspace" "/workspace/data/t-dataset" "$IMAGE" "$JOB_DIR")
 CKPT_CONTENT="fake-checkpoint-bytes-67890"
 printf '%s' "$CKPT_CONTENT" > "$SCRATCH/fr2-runs/t/step-000020.bin"
 CKH=$(printf '%s' "$CKPT_CONTENT" | sha256sum | cut -d' ' -f1)
