@@ -62,7 +62,12 @@ res "rclone" "$(rclone version | head -1)"
 RC=(rclone --s3-no-check-bucket --retries 3 --contimeout 20s --timeout 90s)
 
 # Log survives the pod: mirrored to R2 so the operator can read it without SSH.
-sync_log(){ "${RC[@]}" copyto "$LOG" "$REMOTE_RUNS/logs/$ROLE.log" 2>/dev/null; }
+sync_log(){
+  local err
+  if ! err=$("${RC[@]}" copyto "$LOG" "$REMOTE_RUNS/logs/$ROLE.log" 2>&1); then
+    echo "SYNC: FAILED log mirror -> $REMOTE_RUNS/logs/$ROLE.log: $err" >&2
+  fi
+}
 
 # This demo's manifest schema — sync-to-path.sh/warm-from-path.sh don't know this
 # shape exists; they just move MANIFEST_FILE's bytes as an opaque marker. Written to a
@@ -100,7 +105,10 @@ gpu-a)
 
   say "--- warm volume A from R2 (first use) ---"
   t0=$(date +%s.%N)
-  REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tail -2 | tee -a "$LOG"
+  if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tail -2 | tee -a "$LOG"; then
+    res "dataset" "FAILED to warm from R2"
+    sync_log; exec sleep infinity
+  fi
   t1=$(date +%s.%N)
   B=$(du -sb "$V/data" | cut -f1)
   awk -v b="$B" -v a="$t0" -v c="$t1" \
@@ -223,7 +231,18 @@ gpu-b)
   if [ "$GH" = "$MD" ]; then
     res "CACHE_HIT_dataset" "YES — volume data matches manifest, no R2 pull needed"
   else
-    res "CACHE_HIT_dataset" "NO — stale cache ($GH vs $MD)"
+    res "CACHE_HIT_dataset" "NO — stale cache ($GH vs $MD), pulling from R2"
+    if ! REMOTE="$REMOTE_DATA" LOCAL_PATH="$V/data" /usr/local/bin/warm-from-path.sh 2>&1 | tee -a "$LOG"; then
+      res "dataset_fallback" "FAILED to warm from R2"
+      sync_log; exec sleep infinity
+    fi
+    GH=$(cat "$V"/data/* | sha256sum | cut -d' ' -f1)
+    if [ "$GH" = "$MD" ]; then
+      res "dataset_fallback" "OK — R2 pull now matches manifest"
+    else
+      res "dataset_fallback" "FAILED — R2 pull still does not match manifest ($GH vs $MD)"
+      sync_log; exec sleep infinity
+    fi
   fi
 
   say "--- resume from checkpoint ON THE VOLUME ---"
