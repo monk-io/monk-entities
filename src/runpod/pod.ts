@@ -33,7 +33,7 @@ export interface RunpodPodDefinition extends RunpodEntityDefinition {
     args?: string;
     /** @description Exposed ports in `port/protocol` form, e.g. `["8888/http", "22/tcp"]` */
     ports?: string[];
-    /** @description Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account's API key. */
+    /** @description Environment variables passed to the container. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account's API key. `MONK_RUNPOD_ENTITY_PATH` is reserved — this entity stamps it at create time to prove ownership on a later adoption, overriding any value set here. */
     env?: Record<string, string>;
     /** @description Network volume ID to mount. The volume must live in one of `data_center_ids`. Immutable after creation. */
     network_volume_id?: string;
@@ -73,6 +73,8 @@ export interface RunpodPodState extends RunpodEntityState {
     id?: string;
     /** @description Pod name */
     name?: string;
+    /** @description True when this pod's env carries this entity's ownership marker — proof it was created by this entity, even if adopted after a state loss. Only meaningful when `existing` is true; a freshly created pod is trivially owned. */
+    owned?: boolean;
     /** @description Current lifecycle state: PROVISIONING, STARTING, RUNNING, EXITED, ERROR, TERMINATED */
     pod_status?: string;
     /** @description Exposed ports as reported at runtime, each `{ip, private, public, type}`. Empty until the pod is running. */
@@ -124,6 +126,15 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
     /** GPU capacity is not guaranteed and provisioning is slow — allow ~10 minutes. */
     static readonly readiness = { period: 10, initialDelay: 5, attempts: 60 };
 
+    /**
+     * Env key stamped with `this.path` at create time so a later adoption can tell "a
+     * foreign pod that happens to share a name" apart from "the pod I created and then
+     * lost state for" (architecture review finding 7, 2026-08-19). `this.path` is Monk's
+     * own entity path (`namespace/entity-name`), stable across state loss and already
+     * unique per instance — no new identity scheme needed.
+     */
+    private static readonly OWNERSHIP_ENV_KEY = "MONK_RUNPOD_ENTITY_PATH";
+
     protected getEntityName(): string {
         return `RunPod pod ${this.definition.name}`;
     }
@@ -133,13 +144,17 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
 
         const existing = this.findByName("/pods", this.definition.name);
         if (existing) {
-            this.applyState(existing, true);
+            const owned = this.isOwnedByThisEntity(existing);
+            this.applyState(existing, true, owned);
             cli.output(`📦 Adopted existing pod ${existing.id} (${this.definition.name})`);
+            if (owned) {
+                cli.output(`   Ownership marker confirms this entity created it — delete() can terminate it without allow_destructive_delete: true.`);
+            }
             return;
         }
 
         const created = this.makeRequest("POST", "/pods", this.buildCreateBody());
-        this.applyState(created, false);
+        this.applyState(created, false, true);
         cli.output(`✅ Created pod ${this.state.id} (${this.definition.name})`);
         if (this.state.cost_per_hr) {
             cli.output(`   Billing at $${this.state.cost_per_hr}/hr while running`);
@@ -164,13 +179,18 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         // omitted fields as unchanged, and the base class already skips update() entirely
         // when the definition hash is unchanged (doc/entity-conventions.md:69), so this only
         // runs when something actually changed.
+        // The ownership marker is included only when this pod is already known to be ours
+        // (owned === true). PATCH replaces `env` wholesale (see the class comment above), so
+        // omitting it here would erase the marker on every update of a pod we created — but
+        // adding it here for a pod adopted *without* a marker would stamp our identity onto a
+        // possibly-foreign pod, manufacturing the false ownership finding 7b warns against.
         const body = toApiBody({
             name: this.definition.name,
             image: this.definition.image,
             args: this.definition.args,
             disk: this.definition.disk,
             ports: this.definition.ports,
-            env: this.definition.env,
+            env: this.state.owned ? this.withOwnershipMarker(this.definition.env) : this.definition.env,
             registry: this.definition.registry_id,
             global_networking: this.definition.global_networking,
             locked: this.definition.locked,
@@ -178,7 +198,7 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         });
 
         const updated = this.makeRequest("PATCH", `/pods/${this.state.id}`, body);
-        this.applyState(updated, this.state.existing);
+        this.applyState(updated, this.state.existing, this.state.owned);
         cli.output(`✅ Updated pod ${this.state.id}`);
     }
 
@@ -193,6 +213,12 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
      * volume (where it protects data) or a template (which is free). An adopted pod is still a
      * meter that nobody is watching, so the two escape hatches below are explicit rather than
      * implied, and the skip path shouts instead of whispering.
+     *
+     * A third way out needs no escape hatch at all: if the adopted pod's env carries this
+     * entity's own ownership marker (`state.owned`), adoption did not find someone else's pod —
+     * it found this entity's own pod after a state loss. Termination is safe without an
+     * explicit opt-in in that case; requiring one would only recreate the finding 7b bug where
+     * the guardrail meant to prevent a billing leak becomes the leak.
      */
     override delete(): void {
         if (!this.state.id) return;
@@ -204,9 +230,11 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             );
         }
 
-        // Adopted pod: terminate only on an explicit opt-in, because the pod may be someone
-        // else's. Without the opt-in, make the abandonment impossible to miss.
-        if (this.state.existing && this.definition.allow_destructive_delete !== true) {
+        const provablyOurs = Boolean(this.state.existing && this.state.owned);
+
+        // Adopted, unmarked pod: terminate only on an explicit opt-in, because the pod may be
+        // someone else's. Without the opt-in, make the abandonment impossible to miss.
+        if (this.state.existing && !provablyOurs && this.definition.allow_destructive_delete !== true) {
             const rate = this.state.cost_per_hr;
             const perHour = rate ? `$${rate}/hr` : "an unknown hourly rate";
             const perMonth = rate ? ` (~$${(rate * HOURS_PER_MONTH).toFixed(2)}/month)` : "";
@@ -228,7 +256,11 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             return;
         }
 
-        if (this.state.existing) {
+        if (provablyOurs) {
+            cli.output(
+                `Terminating adopted pod ${this.state.id} — ownership marker confirms this entity created it`
+            );
+        } else if (this.state.existing) {
             cli.output(
                 `Terminating adopted pod ${this.state.id} — allow_destructive_delete is explicitly true`
             );
@@ -261,7 +293,7 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
 
         // Refresh through applyState so connection details (ports, SSH) land in state as soon
         // as the runtime reports them — they are absent until the pod is actually running.
-        this.applyState(pod, this.state.existing);
+        this.applyState(pod, this.state.existing, this.state.owned);
         const status = this.state.pod_status;
 
         // The runtime signals "not ready" by throwing (src/monkec/base.ts:210), so a throw
@@ -577,7 +609,7 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             disk: this.definition.disk,
             args: this.definition.args,
             ports: this.definition.ports,
-            env: this.definition.env,
+            env: this.withOwnershipMarker(this.definition.env),
             template_id: this.definition.template_id,
             registry: this.definition.registry_id,
             data_center_ids: this.definition.data_center_ids,
@@ -737,7 +769,7 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         return { ...info, env: redactedEnv };
     }
 
-    private applyState(pod: any, existing?: boolean): void {
+    private applyState(pod: any, existing?: boolean, owned?: boolean): void {
         this.state.id = pod?.id ?? this.state.id;
         this.state.name = pod?.name ?? this.definition.name;
         this.state.pod_status = this.readStatus(pod);
@@ -749,5 +781,30 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
         this.state.gpu_type_id = pod?.gpu?.id ?? this.definition.gpu_type_id;
         this.state.created_at = pod?.createdAt ?? this.state.created_at;
         this.state.existing = existing;
+        this.state.owned = owned;
+    }
+
+    /**
+     * Merge the ownership marker into a user-supplied env map without mutating it.
+     * No-op when `this.path` is unset (e.g. outside a real Monk context) — an entity that
+     * cannot name itself must not claim ownership of anything.
+     */
+    private withOwnershipMarker(env?: Record<string, string>): Record<string, string> | undefined {
+        if (!this.path) return env;
+        return { ...env, [RunpodPod.OWNERSHIP_ENV_KEY]: this.path };
+    }
+
+    /**
+     * True when `pod.env` carries this entity's own ownership marker.
+     *
+     * Verified against the RunPod v2 OpenAPI spec (`GET /v2/pods` — `ListPodsResponse` ->
+     * `Pod`, 2026-08-20): list items resolve to the same `Pod` schema as the detail endpoint
+     * and include `env` in full, so this can be checked straight off `findByName`'s result —
+     * no extra `GET /pods/{id}` round trip needed to see it. The same check confirmed neither
+     * `/pods` nor `/network-volumes` takes a cursor/limit parameter today, closing finding 7c
+     * (unverified pagination) without a code change.
+     */
+    private isOwnedByThisEntity(pod: any): boolean {
+        return Boolean(this.path) && pod?.env?.[RunpodPod.OWNERSHIP_ENV_KEY] === this.path;
     }
 }

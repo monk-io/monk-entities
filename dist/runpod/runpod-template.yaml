@@ -25,7 +25,7 @@ runpod-template:
       Works with:
       - `runpod/runpod-pod` - wire `template_id` to `state.id` so the pod inherits this
         container config; explicit pod fields still override the template
-    version-hash: 3267e78683ee
+    version-hash: 75552e1130db
   schema:
     secret_ref:
       type: string
