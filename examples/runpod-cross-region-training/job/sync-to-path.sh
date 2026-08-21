@@ -22,8 +22,14 @@ MARKER_NAME=${MARKER_NAME:-.sync-marker}
 LOG_FILE=${LOG_FILE:-}
 DRAIN_FILE=${DRAIN_FILE:-/tmp/drain}
 SYNC_INTERVAL=${SYNC_INTERVAL:-3}
+# Empty (the default) means no cap — matches today's behavior for callers that don't
+# set it. Unlike ionice/nice (free when idle), a bandwidth cap has a real cost even
+# with no contention, so it's opt-in rather than defaulted: only the caller knows
+# whether this sync is actually sharing a NIC with something that needs headroom.
+BWLIMIT=${BWLIMIT:-}
 
 RC=(rclone --s3-no-check-bucket --retries 3 --contimeout 20s --timeout 90s)
+[ -n "$BWLIMIT" ] && RC+=(--bwlimit "$BWLIMIT")
 
 log(){
   if [ -n "$LOG_FILE" ]; then echo "$1" | tee -a "$LOG_FILE"; else echo "$1"; fi
@@ -48,8 +54,14 @@ LAST_SIZE=0
 sync_pass(){
   local t0 t1 bytes_now delta err
   t0=$(date +%s.%N)
-  # Measured optimum (hybrid architecture doc §3 correction): 720 MB/s at concurrency
-  # 16 / chunk 32M, vs. 38 MB/s single-stream — an 18x difference, not a rounding choice.
+  # Tuned per the hybrid architecture doc §3 correction, which claims 720 MB/s at
+  # concurrency 16 / chunk 32M vs. 38 MB/s single-stream (18x), measured on cpu3c in
+  # EU-RO-1. Re-measured live on the SAME flavor (2026-08-20, see README "Upload
+  # tuning" under Performance): baseline 37.4 MB/s (matches), tuned only 80.0 MB/s — a
+  # real ~2.1x, not the claimed 18x. Since the flavor matches, the likely cause is the
+  # benchmark pod landing outside EU-RO-1 (no data_center_ids was set), not a weaker
+  # instance — unconfirmed, the pod was gone before this was noticed. Don't use either
+  # number for capacity planning without a region-pinned re-measurement.
   if err=$("${RC[@]}" copy "$LOCAL_PATH" "$REMOTE" --exclude ".*" \
       --s3-upload-concurrency 16 --s3-chunk-size 32M 2>&1); then
     t1=$(date +%s.%N)

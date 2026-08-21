@@ -103,9 +103,19 @@ get(){ tr -d ' \n' < "$MANIFEST_FILE" | sed -n "s/.*\"$1\":\"\{0,1\}\([^\",}]*\)
 
 # Launches sync-to-path.sh in the background for the current checkpoint dir + manifest.
 # Sets $SYNC_PID. Assumes write_manifest has already been called at least once.
+#
+# Async upload only decouples the BLOCKING dependency — training never waits on the
+# PUT. It does not decouple RESOURCE usage: rclone's TLS/chunking CPU, NIC bandwidth,
+# and multipart buffers (up to ~512 MB at concurrency 16 / chunk 32M) run on the same
+# host as the trainer's own dataloader and any distributed comms. `ionice -c3` (idle
+# class) and a low `nice` value cost nothing when the host is otherwise idle — they
+# only kick in under real contention, which is exactly when they matter — so they're
+# on by default rather than opt-in. `SYNC_NICE`/`SYNC_IONICE_CLASS` exist to override
+# if a specific workload needs different values.
 start_sync(){
   LOCAL_PATH="$CK" REMOTE="$REMOTE_RUNS" MARKER_FILE="$MANIFEST_FILE" MARKER_NAME=manifest.json \
-    LOG_FILE="$LOG" DRAIN_FILE="$DRAIN" SYNC_INTERVAL=3 \
+    LOG_FILE="$LOG" DRAIN_FILE="$DRAIN" SYNC_INTERVAL=3 BWLIMIT="${SYNC_BWLIMIT:-}" \
+    ionice -c "${SYNC_IONICE_CLASS:-3}" nice -n "${SYNC_NICE:-19}" \
     /usr/local/bin/sync-to-path.sh &
   SYNC_PID=$!
 }
