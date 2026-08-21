@@ -487,36 +487,100 @@ explicit push when you already know a checkpoint needs flushing and don't need t
 side of `warm-b`. This does mean `warm-b`'s R2 token now needs **write** access to the
 runs bucket, not just read — it previously never wrote to R2.
 
+## Sync vs. GPU resource contention
+
+The background flow's design argument ("checkpointing is async, so upload speed stops
+mattering") only decouples the *blocking* dependency — the training loop never waits on
+the `PUT` completing. It says nothing about *resource* decoupling: `rclone` at
+`--s3-upload-concurrency 16 --s3-chunk-size 32M` runs on the **same host** as the
+trainer, competing for CPU (TLS/chunking), NIC bandwidth, and multipart buffers (up to
+~512 MB) with whatever the real training job needs those for — a dataloader, distributed
+comms, anything CPU- or network-bound. Async ≠ isolated.
+
+`start_sync()` now launches the background `sync-to-path.sh` under `ionice -c3` (idle I/O
+class) and a low `nice` value by default — both cost nothing when the host is otherwise
+idle and only kick in under real contention, which is exactly when they matter. Override
+with `SYNC_NICE`/`SYNC_IONICE_CLASS` in the pod's `env` if a specific workload needs
+different values.
+
+A NIC bandwidth cap is a different kind of lever: it has a real cost even with no
+contention (it's a ceiling, not a yield), so it's opt-in rather than defaulted — set
+`SYNC_BWLIMIT` (e.g. `"10M"`) in the pod's `env` only when you know this sync is sharing
+a NIC with something that needs guaranteed headroom.
+
+**This demo can't validate whether contention is actually a problem in practice** — the
+"training" loop is `sleep 0.3` with no real dataloader, so there's nothing for a
+backgrounded `rclone` to starve. Confirming real impact needs a realistic workload with
+`nvidia-smi dmon` (or similar) sampled against the `SYNC:` log lines' timing, which is
+outside what this toy demo can exercise.
+
 ## Verify
 
-The job image has no way to expose logs through the entity — `GET /pods/{id}/logs` is
-an SSE stream that this package doesn't wrap (see `../../src/runpod/SUMMARY.md`).
-Instead, the entrypoint script tees everything to a log file under the volume and also
-mirrors it to R2, so it's readable without SSH:
+**`monk logs` does not work on these pods** — don't reach for it. `GET /pods/{id}/logs`
+is a Server-Sent Events stream that never returns, so a request/response client (what
+this package's entities use) would hang forever trying to consume it; there is no
+`get-logs` action for the same reason. Use one of the three options below instead,
+roughly in order of "how much detail do I need":
+
+### 1. Quick status, no log content
 
 ```bash
-rclone cat r2:monk-training-runs/exp-entities-e2e-01/logs/gpu-a.log \
+sudo monk ps                                                            # ready/live, at a glance
+sudo monk describe runpod-cross-region-training/gpu-pod-eu-ro-1         # full state: pod_status, cost, ports…
+sudo monk do runpod-cross-region-training/gpu-pod-eu-ro-1/get-info      # live RunPod API data (env values redacted)
+```
+
+Good for "is it still running / did it error out", not for what the training script
+actually printed.
+
+### 2. RunPod's own web console (real-time, human-in-the-loop)
+
+```bash
+sudo monk do runpod-cross-region-training/gpu-pod-eu-ro-1/get-console-url
+```
+
+Prints a direct link to that pod's page on RunPod's console, landing on the logs tab
+(`https://console.runpod.io/pods?id=<pod-id>&inspectorTab=logs`) — **always get the URL
+from this action, don't hand-construct it.** RunPod has changed this URL's shape before
+(confirmed live, 2026-08-21: an older `www.runpod.io/console/pods/<id>` form 404s now),
+and the action is the one place that gets fixed when it does. This is real-time and
+needs no R2 credentials, but it's a human-facing browser page, not scriptable.
+
+### 3. The actual script output (works for automation too)
+
+The entrypoint script tees everything to a log file on the volume and also mirrors it to
+R2, so the real `RESULT:`/`SYNC:`/`TRAIN:` lines are readable without SSH or a browser:
+
+```bash
+rclone cat r2:monk-training-runs/<EXP>/logs/gpu-a.log \
   --s3-provider Cloudflare --s3-endpoint https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com \
   --s3-access-key-id <your-r2-access-key-id> --s3-secret-access-key <your-r2-secret-access-key> \
   --s3-region auto
 ```
 
-Swap `gpu-a` for `warm-b` / `gpu-b` for the other phases. `gpu-a` and `gpu-b`'s logs
-update continuously while their pod runs (each launches `sync-to-path.sh`
-in the background, which mirrors the log every ~3s alongside uploading checkpoints);
-`warm-b` only writes its log to R2 once, at the very end, so a 404 on that one just
-means the phase hasn't finished yet — retry in a few seconds rather than assuming
-something's wrong.
-
-Alternatively, `monk describe` shows `state.ssh_command` once a pod exposes port
-`22/tcp` (this example's pods don't, to keep the image minimal) — or use the RunPod
-console's own log viewer for the pod by ID.
-
-You can also sanity-check a pod's live state without logs, while it's still running:
+Replace `<EXP>` with whatever `EXP` the pod's `env` actually uses (`exp-entities-e2e-01`
+unless you changed it in `monk-entities.yaml`) — check with
+`sudo monk describe runpod-cross-region-training/gpu-pod-eu-ro-1` if unsure. Swap
+`gpu-a` for `warm-b`/`gpu-b`/`sync-out` for the other phases. If you don't have a local
+`rclone`, run it from the job image instead — no install needed:
 
 ```bash
-sudo monk do runpod-cross-region-training/gpu-pod-eu-ro-1/get-info
+docker run --rm --entrypoint rclone imanachyn/runpod-hybrid-job:latest \
+  cat r2:monk-training-runs/<EXP>/logs/gpu-a.log \
+  --s3-provider Cloudflare --s3-endpoint https://810d603ced5fdba93e42f9f5bb640b91.eu.r2.cloudflarestorage.com \
+  --s3-access-key-id <your-r2-access-key-id> --s3-secret-access-key <your-r2-secret-access-key> \
+  --s3-region auto
 ```
+
+`gpu-a` and `gpu-b`'s logs update continuously while their pod runs (each launches
+`sync-to-path.sh` in the background, which mirrors the log every ~3s alongside
+uploading checkpoints); `warm-b` and `sync-out` only write their log to R2 once, at the
+very end, so a "not found" on either just means the phase hasn't finished yet — retry
+in a few seconds rather than assuming something's wrong.
+
+`monk describe` also shows `state.ssh_command` once a pod exposes port `22/tcp` (this
+example's pods don't, to keep the image minimal) — that's an SSH login, not a log
+viewer, but it's the way in if you need to poke around inside a running pod.
 
 ## Performance
 
@@ -544,6 +608,38 @@ Two things worth knowing before you read these as real benchmarks:
   A pod's very first sync pass after attaching to a volume with pre-existing
   checkpoints will report all of them as "new" for that reason (see the Phase 3 log
   above).
+
+### Upload tuning, validated against a file large enough to matter
+
+The demo's own checkpoints (8 MiB) never validate `sync-to-path.sh`'s upload tuning
+either way — they're smaller than the 32M chunk size, so every checkpoint upload is a
+single-part PUT and `--s3-upload-concurrency`/`--s3-chunk-size` never engage. To check
+the tuning against something that actually triggers multipart upload, a throwaway
+benchmark pod (not part of this example — a separate image tag, deleted after) pushed a
+1 GiB file to R2 from a `cpu3c` pod, twice: once with rclone's defaults, once with
+`sync-to-path.sh`'s exact flags. Live result, 2026-08-20:
+
+| Configuration | Throughput |
+|---|---|
+| Baseline (rclone defaults) | 37.4 MB/s |
+| Tuned (`--s3-upload-concurrency 16 --s3-chunk-size 32M`) | 80.0 MB/s |
+
+Tuning is real — **~2.1x** — and the baseline figure lines up closely with the
+architecture doc's own "38 MB/s single-stream" number. But the tuned result does not
+reproduce the doc's claimed **~720 MB/s** (an 18x difference from baseline, vs. the
+~2.1x measured here) — and this is **not** an instance-type gap: the doc's own
+measurement (§3) used the identical flavor, `cpu3c` (2 vCPU), in EU-RO-1. The more
+likely explanation is the benchmark pod itself: it had no `data_center_ids` set, so
+RunPod's scheduler placed it wherever it liked rather than pinned to EU-RO-1 next to
+the EU-jurisdiction R2 bucket — a CPU-availability probe run an hour earlier under the
+same unpinned setup landed in US-KS-2 (North America), so this benchmark plausibly ran
+a genuinely longer network path than the doc's controlled intra-EU test, not a slower
+instance. The pod was already deleted by the time this was noticed, so which region it
+actually landed in can't be recovered — re-run pinned to `data_center_ids: [EU-RO-1]`
+for an apples-to-apples number before drawing conclusions from either figure. The
+tuning itself is still worth keeping (2x is real either way), but **don't use either
+number for capacity planning** without a region-pinned re-measurement on the instance
+type and route you'll actually run.
 
 ## Cleanup
 
