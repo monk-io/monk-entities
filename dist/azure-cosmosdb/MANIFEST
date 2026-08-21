@@ -1,4 +1,4 @@
 REPO azure-cosmosdb
 VERSION_HASH 50ab373ca587
-LOAD container.yaml database-account.yaml database.yaml access-list.yaml azure-cosmosdb-base.yaml
-RESOURCES container-sync.js database-account-sync.js access-list-sync.js database-sync.js azure-cosmosdb-base.js
+LOAD container.yaml access-list.yaml azure-cosmosdb-base.yaml database.yaml database-account.yaml
+RESOURCES database-account-sync.js database-sync.js access-list-sync.js azure-cosmosdb-base.js container-sync.js

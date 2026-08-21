@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-IMAGE=monkimages.azurecr.io/netlify-build
+IMAGE=monkimages.azurecr.io/vercel-build
 VERSIONS=(18 20 22 24 26)
 
 for version in "${VERSIONS[@]}"; do

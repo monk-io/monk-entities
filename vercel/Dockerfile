@@ -1,4 +1,5 @@
-FROM node:20-alpine
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-alpine
 
 RUN npm i -g vercel
 
@@ -10,4 +11,4 @@ USER node
 
 ENV VERCEL_TOKEN=""
 
-CMD ["sh", "-c", "vercel deploy --prod --public --yes -t $VERCEL_TOKEN"]
+CMD ["sh", "-c", "vercel deploy --prod --yes -t $VERCEL_TOKEN"]

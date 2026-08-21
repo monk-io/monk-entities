@@ -3,5 +3,5 @@ VERSION_HASH 4a75d5bae6d7
 DESCRIPTION Fully managed message queuing.
 HOSTING managed
 TAGS aws,messaging,queue,sqs
-LOAD common.yaml sqs-base.yaml sqs-queue.yaml
-RESOURCES common.js sqs-base.js sqs-queue-sync.js
+LOAD sqs-base.yaml common.yaml sqs-queue.yaml
+RESOURCES common.js sqs-queue-sync.js sqs-base.js
