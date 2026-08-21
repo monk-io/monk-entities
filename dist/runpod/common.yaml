@@ -3,5 +3,5 @@ namespace: runpod
 common:
   defines: module
   metadata:
-    version-hash: 75552e1130db
+    version-hash: bd8390acfa88
   source: <<< common.js
