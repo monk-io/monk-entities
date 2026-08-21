@@ -209,7 +209,7 @@ lifecycle job (verified against a live pod). Use `runpodctl` or the RunPod conso
 `get-console-url` builds that console link for you (pure string construction, no API call, so
 it can't hang) rather than trying to consume the stream. If the job image itself can cooperate,
 having it tee its own log to a file and mirror that elsewhere (object storage, etc.) works too —
-see `examples/runpod-cross-region-training` for that pattern.
+see the runpod cross-region training example (maintained separately) for that pattern.
 
 ## Cost estimation
 
