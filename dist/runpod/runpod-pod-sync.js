@@ -261,7 +261,7 @@ var _RunpodPod = class _RunpodPod extends (_a = RunpodEntity, _forceTerminate_de
       cli.output("Pod not created yet");
       return;
     }
-    cli.output(`https://www.runpod.io/console/pods/${this.state.id}`);
+    cli.output(`https://console.runpod.io/pods?id=${this.state.id}&inspectorTab=logs`);
   }
   getCostEstimate(_args) {
     const rate = this.hourlyRate();
