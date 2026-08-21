@@ -415,7 +415,11 @@ export class RunpodPod extends RunpodEntity<RunpodPodDefinition, RunpodPodState>
             cli.output("Pod not created yet");
             return;
         }
-        cli.output(`https://www.runpod.io/console/pods/${this.state.id}`);
+        // `https://www.runpod.io/console/pods/{id}` (the previous URL here) 404s — RunPod
+        // moved the console to console.runpod.io with pod id as a query param, and added a
+        // tab deep-link (confirmed live, 2026-08-21). Land straight on the logs tab: that is
+        // the one step this action exists to save, per the comment above.
+        cli.output(`https://console.runpod.io/pods?id=${this.state.id}&inspectorTab=logs`);
     }
 
     @action("get-cost-estimate")
