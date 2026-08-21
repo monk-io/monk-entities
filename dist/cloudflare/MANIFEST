@@ -1,7 +1,7 @@
 REPO cloudflare
-VERSION_HASH 8375ba12a194
+VERSION_HASH ec22f41cd276
 DESCRIPTION Managed DNS and CDN.
 HOSTING managed
 TAGS cloudflare,dns,cdn
-LOAD cloudflare-pages-domain.yaml cloudflare-pages-project.yaml cloudflare-workers-script.yaml cloudflare-dns-record.yaml cloudflare-base.yaml cloudflare-tunnel-application.yaml cloudflare-r2-bucket.yaml cloudflare-queue-consumer.yaml cloudflare-custom-hostname-fallback-origin.yaml cloudflare-workers-cron-trigger.yaml cloudflare-tunnel.yaml cloudflare-dns-zone.yaml cloudflare-custom-hostname.yaml cloudflare-workers-route.yaml cloudflare-queue.yaml
-RESOURCES cloudflare-workers-cron-trigger-sync.js cloudflare-workers-route-sync.js cloudflare-tunnel-application-sync.js cloudflare-dns-zone-sync.js cloudflare-workers-script-sync.js cloudflare-custom-hostname-fallback-origin-sync.js cloudflare-base.js cloudflare-tunnel-sync.js cloudflare-custom-hostname-sync.js cloudflare-queue-consumer-sync.js cloudflare-pages-domain-sync.js cloudflare-queue-sync.js cloudflare-r2-bucket-sync.js cloudflare-dns-record-sync.js cloudflare-pages-project-sync.js
+LOAD cloudflare-tunnel.yaml cloudflare-r2-bucket.yaml cloudflare-base.yaml cloudflare-workers-route.yaml cloudflare-dns-zone.yaml cloudflare-dns-record.yaml cloudflare-queue.yaml cloudflare-custom-hostname.yaml cloudflare-tunnel-application.yaml cloudflare-workers-script.yaml cloudflare-custom-hostname-fallback-origin.yaml cloudflare-pages-domain.yaml cloudflare-workers-cron-trigger.yaml cloudflare-queue-consumer.yaml cloudflare-pages-project.yaml
+RESOURCES cloudflare-tunnel-sync.js cloudflare-workers-cron-trigger-sync.js cloudflare-r2-bucket-sync.js cloudflare-workers-route-sync.js cloudflare-base.js cloudflare-dns-zone-sync.js cloudflare-pages-domain-sync.js cloudflare-dns-record-sync.js cloudflare-tunnel-application-sync.js cloudflare-queue-sync.js cloudflare-custom-hostname-fallback-origin-sync.js cloudflare-workers-script-sync.js cloudflare-queue-consumer-sync.js cloudflare-custom-hostname-sync.js cloudflare-pages-project-sync.js

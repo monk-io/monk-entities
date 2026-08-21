@@ -1,0 +1,7 @@
+namespace: runpod
+
+runpod-base:
+  defines: module
+  metadata:
+    version-hash: bd8390acfa88
+  source: <<< runpod-base.js

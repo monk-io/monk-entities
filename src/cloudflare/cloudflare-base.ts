@@ -53,9 +53,10 @@ export abstract class CloudflareEntity<
   protected request<T = any>(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
-    body?: any
+    body?: any,
+    headers?: Record<string, string>
   ): T {
-    const res = this.http.request<T>(method, path, { body });
+    const res = this.http.request<T>(method, path, { body, headers });
     if (!res.ok) {
       throw new Error(
         `Cloudflare API error: ${res.statusCode} ${res.status} - ${typeof res.data === "string" ? res.data : JSON.stringify(res.data)}`

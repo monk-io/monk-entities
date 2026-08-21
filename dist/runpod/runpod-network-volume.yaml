@@ -1,0 +1,87 @@
+namespace: runpod
+runpod-network-volume:
+  defines: entity
+  metadata:
+    name: RunpodNetworkVolume
+    description: |-
+      RunPod network volume — persistent storage that survives pod termination and
+      can be mounted by pods in the same data center.
+
+      ## Required Permissions
+      A RunPod API key with read/write access to the account. RunPod does not offer
+      scoped API keys, so the key grants full account access.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `runpod-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Volume ID; pass to a pod's `network_volume_id` to mount it
+      - `state.data_center` - Data center ID; a consuming pod must pin the same value in
+        `data_center_ids`, because volumes can only attach within their own data center
+
+      ## Composing with Other Entities
+      Works with:
+      - `runpod/runpod-pod` - mount this volume by wiring `network_volume_id` to `state.id`
+        and `data_center_ids` to `state.data_center`
+    version-hash: bd8390acfa88
+  schema:
+    secret_ref:
+      type: string
+      description: Secret reference holding the RunPod API key. Defaults to `runpod-api-token`.
+    name:
+      type: string
+      description: Volume name. Used to adopt a pre-existing volume.
+    size:
+      type: number
+      description: 'Volume size in GB (10–4096). Can be grown later, never shrunk.'
+    data_center:
+      type: string
+      description: Data center ID the volume lives in. Pods must run in this same data center to attach it.
+    volume_type:
+      type: string
+      enum:
+        - STANDARD
+        - HIGH_PERFORMANCE
+      description: Storage tier. Omit to use the data center's default tier.
+    allow_destructive_delete:
+      type: boolean
+      description: 'When false, delete() refuses to destroy the volume and its data. Defaults to true.'
+    required:
+      - name
+      - size
+      - data_center
+  state-schema:
+    existing:
+      type: boolean
+      description: True when the resource already existed and was adopted rather than created
+    id:
+      type: string
+      description: Volume ID assigned by RunPod
+    name:
+      type: string
+      description: Volume name
+    size:
+      type: number
+      description: Current size in GB
+    data_center:
+      type: string
+      description: Data center the volume resides in
+    volume_type:
+      type: string
+      description: Active storage tier
+  lifecycle:
+    sync: <<< runpod-network-volume-sync.js
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 12
+  requires:
+    - monkec/base
+    - runpod/runpod-base
+    - runpod/common
+    - cli

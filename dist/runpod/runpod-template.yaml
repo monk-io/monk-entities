@@ -1,0 +1,117 @@
+namespace: runpod
+runpod-template:
+  defines: entity
+  metadata:
+    name: RunpodTemplate
+    description: |-
+      RunPod template — a reusable container configuration (image, disk, ports, env)
+      that pods and serverless endpoints can instantiate by ID.
+
+      Templates are configuration only and cost nothing on their own, so this entity has no cost
+      actions; the pod that consumes the template is what bills.
+
+      ## Required Permissions
+      A RunPod API key with read/write access to the account. RunPod does not offer
+      scoped API keys, so the key grants full account access.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `runpod-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.id` - Template ID; pass to a pod's `template_id` to deploy from this template
+
+      ## Composing with Other Entities
+      Works with:
+      - `runpod/runpod-pod` - wire `template_id` to `state.id` so the pod inherits this
+        container config; explicit pod fields still override the template
+    version-hash: bd8390acfa88
+  schema:
+    secret_ref:
+      type: string
+      description: Secret reference holding the RunPod API key. Defaults to `runpod-api-token`.
+    name:
+      type: string
+      description: Template name. Used to adopt a pre-existing template.
+    image:
+      type: string
+      description: 'Container image reference, e.g. `runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04`'
+    disk:
+      type: number
+      description: 'Ephemeral container disk in GB, wiped when a pod using this template restarts'
+    args:
+      type: string
+      description: Arguments passed to the container entrypoint
+    env:
+      type: object
+      additionalProperties:
+        type: string
+        description: 'Environment variables applied to containers created from this template. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key.'
+      description: 'Environment variables applied to containers created from this template. Do NOT put secrets here: RunPod returns `env` in full from the API, so anything in it is readable by every holder of the account''s API key.'
+    ports:
+      type: array
+      items:
+        type: string
+      description: 'Exposed ports in `port/protocol` form, e.g. `["8888/http", "22/tcp"]`'
+    registry:
+      type: string
+      description: 'Container registry credential ID, for private images'
+    category:
+      type: string
+      enum:
+        - CPU
+        - NVIDIA
+        - AMD
+      description: 'Console grouping only — does not affect hardware, scheduling, or billing. Defaults to NVIDIA.'
+    persistent_disk_size:
+      type: number
+      description: Host-local persistent storage in GB (minimum 10). Requires `persistent_disk_path`. Not allowed on CPU pods.
+    persistent_disk_path:
+      type: string
+      description: 'Mount path for the persistent disk, e.g. `/workspace`. Required when `persistent_disk_size` is set.'
+    allowed_cuda_versions:
+      type: array
+      items:
+        type: string
+      description: 'Acceptable CUDA versions as `major.minor`, e.g. `["12.8"]`. CPU pods ignore this.'
+    serverless:
+      type: boolean
+      description: Mark as a serverless template rather than a pod template
+    public:
+      type: boolean
+      description: Publish the template publicly
+    start_jupyter:
+      type: boolean
+      description: Inject a generated JUPYTER_PASSWORD to start JupyterLab. RunPod defaults this to true for templates; expose `8888/http` to reach it.
+    start_ssh:
+      type: boolean
+      description: Inject PUBLIC_KEY from the account's registered SSH keys. RunPod defaults this to true for templates; needs `22/tcp` in ports for direct SSH.
+    required:
+      - name
+      - image
+  state-schema:
+    existing:
+      type: boolean
+      description: True when the resource already existed and was adopted rather than created
+    id:
+      type: string
+      description: Template ID assigned by RunPod
+    name:
+      type: string
+      description: Template name
+    image:
+      type: string
+      description: Container image the template deploys
+  lifecycle:
+    sync: <<< runpod-template-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 12
+  requires:
+    - monkec/base
+    - runpod/runpod-base
+    - runpod/common
+    - cli

@@ -63,8 +63,8 @@ var CloudflareEntity = class extends import_base.MonkEntity {
       timeout: 15e3
     });
   }
-  request(method, path, body) {
-    const res = this.http.request(method, path, { body });
+  request(method, path, body, headers) {
+    const res = this.http.request(method, path, { body, headers });
     if (!res.ok) {
       throw new Error(
         `Cloudflare API error: ${res.statusCode} ${res.status} - ${typeof res.data === "string" ? res.data : JSON.stringify(res.data)}`

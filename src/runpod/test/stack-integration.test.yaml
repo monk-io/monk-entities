@@ -1,0 +1,238 @@
+name: RunPod Integration Test
+description: >-
+  Full lifecycle for runpod-template, runpod-network-volume, and runpod-pod.
+  Provisions real billable resources — a CPU pod and a 10 GB network volume — so
+  teardown is asserted rather than assumed.
+timeout: 900000
+
+secrets:
+  global:
+    runpod-api-token: "$RUNPOD_API_TOKEN"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/runpod/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load stack template
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # ---------------------------------------------------------------------------
+  # Template — no catalog IDs involved, so a failure here isolates auth/CRUD
+  # problems from bad data center or CPU flavor values.
+  # ---------------------------------------------------------------------------
+  - name: Create template
+    action: run
+    target: runpod-test/test-template
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for template readiness
+    action: wait
+    target: runpod-test/test-template
+    waitFor:
+      condition: ready
+      timeout: 60000
+
+  - name: Describe template
+    action: describe
+    target: runpod-test/test-template
+    expect:
+      exitCode: 0
+      output:
+        - "runpod-test/test-template"
+        - "id"
+
+  - name: Get template info
+    action: action
+    target: runpod-test/test-template
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-template"
+
+  # ---------------------------------------------------------------------------
+  # Network volume
+  # ---------------------------------------------------------------------------
+  - name: Create network volume
+    action: run
+    target: runpod-test/test-volume
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for network volume readiness
+    action: wait
+    target: runpod-test/test-volume
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Get network volume info
+    action: action
+    target: runpod-test/test-volume
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-volume"
+
+  # RunPod exposes no storage rate via API, so a freshly created volume has no
+  # billing history. The action must still succeed and say so rather than throw.
+  - name: Get network volume cost estimate
+    action: action
+    target: runpod-test/test-volume
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+      output:
+        - "Cost Estimate"
+        - "10 GB"
+
+  - name: Get network volume costs JSON
+    action: action
+    target: runpod-test/test-volume
+    actionName: costs
+    expect:
+      exitCode: 0
+      output:
+        - "runpod-network-volume"
+        - "USD"
+
+  # ---------------------------------------------------------------------------
+  # Pod — mounts the volume above via connection wiring. Provisioning is
+  # capacity-dependent and genuinely slow, hence the long readiness timeout.
+  # ---------------------------------------------------------------------------
+  - name: Create CPU pod
+    action: run
+    target: runpod-test/test-pod
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for pod readiness
+    action: wait
+    target: runpod-test/test-pod
+    waitFor:
+      condition: ready
+      timeout: 600000
+
+  - name: Describe pod
+    action: describe
+    target: runpod-test/test-pod
+    expect:
+      exitCode: 0
+      output:
+        - "runpod-test/test-pod"
+        - "id"
+
+  - name: Get pod info
+    action: action
+    target: runpod-test/test-pod
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-pod"
+
+  - name: Get pod console URL
+    action: action
+    target: runpod-test/test-pod
+    actionName: get-console-url
+    expect:
+      exitCode: 0
+      output:
+        - "https://www.runpod.io/console/pods/"
+
+  # There is deliberately no log step: `GET /v2/pods/{id}/logs` is a Server-Sent
+  # Events stream that never closes, so an action wrapping it hangs until killed.
+  # The entity exposes no `get-logs` action for that reason — get-console-url above
+  # is the safe alternative: pure string construction, no API call, can't hang.
+
+  # A running pod reports a live `cost` value, so this exercises the primary
+  # rate path rather than the catalog fallback.
+  - name: Get pod cost estimate
+    action: action
+    target: runpod-test/test-pod
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+      output:
+        - "Cost Estimate"
+        - "Estimated Monthly Cost"
+
+  - name: Get pod costs JSON
+    action: action
+    target: runpod-test/test-pod
+    actionName: costs
+    expect:
+      exitCode: 0
+      output:
+        - "runpod-pod"
+        - "USD"
+
+  - name: Get pod cost estimate reflects the live rate
+    action: action
+    target: runpod-test/test-pod
+    actionName: get-cost-estimate
+    expect:
+      exitCode: 0
+      output:
+        - "cpu3c"
+        - "live"
+
+  - name: Restart pod
+    action: action
+    target: runpod-test/test-pod
+    actionName: restart
+    expect:
+      exitCode: 0
+      output:
+        - "restart"
+
+  - name: Wait for pod to return to ready after restart
+    action: wait
+    target: runpod-test/test-pod
+    waitFor:
+      condition: ready
+      timeout: 600000
+
+  # `stop` is a Monk builtin dispatched to the entity's stop() hook, which powers
+  # the pod down and halts compute billing.
+  - name: Stop pod
+    action: stop
+    target: runpod-test/test-pod
+    expect:
+      exitCode: 0
+
+cleanup:
+  # Pod first — it mounts the volume, so the volume cannot be removed while the
+  # pod still exists. A leaked pod bills hourly, so this ordering matters.
+  - name: Delete pod
+    action: delete
+    target: runpod-test/test-pod
+    expect:
+      exitCode: 0
+
+  - name: Delete network volume
+    action: delete
+    target: runpod-test/test-volume
+    expect:
+      exitCode: 0
+
+  - name: Delete template
+    action: delete
+    target: runpod-test/test-template
+    expect:
+      exitCode: 0
