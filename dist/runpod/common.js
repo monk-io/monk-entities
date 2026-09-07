@@ -36,6 +36,7 @@ __export(common_exports, {
   extractList: () => extractList,
   getApiToken: () => getApiToken,
   listKeyForPath: () => listKeyForPath,
+  rankByAvailability: () => rankByAvailability,
   toApiBody: () => toApiBody,
   validateVolumeSize: () => validateVolumeSize
 });
@@ -122,6 +123,10 @@ function listKeyForPath(path) {
   const last = segments[segments.length - 1] || "";
   return last.split("-").map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
+function rankByAvailability(list) {
+  const rank = { HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
+  return list.slice().sort((a, b) => (rank[b.availability] ?? -1) - (rank[a.availability] ?? -1));
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BASE_URL,
@@ -130,6 +135,7 @@ function listKeyForPath(path) {
   extractList,
   getApiToken,
   listKeyForPath,
+  rankByAvailability,
   toApiBody,
   validateVolumeSize
 });

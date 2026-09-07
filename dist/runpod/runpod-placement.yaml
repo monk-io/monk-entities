@@ -1,0 +1,122 @@
+namespace: runpod
+runpod-placement:
+  defines: entity
+  metadata:
+    name: RunpodPlacement
+    description: |-
+      RunPod placement — resolves and freezes a datacenter choice for a GPU or
+      CPU type, based on live catalog stock, so runpod-network-volume and runpod-pod can be
+      created directly into a datacenter known to have capacity instead of guessing a region
+      up front.
+
+      This entity manages no remote resource: it only reads RunPod's catalog. `create()`
+      resolves once and writes the result to state; the resolution then never changes again,
+      even across `update()` — a network volume created against the resolved datacenter is
+      immutable, so re-resolving later would silently strand it. There is nothing to delete
+      remotely; `delete()` clears the resolution so a later `create()` starts fresh.
+
+      ## Required Permissions
+      A RunPod API key with read access to the account's catalog. RunPod does not offer
+      scoped API keys, so the key grants full account access.
+
+      ## Secrets
+      - Reads: `secret_ref` (defaults to `runpod-api-token`)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.data_center` - Resolved datacenter ID; wire into a pod's `data_center_ids` and/or
+        a network volume's `data_center`
+
+      ## Composing with Other Entities
+      Works with:
+      - `runpod/runpod-network-volume` - wire `data_center` to `state.data_center`
+      - `runpod/runpod-pod` - wire `data_center_ids` to `[state.data_center]`
+    version-hash: fd38c91499c9
+  schema:
+    secret_ref:
+      type: string
+      description: Secret reference holding the RunPod API key. Defaults to `runpod-api-token`.
+    gpu_type_id:
+      type: string
+      description: 'GPU catalog ID to resolve placement for, e.g. `NVIDIA GeForce RTX 4090`. Exactly one of gpu_type_id/cpu_flavor_id is required.'
+    cpu_flavor_id:
+      type: string
+      description: 'CPU flavor ID to resolve placement for, e.g. `cpu3c`. Exactly one of gpu_type_id/cpu_flavor_id is required.'
+    product:
+      type: string
+      enum:
+        - POD
+        - CLUSTER
+        - SERVERLESS
+      description: Availability product context. Defaults to POD.
+    cloud:
+      type: string
+      enum:
+        - SECURE
+        - COMMUNITY
+      description: Cloud tier for the availability query. Omitted lets the API default to SECURE. Ignored for CPU (not accepted by the CPU availability filter).
+    count:
+      type: number
+      description: GPU count for the availability query. Omitted lets the API default to 1. Ignored for CPU.
+    volume_type:
+      type: string
+      enum:
+        - STANDARD
+        - HIGH_PERFORMANCE
+      description: 'When set, only datacenters supporting this network volume tier are considered — set this whenever the resolved datacenter will host a network volume.'
+    candidate_data_center_ids:
+      type: array
+      items:
+        type: string
+      description: 'Optional allow-list. When set, only these datacenters are considered — still ranked by live availability, never assumed available.'
+  state-schema:
+    existing:
+      type: boolean
+      description: True when the resource already existed and was adopted rather than created
+    data_center:
+      type: string
+      description: Resolved datacenter ID. Wire runpod-network-volume's data_center and runpod-pod's data_center_ids from this.
+    data_center_name:
+      type: string
+      description: Resolved datacenter's display name
+    availability:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+      description: The resolved datacenter's stock level for the requested resource. Never NONE — a NONE-only result set fails create() instead of being chosen.
+    candidates:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          availability:
+            type: string
+            enum:
+              - NONE
+              - LOW
+              - MEDIUM
+              - HIGH
+        required:
+          - id
+          - availability
+        additionalProperties: false
+      description: 'Every candidate considered, ranked, for get-info visibility and debugging'
+  lifecycle:
+    sync: <<< runpod-placement-sync.js
+    get-info: ''
+  checks:
+    readiness:
+      period: 2
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - runpod/runpod-base
+    - runpod/common
+    - cli

@@ -60,6 +60,43 @@ tests:
       output:
         - "monk-test-template"
 
+  # get-datacenter-availability lives on the template, not the pod: a pod must
+  # already be running before any action can be called on it (monk do requires the
+  # target entity in running state), which would defeat "check before you create a
+  # pod". Availability is a live snapshot — GPU stock can legitimately be sold out
+  # everywhere at test time, so this only asserts the header prints, never that the
+  # datacenter list is non-empty.
+  - name: Get datacenter availability for a GPU type
+    action: action
+    target: runpod-test/test-template
+    actionName: get-datacenter-availability
+    args:
+      gpu_type_id: "NVIDIA GeForce RTX 4090"
+    expect:
+      exitCode: 0
+      output:
+        - "=== Datacenter Availability:"
+
+  - name: Get datacenter availability for a CPU flavor
+    action: action
+    target: runpod-test/test-template
+    actionName: get-datacenter-availability
+    args:
+      cpu_flavor_id: "cpu3c"
+    expect:
+      exitCode: 0
+      output:
+        - "=== Datacenter Availability:"
+
+  - name: Get datacenter availability with no GPU or CPU type fails
+    action: action
+    target: runpod-test/test-template
+    actionName: get-datacenter-availability
+    expect:
+      exitCode: 1
+      output:
+        - "needs a GPU or CPU type"
+
   # ---------------------------------------------------------------------------
   # Network volume
   # ---------------------------------------------------------------------------
@@ -153,7 +190,7 @@ tests:
     expect:
       exitCode: 0
       output:
-        - "https://www.runpod.io/console/pods/"
+        - "https://console.runpod.io/pods?id="
 
   # There is deliberately no log step: `GET /v2/pods/{id}/logs` is a Server-Sent
   # Events stream that never closes, so an action wrapping it hangs until killed.

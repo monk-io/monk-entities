@@ -17,9 +17,18 @@ endpoints, network storage).
 - [x] Manual testing — **passed against a live RunPod account.** All three entities created,
       exercised, and destroyed across several cycles; zero leaked resources. Found and fixed 19
       real defects (see "Findings from live API testing" below and `SUMMARY.md`).
-- [ ] Integration tests — suite updated to match live reality; not yet run end to end
-- [ ] PR
-- [ ] Merged
+- [x] Integration tests — suite updated to match live reality, run end to end
+- [x] PR — [#220](https://github.com/monk-io/monk-entities/pull/220), merged 2026-08-21
+- [x] Merged
+
+**Follow-up addenda:**
+- [`PLAN-datacenter-availability.md`](./PLAN-datacenter-availability.md) — **implemented,
+  live-tested (28/28), not yet merged.** Adds a `get-datacenter-availability` action, built
+  2026-08-25 after RunPod's v2 catalog capacity-discovery endpoints went GA.
+- [`PLAN-placement-resolver.md`](./PLAN-placement-resolver.md) — **implemented, compiles,
+  integration suite written but not yet run end to end.** Adds a new `runpod-placement`
+  entity that resolves and freezes a datacenter choice for
+  `runpod-network-volume`/`runpod-pod` to consume via connection wiring, built 2026-08-26.
 
 ---
 

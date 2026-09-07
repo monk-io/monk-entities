@@ -1,0 +1,176 @@
+name: RunPod Placement Integration Test
+description: >-
+  Full lifecycle for runpod-placement, composed with a real network volume and pod to
+  prove the resolved datacenter actually works end-to-end — plus the freeze-on-update
+  and no-candidates-available failure paths. Kept separate from stack-integration.test.yaml
+  deliberately: placement resolution depends on live catalog stock, which is volatile, and
+  must never be able to fail the main pod/volume/template suite.
+timeout: 900000
+
+secrets:
+  global:
+    runpod-api-token: "$RUNPOD_API_TOKEN"
+
+setup:
+  - name: Load compiled entities
+    action: load
+    target: dist/input/runpod/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: Load placement template
+    action: load
+    target: placement-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # ---------------------------------------------------------------------------
+  # Placement — resolves before anything billable exists.
+  # ---------------------------------------------------------------------------
+  - name: Create placement
+    action: run
+    target: runpod-placement-test/test-placement
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for placement readiness
+    action: wait
+    target: runpod-placement-test/test-placement
+    waitFor:
+      condition: ready
+      timeout: 30000
+
+  - name: Describe placement
+    action: describe
+    target: runpod-placement-test/test-placement
+    expect:
+      exitCode: 0
+      output:
+        - "runpod-placement-test/test-placement"
+        - "data_center"
+
+  - name: Get placement info
+    action: action
+    target: runpod-placement-test/test-placement
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "Resolved:"
+
+  # update() must be a no-op once resolved — a volume created against the resolved
+  # datacenter cannot move, so re-resolving here would silently strand it. This only
+  # asserts update() doesn't error; the DSL has no way to diff state.data_center
+  # across steps, so the "value never changes" guarantee lives in the source (see
+  # PLAN-placement-resolver.md's Risks section), not in this test.
+  - name: Update placement is a no-op once resolved
+    action: update
+    target: runpod-placement-test/test-placement
+    expect:
+      exitCode: 0
+
+  # ---------------------------------------------------------------------------
+  # Failure path — isolated instance, no volume/pod, no dependency on the steps
+  # below. Deliberately placed here, before the volume/pod steps: this is the only
+  # structurally-deterministic test in this file (an allow-list containing a
+  # datacenter ID that will never exist in RunPod's catalog guarantees an empty
+  # candidate set, independent of any live stock level), while everything below
+  # depends on real, volatile pod capacity. If a live capacity blip fails a later
+  # step, the suite fail-fasts and skips everything after it — running this first
+  # means that can never cost us coverage of the one test that can't flake.
+  # ---------------------------------------------------------------------------
+  - name: Placement with no satisfiable candidate fails
+    action: run
+    target: runpod-placement-test/test-placement-unsatisfiable
+    args:
+      tag: "local"
+    expect:
+      exitCode: 1
+      output:
+        - "No datacenter has"
+
+  # ---------------------------------------------------------------------------
+  # Network volume — created directly into the datacenter placement resolved.
+  # ---------------------------------------------------------------------------
+  - name: Create network volume in resolved datacenter
+    action: run
+    target: runpod-placement-test/test-placement-volume
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for network volume readiness
+    action: wait
+    target: runpod-placement-test/test-placement-volume
+    waitFor:
+      condition: ready
+      timeout: 120000
+
+  - name: Get network volume info
+    action: action
+    target: runpod-placement-test/test-placement-volume
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-placement-volume"
+
+  # ---------------------------------------------------------------------------
+  # Pod — mounts the volume above and is pinned to the same resolved datacenter.
+  # RunPod rejects mounting a volume from a different datacenter than the pod's, so
+  # a successful create here is itself proof both entities agree on the same
+  # placement-resolved value, not just that each was independently wired.
+  # ---------------------------------------------------------------------------
+  - name: Create pod in resolved datacenter, mounting the volume
+    action: run
+    target: runpod-placement-test/test-placement-pod
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: Wait for pod readiness
+    action: wait
+    target: runpod-placement-test/test-placement-pod
+    waitFor:
+      condition: ready
+      timeout: 600000
+
+  - name: Get pod info
+    action: action
+    target: runpod-placement-test/test-placement-pod
+    actionName: get-info
+    expect:
+      exitCode: 0
+      output:
+        - "monk-test-placement-pod"
+
+cleanup:
+  # Reverse dependency order — pod mounts the volume, both depend on placement.
+  - name: Delete pod
+    action: delete
+    target: runpod-placement-test/test-placement-pod
+    expect:
+      exitCode: 0
+
+  - name: Delete network volume
+    action: delete
+    target: runpod-placement-test/test-placement-volume
+    expect:
+      exitCode: 0
+
+  - name: Delete placement
+    action: delete
+    target: runpod-placement-test/test-placement
+    expect:
+      exitCode: 0
+
+  - name: Delete unsatisfiable placement (best effort — create() failed, so it never resolved)
+    action: delete
+    target: runpod-placement-test/test-placement-unsatisfiable
+    expect:
+      exitCode: 0

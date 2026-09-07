@@ -1,7 +1,7 @@
 REPO runpod
-VERSION_HASH bd8390acfa88
+VERSION_HASH fd38c91499c9
 DESCRIPTION GPU cloud compute — pods, network volumes, and templates on RunPod.
 HOSTING managed
 TAGS runpod,gpu,ml,ai,compute,storage
-LOAD runpod-template.yaml runpod-network-volume.yaml runpod-pod.yaml common.yaml runpod-base.yaml
-RESOURCES runpod-network-volume-sync.js common.js runpod-pod-sync.js runpod-base.js runpod-template-sync.js
+LOAD runpod-placement.yaml runpod-pod.yaml runpod-template.yaml runpod-base.yaml runpod-network-volume.yaml common.yaml
+RESOURCES common.js runpod-template-sync.js runpod-network-volume-sync.js runpod-pod-sync.js runpod-placement-sync.js runpod-base.js

@@ -5,7 +5,7 @@ import {
     type RunpodEntityState,
     action,
 } from "./runpod-base.ts";
-import { toApiBody } from "./common.ts";
+import { toApiBody, rankByAvailability } from "./common.ts";
 import cli from "cli";
 
 /**
@@ -137,6 +137,54 @@ export class RunpodTemplate extends RunpodEntity<
         }
         const info = this.makeRequest("GET", `/templates/${this.state.id}`);
         cli.output(JSON.stringify(info, null, 2));
+    }
+
+    /**
+     * Query real per-datacenter GPU/CPU stock before creating a pod.
+     *
+     * Lives on the template rather than the pod: a pod must already be running to have
+     * any action called on it at all, which defeats "check before you commit" for the
+     * first pod of a stack. The template is non-billable and already the first entity
+     * created in the normal stack topology, so this gives real pre-pod-creation data at
+     * zero extra cost.
+     */
+    @action("get-datacenter-availability")
+    getDatacenterAvailability(args?: Args): void {
+        const gpuTypeId = args?.gpu_type_id;
+        const cpuFlavorId = args?.cpu_flavor_id;
+        const product = (args?.product as "POD" | "CLUSTER" | "SERVERLESS") || "POD";
+        const cloud = args?.cloud as "SECURE" | "COMMUNITY" | undefined;
+        const count = args?.count ? parseInt(args.count, 10) : undefined;
+
+        if (!gpuTypeId && !cpuFlavorId) {
+            throw new Error(
+                "get-datacenter-availability needs a GPU or CPU type: pass gpu_type_id=... " +
+                "or cpu_flavor_id=... as an action argument, e.g. " +
+                'monk do <path>/get-datacenter-availability -- gpu_type_id="NVIDIA GeForce RTX 4090"'
+            );
+        }
+
+        const result = gpuTypeId
+            ? this.gpuAvailability(gpuTypeId, product, cloud, count)
+            : this.cpuAvailability(cpuFlavorId!, product);
+
+        if (!result) {
+            cli.output(`No catalog entry found for ${gpuTypeId ?? cpuFlavorId} (product=${product}).`);
+            return;
+        }
+
+        cli.output(`=== Datacenter Availability: ${result.name ?? result.id} (product=${product}) ===`);
+        cli.output(`Overall: ${result.availability ?? "unknown"}`);
+        cli.output("Snapshot only — not a reservation; stock can change before a pod create() actually lands.");
+
+        const dataCenters = result.dataCenters;
+        if (!dataCenters || dataCenters.length === 0) {
+            cli.output("No datacenter breakdown returned (likely sold out everywhere in this context).");
+            return;
+        }
+        for (const dc of rankByAvailability(dataCenters)) {
+            cli.output(`  ${dc.id} — ${dc.availability}`);
+        }
     }
 
     private buildBody(): Record<string, any> {
