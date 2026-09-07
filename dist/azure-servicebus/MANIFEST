@@ -6,5 +6,5 @@ entities:
   - queue
   - topic
   - subscription
-LOAD subscription.yaml topic.yaml service-bus-namespace.yaml queue.yaml azure-servicebus-base.yaml
-RESOURCES topic-sync.js service-bus-namespace-sync.js queue-sync.js azure-servicebus-base.js subscription-sync.js
+LOAD service-bus-namespace.yaml subscription.yaml topic.yaml azure-servicebus-base.yaml queue.yaml
+RESOURCES topic-sync.js service-bus-namespace-sync.js subscription-sync.js azure-servicebus-base.js queue-sync.js
