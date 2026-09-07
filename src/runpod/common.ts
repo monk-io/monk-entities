@@ -183,8 +183,21 @@ export function listKeyForPath(path: string): string {
 }
 
 /**
+ * One datacenter's stock level for a single catalog resource, from the `dataCenters`
+ * array returned by `GET /v2/catalog/{gpus,cpus}/{id}?include=AVAILABILITY`.
+ */
+export interface CatalogAvailability {
+    id: string;
+    name?: string;
+    availability: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+}
+
+/**
  * A GPU entry from `GET /v2/catalog/gpus`, including live hourly pricing.
  * `price` is per GPU per hour.
+ *
+ * `availability` and `dataCenters` are present only when the request included
+ * `include=AVAILABILITY` (which requires `product`).
  */
 export interface CatalogGpu {
     id: string;
@@ -203,6 +216,35 @@ export interface CatalogGpu {
         community?: number;
         serverless?: number;
     };
+    availability?: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+    dataCenters?: CatalogAvailability[];
+}
+
+/**
+ * A datacenter entry from `GET /v2/catalog/datacenters`.
+ *
+ * `gpuAvailability`/`cpuAvailability` are present only when the request included
+ * `include=GPU_AVAILABILITY`/`CPU_AVAILABILITY`.
+ */
+export interface CatalogDatacenter {
+    id: string;
+    name?: string;
+    region?: string;
+    globalNetwork?: boolean;
+    networkVolumeTypes?: VolumeType[];
+    compliance?: string[];
+    gpuAvailability?: CatalogAvailability[];
+    cpuAvailability?: CatalogAvailability[];
+}
+
+/**
+ * Sort a list of catalog entries by stock level, most available first.
+ * Shared by anything that ranks `CatalogAvailability`-shaped results for display or
+ * selection — do not duplicate this rank table at each call site.
+ */
+export function rankByAvailability<T extends { availability: string }>(list: T[]): T[] {
+    const rank: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
+    return list.slice().sort((a, b) => (rank[b.availability] ?? -1) - (rank[a.availability] ?? -1));
 }
 
 /**
@@ -211,6 +253,9 @@ export interface CatalogGpu {
  * Note the pricing unit: CPU flavors bill **per vCPU per hour**, so an hourly rate is
  * `securePerVcpu × vcpuCount` — unlike GPUs, whose price is already per unit.
  * IDs are short group names such as `cpu3c`, `cpu5g` — not size-suffixed slugs.
+ *
+ * `availability` and `dataCenters` are present only when the request included
+ * `include=AVAILABILITY` (which requires `product`).
  */
 export interface CatalogCpu {
     id: string;
@@ -225,4 +270,6 @@ export interface CatalogCpu {
         securePerVcpu?: number;
         serverlessPerVcpu?: number;
     };
+    availability?: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+    dataCenters?: CatalogAvailability[];
 }

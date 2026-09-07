@@ -25,7 +25,7 @@ runpod-template:
       Works with:
       - `runpod/runpod-pod` - wire `template_id` to `state.id` so the pod inherits this
         container config; explicit pod fields still override the template
-    version-hash: bd8390acfa88
+    version-hash: fd38c91499c9
   schema:
     secret_ref:
       type: string
@@ -105,6 +105,7 @@ runpod-template:
   lifecycle:
     sync: <<< runpod-template-sync.js
     get-info: ''
+    get-datacenter-availability: ''
   checks:
     readiness:
       period: 5

@@ -55,9 +55,10 @@ const RunpodEntity = runpodBase.RunpodEntity;
 const action = runpodBase.action;
 const common = require("runpod/common");
 const toApiBody = common.toApiBody;
+const rankByAvailability = common.rankByAvailability;
 const cli = require("cli");
-var _getInfo_dec, _a, _init;
-var _RunpodTemplate = class _RunpodTemplate extends (_a = RunpodEntity, _getInfo_dec = [action("get-info")], _a) {
+var _getDatacenterAvailability_dec, _getInfo_dec, _a, _init;
+var _RunpodTemplate = class _RunpodTemplate extends (_a = RunpodEntity, _getInfo_dec = [action("get-info")], _getDatacenterAvailability_dec = [action("get-datacenter-availability")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -104,6 +105,34 @@ var _RunpodTemplate = class _RunpodTemplate extends (_a = RunpodEntity, _getInfo
     const info = this.makeRequest("GET", `/templates/${this.state.id}`);
     cli.output(JSON.stringify(info, null, 2));
   }
+  getDatacenterAvailability(args) {
+    const gpuTypeId = args?.gpu_type_id;
+    const cpuFlavorId = args?.cpu_flavor_id;
+    const product = args?.product || "POD";
+    const cloud = args?.cloud;
+    const count = args?.count ? parseInt(args.count, 10) : void 0;
+    if (!gpuTypeId && !cpuFlavorId) {
+      throw new Error(
+        'get-datacenter-availability needs a GPU or CPU type: pass gpu_type_id=... or cpu_flavor_id=... as an action argument, e.g. monk do <path>/get-datacenter-availability -- gpu_type_id="NVIDIA GeForce RTX 4090"'
+      );
+    }
+    const result = gpuTypeId ? this.gpuAvailability(gpuTypeId, product, cloud, count) : this.cpuAvailability(cpuFlavorId, product);
+    if (!result) {
+      cli.output(`No catalog entry found for ${gpuTypeId ?? cpuFlavorId} (product=${product}).`);
+      return;
+    }
+    cli.output(`=== Datacenter Availability: ${result.name ?? result.id} (product=${product}) ===`);
+    cli.output(`Overall: ${result.availability ?? "unknown"}`);
+    cli.output("Snapshot only \u2014 not a reservation; stock can change before a pod create() actually lands.");
+    const dataCenters = result.dataCenters;
+    if (!dataCenters || dataCenters.length === 0) {
+      cli.output("No datacenter breakdown returned (likely sold out everywhere in this context).");
+      return;
+    }
+    for (const dc of rankByAvailability(dataCenters)) {
+      cli.output(`  ${dc.id} \u2014 ${dc.availability}`);
+    }
+  }
   buildBody() {
     const body = {
       name: this.definition.name,
@@ -144,6 +173,7 @@ var _RunpodTemplate = class _RunpodTemplate extends (_a = RunpodEntity, _getInfo
 };
 _init = __decoratorStart(_a);
 __decorateElement(_init, 1, "getInfo", _getInfo_dec, _RunpodTemplate);
+__decorateElement(_init, 1, "getDatacenterAvailability", _getDatacenterAvailability_dec, _RunpodTemplate);
 __decoratorMetadata(_init, _RunpodTemplate);
 __name(_RunpodTemplate, "RunpodTemplate");
 __publicField(_RunpodTemplate, "readiness", { period: 5, initialDelay: 1, attempts: 12 });

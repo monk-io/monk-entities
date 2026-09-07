@@ -1,0 +1,99 @@
+namespace: runpod-placement-test
+
+# ---------------------------------------------------------------------------
+# This is deliberately a separate integration from stack-template.yaml: placement
+# resolution depends on live catalog stock, which is volatile (see PLAN-placement-
+# resolver.md). Keeping it out of the main pod/volume/template suite means a bad
+# catalog snapshot here can never take down that already-green, billable-resource
+# suite.
+#
+# cpu3c + STANDARD volumes mirror the existing suite's own test fixture — STANDARD
+# support is broad (18+ datacenters as of 2026-08-26). An occasional stockout across
+# every candidate is expected, live-tested behavior (see PLAN-placement-resolver.md
+# Risks) — this is exactly the volatility runpod-placement exists to route around, not
+# a defect. If this flakes, check `GET /v2/catalog/cpus/cpu3c?include=AVAILABILITY&
+# product=POD` for real stock before assuming a bug; if that itself looks wrong (e.g.
+# NONE with an empty dataCenters list) cross-check against
+# `GET /v2/catalog/datacenters?include=CPU_AVAILABILITY` — the per-flavor CPU endpoint
+# had a confirmed upstream bug as of 2026-08-31 (see PLAN-placement-resolver.md), which
+# `cpuAvailability()` now routes around, but re-verify if RunPod's v2 API changes again.
+# ---------------------------------------------------------------------------
+
+# Resolves a real datacenter for cpu3c with STANDARD volume support, then feeds it
+# to both a volume and a pod below — this is the actual feature under test.
+test-placement:
+  defines: runpod/runpod-placement
+  cpu_flavor_id: cpu3c
+  volume_type: STANDARD
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+test-placement-volume:
+  defines: runpod/runpod-network-volume
+  name: monk-test-placement-volume
+  size: 10
+  data_center: <- connection-target("placement") entity-state get-member("data_center")
+  volume_type: STANDARD
+  allow_destructive_delete: true
+  connections:
+    placement:
+      runnable: runpod-placement-test/test-placement
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-placement-test/test-placement
+      timeout: 60
+  permitted-secrets:
+    runpod-api-token: true
+  services:
+    data:
+      protocol: custom
+
+# Both the network volume ID and the data center come from other entities' state —
+# the pod must land in the same datacenter placement resolved, which is also where
+# the volume above was created.
+test-placement-pod:
+  defines: runpod/runpod-pod
+  name: monk-test-placement-pod
+  image: runpod/base:1.0.2-ubuntu2404
+  cpu_flavor_id: cpu3c
+  vcpu_count: 2
+  disk: 10
+  ports:
+    - 22/tcp
+  env:
+    MONK_TEST: "1"
+  network_volume_id: <- connection-target("volume") entity-state get-member("id")
+  data_center_ids:
+    - <- connection-target("placement") entity-state get-member("data_center")
+  allow_destructive_delete: true
+  connections:
+    volume:
+      runnable: runpod-placement-test/test-placement-volume
+      service: data
+    placement:
+      runnable: runpod-placement-test/test-placement
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - runpod-placement-test/test-placement-volume
+      timeout: 120
+  permitted-secrets:
+    runpod-api-token: true
+
+# Isolated negative-path instance: an allow-list containing a datacenter ID that will
+# never exist in RunPod's catalog guarantees an empty candidate set deterministically —
+# this does not depend on any live stock or tier-support fact that could drift over
+# time, unlike testing against a real "known incompatible" datacenter would.
+test-placement-unsatisfiable:
+  defines: runpod/runpod-placement
+  cpu_flavor_id: cpu3c
+  candidate_data_center_ids:
+    - ZZ-NOWHERE-1
+  permitted-secrets:
+    runpod-api-token: true

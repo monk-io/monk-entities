@@ -74,6 +74,10 @@ function listKeyForPath(path) {
   const last = segments[segments.length - 1] || "";
   return last.split("-").map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
+function rankByAvailability(list) {
+  const rank = { HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
+  return list.slice().sort((a, b) => (rank[b.availability] ?? -1) - (rank[a.availability] ?? -1));
+}
 
 // input/runpod/runpodBase.ts
 var import_cli = __toESM(require("cli"));
@@ -233,6 +237,96 @@ var RunpodEntity = class extends import_base.MonkEntity {
       if (cpu.id === cpuFlavorId) return cpu;
     }
     return null;
+  }
+  /**
+   * Per-datacenter stock for one GPU type, from
+   * `GET /v2/catalog/gpus/{id}?include=AVAILABILITY`.
+   *
+   * Returns null on a 404 (unknown GPU type ID) or on any other failure, so a caller
+   * driving an inspection action can report "unavailable" instead of throwing.
+   */
+  gpuAvailability(gpuTypeId, product, cloud, count) {
+    try {
+      const query = { include: "AVAILABILITY", product };
+      if (cloud) query.cloud = cloud;
+      if (count !== void 0) query.count = String(count);
+      return this.makeRequest(
+        "GET",
+        `/catalog/gpus/${encodeURIComponent(gpuTypeId)}`,
+        void 0,
+        query
+      );
+    } catch (error) {
+      if (this.isNotFound(error)) return null;
+      import_cli.default.output(`\u26A0\uFE0F  Could not fetch GPU availability: ${error.message}`);
+      return null;
+    }
+  }
+  /**
+   * Per-datacenter stock for one CPU flavor.
+   *
+   * **Does not call `GET /v2/catalog/cpus/{id}?include=AVAILABILITY`** despite that being
+   * the GPU equivalent's approach (`gpuAvailability()`). Live-confirmed 2026-08-31: that
+   * endpoint returns `"availability":"NONE"` with no `dataCenters` for **every** CPU
+   * flavor, while `GET /v2/catalog/datacenters?include=CPU_AVAILABILITY` shows real,
+   * non-empty stock for the same flavors at the same moment — reproduced three times,
+   * `vcpuCount` doesn't fix it, and the GPU per-flavor endpoint has no equivalent
+   * discrepancy (checked side-by-side). This is an upstream v2-beta inconsistency, not a
+   * request-construction bug. Derives the answer from the datacenters view instead, which
+   * has no `product`/`cloud`/`count` filters — `product` is accepted here for signature
+   * parity with `gpuAvailability()` but only `"POD"` is actually verified correct (the
+   * datacenters view's implicit context, per `PLANDatacenterAvailability.md`).
+   */
+  cpuAvailability(cpuFlavorId, product) {
+    try {
+      const base = this.catalogCpu(cpuFlavorId);
+      if (!base) return null;
+      if (product !== "POD") {
+        import_cli.default.output(
+          `\u26A0\uFE0F  CPU availability for product=${product} is not verified \u2014 the working datacenters-view fallback only confirms the POD context.`
+        );
+      }
+      const datacenters = this.catalogDatacenters(void 0, void 0, "CPU_AVAILABILITY");
+      const dataCenters = [];
+      for (const dc of datacenters) {
+        const entry = (dc.cpuAvailability ?? []).filter((c) => c.id === cpuFlavorId)[0];
+        if (entry) dataCenters.push({ id: dc.id, name: dc.name, availability: entry.availability });
+      }
+      const ranked = rankByAvailability(dataCenters);
+      return {
+        ...base,
+        availability: ranked[0]?.availability ?? "NONE",
+        dataCenters
+      };
+    } catch (error) {
+      import_cli.default.output(`\u26A0\uFE0F  Could not fetch CPU availability: ${error.message}`);
+      return null;
+    }
+  }
+  /**
+   * The plain datacenter list from `GET /v2/catalog/datacenters`, optionally filtered by
+   * network volume tier support and/or expanded with per-resource availability. Returns
+   * an empty array on failure so a placement resolution degrades to "no candidates"
+   * rather than throwing mid-lookup.
+   *
+   * Hardcodes the `"dataCenters"` envelope key rather than `listKeyForPath()`: that
+   * helper only splits on hyphens, so `"/catalog/datacenters"` (no hyphen) would compute
+   * `"datacenters"`, which does not match the API's actual `"dataCenters"` key.
+   */
+  catalogDatacenters(networkVolumeTypes, regions, include) {
+    try {
+      const query = {};
+      if (networkVolumeTypes) query.networkVolumeTypes = networkVolumeTypes;
+      if (regions && regions.length > 0) query.regions = regions.join(",");
+      if (include) query.include = include;
+      return extractList(
+        this.makeRequest("GET", "/catalog/datacenters", void 0, query),
+        "dataCenters"
+      );
+    } catch (error) {
+      import_cli.default.output(`\u26A0\uFE0F  Could not fetch datacenter catalog: ${error.message}`);
+      return [];
+    }
   }
   /**
    * Bucketed billing history, e.g. `billingHistory("network-volumes", 30)`.

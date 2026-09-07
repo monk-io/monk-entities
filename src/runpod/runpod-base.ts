@@ -7,8 +7,12 @@ import {
     getApiToken,
     extractList,
     listKeyForPath,
+    rankByAvailability,
     type CatalogGpu,
     type CatalogCpu,
+    type CatalogDatacenter,
+    type CatalogAvailability,
+    type VolumeType,
 } from "./common.ts";
 import cli from "cli";
 
@@ -219,6 +223,114 @@ export abstract class RunpodEntity<
             if (cpu.id === cpuFlavorId) return cpu;
         }
         return null;
+    }
+
+    /**
+     * Per-datacenter stock for one GPU type, from
+     * `GET /v2/catalog/gpus/{id}?include=AVAILABILITY`.
+     *
+     * Returns null on a 404 (unknown GPU type ID) or on any other failure, so a caller
+     * driving an inspection action can report "unavailable" instead of throwing.
+     */
+    protected gpuAvailability(
+        gpuTypeId: string,
+        product: "POD" | "CLUSTER" | "SERVERLESS",
+        cloud?: "SECURE" | "COMMUNITY",
+        count?: number
+    ): CatalogGpu | null {
+        try {
+            const query: Record<string, string> = { include: "AVAILABILITY", product };
+            if (cloud) query.cloud = cloud;
+            if (count !== undefined) query.count = String(count);
+            return this.makeRequest(
+                "GET",
+                `/catalog/gpus/${encodeURIComponent(gpuTypeId)}`,
+                undefined,
+                query
+            ) as CatalogGpu;
+        } catch (error) {
+            if (this.isNotFound(error)) return null;
+            cli.output(`⚠️  Could not fetch GPU availability: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Per-datacenter stock for one CPU flavor.
+     *
+     * **Does not call `GET /v2/catalog/cpus/{id}?include=AVAILABILITY`** despite that being
+     * the GPU equivalent's approach (`gpuAvailability()`). Live-confirmed 2026-08-31: that
+     * endpoint returns `"availability":"NONE"` with no `dataCenters` for **every** CPU
+     * flavor, while `GET /v2/catalog/datacenters?include=CPU_AVAILABILITY` shows real,
+     * non-empty stock for the same flavors at the same moment — reproduced three times,
+     * `vcpuCount` doesn't fix it, and the GPU per-flavor endpoint has no equivalent
+     * discrepancy (checked side-by-side). This is an upstream v2-beta inconsistency, not a
+     * request-construction bug. Derives the answer from the datacenters view instead, which
+     * has no `product`/`cloud`/`count` filters — `product` is accepted here for signature
+     * parity with `gpuAvailability()` but only `"POD"` is actually verified correct (the
+     * datacenters view's implicit context, per `PLAN-datacenter-availability.md`).
+     */
+    protected cpuAvailability(
+        cpuFlavorId: string,
+        product: "POD" | "CLUSTER" | "SERVERLESS"
+    ): CatalogCpu | null {
+        try {
+            const base = this.catalogCpu(cpuFlavorId);
+            if (!base) return null;
+            if (product !== "POD") {
+                cli.output(
+                    `⚠️  CPU availability for product=${product} is not verified — the working ` +
+                    `datacenters-view fallback only confirms the POD context.`
+                );
+            }
+
+            const datacenters = this.catalogDatacenters(undefined, undefined, "CPU_AVAILABILITY");
+            const dataCenters: CatalogAvailability[] = [];
+            for (const dc of datacenters) {
+                const entry = (dc.cpuAvailability ?? []).filter((c) => c.id === cpuFlavorId)[0];
+                if (entry) dataCenters.push({ id: dc.id, name: dc.name, availability: entry.availability });
+            }
+            const ranked = rankByAvailability(dataCenters);
+
+            return {
+                ...base,
+                availability: ranked[0]?.availability ?? "NONE",
+                dataCenters,
+            };
+        } catch (error) {
+            cli.output(`⚠️  Could not fetch CPU availability: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * The plain datacenter list from `GET /v2/catalog/datacenters`, optionally filtered by
+     * network volume tier support and/or expanded with per-resource availability. Returns
+     * an empty array on failure so a placement resolution degrades to "no candidates"
+     * rather than throwing mid-lookup.
+     *
+     * Hardcodes the `"dataCenters"` envelope key rather than `listKeyForPath()`: that
+     * helper only splits on hyphens, so `"/catalog/datacenters"` (no hyphen) would compute
+     * `"datacenters"`, which does not match the API's actual `"dataCenters"` key.
+     */
+    protected catalogDatacenters(
+        networkVolumeTypes?: VolumeType,
+        regions?: string[],
+        include?: "GPU_AVAILABILITY" | "CPU_AVAILABILITY"
+    ): CatalogDatacenter[] {
+        try {
+            const query: Record<string, string> = {};
+            if (networkVolumeTypes) query.networkVolumeTypes = networkVolumeTypes;
+            if (regions && regions.length > 0) query.regions = regions.join(",");
+            if (include) query.include = include;
+            return extractList(
+                this.makeRequest("GET", "/catalog/datacenters", undefined, query),
+                "dataCenters"
+            ) as CatalogDatacenter[];
+        } catch (error) {
+            cli.output(`⚠️  Could not fetch datacenter catalog: ${(error as Error).message}`);
+            return [];
+        }
     }
 
     /**
