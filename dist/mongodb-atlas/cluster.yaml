@@ -21,7 +21,7 @@ cluster:
       Works with:
       - `mongodb-atlas/user` - Create database users with role-based access
       - `mongodb-atlas/project` - The parent project containing the cluster
-    version-hash: ec2c81091c4c
+    version-hash: 5aadf929b2b3
   schema:
     secret_ref:
       type: string
@@ -86,12 +86,33 @@ cluster:
     name:
       type: string
       description: Cluster Name
+    project_id:
+      type: string
+      description: Project (group) ID this cluster was created in
+    tier_family:
+      type: string
+      enum:
+        - free
+        - flex
+        - dedicated
+      description: |-
+        Tier family the cluster was created with ("free" = M0, "flex" = FLEX,
+        "dedicated" = M10+). Atlas cannot migrate a cluster between these families in place;
+        used to detect and reject an unsupported instance_size change on update.
     connection_standard:
       type: string
       description: Standard connection string
     connection_srv:
       type: string
       description: SRV connection string
+    applied_ips:
+      type: array
+      items:
+        type: string
+      description: |-
+        IP/CIDR values from `allow_ips` currently applied to the project's
+        access list by this entity. Used to reconcile additions/removals on update without
+        touching entries added by other means.
   lifecycle:
     sync: <<< cluster-sync.js
     get-backup-info: ''

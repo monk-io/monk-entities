@@ -118,11 +118,32 @@ interface ClusterDefinition {
 interface ClusterState {
   id?: string;                  // Cluster ID
   name?: string;                // Cluster name
+  project_id?: string;          // Project ID the cluster was created in
+  tier_family?: "free" | "flex" | "dedicated"; // Tier family at creation time
   connection_standard?: string; // Standard connection string
   connection_srv?: string;      // SRV connection string
+  applied_ips?: string[];       // allow_ips currently applied by this entity
   existing?: boolean;           // Whether cluster existed before
 }
 ```
+
+**Update behavior:**
+- `allow_ips` is reconciled on every update, and on delete: CIDRs/IPs added to the definition
+  are added to the project's access list, ones removed from the definition are removed, and
+  all of them are removed when the cluster itself is deleted — but only entries this entity
+  itself added (tracked via `state.applied_ips`, or by the `"Added by MonkeC entity"` comment
+  for entries from before that tracking existed). Entries added by other means (e.g.
+  `mongodb-atlas/ip-access-list-entry`, or manually in the Atlas UI) are never touched.
+  Reconciliation requires the project's access list to fit in a single API page; a project
+  with a very large shared access list will raise an error rather than reconcile partially.
+- For **dedicated (M10+)** clusters, `instance_size`, `region`, and `provider` are reconciled
+  via `PATCH` when changed — Atlas supports resizing and migrating dedicated clusters in place.
+- For **M0 (free)** and **FLEX** clusters, Atlas does not support region/provider migration;
+  changing `region` or `provider` on an existing M0/FLEX cluster raises an error instead of
+  silently no-oping.
+- Changing `name`, `project_id`, or `instance_size` **across tier families** (free ↔ Flex ↔
+  dedicated) is not supported by Atlas in place and raises an error — delete and recreate the
+  cluster to apply those changes.
 
 ### 3. User Entity
 
@@ -151,8 +172,10 @@ interface UserState {
 
 Manages a single entry in a project's IP access list (the network gate — Atlas
 rejects connections from non-listed sources). One entity instance = one entry,
-with full create/update/delete lifecycle (unlike the cluster's `allow_ips`, which
-is created once and never reconciled or removed).
+with full create/update/delete lifecycle. `cluster.allow_ips` also reconciles
+adds/removes on update (see above), but only for the whole list at once and only
+for entries it added itself — use this entity when you need independent lifecycle
+control (e.g. time-boxed access, or an entry shared across multiple clusters).
 
 **Definition Interface:**
 ```typescript
