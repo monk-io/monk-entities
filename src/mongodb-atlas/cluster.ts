@@ -62,6 +62,18 @@ export interface ClusterState extends MongoDBAtlasEntityState {
     name?: string;
 
     /**
+     * @description Project (group) ID this cluster was created in
+     */
+    project_id?: string;
+
+    /**
+     * @description Tier family the cluster was created with ("free" = M0, "flex" = FLEX,
+     * "dedicated" = M10+). Atlas cannot migrate a cluster between these families in place;
+     * used to detect and reject an unsupported instance_size change on update.
+     */
+    tier_family?: "free" | "flex" | "dedicated";
+
+    /**
      * @description Standard connection string
      */
     connection_standard?: string;
@@ -70,6 +82,13 @@ export interface ClusterState extends MongoDBAtlasEntityState {
      * @description SRV connection string
      */
     connection_srv?: string;
+
+    /**
+     * @description IP/CIDR values from `allow_ips` currently applied to the project's
+     * access list by this entity. Used to reconcile additions/removals on update without
+     * touching entries added by other means.
+     */
+    applied_ips?: string[];
 }
 
 /**
@@ -125,6 +144,13 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         return !this.isFreeTier() && !this.isFlexTier();
     }
 
+    /** Tier family implied by the current `instance_size`; used to detect unsupported migrations. */
+    private tierFamily(): "free" | "flex" | "dedicated" {
+        if (this.isFlexTier()) return "flex";
+        if (this.isFreeTier()) return "free";
+        return "dedicated";
+    }
+
     /** Collection path for this cluster's tier (Flex uses a separate endpoint). */
     private clustersCollectionPath(): string {
         const base = `/groups/${this.definition.project_id}`;
@@ -144,10 +170,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
             this.createClusterResource();
         }
 
+        this.state.project_id = this.definition.project_id;
+        this.state.tier_family = this.tierFamily();
+
         // Configure IP access list if provided (applies to all tiers)
-        if (this.definition.allow_ips && this.definition.allow_ips.length > 0) {
-            this.configureIPAccessList();
-        }
+        this.reconcileIPAccessList();
     }
 
     /** Create a Flex cluster via the /flexClusters endpoint. */
@@ -211,28 +238,163 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         };
     }
 
-    /** Configure IP access list for the cluster */
-    private configureIPAccessList(): void {
-        if (!this.definition.allow_ips || this.definition.allow_ips.length === 0) {
-            return;
+    private accessListCollectionPath(): string {
+        return `/groups/${this.definition.project_id}/accessList`;
+    }
+
+    /** Single-entry path. CIDR blocks contain "/", which must be URL-encoded. */
+    private accessListEntryPath(value: string): string {
+        return `${this.accessListCollectionPath()}/${encodeURIComponent(value)}`;
+    }
+
+    /** A bare IP goes in `ipAddress`; anything with a "/" is a CIDR block. */
+    private classifyIpEntry(value: string): { field: "ipAddress" | "cidrBlock"; value: string } {
+        return value.includes("/") ? { field: "cidrBlock", value } : { field: "ipAddress", value };
+    }
+
+    /**
+     * Reconcile the project's IP access list against `allow_ips`: add entries that are
+     * newly desired, and remove entries this entity previously added that are no longer
+     * desired. Never touches entries it didn't add — ownership is tracked via
+     * `state.applied_ips`, falling back to matching the "Added by MonkeC entity" comment
+     * for clusters created before that tracking existed.
+     */
+    private reconcileIPAccessList(): void {
+        const desired = this.definition.allow_ips || [];
+
+        // A failed read must not be treated as "nothing to do" — that would report the
+        // update as successful while leaving Atlas unreconciled (the original PRO-877 bug).
+        const response = this.makeRequest("GET", this.accessListCollectionPath());
+        const existing: any[] = (response && response.results) ? response.results : [];
+
+        // The list endpoint is paginated; reconciling against a partial page would add
+        // duplicates (entries that exist on a later page) and miss removals. Fail loudly
+        // instead of silently reconciling against incomplete data.
+        const totalCount = response?.totalCount ?? existing.length;
+        if (existing.length < totalCount) {
+            throw new Error(
+                `IP access list for project ${this.definition.project_id} has ${totalCount} entries but only ` +
+                `${existing.length} were returned by a single page; pagination is not yet supported by allow_ips reconciliation.`
+            );
         }
 
-        const accessList = this.definition.allow_ips.map(ip => ({
-            "ipAddress": ip,
-            "comment": "Added by MonkeC entity"
-        }));
-
-        try {
-            this.makeRequest("POST", `/groups/${this.definition.project_id}/accessList`, accessList);
-        } catch (error) {
-            cli.output(`Warning: Failed to configure IP access list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const existingValues = new Set<string>();
+        for (const e of existing) {
+            const v = e.ipAddress || e.cidrBlock || e.awsSecurityGroup;
+            if (v) existingValues.add(v);
         }
+
+        const managed = new Set<string>(
+            this.state.applied_ips ?? existing
+                .filter(e => e.comment === "Added by MonkeC entity")
+                .map(e => e.ipAddress || e.cidrBlock || e.awsSecurityGroup)
+                .filter(Boolean)
+        );
+
+        const toAdd = desired.filter(ip => !existingValues.has(ip));
+        const toRemove = [...managed].filter(ip => !desired.includes(ip) && existingValues.has(ip));
+
+        if (toAdd.length > 0) {
+            const body = toAdd.map(ip => {
+                const entry = this.classifyIpEntry(ip);
+                return { [entry.field]: entry.value, comment: "Added by MonkeC entity" };
+            });
+            this.makeRequest("POST", this.accessListCollectionPath(), body);
+        }
+
+        for (const ip of toRemove) {
+            try {
+                this.makeRequest("DELETE", this.accessListEntryPath(ip));
+            } catch (error) {
+                if (!this.isResourceGoneError(error)) {
+                    throw error;
+                }
+            }
+        }
+
+        this.state.applied_ips = [...desired];
+    }
+
+    /**
+     * Live region/provider (and, for non-Flex tiers, the raw region config) read off the
+     * cluster. For M0 (free tier), `providerName` is always the fixed value `"TENANT"` —
+     * never compare that against `definition.provider`, only `backingProviderName` reflects
+     * the actual cloud. Returns `undefined` rather than a misleading value when the field
+     * we need isn't present, so callers can treat "can't tell" as "don't flag a change".
+     */
+    private liveRegionConfig(clusterData: any): { provider?: string; region?: string; regionConfig?: any } {
+        if (this.isFlexTier()) {
+            return {
+                provider: clusterData.providerSettings?.backingProviderName,
+                region: clusterData.providerSettings?.regionName
+            };
+        }
+        const regionConfig = clusterData.replicationSpecs?.[0]?.regionConfigs?.[0];
+        const provider = this.isFreeTier()
+            ? regionConfig?.backingProviderName
+            : regionConfig?.providerName;
+        return {
+            provider,
+            region: regionConfig?.regionName,
+            regionConfig
+        };
+    }
+
+    /**
+     * PATCH instance_size/region/provider changes for a dedicated (M10+) cluster.
+     * Deep-clones the live `replicationSpecs` and mutates only the fields that changed,
+     * so nodeCount/priority/analytics specs set outside this entity are preserved —
+     * Atlas replaces the whole array on PATCH rather than merging it.
+     */
+    private reconcileClusterConfig(clusterData: any): void {
+        const replicationSpecs = JSON.parse(JSON.stringify(clusterData.replicationSpecs || []));
+        const regionConfig = replicationSpecs?.[0]?.regionConfigs?.[0];
+        if (!regionConfig) {
+            throw new Error("Unable to read current cluster region configuration; cannot reconcile instance_size/region/provider.");
+        }
+
+        if (regionConfig.electableSpecs) {
+            regionConfig.electableSpecs.instanceSize = this.definition.instance_size;
+        }
+        regionConfig.regionName = this.definition.region;
+        if (regionConfig.providerName === "TENANT") {
+            regionConfig.backingProviderName = this.definition.provider;
+        } else {
+            regionConfig.providerName = this.definition.provider;
+        }
+
+        cli.output(`Updating cluster configuration: instance_size=${this.definition.instance_size}, region=${this.definition.region}, provider=${this.definition.provider}`);
+        this.makeRequest("PATCH", this.clusterResourcePath(), { replicationSpecs });
     }
 
     override update(): void {
         if (!this.state.id) {
             this.create();
             return;
+        }
+
+        // Identity fields can't be changed via update — Atlas has no rename/move
+        // operation, and the resource path is derived from these values.
+        if (this.state.project_id && this.state.project_id !== this.definition.project_id) {
+            throw new Error(
+                `Cannot change project_id for an existing cluster (was ${this.state.project_id}, now ${this.definition.project_id}). ` +
+                `Atlas does not support moving a cluster between projects; delete and recreate it instead.`
+            );
+        }
+        if (this.state.name && this.state.name !== this.definition.name) {
+            throw new Error(
+                `Cannot rename an existing cluster (was ${this.state.name}, now ${this.definition.name}). ` +
+                `Atlas does not support renaming a cluster; delete and recreate it instead.`
+            );
+        }
+
+        const desiredTierFamily = this.tierFamily();
+        if (this.state.tier_family && this.state.tier_family !== desiredTierFamily) {
+            throw new Error(
+                `Cannot change instance_size from a ${this.state.tier_family} tier to a ${desiredTierFamily} tier ` +
+                `(${this.definition.instance_size}) on an existing cluster. Atlas does not support migrating between ` +
+                `free/Flex/dedicated tiers via update; delete and recreate the cluster instead.`
+            );
         }
 
         // Check current cluster state
@@ -243,13 +405,58 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
                 ...this.state,
                 id: clusterData.id || this.state.id,
                 name: clusterData.name,
+                project_id: this.definition.project_id,
+                tier_family: desiredTierFamily,
                 connection_standard: clusterData.connectionStrings?.standard,
                 connection_srv: clusterData.connectionStrings?.standardSrv
             };
+
+            // Only flag a change when we can actually read the live value — an absent
+            // field means "can't tell", not "different", so it must not trip the
+            // M0/Flex "unsupported migration" error below on an unchanged cluster.
+            const live = this.liveRegionConfig(clusterData);
+            const regionOrProviderChanged = live.region !== undefined && live.provider !== undefined
+                && (this.definition.region !== live.region || this.definition.provider !== live.provider);
+            const instanceSizeChanged = live.regionConfig?.electableSpecs?.instanceSize !== undefined
+                && this.definition.instance_size !== live.regionConfig.electableSpecs.instanceSize;
+
+            if (desiredTierFamily === "dedicated") {
+                if (regionOrProviderChanged || instanceSizeChanged) {
+                    this.reconcileClusterConfig(clusterData);
+                }
+            } else if (regionOrProviderChanged) {
+                throw new Error(
+                    `Cannot change region/provider for a ${desiredTierFamily} cluster after creation. ` +
+                    `Atlas does not support region/provider migration for M0/Flex clusters; delete and recreate the cluster instead.`
+                );
+            }
         }
+
+        this.reconcileIPAccessList();
+    }
+
+    /**
+     * Remove the access-list entries this entity added via `allow_ips`. Best-effort:
+     * a failure here shouldn't block the cluster itself from being torn down, so
+     * unexpected errors are logged rather than thrown.
+     */
+    private removeManagedIpEntries(): void {
+        const managed = this.state.applied_ips || [];
+        for (const ip of managed) {
+            try {
+                this.makeRequest("DELETE", this.accessListEntryPath(ip));
+            } catch (error) {
+                if (!this.isResourceGoneError(error)) {
+                    cli.output(`Warning: Failed to remove IP access list entry ${ip}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                }
+            }
+        }
+        this.state.applied_ips = [];
     }
 
     override delete(): void {
+        this.removeManagedIpEntries();
+
         if (!this.state.id) {
             cli.output("Cluster does not exist, nothing to delete");
             return;

@@ -26,12 +26,16 @@ existing package — it reuses `common.ts` and `atlas-base.ts` (auth, `makeReque
 - **Default secret**: `mongodb-atlas-token`
 
 ## Motivation
-Today the IP access list is a **fire-and-forget side effect** of `cluster.create()`
-(`cluster.ts` `configureIPAccessList` → `POST /groups/{id}/accessList`): failures are
-swallowed, changes aren't reconciled, and entries are **never removed** on teardown. The
-project IP access list is the network gate — Atlas rejects all connections except from
-listed IPs/CIDRs/AWS security groups. Promoting it to a managed entity gives proper
-create/update/delete lifecycle, dynamic IP wiring, and time-boxed entries.
+Originally the IP access list was a **fire-and-forget side effect** of `cluster.create()`
+(`cluster.ts` `configureIPAccessList` → `POST /groups/{id}/accessList`): failures were
+swallowed, changes weren't reconciled, and entries were **never removed** on teardown (see
+[PRO-877](https://linear.app/monk-io/issue/PRO-877) — a customer changed `allow_ips` and
+redeployed, and the stale `0.0.0.0/0` entry stayed in Atlas). The project IP access list is
+the network gate — Atlas rejects all connections except from listed IPs/CIDRs/AWS security
+groups. This standalone entity gives proper create/update/delete lifecycle, dynamic IP
+wiring, and time-boxed entries for a single entry. `cluster.allow_ips` was separately fixed
+to reconcile add/remove for the whole list on update (see "Implementation Order" below) —
+this entity remains the right choice when independent per-entry lifecycle is needed.
 
 ## Entities
 
@@ -97,9 +101,17 @@ backward compatibility. Optionally support a `roles[]` array for multiple scoped
 ## Implementation Order
 1. `ip-access-list.ts` — new entity (reuses existing base/common).
 2. Add to package: appears automatically in generated `MANIFEST` on compile.
-3. (Optional, follow-up) Refactor `cluster.ts`: deprecate the inline `configureIPAccessList`
-   side effect in favor of standalone entities, or keep `allow_ips` as a convenience that is
-   documented as not-lifecycle-managed.
+3. **Done** (PRO-877 fix) — `cluster.ts` `update()` now reconciles the full set of mutable
+   properties instead of only re-reading live state:
+   - `allow_ips`: `reconcileIPAccessList()` diffs desired vs. current access-list entries and
+     adds/removes only the ones this entity manages (tracked via `state.applied_ips`, falling
+     back to the `"Added by MonkeC entity"` comment for pre-existing state).
+   - `instance_size` / `region` / `provider`: reconciled via `PATCH` for dedicated (M10+)
+     clusters only, by mutating a deep-cloned copy of the live `replicationSpecs` (Atlas
+     replaces the array wholesale, so untouched fields like `nodeCount` must be preserved).
+   - Tier-family changes (free ↔ Flex ↔ dedicated) and `name`/`project_id` changes are not
+     supported by Atlas in place — `update()` now throws a clear error instead of silently
+     no-oping.
 4. (Separate change) `user.ts` per-database role scoping enhancement.
 
 ## Required Permissions (SaaS / Atlas)
