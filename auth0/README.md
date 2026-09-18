@@ -22,3 +22,14 @@ We'll use Monk CLI to load and run everything:
       monk run auth0-example/my-auth0-app
 
 This should deploy a client(app) with your configuration
+
+## Rotating the client secret
+
+To rotate an application's client secret without recreating it:
+
+      monk do auth0-example/my-auth0-app/rotate-secret
+
+This calls Auth0's `POST /api/v2/clients/{id}/rotate-secret` and updates `client-secret`
+in the entity's state. Anything reading it via `entity-state get-member("client-secret")`
+(e.g. the `backend` runnable's variables in example.yaml) is only re-evaluated when that
+runnable restarts, so restart dependents after rotating.
