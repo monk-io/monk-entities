@@ -1,0 +1,141 @@
+name: "Auth0 Integration Test"
+description: "Full lifecycle test for Auth0 application and resource server entities"
+timeout: 300000
+
+secrets:
+  global:
+    auth0-management-client-id: "$AUTH0_MANAGEMENT_CLIENT_ID"
+    auth0-management-client-secret: "$AUTH0_MANAGEMENT_CLIENT_SECRET"
+
+setup:
+  - name: "Load compiled entities"
+    action: load
+    target: dist/input/auth0/MANIFEST
+    expect:
+      exitCode: 0
+
+  - name: "Load test stack template"
+    action: load
+    target: stack-template.yaml
+    expect:
+      exitCode: 0
+
+tests:
+  # === Deployment (independent entities, deployed individually) ===
+  - name: "Deploy application"
+    action: run
+    target: auth0-test/test-app
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  - name: "Deploy resource server"
+    action: run
+    target: auth0-test/test-api
+    args:
+      tag: "local"
+    expect:
+      exitCode: 0
+
+  # === Readiness ===
+  - name: "Wait for application readiness"
+    action: wait
+    target: auth0-test/test-app
+    waitFor:
+      condition: ready
+      timeout: 30000
+
+  - name: "Wait for resource server readiness"
+    action: wait
+    target: auth0-test/test-api
+    waitFor:
+      condition: ready
+      timeout: 30000
+
+  # === State verification ===
+  - name: "Describe application"
+    action: describe
+    target: auth0-test/test-app
+    expect:
+      exitCode: 0
+      output:
+        - "client_id"
+
+  - name: "Describe resource server"
+    action: describe
+    target: auth0-test/test-api
+    expect:
+      exitCode: 0
+      output:
+        - "resource_server_id"
+
+  - name: "Verify all entities running"
+    action: ps
+    expect:
+      exitCode: 0
+
+  # === Application actions ===
+  - name: "Get application info"
+    action: do
+    target: auth0-test/test-app/get-info
+    expect:
+      exitCode: 0
+
+  - name: "Patch application web_origins"
+    action: do
+    target: auth0-test/test-app/patch
+    args:
+      web_origins: "https://monk-test-patched.example.com"
+    expect:
+      exitCode: 0
+
+  - name: "Rotate application client secret"
+    action: do
+    target: auth0-test/test-app/rotate-secret
+    expect:
+      exitCode: 0
+
+  - name: "Get application cost estimate"
+    action: do
+    target: auth0-test/test-app/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: "Get application costs"
+    action: do
+    target: auth0-test/test-app/costs
+    expect:
+      exitCode: 0
+
+  # === Resource server actions ===
+  - name: "Get resource server info"
+    action: do
+    target: auth0-test/test-api/get-info
+    expect:
+      exitCode: 0
+
+  - name: "Get resource server cost estimate"
+    action: do
+    target: auth0-test/test-api/get-cost-estimate
+    expect:
+      exitCode: 0
+
+  - name: "Get resource server costs"
+    action: do
+    target: auth0-test/test-api/costs
+    expect:
+      exitCode: 0
+
+cleanup:
+  - name: "Delete application"
+    action: delete
+    target: auth0-test/test-app
+    expect:
+      exitCode: 0
+
+  - name: "Delete resource server"
+    action: delete
+    target: auth0-test/test-api
+    expect:
+      exitCode: 0

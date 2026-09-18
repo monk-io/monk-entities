@@ -1,0 +1,7 @@
+REPO auth0
+VERSION_HASH 9f81d0d91f42
+DESCRIPTION Applications (OAuth clients) and resource servers (APIs) via the Auth0 Management API.
+HOSTING managed
+TAGS auth0,authentication,identity
+LOAD resource-server.yaml common.yaml auth0-base.yaml application.yaml
+RESOURCES application-sync.js auth0-base.js common.js resource-server-sync.js

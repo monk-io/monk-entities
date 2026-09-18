@@ -1,0 +1,54 @@
+# NOTE: `domain` below is not a secret, so it can't be injected from test/.env the
+# way AUTH0_MANAGEMENT_CLIENT_ID/SECRET are. Replace both `domain` values with your
+# own Auth0 test tenant domain before running these tests.
+namespace: auth0-test
+
+test-app:
+  defines: auth0/application
+  domain: monk-demo.us.auth0.com
+  name: monk-test-auth0-app
+  app_type: spa
+  callback_urls:
+    - https://monk-test.example.com/callback
+  allowed_logout_urls:
+    - https://monk-test.example.com/logout
+  web_origins:
+    - https://monk-test.example.com
+  grant_types:
+    - authorization_code
+    - refresh_token
+  management_client_id_ref: auth0-management-client-id
+  management_client_secret_ref: auth0-management-client-secret
+  client_secret_ref: auth0-test-client-secret
+  permitted-secrets:
+    auth0-management-client-id: true
+    auth0-management-client-secret: true
+    auth0-test-client-secret: true
+  services:
+    data:
+      protocol: custom
+
+test-api:
+  defines: auth0/resource-server
+  domain: monk-demo.us.auth0.com
+  name: monk-test-auth0-api
+  identifier: https://monk-test-auth0-api.example.com
+  scopes:
+    - value: read:data
+      scope_description: Read access to test data
+    - value: write:data
+      scope_description: Write access to test data
+  management_client_id_ref: auth0-management-client-id
+  management_client_secret_ref: auth0-management-client-secret
+  permitted-secrets:
+    auth0-management-client-id: true
+    auth0-management-client-secret: true
+  services:
+    data:
+      protocol: custom
+
+stack:
+  defines: group
+  members:
+    - auth0-test/test-app
+    - auth0-test/test-api

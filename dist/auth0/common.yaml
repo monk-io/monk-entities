@@ -1,0 +1,7 @@
+namespace: auth0
+
+common:
+  defines: module
+  metadata:
+    version-hash: 9f81d0d91f42
+  source: <<< common.js

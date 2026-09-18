@@ -1,0 +1,118 @@
+namespace: auth0
+application:
+  defines: entity
+  metadata:
+    name: Application
+    description: |-
+      Auth0 Application (OAuth client) entity.
+      Creates and manages Auth0 applications (Clients) via the Management API.
+
+      ## Secrets
+      - Reads: `management_client_id_ref` / `management_client_secret_ref` — Auth0 Management API M2M credentials
+      - Writes: the application's client secret, to `client_secret_ref` (default: `auth0-client-secret`)
+
+      ## State Fields for Composition
+      - `state.client_id` - OAuth client ID
+      - `state.client_secret_secret` - secret name holding the current client secret
+    version-hash: 9f81d0d91f42
+  schema:
+    domain:
+      type: string
+      minLength: 1
+      description: 'Auth0 tenant domain, e.g. your-tenant.us.auth0.com'
+    management_client_id_ref:
+      type: string
+      description: 'Secret name holding the Auth0 Management API M2M application''s client ID (default: auth0-management-client-id)'
+    management_client_secret_ref:
+      type: string
+      description: 'Secret name holding the Auth0 Management API M2M application''s client secret (default: auth0-management-client-secret)'
+    name:
+      type: string
+      minLength: 1
+      description: Application name
+    app_type:
+      type: string
+      description: 'Auth0 application type, e.g. native, spa, regular_web, non_interactive (default: regular_web)'
+    callback_urls:
+      type: array
+      items:
+        type: string
+      description: Callback URLs allowed for this application (maps to Auth0's `callbacks`)
+    grant_types:
+      type: array
+      items:
+        type: string
+      description: 'Grant types supported by this application, e.g. authorization_code, refresh_token, client_credentials'
+    allowed_logout_urls:
+      type: array
+      items:
+        type: string
+      description: Allowed logout redirect URLs
+    allowed_origins:
+      type: array
+      items:
+        type: string
+      description: Allowed origins for CORS
+    web_origins:
+      type: array
+      items:
+        type: string
+      description: Allowed web origins for CORS on the token endpoint
+    logo_uri:
+      type: string
+      description: URL for the application logo
+    cross_origin_authentication:
+      type: boolean
+      description: Enable cross-origin authentication
+    token_endpoint_auth_method:
+      type: string
+      enum:
+        - none
+        - client_secret_post
+        - client_secret_basic
+      description: Token endpoint authentication method
+    client_secret_ref:
+      type: string
+      description: 'Secret name to store the client secret (default: auth0-client-secret)'
+    required:
+      - domain
+      - name
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates the resource already existed before this entity managed it
+    client_id:
+      type: string
+      description: Auth0 client ID
+    client_secret_secret:
+      type: string
+      description: Secret name where the current client secret is stored
+    name:
+      type: string
+      description: Application name
+    app_type:
+      type: string
+      description: Auth0 application type
+    callback_urls:
+      type: array
+      items:
+        type: string
+      description: Callback URLs configured for this application
+  lifecycle:
+    sync: <<< application-sync.js
+    get-info: ''
+    patch: ''
+    rotate-secret: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - auth0/auth0-base
+    - auth0/common
+    - secret
+    - cli
