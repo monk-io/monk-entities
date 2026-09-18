@@ -1,0 +1,4 @@
+REPO auth0
+DESCRIPTION Applications (OAuth clients) and resource servers (APIs) via the Auth0 Management API.
+HOSTING managed
+TAGS auth0,authentication,identity

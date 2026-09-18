@@ -1,0 +1,44 @@
+namespace: auth0-example
+
+app:
+  defines: auth0/application
+  domain: your-tenant.us.auth0.com
+  name: my-auth0-app
+  app_type: spa
+  callback_urls:
+    - https://my-app.example.com/callback
+  allowed_logout_urls:
+    - https://my-app.example.com/logout
+  web_origins:
+    - https://my-app.example.com
+  allowed_origins:
+    - https://my-app.example.com
+  management_client_id_ref: auth0-management-client-id
+  management_client_secret_ref: auth0-management-client-secret
+  client_secret_ref: auth0-client-secret
+  permitted-secrets:
+    auth0-management-client-id: true
+    auth0-management-client-secret: true
+    auth0-client-secret: true
+  services:
+    data:
+      protocol: custom
+
+api:
+  defines: auth0/resource-server
+  domain: your-tenant.us.auth0.com
+  name: my-auth0-api
+  identifier: https://api.example.com
+  scopes:
+    - value: read:data
+      scope_description: Read access to data
+    - value: write:data
+      scope_description: Write access to data
+  management_client_id_ref: auth0-management-client-id
+  management_client_secret_ref: auth0-management-client-secret
+  permitted-secrets:
+    auth0-management-client-id: true
+    auth0-management-client-secret: true
+  services:
+    data:
+      protocol: custom

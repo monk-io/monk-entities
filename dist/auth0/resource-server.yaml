@@ -1,0 +1,81 @@
+namespace: auth0
+resource-server:
+  defines: entity
+  metadata:
+    name: ResourceServer
+    description: |-
+      Auth0 Resource Server (API) entity.
+      Creates and manages Auth0 resource servers via the Management API. Resource servers
+      have no client secret of their own (that's an Application/client concept), so there
+      is no rotate-secret action here.
+
+      ## State Fields for Composition
+      - `state.resource_server_id` - Auth0-generated resource server ID
+      - `state.identifier` - API identifier (audience), usable by `application` entities' grant configuration
+    version-hash: 9f81d0d91f42
+  schema:
+    domain:
+      type: string
+      minLength: 1
+      description: 'Auth0 tenant domain, e.g. your-tenant.us.auth0.com'
+    management_client_id_ref:
+      type: string
+      description: 'Secret name holding the Auth0 Management API M2M application''s client ID (default: auth0-management-client-id)'
+    management_client_secret_ref:
+      type: string
+      description: 'Secret name holding the Auth0 Management API M2M application''s client secret (default: auth0-management-client-secret)'
+    name:
+      type: string
+      minLength: 1
+      description: Friendly name for the resource server
+    identifier:
+      type: string
+      minLength: 1
+      description: 'Unique identifier (audience) for the API, e.g. https://api.example.com. Immutable once set.'
+    scopes:
+      type: array
+      items:
+        type: object
+        properties:
+          value:
+            type: string
+            description: 'Permission string, e.g. "read:data"'
+          scope_description:
+            type: string
+            description: Human-readable explanation of the scope
+        required:
+          - value
+        additionalProperties: false
+      description: Scopes (permissions) exposed by this API
+    required:
+      - domain
+      - name
+      - identifier
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates the resource already existed before this entity managed it
+    resource_server_id:
+      type: string
+      description: Auth0-generated resource server ID
+    identifier:
+      type: string
+      description: API identifier (audience)
+    name:
+      type: string
+      description: Friendly name for the resource server
+  lifecycle:
+    sync: <<< resource-server-sync.js
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 1
+      attempts: 10
+  requires:
+    - monkec/base
+    - auth0/auth0-base
+    - auth0/common
+    - cli
