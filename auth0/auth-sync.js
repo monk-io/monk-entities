@@ -304,6 +304,46 @@ function deleteApplication(def, state) {
   }
 }
 
+function rotateApplicationSecret(def, state) {
+  if (!state["client-id"]) {
+    throw new Error("No client-id found in state for rotating application secret");
+  }
+
+  const managementToken = getManagementToken(def);
+  console.log("Rotating secret for application with ID:", state["client-id"]);
+
+  const res = http.post(
+    `${def["management-api"]}/api/v2/clients/${state["client-id"]}/rotate-secret`,
+    {
+      headers: {
+        Authorization: `Bearer ${managementToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    }
+  );
+
+  if (isHttpFailure(res)) {
+    throw new Error(
+      `Failed to rotate secret for application (client-id=${state["client-id"]}): ${describeAuth0Error(res)}`
+    );
+  }
+
+  let appObj;
+  try {
+    appObj = JSON.parse(res.body);
+  } catch (err) {
+    throw new Error(
+      `Failed to parse response: ${err.message}, body: ${res.body}`
+    );
+  }
+
+  state["client-secret"] = appObj.client_secret;
+  console.log(`Rotated client secret for application ${state["client-id"]}`);
+
+  return state;
+}
+
 function checkReadiness(def, state) {
   const res = http.get(
     `https://${def.domain}/.well-known/openid-configuration`,
@@ -469,6 +509,9 @@ function main(def, state, ctx) {
       break;
     case "patch":
       state = patchApplication(def, state, ctx);
+      break;
+    case "rotate-secret":
+      state = rotateApplicationSecret(def, state);
       break;
     default:
       return state;
