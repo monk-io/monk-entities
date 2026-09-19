@@ -75,6 +75,60 @@ type DeepReadonlyObject<T> = {
 };
 
 /**
+ * The Monk runtime represents array-of-object fields (in Definition or State) as
+ * flattened indexed keys on the parent object (e.g. `scopes!0`, `scopes!1`) rather
+ * than a real JS array — arrays of primitives (string/number/boolean) are handed in
+ * already reconstructed and are unaffected. Several entities have historically
+ * worked around this with a hand-rolled per-field `collectArray()` helper; this is
+ * the same detection/collection logic applied generically and recursively to the
+ * whole object graph, once, in the base class, so no entity needs its own copy.
+ *
+ * Detection: a key matches `^(.+)!(\d+)$`. For each distinct field name found this
+ * way, elements are collected starting at index 0 and stopping at the first missing
+ * index (mirrors the existing hand-rolled helpers' behavior for a sparse/gapped
+ * sequence, which should not occur in practice). Recurses into collected elements
+ * and into any already-real array/object values, so nested cases (an array-of-objects
+ * whose own properties are themselves array-of-objects, or a primitive array nested
+ * inside a flattened element) are fixed at every depth, not just the top level.
+ */
+function unflattenIndexedArrays<T>(value: T): T {
+    if (Array.isArray(value)) {
+        return value.map((v) => unflattenIndexedArrays(v)) as unknown as T;
+    }
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+
+    const obj = value as Record<string, unknown>;
+    const arrayFieldPattern = /^(.+)!\d+$/;
+    const arrayFields = new Set<string>();
+    for (const key of Object.keys(obj)) {
+        const match = arrayFieldPattern.exec(key);
+        if (match) {
+            arrayFields.add(match[1]);
+        }
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj)) {
+        if (!arrayFieldPattern.test(key)) {
+            result[key] = unflattenIndexedArrays(val);
+        }
+    }
+    for (const field of arrayFields) {
+        const collected: unknown[] = [];
+        let i = 0;
+        while (Object.prototype.hasOwnProperty.call(obj, `${field}!${i}`)) {
+            collected.push(unflattenIndexedArrays(obj[`${field}!${i}`]));
+            i++;
+        }
+        result[field] = collected;
+    }
+
+    return result as T;
+}
+
+/**
  * Base abstract class for all Monk entities
  * @template D - The definition type for the entity
  * @template S - The state type for the entity
@@ -91,14 +145,23 @@ export abstract class MonkEntity<D extends object, S extends object> {
     metadata?: Metadata;
 
     /**
+     * The definition exactly as received, before array-of-object reconstruction.
+     * Used only for idempotence hashing, so that fixing array reconstruction does
+     * not change the hash of any already-deployed entity's definition and trigger
+     * a spurious update() on upgrade.
+     */
+    private readonly rawDefinitionForHash: D;
+
+    /**
      * Creates a new MonkEntity instance
      * @param definition - The entity definition
      * @param state - The entity state
      * @param ctx - The context object
      */
     constructor(definition: D, state: S, ctx: MonkContext | undefined) {
-        this.definition = definition as DeepReadonly<D>;
-        this.state = state;
+        this.rawDefinitionForHash = definition;
+        this.definition = unflattenIndexedArrays(definition) as DeepReadonly<D>;
+        this.state = unflattenIndexedArrays(state);
         this.path = ctx?.path || "";
     }
 
@@ -352,6 +415,10 @@ export abstract class MonkEntity<D extends object, S extends object> {
     /**
      * Allows subclasses to customize what participates in the idempotence hash.
      * Default: current definition bundled with optional metadata version signals.
+     *
+     * Uses the pristine, pre-unflatten definition (see `rawDefinitionForHash`) rather
+     * than `this.definition`, so that array-of-object reconstruction never changes an
+     * already-deployed entity's hash on its own.
      */
     protected getDefinitionForHash(): unknown {
         const meta = this.metadata || {};
@@ -360,7 +427,7 @@ export abstract class MonkEntity<D extends object, S extends object> {
                 version: meta.version || "",
                 version_hash: (meta as any)["version-hash"] || "",
             },
-            definition: this.definition,
+            definition: this.rawDefinitionForHash,
         } as const;
     }
 
