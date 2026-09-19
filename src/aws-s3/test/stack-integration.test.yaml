@@ -146,6 +146,16 @@ tests:
     expect:
       exitCode: 0
 
+  - name: "Verify CORS configuration reached S3 (array-of-object Definition field)"
+    action: "do"
+    target: "aws-s3-test/test-versioned-bucket/get-cors-config"
+    expect:
+      exitCode: 0
+      output:
+        - "ExposeHeader"
+        - "ETag"
+        - "3600"
+
   # Test custom actions on advanced bucket
   - name: "Test get-bucket-info action on advanced bucket"
     action: "do"
@@ -180,6 +190,28 @@ tests:
     target: "aws-s3-test/test-advanced-bucket/empty-bucket"
     expect:
       exitCode: 0
+
+  - name: "Verify lifecycle configuration reached S3, including transitions and noncurrent-version expiration (array-of-object Definition fields)"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/get-lifecycle-config"
+    expect:
+      exitCode: 0
+      output:
+        - "transition-to-ia"
+        - "STANDARD_IA"
+        - "GLACIER"
+        - "cleanup-incomplete-uploads"
+        - "NoncurrentVersionExpiration"
+        - "NoncurrentDays"
+
+  - name: "Verify server-side encryption configuration reached S3 (array-of-object Definition field)"
+    action: "do"
+    target: "aws-s3-test/test-advanced-bucket/get-encryption-config"
+    expect:
+      exitCode: 0
+      output:
+        - "AES256"
+        - "BucketKeyEnabled"
 
   # Advanced testing scenarios
   - name: "Test multiple presigned URLs generation"

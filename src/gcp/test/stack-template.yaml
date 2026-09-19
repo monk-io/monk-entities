@@ -145,6 +145,13 @@ test-memorystore:
   persistence_config:
     persistence_mode: RDB
     rdb_snapshot_period: SIX_HOURS
+  maintenance_policy:
+    description: Weekly maintenance window
+    weekly_maintenance_window:
+      - day: SUNDAY
+        start_time:
+          hours: 3
+          minutes: 0
   depends:
     wait-for:
       runnables:
