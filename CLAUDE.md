@@ -61,6 +61,7 @@ Use these skills for the full integration development pipeline:
 - **Integration tests**: use `run` action with `args: tag: "local"` (not `run` on groups)
 - **Entity dependencies**: wire with `connection-target("name") entity-state get-member("field")` + `service: default`
 - **Cost actions**: every billable entity needs `get-cost-estimate` (human-readable) and `costs` (JSON for billing)
+- **Array-of-object Definition/State fields**: `MonkEntity` (`src/monkec/base.ts`) reconstructs these from the Monk runtime's flattened `field!0`, `field!1`, ... representation automatically — just declare `foo?: SomeObject[]` and read `this.definition.foo` normally. (Older packages have their own hand-rolled `collectArray()` helper predating this fix; harmless to leave, no need to add new ones.)
 
 ## Key docs
 

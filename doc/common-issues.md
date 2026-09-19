@@ -86,6 +86,12 @@ This guide collects recurring errors and fixes seen while building MonkEC entiti
     - Recompile and reload MANIFEST, then rerun tests.
   - Prevention: See `doc/entity-conventions.md` → Reserved property names.
 
+- Array-of-object Definition/State field reads as `undefined`
+  - Symptom: `this.definition.someField` (declared as `SomeObject[]`) is `undefined` at runtime even though the template sets it, while a sibling `string[]`/`number[]`/`boolean[]` field on the same Definition works fine.
+  - Root cause: the Monk runtime represents an array of primitives as a real JS array by the time it reaches the compiled entity, but represents an array of *objects* as flattened indexed keys on the parent object instead (`someField!0`, `someField!1`, ...) — not a bug in your entity code.
+  - Fix: none needed as of the `MonkEntity` base-class fix in `src/monkec/base.ts` (recompile `src/monkec` if you're on an older `dist/monkec`) — `this.definition`/`this.state` are reconstructed automatically, including nested cases (an array-of-objects whose own properties are themselves arrays). Just declare the field normally and read it normally.
+  - History: several packages predate this fix and hand-roll a `collectArray<T>(obj, key)` helper for the same purpose (e.g. `src/gcp/cloud-armor-security-policy.ts`, `src/aws-cloudfront/distribution.ts`, `src/azure-cosmosdb/{access-list,database-account}.ts`, `src/auth0/common.ts`). These are harmless no-ops now and don't need to be removed, but don't copy the pattern into new code — it's no longer necessary.
+
 ## Debugging
 
 - Decode Monk errors
