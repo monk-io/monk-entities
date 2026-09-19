@@ -294,6 +294,9 @@ tests:
     actionName: get-info
     expect:
       exitCode: 0
+      output:
+        - "weeklyMaintenanceWindow"
+        - "SUNDAY"
 
   - name: Test Memorystore get-backup-info action
     action: action

@@ -531,6 +531,57 @@ export class S3Bucket extends AWSS3Entity<S3BucketDefinition, S3BucketState> {
         }
     }
 
+    @action()
+    getCorsConfig(_args?: Args): void {
+        if (!this.state.bucket_name) {
+            throw new Error('Bucket not created yet');
+        }
+        const url = this.getBucketUrl(this.getBucketName(), "?cors");
+        const response = aws.get(url, { service: 's3', region: this.region });
+        if (response.statusCode === 404 || response.statusCode === 204) {
+            cli.output('CORS configuration: NOT SET');
+            return;
+        }
+        if (response.statusCode !== 200) {
+            throw new Error(`Failed to get bucket CORS configuration: ${parseS3Error(response)}`);
+        }
+        cli.output(`CORS configuration:\n${response.body}`);
+    }
+
+    @action()
+    getLifecycleConfig(_args?: Args): void {
+        if (!this.state.bucket_name) {
+            throw new Error('Bucket not created yet');
+        }
+        const url = this.getBucketUrl(this.getBucketName(), "?lifecycle");
+        const response = aws.get(url, { service: 's3', region: this.region });
+        if (response.statusCode === 404) {
+            cli.output('Lifecycle configuration: NOT SET');
+            return;
+        }
+        if (response.statusCode !== 200) {
+            throw new Error(`Failed to get bucket lifecycle configuration: ${parseS3Error(response)}`);
+        }
+        cli.output(`Lifecycle configuration:\n${response.body}`);
+    }
+
+    @action()
+    getEncryptionConfig(_args?: Args): void {
+        if (!this.state.bucket_name) {
+            throw new Error('Bucket not created yet');
+        }
+        const url = this.getBucketUrl(this.getBucketName(), "?encryption");
+        const response = aws.get(url, { service: 's3', region: this.region });
+        if (response.statusCode === 404) {
+            cli.output('Server-side encryption configuration: NOT SET');
+            return;
+        }
+        if (response.statusCode !== 200) {
+            throw new Error(`Failed to get bucket encryption configuration: ${parseS3Error(response)}`);
+        }
+        cli.output(`Server-side encryption configuration:\n${response.body}`);
+    }
+
     /**
      * Get estimated monthly cost for this S3 bucket based on current storage usage
      * and actual request metrics from CloudWatch.
