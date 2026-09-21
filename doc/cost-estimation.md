@@ -87,7 +87,13 @@ If an error occurs, the output includes an `error` field:
 | Spaces Bucket | `digitalocean-spaces/bucket` | Hardcoded pricing | S3-compatible API |
 | Container Registry | `digitalocean-container-registry/registry` | Hardcoded pricing | DO API |
 
-**Total: 23 billable entities with cost estimation**
+### MongoDB Atlas (1 entity)
+
+| Entity | Path | Pricing Source | Usage Metrics |
+|--------|------|---------------|---------------|
+| Cluster | `mongodb-atlas/cluster` | Hardcoded pricing table | Atlas Admin API |
+
+**Total: 24 billable entities with cost estimation**
 
 ---
 
@@ -941,6 +947,158 @@ Fixed monthly price based on subscription tier. No usage-based charges.
 
 ---
 
+# MongoDB Atlas Entities
+
+## Common MongoDB Atlas Pricing Infrastructure
+
+MongoDB provides **no pricing API**. The Atlas Administration API exposes only *incurred*
+usage — invoices, line items and Cost Explorer — never a rate card. A search of the full
+Atlas Admin API v2 OpenAPI spec confirms no `pricing`, `rates` or `estimate` resource
+exists; `GET /skus` returns SKU names and descriptions, not prices.
+
+Pricing is therefore **hardcoded** from MongoDB's published pricing and needs manual
+refreshing. Atlas is, however, the first entity able to report **actual billed cost**, via
+the org-level invoice endpoints.
+
+### Required Atlas Permissions
+
+| Action | Required Role |
+|--------|--------------|
+| `get-cost-estimate`, `costs` | Project-scoped access (what the entity already has) |
+| `get-actual-cost` | **Organization Billing Viewer** (org-level) |
+
+Atlas has no project-scoped billing role, so a project-scoped service account cannot read
+invoices at all. `get-actual-cost` detects a 401/403 and explains the requirement rather
+than failing opaquely; the estimate actions never need billing access.
+
+---
+
+## Cluster Cost Estimation
+
+### Overview
+
+Calculates estimated monthly costs by combining:
+
+1. **Atlas Admin API** — Live cluster topology (tier, node counts, regions, disk, backup)
+2. **Hardcoded pricing table** — Published hourly rates per instance tier
+
+When the live cluster cannot be read, the estimate falls back to the entity definition and
+says so.
+
+### Pricing Table (AWS us-east-1 baseline, hourly)
+
+| Tier | RAM | vCPU | $/hr | $/month (×730) |
+|------|-----|------|------|----------------|
+| M10 | 2 GB | 2 | 0.08 | 58.40 |
+| M20 | 4 GB | 2 | 0.20 | 146.00 |
+| M30 | 8 GB | 2 | 0.54 | 394.20 |
+| M40 | 16 GB | 4 | 1.04 | 759.20 |
+| M50 | 32 GB | 8 | 2.00 | 1460.00 |
+| M60 | 64 GB | 16 | 3.95 | 2883.50 |
+| M80 | 128 GB | 32 | 7.30 | 5329.00 |
+| M140 | 192 GB | 48 | 10.99 | 8022.70 |
+| M200 | 256 GB | 64 | 14.59 | 10650.70 |
+| M300 | 384 GB | 96 | 21.85 | 15950.50 |
+
+Low-CPU (R-series) hourly rates: R40 0.77, R50 1.48, R60 2.92, R80 5.61, R200 11.21,
+R300 16.63, R400 22.40, R700 33.26. MongoDB does not publish RAM/vCPU specs alongside
+these rates, so those columns are omitted rather than guessed.
+
+Other tiers: **M0** free (512 MB storage); **FLEX** usage-tiered $8/month (0-100 ops/sec)
+to a $30/month cap (400-500 ops/sec), including 5 GB storage and data transfer.
+
+### A tier rate covers a whole replica set, not one node
+
+This is the most common way to get Atlas pricing wrong. A published hourly rate buys an
+entire standard 3-node replica set, including default storage/IOPS and automated backups.
+Multiplying it by 3 — as several third-party pricing write-ups do — overstates cost 3×.
+
+Extra nodes therefore scale the rate *per node* rather than multiplying it:
+
+```
+monthly = hourly × 730 × (total_nodes / 3)
+```
+
+`total_nodes` sums electable, read-only and analytics nodes across every region config, so
+added regions and analytics nodes are priced correctly. With no live data the standard
+3-node set is assumed, giving a multiplier of 1.
+
+### Cost Components
+
+| Component | Calculation | Source |
+|-----------|-------------|--------|
+| Compute | `hourly × 730 × (nodes ÷ 3)` | Hardcoded table |
+| Storage and IOPS | Included in the tier rate at default settings | — |
+| Backup snapshots | Usage-based, excluded from the total | — |
+| Data transfer | Usage-based, excluded from the total | — |
+
+### What's NOT Included
+
+- Backup snapshot storage ($0.08-$0.65/GB-month depending on provider)
+- Continuous Cloud Backup / point-in-time recovery (tiered, from $1.00/GB-month on AWS)
+- Data transfer (same-region $0.01/GB, cross-region $0.02/GB, internet egress $0.09/GB)
+- BI Connector, Data Federation, Stream Processing and other add-on services
+- Reserved-capacity and enterprise-agreement discounts
+- Per-provider and per-region rate differences — the table is the AWS us-east-1 baseline,
+  so GCP, Azure and other regions will differ
+
+### Reported periods and the monk core contract
+
+Monk core invokes only the `costs` action (`pkg/base/billing/logic/update_billing_metrics.go`,
+`entityAction := "costs"`), decodes stdout into `EntityCosts{type, costs}`, and feeds the
+result to `billing.BuildPeriods(pricing, createdAt, now)` to accrue running cost. The
+`get-cost-estimate` and `get-actual-cost` actions are not consumed by core — core's own
+estimation paths (`plan/cost.go`, `cluster/logic/costs_estimation.go`) cover provider
+infrastructure (nodes, volumes, snapshots, balancers) only and never call an entity.
+
+Core's `fetchEntityPricing` accepts the periods `hour`, `day`, `month` and `quarter`, and
+checks them **in that order**. This entity reports both `hour` and `month`:
+
+```json
+{
+  "type": "mongodb-atlas-cluster",
+  "costs": {
+    "hour":  { "amount": "0.540000", "currency": "USD" },
+    "month": { "amount": "394.20",   "currency": "USD" }
+  }
+}
+```
+
+Reporting `hour` matters. A month-only entity is tagged `UnitMonthly`, and core's running-cost
+accrual normalizes every price to hourly via `Pricing.ToUnit`, which divides a monthly amount
+by `30 × 24 = 720` — while core elsewhere treats a month as `730` hours
+(`costs.HoursInMonth`, `pricing.DurationMonth`). That inconsistency inflates the accrued cost
+of a month-only entity by a factor of `730/720` ≈ **1.4%**. Atlas publishes hourly rates
+natively, so reporting `hour` sidesteps the conversion and is exact; `month` is retained for
+the repo-wide convention and for humans reading the raw output.
+
+The other 23 entities here report `month` only and are subject to that ~1.4% drift.
+
+Note that `costs.Cost` in `monk-io/api` defines only `amount`, `currency` and `description` —
+there is no `error` field. The `error` key this repo's convention adds is silently ignored by
+core (Go's decoder does not reject unknown fields), so it serves human readers and any other
+consumer, not core.
+
+---
+
+### `get-actual-cost` — MongoDB's own billed figures
+
+Reads the org's pending invoice (`GET /orgs/{orgId}/invoices/pending`, falling back to
+`GET /orgs/{orgId}/invoices/{invoiceId}` when the listing omits line items) and sums the
+line items whose `clusterName` matches this cluster and whose `groupId` matches its
+project. Amounts arrive as `totalPriceCents` and are grouped per SKU.
+
+Because it is MongoDB's own figure it includes backup, data transfer and applied discounts
+— but a pending invoice is a **partial-month accrual**, not a full-month projection, which
+is why `costs` reports the estimate instead.
+
+Note that the billing endpoints are versioned separately from the cluster endpoints and
+only accept `2023-01-01`, hence the `BILLING_API_VERSION` override in `common.ts`.
+
+### Accuracy: 90-95% for AWS on-demand (based on published pricing); lower on GCP/Azure
+
+---
+
 # Cross-Cutting Concerns
 
 ## Pricing Data Freshness
@@ -951,6 +1109,7 @@ Fixed monthly price based on subscription tier. No usage-based charges.
 | GCP | Live API calls (Cloud Billing Catalog) | Real-time |
 | Azure | Live API calls (Retail Prices API) | Real-time |
 | DigitalOcean | Hardcoded pricing tables | Manual updates needed |
+| MongoDB Atlas | Hardcoded pricing tables (no pricing API exists) | Manual updates needed |
 
 ## Fallback Behavior
 
@@ -958,12 +1117,15 @@ Fixed monthly price based on subscription tier. No usage-based charges.
 - **GCP**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Cloud Monitoring data is unavailable instead of being guessed.
 - **Azure**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Azure Monitor data is unavailable or insufficient for an accurate breakdown.
 - **DigitalOcean**: Always uses hardcoded rates (no API available)
+- **MongoDB Atlas**: Always uses hardcoded rates (no pricing API exists). An unknown tier is
+  reported as an explicit error in `costs` rather than priced from a substituted rate.
+  `get-actual-cost` degrades gracefully when the credentials lack org billing access.
 
 ## Usage-Based vs Fixed Cost Entities
 
 | Type | Entities | `costs` Behavior |
 |------|----------|-----------------|
-| **Fixed cost** | RDS, Cloud SQL, Neptune, Memorystore Redis, Event Hubs (Premium), Service Bus (Premium), DO Database, DO Registry | Returns calculated monthly cost |
+| **Fixed cost** | RDS, Cloud SQL, Neptune, Memorystore Redis, Event Hubs (Premium), Service Bus (Premium), DO Database, DO Registry, Atlas Cluster | Returns calculated monthly cost |
 | **Usage-based** | S3, Lambda, DynamoDB, CloudFront, SQS, SNS, API Gateway, Cloud Function, Cloud Storage, BigQuery, Firestore | Returns cost based on CloudWatch/Monitoring metrics (may be $0 if no metrics) |
 | **Hybrid** | Cosmos DB, Event Hubs, Service Bus, DO Spaces | Returns fixed components plus measured usage components when metrics are available |
 

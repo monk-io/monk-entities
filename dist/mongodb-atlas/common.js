@@ -32,6 +32,7 @@ var common_exports = {};
 __export(common_exports, {
   API_VERSION: () => API_VERSION,
   BASE_URL: () => BASE_URL,
+  BILLING_API_VERSION: () => BILLING_API_VERSION,
   getOrganization: () => getOrganization,
   getToken: () => getToken
 });
@@ -41,6 +42,7 @@ var import_secret = __toESM(require("secret"));
 var import_crypto = __toESM(require("crypto"));
 var BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
 var API_VERSION = "application/vnd.atlas.2025-03-12+json";
+var BILLING_API_VERSION = "application/vnd.atlas.2023-01-01+json";
 function getToken(secretRef) {
   const now = /* @__PURE__ */ new Date();
   let cachedToken;
@@ -128,6 +130,7 @@ function getOrganization(name, bearerToken) {
 0 && (module.exports = {
   API_VERSION,
   BASE_URL,
+  BILLING_API_VERSION,
   getOrganization,
   getToken
 });

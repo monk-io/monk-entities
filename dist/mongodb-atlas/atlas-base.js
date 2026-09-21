@@ -148,15 +148,21 @@ var MongoDBAtlasEntity = class extends import_base.MonkEntity {
   }
   /**
    * Helper method to make authenticated HTTP requests with consistent error handling
+   *
+   * @param version Optional resource version override (full media type, e.g.
+   *   "application/vnd.atlas.2023-01-01+json"). Atlas versions each resource
+   *   independently: the billing/invoice endpoints only accept 2023-01-01, while the
+   *   cluster endpoints need the newer pinned API_VERSION. Defaults to API_VERSION.
    */
-  makeRequest(method, path, body) {
+  makeRequest(method, path, body, version) {
     try {
+      const mediaType = version || API_VERSION;
       const headers = {
-        "Accept": API_VERSION,
+        "Accept": mediaType,
         "Authorization": "Bearer " + this.apiToken
       };
       if (method.toUpperCase() !== "GET") {
-        headers["Content-Type"] = API_VERSION;
+        headers["Content-Type"] = mediaType;
       }
       const response = this.httpClient.request(method, path, {
         body,

@@ -1,6 +1,7 @@
 import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntityState } from "./atlas-base.ts";
 import cli from "cli";
 import { action, Args } from "monkec/base";
+import { BILLING_API_VERSION } from "./common.ts";
 
 /**
  * Represents a MongoDB Atlas cluster entity.
@@ -1141,5 +1142,479 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
                 return '🔄';
         }
     }
-}
 
+    // ==================== COST ESTIMATION ACTIONS ====================
+
+    /** Hours used to convert hourly Atlas rates to a monthly figure (repo-wide convention). */
+    private static readonly HOURS_PER_MONTH = 730;
+
+    /**
+     * MongoDB Atlas dedicated cluster pricing, hourly USD.
+     *
+     * MongoDB does not expose a pricing API — the Atlas Administration API only reports
+     * *incurred* usage (invoices, Cost Explorer), never a rate card. These rates are
+     * therefore transcribed from MongoDB's published pricing and need manual refreshing.
+     * Source: https://www.mongodb.com/pricing (AWS us-east-1 baseline)
+     *
+     * IMPORTANT: each rate covers an entire standard 3-node replica set, not one node.
+     * Do not multiply by node count — see nodeEquivalents() for how extra nodes are priced.
+     *
+     * R-series entries are the low-CPU variants; MongoDB does not publish their RAM/vCPU
+     * specs alongside the rates, so those fields are omitted rather than guessed.
+     */
+    private static readonly DEDICATED_PRICING: Record<string, { hourly: number; ram_gb?: number; vcpu?: number }> = {
+        M10:  { hourly: 0.08,  ram_gb: 2,   vcpu: 2 },
+        M20:  { hourly: 0.20,  ram_gb: 4,   vcpu: 2 },
+        M30:  { hourly: 0.54,  ram_gb: 8,   vcpu: 2 },
+        M40:  { hourly: 1.04,  ram_gb: 16,  vcpu: 4 },
+        M50:  { hourly: 2.00,  ram_gb: 32,  vcpu: 8 },
+        M60:  { hourly: 3.95,  ram_gb: 64,  vcpu: 16 },
+        M80:  { hourly: 7.30,  ram_gb: 128, vcpu: 32 },
+        M140: { hourly: 10.99, ram_gb: 192, vcpu: 48 },
+        M200: { hourly: 14.59, ram_gb: 256, vcpu: 64 },
+        M300: { hourly: 21.85, ram_gb: 384, vcpu: 96 },
+        R40:  { hourly: 0.77 },
+        R50:  { hourly: 1.48 },
+        R60:  { hourly: 2.92 },
+        R80:  { hourly: 5.61 },
+        R200: { hourly: 11.21 },
+        R300: { hourly: 16.63 },
+        R400: { hourly: 22.40 },
+        R700: { hourly: 33.26 },
+    };
+
+    /**
+     * Flex cluster pricing bounds, monthly USD.
+     * Flex is billed on a usage tier (operations/sec), from $8/mo at 0-100 ops/sec up to a
+     * $30/mo cap at 400-500 ops/sec. Storage (5GB) and data transfer are included.
+     * Source: https://www.mongodb.com/docs/atlas/billing/atlas-flex-costs/
+     */
+    private static readonly FLEX_MIN_MONTHLY = 8.00;
+    private static readonly FLEX_MAX_MONTHLY = 30.00;
+
+    /** Standard replica set size that a published dedicated-tier hourly rate covers. */
+    private static readonly BASE_REPLICA_NODES = 3;
+
+    /**
+     * Fetch the live cluster document, or null if it cannot be read.
+     * Used so the estimate reflects the cluster as actually deployed (tier changes,
+     * added regions, extra read-only/analytics nodes) rather than only the definition.
+     */
+    private fetchClusterForCosting(): any | null {
+        try {
+            return this.checkResourceExists(this.clusterResourcePath());
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    /** Instance size as deployed, falling back to the definition. */
+    private resolveInstanceSize(clusterData: any | null): string {
+        const regionConfig = clusterData?.replicationSpecs?.[0]?.regionConfigs?.[0];
+        const liveSize = regionConfig?.electableSpecs?.instanceSize
+            || clusterData?.providerSettings?.instanceSizeName;
+        return String(liveSize || this.definition.instance_size);
+    }
+
+    /**
+     * Total billable nodes across every replication spec and region, counting electable,
+     * read-only and analytics nodes. Returns null when the live cluster is unavailable,
+     * in which case the caller assumes the standard replica set.
+     */
+    private countClusterNodes(clusterData: any | null): number | null {
+        const specs = clusterData?.replicationSpecs;
+        if (!specs || specs.length === 0) {
+            return null;
+        }
+
+        let total = 0;
+        for (let i = 0; i < specs.length; i++) {
+            const regionConfigs = specs[i]?.regionConfigs;
+            if (!regionConfigs) {
+                continue;
+            }
+            for (let j = 0; j < regionConfigs.length; j++) {
+                const rc = regionConfigs[j];
+                total += Number(rc?.electableSpecs?.nodeCount || 0);
+                total += Number(rc?.readOnlySpecs?.nodeCount || 0);
+                total += Number(rc?.analyticsSpecs?.nodeCount || 0);
+            }
+        }
+
+        return total > 0 ? total : null;
+    }
+
+    /**
+     * Multiplier applied to the published tier rate.
+     *
+     * A published rate buys a standard 3-node replica set, so a cluster with extra nodes
+     * (additional regions, read-only or analytics nodes) scales proportionally per node.
+     */
+    private nodeEquivalents(nodeCount: number | null): number {
+        if (!nodeCount) {
+            return 1;
+        }
+        return nodeCount / Cluster.BASE_REPLICA_NODES;
+    }
+
+    /**
+     * Resolve pricing for this cluster's tier.
+     * Returns null when the tier is dedicated but absent from the rate table, so callers
+     * can surface an explicit error instead of reporting a wrong number.
+     */
+    private getClusterPricing(instanceSize: string): {
+        family: "free" | "flex" | "dedicated";
+        hourly: number;
+        monthlyMin: number;
+        monthlyMax: number;
+        ram_gb?: number;
+        vcpu?: number;
+        source: string;
+    } | null {
+        const size = instanceSize.toUpperCase();
+
+        if (size === "M0") {
+            return {
+                family: "free",
+                hourly: 0,
+                monthlyMin: 0,
+                monthlyMax: 0,
+                source: "MongoDB Atlas free tier (M0)"
+            };
+        }
+
+        if (size === "FLEX") {
+            return {
+                family: "flex",
+                hourly: 0,
+                monthlyMin: Cluster.FLEX_MIN_MONTHLY,
+                monthlyMax: Cluster.FLEX_MAX_MONTHLY,
+                source: "MongoDB published Flex pricing (hardcoded)"
+            };
+        }
+
+        const tier = Cluster.DEDICATED_PRICING[size];
+        if (!tier) {
+            return null;
+        }
+
+        const monthly = tier.hourly * Cluster.HOURS_PER_MONTH;
+        return {
+            family: "dedicated",
+            hourly: tier.hourly,
+            monthlyMin: monthly,
+            monthlyMax: monthly,
+            ram_gb: tier.ram_gb,
+            vcpu: tier.vcpu,
+            source: "MongoDB published pricing, AWS us-east-1 baseline (hardcoded)"
+        };
+    }
+
+    /**
+     * Get a detailed cost estimate for the cluster
+     *
+     * Usage:
+     * - monk do namespace/cluster/get-cost-estimate
+     */
+    @action("get-cost-estimate")
+    getCostEstimate(_args?: Args): void {
+        cli.output(`\n💰 Cost Estimate for MongoDB Atlas Cluster: ${this.state.name || this.definition.name}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const clusterData = this.fetchClusterForCosting();
+        if (!clusterData) {
+            cli.output(`⚠️ Could not fetch live cluster info — estimating from the entity definition`);
+        }
+
+        const instanceSize = this.resolveInstanceSize(clusterData);
+        const nodeCount = this.countClusterNodes(clusterData);
+        const regionCount = clusterData?.replicationSpecs?.[0]?.regionConfigs?.length || 1;
+
+        cli.output(`\n📊 Cluster Configuration:`);
+        cli.output(`   Name: ${this.state.name || this.definition.name}`);
+        cli.output(`   Tier: ${instanceSize}`);
+        cli.output(`   Provider: ${this.definition.provider}`);
+        cli.output(`   Region: ${this.definition.region}`);
+        cli.output(`   Nodes: ${nodeCount !== null ? nodeCount : `${Cluster.BASE_REPLICA_NODES} (assumed — live data unavailable)`}`);
+        if (regionCount > 1) {
+            cli.output(`   Regions: ${regionCount}`);
+        }
+        if (clusterData?.diskSizeGB) {
+            cli.output(`   Disk Size: ${clusterData.diskSizeGB} GB`);
+        }
+        if (clusterData?.backupEnabled !== undefined) {
+            cli.output(`   Backup Enabled: ${clusterData.backupEnabled ? 'Yes' : 'No'}`);
+        }
+
+        const pricing = this.getClusterPricing(instanceSize);
+        if (!pricing) {
+            cli.output(`\n❌ Error: No published rate on file for tier ${instanceSize}`);
+            cli.output(`   Update DEDICATED_PRICING in src/mongodb-atlas/cluster.ts to add it.`);
+            return;
+        }
+
+        cli.output(`\n💵 Pricing Information:`);
+        cli.output(`   Source: ${pricing.source}`);
+        if (pricing.ram_gb && pricing.vcpu) {
+            cli.output(`   Tier Specs: ${pricing.ram_gb} GB RAM, ${pricing.vcpu} vCPU`);
+        }
+
+        if (pricing.family === "free") {
+            cli.output(`\n${'='.repeat(60)}`);
+            cli.output(`💰 ESTIMATED MONTHLY COST: $0.00 (free tier)`);
+            cli.output(`${'='.repeat(60)}`);
+            cli.output(`\n📝 Notes:`);
+            cli.output(`   - M0 clusters are free and include 512 MB of storage`);
+            cli.output(`   - Data transfer is free on M0`);
+            return;
+        }
+
+        if (pricing.family === "flex") {
+            cli.output(`   Usage Tier Range: $${pricing.monthlyMin.toFixed(2)}–$${pricing.monthlyMax.toFixed(2)}/month`);
+            cli.output(`\n📈 Cost Breakdown:`);
+            cli.output(`   Base tier (0-100 ops/sec): $${pricing.monthlyMin.toFixed(2)}/month`);
+            cli.output(`   Storage (5 GB) and data transfer: Included`);
+            cli.output(`\n${'='.repeat(60)}`);
+            cli.output(`💰 ESTIMATED MONTHLY COST: $${pricing.monthlyMin.toFixed(2)} (base tier)`);
+            cli.output(`${'='.repeat(60)}`);
+            cli.output(`\n📝 Notes:`);
+            cli.output(`   - Flex billing is usage-tiered by operations/sec, from $${pricing.monthlyMin.toFixed(2)} up to a $${pricing.monthlyMax.toFixed(2)} cap`);
+            cli.output(`   - The estimate above assumes the lowest tier; actual cost rises with throughput`);
+            cli.output(`   - Run get-actual-cost for the amount currently accrued this billing period`);
+            return;
+        }
+
+        const multiplier = this.nodeEquivalents(nodeCount);
+        const computeCost = pricing.monthlyMin * multiplier;
+
+        cli.output(`   Hourly Rate (${Cluster.BASE_REPLICA_NODES}-node replica set): $${pricing.hourly.toFixed(4)}/hr`);
+        cli.output(`   Monthly Rate (${Cluster.BASE_REPLICA_NODES}-node replica set): $${pricing.monthlyMin.toFixed(2)}/month`);
+
+        cli.output(`\n📈 Cost Breakdown:`);
+        cli.output(`   Compute: $${pricing.monthlyMin.toFixed(2)} × ${multiplier.toFixed(2)} (${nodeCount !== null ? nodeCount : Cluster.BASE_REPLICA_NODES} nodes ÷ ${Cluster.BASE_REPLICA_NODES}) = $${computeCost.toFixed(2)}/month`);
+        cli.output(`   Storage and IOPS: Included in the tier rate at default settings`);
+        cli.output(`   Backup snapshots: Usage-based, NOT included in the total below`);
+        cli.output(`   Data transfer: Usage-based, NOT included in the total below`);
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`💰 ESTIMATED MONTHLY COST: $${computeCost.toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - MongoDB publishes no pricing API; these rates are hardcoded and may go stale`);
+        cli.output(`   - Rates are the AWS us-east-1 baseline — GCP, Azure and other regions differ`);
+        cli.output(`   - A tier rate covers a standard ${Cluster.BASE_REPLICA_NODES}-node replica set, so extra nodes and regions scale it per node`);
+        cli.output(`   - Backup storage ($0.08–$0.65/GB-month by provider) and data transfer are excluded`);
+        cli.output(`   - Reserved-capacity and enterprise-agreement discounts are not reflected`);
+        cli.output(`   - Run get-actual-cost for MongoDB's own billed figures for this cluster`);
+    }
+
+    /**
+     * Returns cost information in the format expected by Monk billing system.
+     *
+     * Reports the table-driven estimate rather than invoiced amounts: the estimate is
+     * deterministic, needs only the project-scoped credentials this entity already has,
+     * and represents a full month. Invoiced figures require org-level billing access and
+     * a pending invoice is only a partial-month accrual — see get-actual-cost for those.
+     *
+     * Reports both the "hour" and "month" periods. Monk core's fetchEntityPricing prefers
+     * "hour" and tags it Hourly, which is what its running-cost accrual is computed from.
+     * A month-only entity is tagged Monthly and every accrual then passes through core's
+     * Monthly->Hourly conversion, which divides by 720 (30x24) even though core treats a
+     * month as 730 hours — inflating running cost by ~1.4%. Atlas publishes hourly rates
+     * natively, so reporting "hour" avoids that conversion entirely; "month" is kept for
+     * the repo-wide convention and for humans reading the raw output.
+     *
+     * Returns JSON in format:
+     * {
+     *   "type": "mongodb-atlas-cluster",
+     *   "costs": {
+     *     "hour":  { "amount": "X.XXXXXX", "currency": "USD" },
+     *     "month": { "amount": "X.XX",     "currency": "USD" }
+     *   }
+     * }
+     */
+    @action("costs")
+    costs(_args?: Args): void {
+        const clusterData = this.fetchClusterForCosting();
+        const instanceSize = this.resolveInstanceSize(clusterData);
+        const pricing = this.getClusterPricing(instanceSize);
+
+        if (!pricing) {
+            cli.output(JSON.stringify({
+                type: "mongodb-atlas-cluster",
+                costs: {
+                    month: {
+                        amount: "0",
+                        currency: "USD",
+                        error: `No published rate on file for cluster tier ${instanceSize}`
+                    }
+                }
+            }));
+            return;
+        }
+
+        let monthly = pricing.monthlyMin;
+        let hourly = pricing.monthlyMin / Cluster.HOURS_PER_MONTH;
+        if (pricing.family === "dedicated") {
+            const multiplier = this.nodeEquivalents(this.countClusterNodes(clusterData));
+            monthly = pricing.monthlyMin * multiplier;
+            // Derived from the published rate rather than monthly/730 to avoid rounding drift.
+            hourly = pricing.hourly * multiplier;
+        }
+
+        cli.output(JSON.stringify({
+            type: "mongodb-atlas-cluster",
+            costs: {
+                hour: {
+                    amount: hourly.toFixed(6),
+                    currency: "USD"
+                },
+                month: {
+                    amount: monthly.toFixed(2),
+                    currency: "USD"
+                }
+            }
+        }));
+    }
+
+    /**
+     * Get the cost MongoDB has actually billed for this cluster in the current period
+     *
+     * Reads the organization's pending invoice and sums the line items attributed to this
+     * cluster. Unlike get-cost-estimate this is MongoDB's own figure, so it includes
+     * backup, data transfer and any discounts.
+     *
+     * Requires credentials with the org-level Organization Billing Viewer role. Atlas has
+     * no project-scoped billing role, so a project-scoped service account cannot read this.
+     *
+     * Usage:
+     * - monk do namespace/cluster/get-actual-cost
+     */
+    @action("get-actual-cost")
+    getActualCost(_args?: Args): void {
+        cli.output(`\n🧾 Actual Billed Cost for MongoDB Atlas Cluster: ${this.state.name || this.definition.name}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        const orgId = this.resolveOrgId();
+        if (!orgId) {
+            return;
+        }
+
+        let pending: any;
+        try {
+            pending = this.makeRequest("GET", `/orgs/${orgId}/invoices/pending`, undefined, BILLING_API_VERSION);
+        } catch (error) {
+            this.reportBillingAccessError(error);
+            return;
+        }
+
+        const invoices = pending?.results || (pending?.id ? [pending] : []);
+        if (!invoices || invoices.length === 0) {
+            cli.output(`\nℹ️  No pending invoice for organization ${orgId}.`);
+            cli.output(`   A pending invoice appears once the current billing period accrues charges.`);
+            return;
+        }
+
+        let matched = 0;
+        let totalCents = 0;
+        const bySku: Record<string, number> = {};
+        const clusterName = this.state.name || this.definition.name;
+
+        for (let i = 0; i < invoices.length; i++) {
+            const lineItems = this.fetchInvoiceLineItems(orgId, invoices[i]);
+            for (let j = 0; j < lineItems.length; j++) {
+                const item = lineItems[j];
+                if (item?.clusterName !== clusterName) {
+                    continue;
+                }
+                if (item?.groupId && item.groupId !== this.definition.project_id) {
+                    continue;
+                }
+
+                const cents = Number(item?.totalPriceCents || 0);
+                const sku = String(item?.sku || item?.description || 'UNKNOWN');
+                bySku[sku] = (bySku[sku] || 0) + cents;
+                totalCents += cents;
+                matched++;
+            }
+
+            if (invoices[i]?.startDate) {
+                cli.output(`\n📅 Billing Period: ${invoices[i].startDate} → ${invoices[i].endDate || 'now'}`);
+            }
+        }
+
+        if (matched === 0) {
+            cli.output(`\nℹ️  No line items attributed to cluster "${clusterName}" yet.`);
+            cli.output(`   Atlas attributes usage to a cluster by name once charges accrue for it.`);
+            return;
+        }
+
+        cli.output(`\n📈 Billed Line Items (${matched} total):`);
+        const skus = Object.keys(bySku);
+        for (let i = 0; i < skus.length; i++) {
+            cli.output(`   ${skus[i]}: $${(bySku[skus[i]] / 100).toFixed(2)}`);
+        }
+
+        cli.output(`\n${'='.repeat(60)}`);
+        cli.output(`🧾 BILLED SO FAR THIS PERIOD: $${(totalCents / 100).toFixed(2)}`);
+        cli.output(`${'='.repeat(60)}`);
+
+        cli.output(`\n📝 Notes:`);
+        cli.output(`   - This is a partial-month accrual, not a full-month figure`);
+        cli.output(`   - Amounts come from MongoDB's pending invoice and reflect applied discounts`);
+        cli.output(`   - Run get-cost-estimate for a projected full-month cost`);
+    }
+
+    /**
+     * Resolve the organization that owns this cluster's project.
+     * Billing endpoints are org-scoped while this entity only knows its project id.
+     */
+    private resolveOrgId(): string | null {
+        try {
+            const group = this.makeRequest("GET", `/groups/${this.definition.project_id}`);
+            const orgId = group?.orgId;
+            if (!orgId) {
+                cli.output(`\n❌ Could not determine the organization for project ${this.definition.project_id}`);
+                return null;
+            }
+            return String(orgId);
+        } catch (error) {
+            cli.output(`\n❌ Could not look up project ${this.definition.project_id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return null;
+        }
+    }
+
+    /**
+     * Line items for one invoice, fetching the full document when the listing omits them.
+     */
+    private fetchInvoiceLineItems(orgId: string, invoice: any): any[] {
+        if (invoice?.lineItems && invoice.lineItems.length > 0) {
+            return invoice.lineItems;
+        }
+        if (!invoice?.id) {
+            return [];
+        }
+
+        try {
+            const detail = this.makeRequest("GET", `/orgs/${orgId}/invoices/${invoice.id}`, undefined, BILLING_API_VERSION);
+            return detail?.lineItems || [];
+        } catch (error) {
+            cli.output(`⚠️ Could not read invoice ${invoice.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return [];
+        }
+    }
+
+    /** Explain a failed billing read, calling out the org-role requirement on 401/403. */
+    private reportBillingAccessError(error: unknown): void {
+        const message = error instanceof Error ? error.message : String(error);
+        cli.output(`\n❌ Could not read billing data: ${message}`);
+        if (message.includes(" 401") || message.includes(" 403") || message.toUpperCase().includes("UNAUTHORIZED") || message.toUpperCase().includes("FORBIDDEN")) {
+            cli.output(`\n   Atlas billing endpoints require the org-level Organization Billing Viewer role.`);
+            cli.output(`   There is no project-scoped billing role, so a project-only service account`);
+            cli.output(`   cannot read invoices. Grant the role in Atlas: Organization Settings →`);
+            cli.output(`   Access Manager → Service Accounts, then retry.`);
+            cli.output(`\n   get-cost-estimate works without any billing access.`);
+        }
+    }
+}

@@ -21,6 +21,7 @@ This entity allows you to:
 - **Connection String Generation**: Automatically generate connection strings for applications
 - **Backup Management**: Create on-demand snapshots and list available backups (M10+ clusters)
 - **Restore Operations**: Restore from snapshots or point-in-time, monitor restore progress (M10+ clusters)
+- **Cost Estimation**: Table-driven monthly cost estimates, plus actual billed cost from the Atlas invoice API
 - **Error Handling**: Comprehensive error handling and logging
 - **Resource Cleanup**: Proper resource cleanup on entity deletion
 
@@ -38,6 +39,17 @@ This entity allows you to:
 **Requirements:** M10+ cluster (dedicated). M0 (free) and FLEX clusters do not support the on-demand backup API.
 
 **⚠️ Important:** Restore operations make the cluster **READ-ONLY** until complete.
+
+## Cost Quick Reference
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| **Estimate Cost** | `monk do ns/cluster/get-cost-estimate` | Human-readable monthly cost breakdown |
+| **Costs (JSON)** | `monk do ns/cluster/costs` | Machine-readable output for Monk billing |
+| **Actual Cost** | `monk do ns/cluster/get-actual-cost` | Cost MongoDB has billed this period |
+
+**Requirements:** the two estimate actions need no extra permissions. `get-actual-cost`
+requires credentials with the org-level **Organization Billing Viewer** role.
 
 ## Prerequisites
 
@@ -284,6 +296,81 @@ my-app:
 ```
 
 ## Custom Actions
+
+### Cost Actions
+
+MongoDB publishes **no pricing API** — the Atlas Administration API reports only incurred
+usage, never a rate card. Estimates therefore come from a hardcoded rate table
+(`DEDICATED_PRICING` in `cluster.ts`) transcribed from MongoDB's published pricing, which
+needs refreshing when MongoDB changes its rates.
+
+#### Get Cost Estimate
+
+Reads the live cluster topology and prices it against the rate table:
+
+```bash
+monk do mongodb-test-stack/dev-cluster/get-cost-estimate
+```
+
+Reports tier, provider, region, node count, disk size and backup status, then the monthly
+compute cost plus what is excluded from it.
+
+**A tier rate covers an entire 3-node replica set, not one node.** Extra nodes (added
+regions, read-only or analytics nodes) scale the rate per node:
+
+```
+monthly = hourly × 730 × (total_nodes / 3)
+```
+
+Rates are the AWS us-east-1 baseline, so GCP, Azure and other regions will differ. Backup
+snapshot storage and data transfer are usage-based and excluded from the total rather than
+guessed. M0 reports $0; FLEX reports its $8/month base tier and notes the $30/month cap.
+
+#### Costs (JSON)
+
+Standardized output consumed by Monk's billing system:
+
+```bash
+monk do mongodb-test-stack/dev-cluster/costs
+```
+
+```json
+{
+  "type": "mongodb-atlas-cluster",
+  "costs": {
+    "hour":  { "amount": "0.540000", "currency": "USD" },
+    "month": { "amount": "394.20",   "currency": "USD" }
+  }
+}
+```
+
+Monk core invokes only this action; it prefers the `hour` period and computes running cost
+from it. Reporting `hour` avoids core's `Monthly -> Hourly` conversion, which divides by 720
+while core treats a month as 730 hours — a ~1.4% overstatement for month-only entities.
+`month` is retained for the repo-wide convention and for humans.
+
+This reports the table-driven estimate, not invoiced amounts — the estimate is
+deterministic, needs only the project-scoped credentials the entity already has, and covers
+a full month. An unknown tier yields `amount: "0"` plus an `error` field rather than a
+substituted rate.
+
+#### Get Actual Cost
+
+Reports what MongoDB has actually billed for this cluster in the current period, by summing
+the pending invoice's line items for this cluster and project, grouped by SKU:
+
+```bash
+monk do mongodb-test-stack/dev-cluster/get-actual-cost
+```
+
+Because it is MongoDB's own figure it includes backup, data transfer and applied discounts.
+Note that a pending invoice is a **partial-month accrual**, not a full-month projection.
+
+**Permissions:** Atlas billing endpoints require the org-level **Organization Billing
+Viewer** role. There is no project-scoped billing role, so a project-scoped service account
+cannot read invoices at all. Grant the role under Organization Settings → Access Manager →
+Service Accounts. The action detects a 401/403 and explains this rather than failing
+opaquely; `get-cost-estimate` works without any billing access.
 
 ### Backup Actions
 

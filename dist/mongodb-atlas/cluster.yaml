@@ -21,7 +21,7 @@ cluster:
       Works with:
       - `mongodb-atlas/user` - Create database users with role-based access
       - `mongodb-atlas/project` - The parent project containing the cluster
-    version-hash: 5aadf929b2b3
+    version-hash: 31f705989c69
   schema:
     secret_ref:
       type: string
@@ -123,6 +123,9 @@ cluster:
     list-restore-jobs: ''
     describe-snapshot: ''
     delete-snapshot: ''
+    get-cost-estimate: ''
+    costs: ''
+    get-actual-cost: ''
   checks:
     readiness:
       period: 30
@@ -134,3 +137,4 @@ cluster:
     - mongodb-atlas/atlas-base
     - cli
     - monkec/base
+    - mongodb-atlas/common

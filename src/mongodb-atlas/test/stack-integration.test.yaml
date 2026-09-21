@@ -40,6 +40,28 @@ tests:
     expect:
       exitCode: 0
 
+  # === Cost estimation ===
+  - name: "Test get-cost-estimate action"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/get-cost-estimate"
+    expect:
+      exitCode: 0
+
+  - name: "Test costs action"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/costs"
+    expect:
+      exitCode: 0
+
+  # The test cluster is M0, so both actions report the free tier.
+  # get-actual-cost degrades gracefully without org-level billing access,
+  # so it must still exit 0 whether or not the CI credentials can read invoices.
+  - name: "Test get-actual-cost action"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/get-actual-cost"
+    expect:
+      exitCode: 0
+
   - name: "Wait for connection test to exit"
     action: "wait"
     target: "mongodb-test-stack/dev-connection-test"
