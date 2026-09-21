@@ -26,7 +26,53 @@ ip-access-list-entry:
       Works with:
       - `mongodb-atlas/project` - the project whose access list this entry belongs to
       - `mongodb-atlas/cluster` - grants the network access clusters in the project rely on
-    version-hash: 31f705989c69
+
+      ---
+      ## Dynamic IP Access
+
+      Prefer resolving the connecting workload's address with a Monk operator over hardcoding it.
+      Use this entity — rather than the cluster's `allow_ips` — when the entry must be created
+      after the workload is up, since this entity can depend on the workload without inverting
+      the cluster's own ordering:
+
+      ```yaml
+      api-access:
+        defines: mongodb-atlas/ip-access-list-entry
+        project_id: <- connection-target("project") entity-state get-member("id")
+        ip_address: <- peer-ip-address("my-app/api")
+        comment: api workload node
+        secret_ref: mongodb-atlas-token
+        permitted-secrets:
+          mongodb-atlas-token: true
+        services:
+          data:
+            protocol: custom
+        connections:
+          project:
+            runnable: my-app/project
+            service: data
+        depends:
+          wait-for:
+            runnables:
+              - my-app/project
+              - my-app/api
+            timeout: 600
+      ```
+
+      `peer-ip-address` returns a single bare IP, which matches this entity's `ip_address` field.
+      The address comes from Monk's container state, so it is available once the workload is
+      *placed* and does not require it to be ready — but it does require it to be placed when the
+      operator is evaluated: it resolves to nil for a runnable that is not placed anywhere, which
+      would leave this entity with no entry value at all. Hence the `wait-for` above, which
+      matters more here than for the cluster's array form (that one merely comes back empty).
+      For a workload spanning several nodes,
+      wire `runnable-peers-public-ips` into the cluster's `allow_ips` array instead of declaring
+      one entry per node; see "Dynamic IP Access" on `mongodb-atlas/cluster`.
+
+      Time-boxed access pairs well with this: set `delete_after` and Atlas removes the entry on
+      its own, which is useful for temporary operator or CI access.
+      ---
+    version-hash: 9c1575235865
   schema:
     secret_ref:
       type: string
