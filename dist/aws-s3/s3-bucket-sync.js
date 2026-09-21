@@ -61,8 +61,8 @@ const DEFAULT_BUCKET_CONFIG = common.DEFAULT_BUCKET_CONFIG;
 const buildLifecycleConfigXml = common.buildLifecycleConfigXml;
 const buildEncryptionConfigXml = common.buildEncryptionConfigXml;
 const parseS3Error = common.parseS3Error;
-var _costs_dec, _getCostEstimate_dec, _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
-var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _getWebsiteInfo_dec = [action()], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
+var _costs_dec, _getCostEstimate_dec, _getEncryptionConfig_dec, _getLifecycleConfig_dec, _getCorsConfig_dec, _getWebsiteInfo_dec, _getBucketStatistics_dec, _emptyBucket_dec, _generatePresignedUrl_dec, _listObjects_dec, _getBucketInfo_dec, _a, _init;
+var _S3Bucket = class _S3Bucket extends (_a = AWSS3Entity, _getBucketInfo_dec = [action()], _listObjects_dec = [action()], _generatePresignedUrl_dec = [action()], _emptyBucket_dec = [action()], _getBucketStatistics_dec = [action()], _getWebsiteInfo_dec = [action()], _getCorsConfig_dec = [action()], _getLifecycleConfig_dec = [action()], _getEncryptionConfig_dec = [action()], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _a) {
   constructor() {
     super(...arguments);
     __runInitializers(_init, 5, this);
@@ -333,6 +333,54 @@ ${JSON.stringify(statistics, null, 2)}`);
     } catch (error) {
       throw new Error(`Failed to get website info: ${error.message}`);
     }
+  }
+  getCorsConfig(_args) {
+    if (!this.state.bucket_name) {
+      throw new Error("Bucket not created yet");
+    }
+    const url = this.getBucketUrl(this.getBucketName(), "?cors");
+    const response = aws.get(url, { service: "s3", region: this.region });
+    if (response.statusCode === 404 || response.statusCode === 204) {
+      cli.output("CORS configuration: NOT SET");
+      return;
+    }
+    if (response.statusCode !== 200) {
+      throw new Error(`Failed to get bucket CORS configuration: ${parseS3Error(response)}`);
+    }
+    cli.output(`CORS configuration:
+${response.body}`);
+  }
+  getLifecycleConfig(_args) {
+    if (!this.state.bucket_name) {
+      throw new Error("Bucket not created yet");
+    }
+    const url = this.getBucketUrl(this.getBucketName(), "?lifecycle");
+    const response = aws.get(url, { service: "s3", region: this.region });
+    if (response.statusCode === 404) {
+      cli.output("Lifecycle configuration: NOT SET");
+      return;
+    }
+    if (response.statusCode !== 200) {
+      throw new Error(`Failed to get bucket lifecycle configuration: ${parseS3Error(response)}`);
+    }
+    cli.output(`Lifecycle configuration:
+${response.body}`);
+  }
+  getEncryptionConfig(_args) {
+    if (!this.state.bucket_name) {
+      throw new Error("Bucket not created yet");
+    }
+    const url = this.getBucketUrl(this.getBucketName(), "?encryption");
+    const response = aws.get(url, { service: "s3", region: this.region });
+    if (response.statusCode === 404) {
+      cli.output("Server-side encryption configuration: NOT SET");
+      return;
+    }
+    if (response.statusCode !== 200) {
+      throw new Error(`Failed to get bucket encryption configuration: ${parseS3Error(response)}`);
+    }
+    cli.output(`Server-side encryption configuration:
+${response.body}`);
   }
   getCostEstimate(_args) {
     if (!this.state.bucket_name) {
@@ -1283,6 +1331,9 @@ __decorateElement(_init, 1, "generatePresignedUrl", _generatePresignedUrl_dec, _
 __decorateElement(_init, 1, "emptyBucket", _emptyBucket_dec, _S3Bucket);
 __decorateElement(_init, 1, "getBucketStatistics", _getBucketStatistics_dec, _S3Bucket);
 __decorateElement(_init, 1, "getWebsiteInfo", _getWebsiteInfo_dec, _S3Bucket);
+__decorateElement(_init, 1, "getCorsConfig", _getCorsConfig_dec, _S3Bucket);
+__decorateElement(_init, 1, "getLifecycleConfig", _getLifecycleConfig_dec, _S3Bucket);
+__decorateElement(_init, 1, "getEncryptionConfig", _getEncryptionConfig_dec, _S3Bucket);
 __decorateElement(_init, 1, "getCostEstimate", _getCostEstimate_dec, _S3Bucket);
 __decorateElement(_init, 1, "costs", _costs_dec, _S3Bucket);
 __decoratorMetadata(_init, _S3Bucket);

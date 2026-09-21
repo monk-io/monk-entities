@@ -1,5 +1,5 @@
 REPO aws-s3
-VERSION_HASH 3bd4cf1a41ec
+VERSION_HASH 8260be63723a
 DESCRIPTION Object storage on AWS.
 HOSTING managed
 TAGS aws,storage,s3,object-storage

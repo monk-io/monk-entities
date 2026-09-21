@@ -177,6 +177,9 @@ function buildLifecycleConfigXml(rules) {
         ruleXml += "</Transition>";
       });
     }
+    if (rule.noncurrent_version_expiration) {
+      ruleXml += `<NoncurrentVersionExpiration><NoncurrentDays>${rule.noncurrent_version_expiration.noncurrent_days}</NoncurrentDays></NoncurrentVersionExpiration>`;
+    }
     ruleXml += "</Rule>";
     return ruleXml;
   }).join("");
