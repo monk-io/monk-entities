@@ -460,7 +460,7 @@ public-access-list:
   server_name: <- connection-target("server") entity-state get-member("server_name")
   
   # Dynamic IP list from client nodes - works across clouds!
-  # runnable-peers-public-ips returns IPs in CIDR format (e.g., "1.2.3.4/32")
+  # runnable-peers-public-ips returns bare node IPs (e.g., "1.2.3.4")
   # Replace with your client runnable path
   allowed_cidr_blocks: <- runnable-peers-public-ips("azure-postgresql-example/public-client")
   
