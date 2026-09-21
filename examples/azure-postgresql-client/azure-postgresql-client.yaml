@@ -460,7 +460,7 @@ public-postgres-client:
 # How it works:
 # 1. Waits for server and client to be deployed
 # 2. Calls runnable-peers-public-ips("azure-pg-client-demo/public-postgres-client")
-# 3. Gets list of public IPs where client is running (e.g., ["20.224.193.55/32"])
+# 3. Gets list of public IPs where client is running (e.g., ["20.224.193.55"])
 # 4. Creates firewall rules for each IP (e.g., "monk-client-0" allowing 20.224.193.55)
 # 5. Client can now connect to database
 #
@@ -486,7 +486,7 @@ postgres-access-list:
   server_name: <- connection-target("server") entity-state get-member("server_name")
   
   # Dynamic IP list from client nodes - works across clouds!
-  # runnable-peers-public-ips returns IPs in CIDR format (e.g., "1.2.3.4/32")
+  # runnable-peers-public-ips returns bare node IPs (e.g., "1.2.3.4")
   allowed_cidr_blocks: <- runnable-peers-public-ips("azure-pg-client-demo/public-postgres-client")
   
   # Optional: custom rule name prefix (default: "monk-access")

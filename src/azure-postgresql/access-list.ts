@@ -14,10 +14,11 @@ export interface AccessListDefinition extends AzurePostgreSQLDefinition {
 
     /**
      * @description List of IPs or /32 CIDRs to allow access from.
-     * Designed for use with runnable-peers-public-ips() which returns /32 CIDRs.
-     * IMPORTANT: Only /32 CIDRs (single IPs) are supported. Non-/32 ranges like
-     * /24 will cause an error because Azure firewall rules require explicit IPs.
-     * @example ["1.2.3.4/32", "5.6.7.8/32"] or ["1.2.3.4", "5.6.7.8"]
+     * Designed for use with runnable-peers-public-ips(), which returns bare IPs
+     * (e.g. ["1.2.3.4"]); those are accepted as-is.
+     * IMPORTANT: Only single IPs are supported, bare or as /32 CIDRs. Wider ranges
+     * like /24 will cause an error because Azure firewall rules require explicit IPs.
+     * @example ["1.2.3.4", "5.6.7.8"] or ["1.2.3.4/32", "5.6.7.8/32"]
      */
     allowed_cidr_blocks?: string[];
 
@@ -425,7 +426,7 @@ export class AccessList extends AzurePostgreSQLEntity<AccessListDefinition, Acce
                 throw new Error(
                     `Unsupported CIDR range "${cidr}": Azure PostgreSQL firewall rules require individual IPs. ` +
                     `Only /32 CIDRs (single IPs) are supported. Got /${prefix} which represents ${Math.pow(2, 32 - prefix)} IPs. ` +
-                    `Use runnable-peers-public-ips() which returns /32 CIDRs, or specify individual IPs.`
+                    `Use runnable-peers-public-ips(), which returns single node IPs, or specify individual IPs.`
                 );
             }
             
