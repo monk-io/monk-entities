@@ -34,5 +34,5 @@ schema-version:
   services:
     data:
       protocol: custom
-LOAD common.yaml schema.yaml glue-schema-registry-base.yaml registry.yaml schema-version.yaml
-RESOURCES glue-schema-registry-base.js schema-version-sync.js schema-sync.js registry-sync.js common.js
+LOAD glue-schema-registry-base.yaml registry.yaml schema.yaml schema-version.yaml common.yaml
+RESOURCES registry-sync.js schema-version-sync.js common.js schema-sync.js glue-schema-registry-base.js

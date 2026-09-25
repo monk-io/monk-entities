@@ -109,8 +109,8 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       existing: false
     };
   }
-  create() {
-    const entry = this.resolveEntry();
+  /** Adopt a pre-existing entry rather than recreating it, or POST a new one. */
+  adoptOrCreate(entry) {
     const existing = this.checkResourceExists(this.entryPath(entry.value));
     if (existing && (existing.ipAddress || existing.cidrBlock || existing.awsSecurityGroup)) {
       this.state = {
@@ -124,23 +124,28 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
     }
     this.createEntry(entry);
   }
+  create() {
+    this.adoptOrCreate(this.resolveEntry());
+  }
   update() {
     if (!this.state.entry_value) {
       this.create();
       return;
     }
-    if (this.state.existing) {
+    const desired = this.resolveEntry();
+    if (desired.value === this.state.entry_value) {
       return;
     }
-    const desired = this.resolveEntry();
-    try {
-      this.makeRequest("DELETE", this.entryPath(this.state.entry_value));
-    } catch (error) {
-      if (!this.isResourceGoneError(error)) {
-        throw error;
+    if (!this.state.existing) {
+      try {
+        this.makeRequest("DELETE", this.entryPath(this.state.entry_value));
+      } catch (error) {
+        if (!this.isResourceGoneError(error)) {
+          throw error;
+        }
       }
     }
-    this.createEntry(desired);
+    this.adoptOrCreate(desired);
   }
   delete() {
     if (!this.state.entry_value) {

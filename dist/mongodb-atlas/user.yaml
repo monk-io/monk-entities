@@ -20,7 +20,7 @@ user:
       Works with:
       - `mongodb-atlas/project` - The parent project for this user
       - `mongodb-atlas/cluster` - Use this user to connect to clusters
-    version-hash: 31f705989c69
+    version-hash: 9831e612bb76
   schema:
     secret_ref:
       type: string

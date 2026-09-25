@@ -1,4 +1,4 @@
 REPO mongodb-atlas
-VERSION_HASH 31f705989c69
-LOAD user.yaml ip-access-list-entry.yaml project.yaml cluster.yaml common.yaml atlas-base.yaml
-RESOURCES ip-access-list-entry-sync.js project-sync.js atlas-base.js cluster-sync.js user-sync.js common.js
+VERSION_HASH 9831e612bb76
+LOAD user.yaml common.yaml atlas-base.yaml cluster.yaml project.yaml ip-access-list-entry.yaml
+RESOURCES common.js cluster-sync.js project-sync.js ip-access-list-entry-sync.js atlas-base.js user-sync.js

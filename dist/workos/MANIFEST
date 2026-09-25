@@ -3,5 +3,5 @@ VERSION_HASH 989ef547a790
 DESCRIPTION Organizations, SSO connections, roles, and users.
 HOSTING managed
 TAGS workos,authentication,identity,sso,rbac
-LOAD credentials.yaml user.yaml connection.yaml role.yaml organization.yaml redirect-uri.yaml workos-base.yaml
-RESOURCES workos-base.js redirect-uri-sync.js role-sync.js user-sync.js credentials-sync.js connection-sync.js organization-sync.js
+LOAD credentials.yaml workos-base.yaml user.yaml connection.yaml redirect-uri.yaml role.yaml organization.yaml
+RESOURCES organization-sync.js credentials-sync.js redirect-uri-sync.js connection-sync.js role-sync.js workos-base.js user-sync.js
