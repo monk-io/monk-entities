@@ -163,10 +163,8 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
         };
     }
 
-    override create(): void {
-        const entry = this.resolveEntry();
-
-        // Adopt a pre-existing entry rather than recreating it.
+    /** Adopt a pre-existing entry rather than recreating it, or POST a new one. */
+    private adoptOrCreate(entry: ResolvedEntry): void {
         const existing = this.checkResourceExists(this.entryPath(entry.value));
         if (existing && (existing.ipAddress || existing.cidrBlock || existing.awsSecurityGroup)) {
             this.state = {
@@ -182,29 +180,39 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
         this.createEntry(entry);
     }
 
+    override create(): void {
+        this.adoptOrCreate(this.resolveEntry());
+    }
+
     override update(): void {
         if (!this.state.entry_value) {
             this.create();
             return;
         }
 
-        // Never mutate an entry that pre-existed this entity.
-        if (this.state.existing) {
+        const desired = this.resolveEntry();
+
+        // Desired value unchanged: nothing to reconcile, whether adopted or not.
+        if (desired.value === this.state.entry_value) {
             return;
         }
 
-        const desired = this.resolveEntry();
-
-        // There is no single-entry PATCH; apply changes by removing the currently
-        // managed entry and recreating it from the current definition.
-        try {
-            this.makeRequest("DELETE", this.entryPath(this.state.entry_value));
-        } catch (error) {
-            if (!this.isResourceGoneError(error)) {
-                throw error;
+        // The desired value changed (e.g. a runnable-derived IP moved to a new
+        // peer). Never delete an entry this entity did not create itself --
+        // `existing` describes the OLD value's adoption status, not a permanent
+        // freeze on ever reconciling this entity again. There is no single-entry
+        // PATCH; apply the change by removing the old entry (when owned) and
+        // adopting-or-creating the new one.
+        if (!this.state.existing) {
+            try {
+                this.makeRequest("DELETE", this.entryPath(this.state.entry_value));
+            } catch (error) {
+                if (!this.isResourceGoneError(error)) {
+                    throw error;
+                }
             }
         }
-        this.createEntry(desired);
+        this.adoptOrCreate(desired);
     }
 
     override delete(): void {

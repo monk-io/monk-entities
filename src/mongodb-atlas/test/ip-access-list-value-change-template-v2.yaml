@@ -1,0 +1,65 @@
+namespace: mongodb-atlas-acl-valuechange-test
+
+# Identical to ip-access-list-value-change-template.yaml except acl-entry-shared-b
+# now points at a NEW, distinct IP -- simulating the runnable it's derived from
+# moving to a different peer with a different public IP.
+
+acl-project:
+  defines: mongodb-atlas/project
+  name: monkec-acl-valuechange-test-project
+  organization: Monk
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+
+acl-entry-shared-a:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: <- connection-target("project") entity-state get-member("id")
+  ip_address: 203.0.113.40
+  comment: "monkec valuechange test - shared a"
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-acl-valuechange-test/acl-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-acl-valuechange-test/acl-project
+      timeout: 120
+
+acl-entry-shared-b:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: <- connection-target("project") entity-state get-member("id")
+  ip_address: 203.0.113.41
+  comment: "monkec valuechange test - shared b moved"
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-acl-valuechange-test/acl-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-acl-valuechange-test/acl-project
+      timeout: 120
+
+acl-valuechange-stack:
+  defines: group
+  members:
+    - mongodb-atlas-acl-valuechange-test/acl-project
+    - mongodb-atlas-acl-valuechange-test/acl-entry-shared-a
+    - mongodb-atlas-acl-valuechange-test/acl-entry-shared-b
