@@ -157,6 +157,52 @@ interface ClusterState {
   dedicated) is not supported by Atlas in place and raises an error — delete and recreate the
   cluster to apply those changes.
 
+#### Dynamic IP Access
+
+Atlas refuses connections from any address not on the project's IP access list, so a workload
+cannot reach the cluster until its node IP is listed. Don't hardcode `allow_ips` (and don't
+ship `0.0.0.0/0` outside throwaway test stacks) — wire it to the connecting workload's node
+addresses:
+
+```yaml
+cluster:
+  defines: mongodb-atlas/cluster
+  name: app-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_EAST_1
+  instance_size: M10
+  secret_ref: mongodb-atlas-token
+  # Node IPs of every replica of the API workload
+  allow_ips: <- runnable-peers-public-ips("my-app/api")
+```
+
+`runnable-peers-public-ips` returns bare IPs (`["8.8.8.8"]`), which the entity sends as Atlas
+`ipAddress` entries; values containing `/` are sent as CIDR blocks instead.
+
+**This does not require waiting for the workload to be ready.** The operator reads node
+addresses from Monk's own container state (`runnable -> container -> peer.PublicIP`), so they
+resolve as soon as the workload's containers are *placed*. The cluster does not need to depend
+on the workload — which is just as well, since the workload depends on the cluster's
+connection string.
+
+It does need the workload to be placed *when the operator is evaluated*, and returns an empty
+list otherwise. So on a first full-stack deploy the list usually starts empty and fills in on
+the next `monk update` of the cluster; if the workload must connect on its very first start,
+put the entry in a `mongodb-atlas/ip-access-list-entry` that depends on the workload instead.
+The list is also a snapshot — if the workload is rescheduled or scaled, `monk update` the
+cluster to reconcile it.
+
+| Operator | Returns | Use for |
+|---|---|---|
+| `runnable-peers-public-ips("ns/workload")` | Array of node IPs | `allow_ips`, multi-node or scaled workloads |
+| `peer-ip-address("ns/workload")` | Single node IP | one `ip-access-list-entry` |
+| `service-public-ip("ns/workload", "svc")` | Single node IP behind a service | a specific service's node |
+| `ip-address-public` | Public IP of the evaluating node | whitelisting the Monk node itself |
+
+For workloads on a private network, `mongodb-atlas/ip-access-list-entry` also accepts
+`aws_security_group`, which needs an active VPC peering connection and avoids public IPs.
+
 ### 3. User Entity
 
 Creates and manages MongoDB Atlas database users.

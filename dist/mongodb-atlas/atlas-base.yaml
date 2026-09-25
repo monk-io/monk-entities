@@ -3,5 +3,5 @@ namespace: mongodb-atlas
 atlas-base:
   defines: module
   metadata:
-    version-hash: 31f705989c69
+    version-hash: 9c1575235865
   source: <<< atlas-base.js
