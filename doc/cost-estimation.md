@@ -1086,7 +1086,9 @@ consumer, not core.
 Reads the org's pending invoice (`GET /orgs/{orgId}/invoices/pending`, falling back to
 `GET /orgs/{orgId}/invoices/{invoiceId}` when the listing omits line items) and sums the
 line items whose `clusterName` matches this cluster and whose `groupId` matches its
-project. Amounts arrive as `totalPriceCents` and are grouped per SKU.
+project. Items with the cluster's name but no `groupId` are excluded from the total and
+reported as unattributable, since cluster names are only unique within a project. Line
+items carry no stable cluster id, so attribution is by the cluster's current name. Amounts arrive as `totalPriceCents` and are grouped per SKU.
 
 Because it is MongoDB's own figure it includes backup, data transfer and applied discounts
 — but a pending invoice is a **partial-month accrual**, not a full-month projection, which
@@ -1117,8 +1119,9 @@ only accept `2023-01-01`, hence the `BILLING_API_VERSION` override in `common.ts
 - **GCP**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Cloud Monitoring data is unavailable instead of being guessed.
 - **Azure**: Pricing API failures surface as errors in `costs` output; usage-based components are omitted when Azure Monitor data is unavailable or insufficient for an accurate breakdown.
 - **DigitalOcean**: Always uses hardcoded rates (no API available)
-- **MongoDB Atlas**: Always uses hardcoded rates (no pricing API exists). An unknown tier is
-  reported as an explicit error in `costs` rather than priced from a substituted rate.
+- **MongoDB Atlas**: Always uses hardcoded rates (no pricing API exists). For an unknown tier
+  the `costs` action fails with an error instead of emitting `amount: "0"`, so core logs it
+  and skips the entity rather than accruing it as free.
   `get-actual-cost` degrades gracefully when the credentials lack org billing access.
 
 ## Usage-Based vs Fixed Cost Entities
