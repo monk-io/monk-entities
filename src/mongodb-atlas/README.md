@@ -366,13 +366,18 @@ while core treats a month as 730 hours — a ~1.4% overstatement for month-only 
 
 This reports the table-driven estimate, not invoiced amounts — the estimate is
 deterministic, needs only the project-scoped credentials the entity already has, and covers
-a full month. An unknown tier yields `amount: "0"` plus an `error` field rather than a
-substituted rate.
+a full month. For a tier with no rate on file the action fails with an error naming the
+tier, rather than reporting `amount: "0"`: core would otherwise bill the cluster as free.
+Core logs the failure and leaves the cluster out of billing until the rate is added.
 
 #### Get Actual Cost
 
 Reports what MongoDB has actually billed for this cluster in the current period, by summing
-the pending invoice's line items for this cluster and project, grouped by SKU:
+the pending invoice's line items for this cluster and project, grouped by SKU. Line items
+are matched by the cluster's current name and this project's id; charges accrued under an
+earlier name are not included. Items that name the cluster but carry no project id are left
+out of the total and reported separately, since a same-named cluster in another project of
+the org could have incurred them:
 
 ```bash
 monk do mongodb-test-stack/dev-cluster/get-actual-cost
@@ -396,6 +401,7 @@ MongoDB Atlas clusters (M10 and higher) support on-demand backup snapshots via c
 - **FLEX clusters:** Replaced the retired M2/M5 shared tiers (M2/M5 reached End-of-Life 2026-01-22). Receive automatic snapshots; not managed via these on-demand actions
 - **Flex clusters:** Automatic daily snapshots (cannot be disabled)
 - **M10+ clusters:** Full Cloud Backup support with on-demand snapshots via API
+- On M0 and Flex, `list-snapshots` reports an empty list with a note instead of failing; the other backup actions fail with an error explaining the M10 requirement
 - **During restore:** Cluster becomes read-only until restore completes
 
 #### Get Backup Info

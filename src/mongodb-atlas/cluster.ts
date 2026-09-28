@@ -641,7 +641,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
      * 
      * Shows both automated (scheduled) and on-demand snapshots.
      * Use this to find snapshot IDs for restore operations.
-     * 
+     *
+     * On M0/Flex tiers, which have no on-demand backups, this reports an empty list and a
+     * note instead of failing: listing is read-only, and "nothing to list" is the true
+     * answer there (matching get-backup-info). Mutating backup actions still throw.
+     *
      * Usage:
      * - monk do namespace/cluster list-snapshots
      * - monk do namespace/cluster list-snapshots limit=20
@@ -656,8 +660,14 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Project ID: ${this.definition.project_id}`);
         cli.output(`==================================================`);
 
-        // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        if (!this.isDedicatedTier()) {
+            cli.output(`\nTotal snapshots available: 0`);
+            cli.output(`\n⚠️  Note: Backups require a dedicated cluster (M10 or higher).`);
+            cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
+            cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
+            cli.output(`\n==================================================`);
+            return;
+        }
 
         if (!this.state.id) {
             throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
@@ -1425,6 +1435,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
      * natively, so reporting "hour" avoids that conversion entirely; "month" is kept for
      * the repo-wide convention and for humans reading the raw output.
      *
+     * When the tier has no rate on file the action throws instead of printing JSON. The
+     * repo-wide {amount: "0", error} fallback is not used here: core ignores the error key
+     * and would bill the cluster as $0. On a thrown action core logs the error and skips
+     * the entity, which keeps an unknown cost unknown.
+     *
      * Returns JSON in format:
      * {
      *   "type": "mongodb-atlas-cluster",
@@ -1441,17 +1456,14 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         const pricing = this.getClusterPricing(instanceSize);
 
         if (!pricing) {
-            cli.output(JSON.stringify({
-                type: "mongodb-atlas-cluster",
-                costs: {
-                    month: {
-                        amount: "0",
-                        currency: "USD",
-                        error: `No published rate on file for cluster tier ${instanceSize}`
-                    }
-                }
-            }));
-            return;
+            // Fail the action rather than emit {amount:"0", error}. Core's Cost type has no
+            // error field, so it would decode that payload as a real $0 figure and accrue the
+            // cluster as free. A failed action is instead logged by core with this message
+            // and the entity is left out of billing, i.e. treated as unknown, not free.
+            throw new Error(
+                `No published rate on file for MongoDB Atlas cluster tier ${instanceSize}; ` +
+                `cost is unknown. Add the tier to DEDICATED_PRICING in src/mongodb-atlas/cluster.ts.`
+            );
         }
 
         let monthly = pricing.monthlyMin;
@@ -1518,8 +1530,15 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
 
         let matched = 0;
         let totalCents = 0;
+        let unattributed = 0;
+        let unattributedCents = 0;
         const bySku: Record<string, number> = {};
+        // Attribution is by the cluster's current name within this project. Invoice line
+        // items carry clusterName and groupId but no stable cluster id, so charges accrued
+        // under a previous name are not picked up after a rename. This is deliberate: the
+        // name plus project is the only key the invoice API offers.
         const clusterName = this.state.name || this.definition.name;
+        const projectId = this.definition.project_id;
 
         for (let i = 0; i < invoices.length; i++) {
             const lineItems = this.fetchInvoiceLineItems(orgId, invoices[i]);
@@ -1528,7 +1547,16 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
                 if (item?.clusterName !== clusterName) {
                     continue;
                 }
-                if (item?.groupId && item.groupId !== this.definition.project_id) {
+                // Cluster names are only unique per project, so a same-named cluster in
+                // another project of this org must not be summed in. An item with no
+                // groupId cannot be placed in a project at all: count it separately rather
+                // than silently attributing it here.
+                if (!item?.groupId) {
+                    unattributed++;
+                    unattributedCents += Number(item?.totalPriceCents || 0);
+                    continue;
+                }
+                if (item.groupId !== projectId) {
                     continue;
                 }
 
@@ -1545,8 +1573,9 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         }
 
         if (matched === 0) {
-            cli.output(`\nℹ️  No line items attributed to cluster "${clusterName}" yet.`);
+            cli.output(`\nℹ️  No line items attributed to cluster "${clusterName}" in project ${projectId} yet.`);
             cli.output(`   Atlas attributes usage to a cluster by name once charges accrue for it.`);
+            this.reportUnattributedLineItems(clusterName, unattributed, unattributedCents);
             return;
         }
 
@@ -1560,10 +1589,25 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`🧾 BILLED SO FAR THIS PERIOD: $${(totalCents / 100).toFixed(2)}`);
         cli.output(`${'='.repeat(60)}`);
 
+        this.reportUnattributedLineItems(clusterName, unattributed, unattributedCents);
+
         cli.output(`\n📝 Notes:`);
         cli.output(`   - This is a partial-month accrual, not a full-month figure`);
         cli.output(`   - Amounts come from MongoDB's pending invoice and reflect applied discounts`);
         cli.output(`   - Run get-cost-estimate for a projected full-month cost`);
+    }
+
+    /**
+     * Report line items that name this cluster but carry no project id. They are left out of
+     * the total because they cannot be told apart from a same-named cluster elsewhere in the org.
+     */
+    private reportUnattributedLineItems(clusterName: string, count: number, cents: number): void {
+        if (count === 0) {
+            return;
+        }
+        cli.output(`\n⚠️  ${count} line item(s) totalling $${(cents / 100).toFixed(2)} name cluster "${clusterName}" but have no project id.`);
+        cli.output(`   They are NOT included above: cluster names are only unique per project, so these`);
+        cli.output(`   charges cannot be attributed to this cluster. Check the invoice in the Atlas UI.`);
     }
 
     /**
