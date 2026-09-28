@@ -204,6 +204,21 @@ interface IpAccessListEntryDefinition {
 
 **Actions:** `get-info`, `list-entries`.
 
+**Behavior notes:**
+- Entries are matched by a canonical key. Atlas stores a single IP as one record
+  holding both the address and its host CIDR, so `ip_address: 198.51.100.7` and
+  `cidr_block: 198.51.100.7/32` (IPv6: `/128`) are the same entry.
+- If a matching entry is already in the access list when the entity is created, it is
+  adopted (`existing: true`) and left in place on delete. Only an entry the entity
+  added itself is removed on delete.
+- Create does not trust a successful response on its own: concurrent writes to a
+  project's access list can make Atlas drop an entry it just accepted. The entity
+  checks that the entry is still there over a short settle window, re-adds it if it
+  was dropped, and fails create with an error if it still isn't there after a few
+  attempts.
+- Two entities for the same entry in one project, created at the same moment, can
+  still both believe they added it. Declare each entry once per project.
+
 **Required permissions:** the service account / API key must hold the **Project
 Owner** role on the target project (covers add / list / get / remove access list
 entry operations). No cost actions — IP access list entries are free.
