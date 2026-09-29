@@ -218,6 +218,13 @@ interface IpAccessListEntryDefinition {
   attempts.
 - Two entities for the same entry in one project, created at the same moment, can
   still both believe they added it. Declare each entry once per project.
+- Changing `comment` or `delete_after` on an entry the entity created updates it in
+  place. Atlas has no edit call for a single entry, so the entity re-adds the entry
+  and reads it back. If Atlas kept the old values (and always when `delete_after` is
+  removed), it deletes and recreates the entry, which refuses connections from that
+  address for a few seconds.
+- On an adopted entry (`existing: true`), `comment` / `delete_after` changes are not
+  applied. The update prints a warning and the state shows the values Atlas has.
 
 **Required permissions:** the service account / API key must hold the **Project
 Owner** role on the target project (covers add / list / get / remove access list

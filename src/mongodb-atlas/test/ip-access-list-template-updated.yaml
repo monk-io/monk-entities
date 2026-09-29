@@ -1,0 +1,24 @@
+namespace: mongodb-atlas-acl-test
+
+# Loaded over ip-access-list-template.yaml by the "comment change" test step.
+# Same CIDR entry, new comment: update must apply it to the live Atlas entry.
+acl-entry:
+  defines: mongodb-atlas/ip-access-list-entry
+  project_id: <- connection-target("project") entity-state get-member("id")
+  cidr_block: 192.0.2.0/24
+  comment: "monkec integration test (updated)"
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-atlas-acl-test/acl-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-atlas-acl-test/acl-project
+      timeout: 120
