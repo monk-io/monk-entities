@@ -459,7 +459,17 @@ Note: Snapshot creation may take several minutes depending on cluster size.`);
     cli.output(`Listing backup snapshots for cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
     cli.output(`==================================================`);
-    this.validateBackupSupport();
+    if (!this.isDedicatedTier()) {
+      cli.output(`
+Total snapshots available: 0`);
+      cli.output(`
+\u26A0\uFE0F  Note: Backups require a dedicated cluster (M10 or higher).`);
+      cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
+      cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
+      cli.output(`
+==================================================`);
+      return;
+    }
     if (!this.state.id) {
       throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
     }
@@ -1029,17 +1039,9 @@ ${"=".repeat(60)}`);
     const instanceSize = this.resolveInstanceSize(clusterData);
     const pricing = this.getClusterPricing(instanceSize);
     if (!pricing) {
-      cli.output(JSON.stringify({
-        type: "mongodb-atlas-cluster",
-        costs: {
-          month: {
-            amount: "0",
-            currency: "USD",
-            error: `No published rate on file for cluster tier ${instanceSize}`
-          }
-        }
-      }));
-      return;
+      throw new Error(
+        `No published rate on file for MongoDB Atlas cluster tier ${instanceSize}; cost is unknown. Add the tier to DEDICATED_PRICING in src/mongodb-atlas/cluster.ts.`
+      );
     }
     let monthly = pricing.monthlyMin;
     let hourly = pricing.monthlyMin / _Cluster.HOURS_PER_MONTH;
@@ -1086,8 +1088,11 @@ ${"=".repeat(60)}`);
     }
     let matched = 0;
     let totalCents = 0;
+    let unattributed = 0;
+    let unattributedCents = 0;
     const bySku = {};
     const clusterName = this.state.name || this.definition.name;
+    const projectId = this.definition.project_id;
     for (let i = 0; i < invoices.length; i++) {
       const lineItems = this.fetchInvoiceLineItems(orgId, invoices[i]);
       for (let j = 0; j < lineItems.length; j++) {
@@ -1095,7 +1100,12 @@ ${"=".repeat(60)}`);
         if (item?.clusterName !== clusterName) {
           continue;
         }
-        if (item?.groupId && item.groupId !== this.definition.project_id) {
+        if (!item?.groupId) {
+          unattributed++;
+          unattributedCents += Number(item?.totalPriceCents || 0);
+          continue;
+        }
+        if (item.groupId !== projectId) {
           continue;
         }
         const cents = Number(item?.totalPriceCents || 0);
@@ -1111,8 +1121,9 @@ ${"=".repeat(60)}`);
     }
     if (matched === 0) {
       cli.output(`
-\u2139\uFE0F  No line items attributed to cluster "${clusterName}" yet.`);
+\u2139\uFE0F  No line items attributed to cluster "${clusterName}" in project ${projectId} yet.`);
       cli.output(`   Atlas attributes usage to a cluster by name once charges accrue for it.`);
+      this.reportUnattributedLineItems(clusterName, unattributed, unattributedCents);
       return;
     }
     cli.output(`
@@ -1125,11 +1136,25 @@ ${"=".repeat(60)}`);
 ${"=".repeat(60)}`);
     cli.output(`\u{1F9FE} BILLED SO FAR THIS PERIOD: $${(totalCents / 100).toFixed(2)}`);
     cli.output(`${"=".repeat(60)}`);
+    this.reportUnattributedLineItems(clusterName, unattributed, unattributedCents);
     cli.output(`
 \u{1F4DD} Notes:`);
     cli.output(`   - This is a partial-month accrual, not a full-month figure`);
     cli.output(`   - Amounts come from MongoDB's pending invoice and reflect applied discounts`);
     cli.output(`   - Run get-cost-estimate for a projected full-month cost`);
+  }
+  /**
+   * Report line items that name this cluster but carry no project id. They are left out of
+   * the total because they cannot be told apart from a same-named cluster elsewhere in the org.
+   */
+  reportUnattributedLineItems(clusterName, count, cents) {
+    if (count === 0) {
+      return;
+    }
+    cli.output(`
+\u26A0\uFE0F  ${count} line item(s) totalling $${(cents / 100).toFixed(2)} name cluster "${clusterName}" but have no project id.`);
+    cli.output(`   They are NOT included above: cluster names are only unique per project, so these`);
+    cli.output(`   charges cannot be attributed to this cluster. Check the invoice in the Atlas UI.`);
   }
   /**
    * Resolve the organization that owns this cluster's project.

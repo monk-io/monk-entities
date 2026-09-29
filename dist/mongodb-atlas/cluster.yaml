@@ -21,7 +21,7 @@ cluster:
       Works with:
       - `mongodb-atlas/user` - Create database users with role-based access
       - `mongodb-atlas/project` - The parent project containing the cluster
-    version-hash: 9831e612bb76
+    version-hash: 29b216211990
   schema:
     secret_ref:
       type: string

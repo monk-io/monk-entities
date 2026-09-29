@@ -55,6 +55,14 @@ const MongoDBAtlasEntity = atlasBase.MongoDBAtlasEntity;
 const base = require("monkec/base");
 const action = base.action;
 const cli = require("cli");
+const accessListKey = require("mongodb-atlas/access-list-key");
+const accessListRecordKey = accessListKey.accessListRecordKey;
+const normalizeAccessListKey = accessListKey.normalizeAccessListKey;
+var LIST_PAGE_SIZE = 500;
+var MAX_CREATE_ATTEMPTS = 4;
+var VERIFY_DELAYS_MS = [1500, 3e3];
+var RETRY_BACKOFF_MS = 2e3;
+var RETRY_JITTER_MS = 2e3;
 var _listEntries_dec, _getInfo_dec, _a, _init;
 var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEntity, _getInfo_dec = [action("get-info")], _listEntries_dec = [action("list-entries")], _a) {
   constructor() {
@@ -91,8 +99,44 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
   entryPath(value) {
     return `${this.collectionPath()}/${encodeURIComponent(value)}`;
   }
-  /** POST the entry (the create endpoint takes an array of entries). */
-  createEntry(entry) {
+  /**
+   * Every entry in the project's access list, read in one page. Atlas caps a project's
+   * access list well below the maximum page size, so a short page means the read is
+   * incomplete — fail rather than decide ownership against partial data.
+   */
+  listAllEntries() {
+    const response = this.makeRequest("GET", `${this.collectionPath()}?itemsPerPage=${LIST_PAGE_SIZE}`);
+    const entries = response && Array.isArray(response.results) ? response.results : [];
+    const totalCount = response?.totalCount ?? entries.length;
+    if (entries.length < totalCount) {
+      throw new Error(
+        `IP access list for project ${this.definition.project_id} has ${totalCount} entries but only ${entries.length} were returned in one page`
+      );
+    }
+    return entries;
+  }
+  /**
+   * Find the Atlas record for `key` (a canonical key from normalizeAccessListKey).
+   * Matches by canonical key, so `ip_address: X` and `cidr_block: X/32` find the same
+   * record. Throws when the list cannot be read.
+   */
+  findEntry(key) {
+    for (const e of this.listAllEntries()) {
+      if (accessListRecordKey(e) === key) {
+        return e;
+      }
+    }
+    return null;
+  }
+  /** Like findEntry, but a failed read counts as "not seen" instead of throwing. */
+  entryVisible(key) {
+    try {
+      return this.findEntry(key) !== null;
+    } catch (_error) {
+      return false;
+    }
+  }
+  entryBody(entry) {
     const body = { [entry.field]: entry.value };
     if (this.definition.comment) {
       body.comment = this.definition.comment;
@@ -100,19 +144,67 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
     if (this.definition.delete_after) {
       body.deleteAfterDate = this.definition.delete_after;
     }
-    this.makeRequest("POST", this.collectionPath(), [body]);
-    this.state = {
-      project_id: this.definition.project_id,
-      entry_value: entry.value,
-      kind: entry.kind,
-      comment: this.definition.comment,
-      existing: false
-    };
+    return body;
   }
-  /** Adopt a pre-existing entry rather than recreating it, or POST a new one. */
+  /**
+   * POST the entry and confirm Atlas actually kept it.
+   *
+   * The access list is one project-wide document: concurrent POSTs from other entities
+   * (or anything else writing the list) can make Atlas drop an entry it had already
+   * accepted with a 2xx. So a successful response proves nothing on its own. After each
+   * POST the entry must be present in the POST response and then stay visible across
+   * a settle window; if it vanishes, re-POST (adding an entry that is already present is
+   * a no-op) after a jittered backoff, and give up with an error after a bounded number
+   * of attempts rather than report an entry that does not exist.
+   */
+  createEntry(entry, key) {
+    const body = this.entryBody(entry);
+    for (let attempt = 1; attempt <= MAX_CREATE_ATTEMPTS; attempt++) {
+      if (attempt > 1) {
+        sleep(RETRY_BACKOFF_MS * (attempt - 1) + Math.floor(Math.random() * RETRY_JITTER_MS));
+      }
+      const response = this.makeRequest("POST", this.collectionPath(), [body]);
+      const returned = response && Array.isArray(response.results) ? response.results : [];
+      const complete = returned.length > 0 && returned.length >= (response?.totalCount ?? returned.length);
+      if (complete && !returned.some((e) => accessListRecordKey(e) === key)) {
+        cli.output(`IP access list entry ${entry.value} missing from the create response (attempt ${attempt}/${MAX_CREATE_ATTEMPTS}), retrying`);
+        continue;
+      }
+      let persisted = true;
+      for (const delay of VERIFY_DELAYS_MS) {
+        sleep(delay);
+        if (!this.entryVisible(key)) {
+          persisted = false;
+          break;
+        }
+      }
+      if (!persisted) {
+        cli.output(`IP access list entry ${entry.value} was dropped by Atlas after create (attempt ${attempt}/${MAX_CREATE_ATTEMPTS}), retrying`);
+        continue;
+      }
+      this.state = {
+        project_id: this.definition.project_id,
+        entry_value: entry.value,
+        kind: entry.kind,
+        comment: this.definition.comment,
+        existing: false
+      };
+      return;
+    }
+    throw new Error(
+      `IP access list entry ${entry.value} was not persisted in project ${this.definition.project_id} after ${MAX_CREATE_ATTEMPTS} attempts; Atlas accepted the request but the entry is not in the access list (concurrent access list writes can drop entries)`
+    );
+  }
+  /**
+   * Adopt an entry that is already in the access list, or create a new one.
+   * Existence is decided BEFORE posting and by canonical key, so an entry that is
+   * already present under another spelling (X vs X/32) is adopted as `existing` and
+   * never deleted by this entity.
+   */
   adoptOrCreate(entry) {
-    const existing = this.checkResourceExists(this.entryPath(entry.value));
-    if (existing && (existing.ipAddress || existing.cidrBlock || existing.awsSecurityGroup)) {
+    const key = normalizeAccessListKey(entry.value);
+    const existing = this.findEntry(key);
+    if (existing) {
       this.state = {
         project_id: this.definition.project_id,
         entry_value: entry.value,
@@ -122,7 +214,7 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       };
       return;
     }
-    this.createEntry(entry);
+    this.createEntry(entry, key);
   }
   create() {
     this.adoptOrCreate(this.resolveEntry());
@@ -133,7 +225,9 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       return;
     }
     const desired = this.resolveEntry();
-    if (desired.value === this.state.entry_value) {
+    if (normalizeAccessListKey(desired.value) === normalizeAccessListKey(this.state.entry_value)) {
+      this.state.entry_value = desired.value;
+      this.state.kind = desired.kind;
       return;
     }
     if (!this.state.existing) {
@@ -159,7 +253,18 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       return false;
     }
     const data = this.checkResourceExists(this.entryPath(this.state.entry_value));
-    return Boolean(data && (data.ipAddress || data.cidrBlock || data.awsSecurityGroup));
+    if (data && (data.ipAddress || data.cidrBlock || data.awsSecurityGroup)) {
+      return true;
+    }
+    if (!this.state.existing) {
+      cli.output(`IP access list entry ${this.state.entry_value} not found, re-adding it`);
+      try {
+        this.makeRequest("POST", this.collectionPath(), [this.entryBody(this.resolveEntry())]);
+      } catch (error) {
+        cli.output(`Re-adding IP access list entry failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return false;
   }
   checkLiveness() {
     if (!this.state.entry_value) {

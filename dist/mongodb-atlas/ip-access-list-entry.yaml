@@ -7,7 +7,8 @@ ip-access-list-entry:
       Manages a single entry in a MongoDB Atlas project's IP access list.
       The IP access list is the network gate for a project: Atlas rejects all client
       connections except from listed IP addresses, CIDR blocks, or AWS security groups.
-      Each entity instance manages one entry (keyed by its value) with full lifecycle —
+      Each entity instance manages one entry (keyed by its canonical value, so a single IP
+      and its /32 are the same entry) with full lifecycle —
       unlike the cluster entity's `allow_ips`, entries are reconciled and removed on delete.
 
       ## Required Permissions
@@ -26,7 +27,7 @@ ip-access-list-entry:
       Works with:
       - `mongodb-atlas/project` - the project whose access list this entry belongs to
       - `mongodb-atlas/cluster` - grants the network access clusters in the project rely on
-    version-hash: 9831e612bb76
+    version-hash: 29b216211990
   schema:
     secret_ref:
       type: string
@@ -88,3 +89,4 @@ ip-access-list-entry:
     - mongodb-atlas/atlas-base
     - monkec/base
     - cli
+    - mongodb-atlas/access-list-key
