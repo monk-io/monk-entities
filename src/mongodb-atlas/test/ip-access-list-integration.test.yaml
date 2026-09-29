@@ -82,6 +82,51 @@ tests:
       contains:
         - "192.0.2.0/24"
 
+  # Comment change on an entry this stack created (PRO-885): update must apply the new
+  # comment to the live Atlas entry, not only to the definition.
+  - name: "get-info shows the original comment"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/get-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "comment: monkec integration test"
+
+  - name: "Load template with a changed comment"
+    action: "load"
+    target: "ip-access-list-template-updated.yaml"
+    expect:
+      exitCode: 0
+
+  - name: "Update the stack with the changed comment"
+    action: "update"
+    target: "mongodb-atlas-acl-test/acl-stack"
+    expect:
+      exitCode: 0
+
+  - name: "Wait for CIDR entry readiness after the comment change"
+    action: "wait"
+    target: "mongodb-atlas-acl-test/acl-entry"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
+
+  - name: "get-info shows the updated comment from Atlas"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/get-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "comment: monkec integration test (updated)"
+
+  - name: "list-entries shows the updated comment"
+    action: "do"
+    target: "mongodb-atlas-acl-test/acl-entry/list-entries"
+    expect:
+      exitCode: 0
+      contains:
+        - "monkec integration test (updated)"
+
   # Negative case: an entry with two values set must fail validation before any API call.
   - name: "Reject entry with multiple values set"
     action: "run"

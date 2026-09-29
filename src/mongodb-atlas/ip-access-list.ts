@@ -2,6 +2,12 @@ import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntitySta
 import { action, Args } from "monkec/base";
 import cli from "cli";
 import { accessListRecordKey, normalizeAccessListKey } from "./access-list-key.ts";
+import {
+    AccessListAttributes,
+    accessListAttributeDrift,
+    describeAttributeDrift,
+    hasAttributeDrift
+} from "./access-list-attrs.ts";
 
 /** Page size for reading the whole access list (Atlas maximum). */
 const LIST_PAGE_SIZE = 500;
@@ -77,6 +83,11 @@ export interface IpAccessListEntryState extends MongoDBAtlasEntityState {
      * @description Comment stored on the entry
      */
     comment?: string;
+
+    /**
+     * @description Expiry (ISO-8601) stored on the entry, if any
+     */
+    delete_after?: string;
 }
 
 interface ResolvedEntry {
@@ -253,6 +264,7 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
                 entry_value: entry.value,
                 kind: entry.kind,
                 comment: this.definition.comment,
+                delete_after: this.definition.delete_after,
                 existing: false
             };
             return;
@@ -280,6 +292,7 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
                 entry_value: entry.value,
                 kind: entry.kind,
                 comment: existing.comment,
+                delete_after: existing.deleteAfterDate,
                 existing: true
             };
             return;
@@ -300,12 +313,12 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
 
         const desired = this.resolveEntry();
 
-        // Desired entry unchanged (compared by canonical key, so switching between
-        // ip_address X and cidr_block X/32 is not a change): nothing to reconcile,
-        // whether adopted or not.
+        // Same entry (compared by canonical key, so switching between ip_address X and
+        // cidr_block X/32 is not a change). Only comment/delete_after can differ.
         if (normalizeAccessListKey(desired.value) === normalizeAccessListKey(this.state.entry_value)) {
             this.state.entry_value = desired.value;
             this.state.kind = desired.kind;
+            this.reconcileAttributes(desired);
             return;
         }
 
@@ -325,6 +338,92 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
             }
         }
         this.adoptOrCreate(desired);
+    }
+
+    private desiredAttributes(): AccessListAttributes {
+        return { comment: this.definition.comment, deleteAfterDate: this.definition.delete_after };
+    }
+
+    private refreshAttributesFromLive(live: any): void {
+        this.state.comment = live.comment;
+        this.state.delete_after = live.deleteAfterDate;
+    }
+
+    /**
+     * Apply comment/delete_after changes to an entry whose value is unchanged.
+     *
+     * Atlas has no single-entry PATCH, and its docs don't say whether POSTing an entry
+     * that already exists updates its comment or expiry. So: re-POST the entry, read it
+     * back, and if Atlas kept the old values, delete and recreate it. Removing an expiry
+     * goes straight to delete-and-recreate, since a POST without deleteAfterDate is not
+     * documented to clear one. An adopted entry (`existing: true`) belongs to someone
+     * else and is never modified; the change is reported as not applied.
+     */
+    private reconcileAttributes(desired: ResolvedEntry): void {
+        const key = normalizeAccessListKey(desired.value);
+        const live = this.findEntry(key);
+
+        if (!live) {
+            // Gone from Atlas (expired, or removed out of band): add it again. An entry
+            // this entity adopts-or-creates here is its own from now on.
+            cli.output(`IP access list entry ${desired.value} not found in project ${this.definition.project_id}, re-adding it`);
+            this.adoptOrCreate(desired);
+            return;
+        }
+
+        const want = this.desiredAttributes();
+        const drift = accessListAttributeDrift(want, live);
+        if (!hasAttributeDrift(drift)) {
+            this.refreshAttributesFromLive(live);
+            return;
+        }
+
+        const change = describeAttributeDrift(drift, want, live);
+        if (this.state.existing) {
+            cli.output(
+                `WARNING: IP access list entry ${desired.value} was not created by this entity (existing: true), ` +
+                `so the change to ${change} was NOT applied. Change it in Atlas directly, or remove the entry and ` +
+                `let this entity create it.`
+            );
+            this.refreshAttributesFromLive(live);
+            return;
+        }
+
+        cli.output(`Updating IP access list entry ${desired.value}: ${change}`);
+
+        if (!drift.clearsDeleteAfter) {
+            this.makeRequest("POST", this.collectionPath(), [this.entryBody(desired)]);
+            const after = this.findEntry(key);
+            if (after && !hasAttributeDrift(accessListAttributeDrift(want, after))) {
+                this.refreshAttributesFromLive(after);
+                return;
+            }
+            cli.output(`Atlas kept the old values after re-adding the entry; deleting and recreating it`);
+        }
+
+        cli.output(
+            `WARNING: recreating IP access list entry ${desired.value}. Connections from it are refused ` +
+            `until the new entry is active (usually a few seconds).`
+        );
+        try {
+            this.makeRequest("DELETE", this.entryPath(desired.value));
+        } catch (error) {
+            if (!this.isResourceGoneError(error)) {
+                throw error;
+            }
+        }
+        this.createEntry(desired, key);
+
+        const recreated = this.findEntry(key);
+        if (recreated && hasAttributeDrift(accessListAttributeDrift(want, recreated))) {
+            throw new Error(
+                `IP access list entry ${desired.value} was recreated but Atlas reports ` +
+                `${describeAttributeDrift(accessListAttributeDrift(want, recreated), want, recreated)}`
+            );
+        }
+        if (recreated) {
+            this.refreshAttributesFromLive(recreated);
+        }
     }
 
     override delete(): void {
