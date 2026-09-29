@@ -225,6 +225,11 @@ interface IpAccessListEntryDefinition {
   address for a few seconds.
 - On an adopted entry (`existing: true`), `comment` / `delete_after` changes are not
   applied. The update prints a warning and the state shows the values Atlas has.
+- Once `delete_after` has passed, Atlas removes the entry and the entity leaves it
+  removed: updates and readiness report it as expired instead of re-adding it. Set a
+  future `delete_after` (or remove it) to restore access.
+- An adopted entry that disappears from Atlas is not re-created; the update prints a
+  warning.
 
 **Required permissions:** the service account / API key must hold the **Project
 Owner** role on the target project (covers add / list / get / remove access list

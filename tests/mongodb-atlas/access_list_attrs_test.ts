@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import {
     accessListAttributeDrift,
+    deleteAfterExpired,
     describeAttributeDrift,
     hasAttributeDrift,
     sameDeleteAfter,
@@ -65,4 +66,19 @@ Deno.test("removing an expiry is flagged as clearing it", () => {
 Deno.test("unparseable expiries compare as strings", () => {
     assert.equal(sameDeleteAfter("soon", "soon"), true);
     assert.equal(sameDeleteAfter("soon", "later"), false);
+});
+
+Deno.test("deleteAfterExpired: past or now is expired", () => {
+    const now = Date.parse("2026-10-01T10:00:00Z");
+    assert.equal(deleteAfterExpired("2026-10-01T09:00:00Z", now), true);
+    assert.equal(deleteAfterExpired("2026-10-01T10:00:00Z", now), true);
+    assert.equal(deleteAfterExpired("2026-10-01T12:00:00+02:00", now), true);
+});
+
+Deno.test("deleteAfterExpired: future, absent or unparseable is not expired", () => {
+    const now = Date.parse("2026-10-01T10:00:00Z");
+    assert.equal(deleteAfterExpired("2026-10-01T10:00:01Z", now), false);
+    assert.equal(deleteAfterExpired(undefined, now), false);
+    assert.equal(deleteAfterExpired("", now), false);
+    assert.equal(deleteAfterExpired("next tuesday", now), false);
 });

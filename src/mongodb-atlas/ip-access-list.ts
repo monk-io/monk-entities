@@ -5,6 +5,7 @@ import { accessListRecordKey, normalizeAccessListKey } from "./access-list-key.t
 import {
     AccessListAttributes,
     accessListAttributeDrift,
+    deleteAfterExpired,
     describeAttributeDrift,
     hasAttributeDrift
 } from "./access-list-attrs.ts";
@@ -88,6 +89,12 @@ export interface IpAccessListEntryState extends MongoDBAtlasEntityState {
      * @description Expiry (ISO-8601) stored on the entry, if any
      */
     delete_after?: string;
+
+    /**
+     * @description True once delete_after has passed and Atlas has removed the entry as
+     * configured; the entity then leaves it removed instead of re-adding it
+     */
+    expired?: boolean;
 }
 
 interface ResolvedEntry {
@@ -340,6 +347,11 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
         this.adoptOrCreate(desired);
     }
 
+    /** True when the definition's delete_after is at or before now. */
+    private expiredAsConfigured(): boolean {
+        return deleteAfterExpired(this.definition.delete_after, Date.now());
+    }
+
     private desiredAttributes(): AccessListAttributes {
         return { comment: this.definition.comment, deleteAfterDate: this.definition.delete_after };
     }
@@ -364,12 +376,36 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
         const live = this.findEntry(key);
 
         if (!live) {
-            // Gone from Atlas (expired, or removed out of band): add it again. An entry
-            // this entity adopts-or-creates here is its own from now on.
+            // Past its delete_after, Atlas removed the entry by design. Re-adding it would
+            // reopen access that was meant to lapse (or fail on a past deleteAfterDate).
+            if (this.expiredAsConfigured()) {
+                cli.output(
+                    `IP access list entry ${desired.value} expired as configured (delete_after ` +
+                    `${this.definition.delete_after}) and was removed by Atlas; not re-adding it. ` +
+                    `Set a future delete_after, or remove it, to restore access.`
+                );
+                this.state.expired = true;
+                this.state.comment = undefined;
+                this.state.delete_after = this.definition.delete_after;
+                return;
+            }
+            // Adopted entries are never recreated (same rule as checkReadiness): it
+            // wasn't ours, so re-adding it would silently claim it.
+            if (this.state.existing) {
+                cli.output(
+                    `WARNING: IP access list entry ${desired.value} was adopted (existing: true) and is no longer in ` +
+                    `project ${this.definition.project_id}. Not re-creating it; add it in Atlas, or remove it from ` +
+                    `this stack and redeploy so this entity creates and owns it.`
+                );
+                return;
+            }
+            // Ours, no expiry or a future one, removed out of band: add it again.
             cli.output(`IP access list entry ${desired.value} not found in project ${this.definition.project_id}, re-adding it`);
             this.adoptOrCreate(desired);
             return;
         }
+
+        this.state.expired = false;
 
         const want = this.desiredAttributes();
         const drift = accessListAttributeDrift(want, live);
@@ -443,6 +479,13 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
             return true;
         }
 
+        // Removed by Atlas at its configured expiry: that is the desired end state, so
+        // don't re-add it (the past deleteAfterDate would be rejected anyway).
+        if (this.expiredAsConfigured()) {
+            cli.output(`IP access list entry ${this.state.entry_value} expired as configured (delete_after ${this.definition.delete_after})`);
+            return true;
+        }
+
         // An entry this entity created can still be dropped by a concurrent access list
         // write after create verified it. Re-add it (a no-op if it reappeared) so the
         // next readiness poll can pass; never recreate an adopted entry.
@@ -462,6 +505,9 @@ export class IpAccessListEntry extends MongoDBAtlasEntity<IpAccessListEntryDefin
             throw new Error("IP access list entry value is not available");
         }
         const data = this.checkResourceExists(this.entryPath(this.state.entry_value));
+        if (!data && this.expiredAsConfigured()) {
+            return true;
+        }
         if (!data) {
             throw new Error(`IP access list entry ${this.state.entry_value} not found`);
         }
