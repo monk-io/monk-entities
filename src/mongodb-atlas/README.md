@@ -139,6 +139,22 @@ interface ClusterState {
 }
 ```
 
+**Create and existing clusters:**
+- Create looks the cluster up by name first and only creates it when Atlas answers
+  "not found". Any other failed lookup (bad credentials, missing permission, an Atlas
+  outage) fails the create instead of risking a second cluster. This also covers an
+  update whose state was lost: it finds the cluster rather than creating another.
+- Clusters the entity creates carry a `monk-entity-path` tag holding the entity's Monk
+  path. A cluster found by name with this entity's tag is its own: management resumes
+  and deleting the stack deletes it. One without the tag, or with another entity's, is
+  adopted as `existing: true` and left in place on delete.
+- A cluster found by name whose tier family (M0 / Flex / M10+), provider or region differs
+  from the definition is not adopted; create fails and names the difference. A different
+  dedicated instance size is applied to a cluster the entity owns and refused on one it
+  doesn't.
+- `allow_ips` entries from other clusters are never removed on create, even when they
+  carry the same `"Added by MonkeC entity"` comment.
+
 **Update behavior:**
 - `allow_ips` is reconciled on every update, and on delete: CIDRs/IPs added to the definition
   are added to the project's access list, ones removed from the definition are removed, and

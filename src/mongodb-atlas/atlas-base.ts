@@ -2,6 +2,7 @@ import { MonkEntity } from "monkec/base";
 import { HttpClient } from "monkec/http-client";
 import { API_VERSION, BASE_URL, getToken } from "./common.ts";
 import cli from "cli";
+import { atlasErrorStatus } from "./cluster-identity.ts";
 
 /**
  * Base definition interface for all MongoDB Atlas entities
@@ -144,6 +145,23 @@ export abstract class MongoDBAtlasEntity<
         } catch (error) {
             // Resource doesn't exist or other error
             return null;
+        }
+    }
+
+    /**
+     * GET a resource, returning null only when Atlas answers 404. Unlike
+     * checkResourceExists, any other failure (auth, permission, rate limit, outage,
+     * network) throws, so a caller deciding "absent, so create it" never acts on a read
+     * that simply failed.
+     */
+    protected findResource(path: string): any | null {
+        try {
+            return this.makeRequest("GET", path);
+        } catch (error) {
+            if (atlasErrorStatus(error) === 404) {
+                return null;
+            }
+            throw error;
         }
     }
 

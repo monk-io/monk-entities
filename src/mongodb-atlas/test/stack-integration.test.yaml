@@ -77,12 +77,66 @@ tests:
       contains:
         - "Connected to MongoDB Atlas DEVELOPMENT successfully!"
 
+  # === Existing cluster by name (ENG-836) ===
+  # The test framework can't wipe one entity's state, so a second entity with the same
+  # cluster name stands in for "state lost": it has no state.id, so create() runs and
+  # must find the cluster instead of POSTing a duplicate. Its owner tag names
+  # dev-cluster, so the twin adopts it as existing.
+  - name: "Second entity for the same cluster name adopts it"
+    action: "run"
+    target: "mongodb-test-stack/dev-cluster-twin"
+    expect:
+      exitCode: 0
+
+  - name: "Twin reaches readiness on the adopted cluster"
+    action: "wait"
+    target: "mongodb-test-stack/dev-cluster-twin"
+    waitFor:
+      condition: "ready"
+      timeout: 120000
+
+  - name: "Deleting the twin leaves the cluster in place"
+    action: "delete"
+    target: "mongodb-test-stack/dev-cluster-twin"
+    expect:
+      exitCode: 0
+
+  - name: "Cluster still exists after the twin is deleted"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/get-backup-info"
+    expect:
+      exitCode: 0
+      contains:
+        - "Cluster Tier: M0"
+
+  - name: "Same name in another region is refused, not adopted"
+    action: "run"
+    target: "mongodb-test-stack/dev-cluster-mismatch"
+    expect:
+      exitCode: 1
+      contains:
+        - "does not match the definition"
+
   - name: "Verify all entities are running"
     action: "ps"
     expect:
       exitCode: 0
 
 cleanup:
+  # Twin and mismatch entities are never owners of the cluster, so deleting them
+  # removes nothing in Atlas. Delete them first, then the stack that owns it.
+  - name: "Delete cluster twin (best effort)"
+    action: "delete"
+    target: "mongodb-test-stack/dev-cluster-twin"
+    expect:
+      exitCode: 0
+
+  - name: "Delete mismatched cluster entity (best effort)"
+    action: "delete"
+    target: "mongodb-test-stack/dev-cluster-mismatch"
+    expect:
+      exitCode: 0
+
   - name: "Delete development stack"
     action: "delete"
     target: "mongodb-test-stack/dev-stack"
