@@ -61,6 +61,59 @@ dev-user:
         - mongodb-test-stack/dev-project
       timeout: 120
 
+# Second entity for the same Atlas cluster name (ENG-836). Run on its own after
+# dev-stack is up: it must find monkec-dev-cluster by name and adopt it as existing
+# (owner tag names dev-cluster, not this entity) instead of POSTing a duplicate, and
+# its delete must leave the cluster in place. No allow_ips, so it adds no access list
+# entries. Not a member of dev-stack.
+dev-cluster-twin:
+  defines: mongodb-atlas/cluster
+  name: monkec-dev-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: US_WEST_2
+  instance_size: M0
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-test-stack/dev-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-test-stack/dev-project
+      timeout: 120
+
+# Same name, different region: must refuse to adopt rather than take over a cluster
+# of another shape. Not a member of dev-stack.
+dev-cluster-mismatch:
+  defines: mongodb-atlas/cluster
+  name: monkec-dev-cluster
+  project_id: <- connection-target("project") entity-state get-member("id")
+  provider: AWS
+  region: EU_WEST_1
+  instance_size: M0
+  secret_ref: mongodb-atlas-token
+  permitted-secrets:
+    mongodb-atlas-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    project:
+      runnable: mongodb-test-stack/dev-project
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - mongodb-test-stack/dev-project
+      timeout: 120
+
 # Stack Definitions - Process Groups
 
 dev-stack:

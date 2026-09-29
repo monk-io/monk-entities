@@ -2,6 +2,16 @@ import { MongoDBAtlasEntity, MongoDBAtlasEntityDefinition, MongoDBAtlasEntitySta
 import cli from "cli";
 import { action, Args } from "monkec/base";
 import { BILLING_API_VERSION } from "./common.ts";
+import {
+    ClusterShape,
+    OWNER_TAG_KEY,
+    atlasErrorStatus,
+    clusterOwnership,
+    instanceSizeDiffers,
+    liveClusterShape,
+    ownerTagValue,
+    shapeMismatches
+} from "./cluster-identity.ts";
 
 /**
  * Represents a MongoDB Atlas cluster entity.
@@ -163,9 +173,27 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         return `${this.clustersCollectionPath()}/${this.definition.name}`;
     }
 
-    /** Create a new MongoDB Atlas cluster (Flex, free, or dedicated). */
+    /**
+     * Create the cluster (Flex, free, or dedicated), or take over one that already has
+     * this name.
+     *
+     * update() calls create() whenever `state.id` is missing, so a lost state must not
+     * lead to a second POST for a cluster that exists. The name is looked up first; only
+     * a real 404 proceeds to create. A cluster that exists is adopted when its tier
+     * family, provider and region match the definition (otherwise this throws). It
+     * counts as this entity's own (`existing: false`, deleted with the stack) only when
+     * it carries this entity's owner tag, stamped on every cluster it creates.
+     */
     override create(): void {
-        if (this.isFlexTier()) {
+        // A fresh create has applied no allow_ips yet. Starting from an empty list keeps
+        // the legacy comment-matching fallback in reconcileIPAccessList from removing
+        // entries that other clusters in the project added.
+        this.state.applied_ips = this.state.applied_ips ?? [];
+
+        const live = this.findResource(this.clusterResourcePath());
+        if (live) {
+            this.adoptExistingCluster(live);
+        } else if (this.isFlexTier()) {
             this.createFlexCluster();
         } else {
             this.createClusterResource();
@@ -178,6 +206,99 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         this.reconcileIPAccessList();
     }
 
+    /** The shape the definition asks for, comparable with liveClusterShape(). */
+    private desiredShape(): ClusterShape {
+        return {
+            family: this.tierFamily(),
+            provider: this.definition.provider,
+            region: this.definition.region,
+            instanceSize: this.isDedicatedTier() ? this.definition.instance_size : undefined
+        };
+    }
+
+    /** Owner tag for the create body; empty when this entity has no path to stamp. */
+    private ownerTags(): { key: string; value: string }[] {
+        const value = ownerTagValue(this.path);
+        return value ? [{ key: OWNER_TAG_KEY, value }] : [];
+    }
+
+    /** Take over a cluster found by name (see create()). */
+    private adoptExistingCluster(live: any): void {
+        const name = this.definition.name;
+        const desired = this.desiredShape();
+        const liveShape = liveClusterShape(live, this.isFlexTier());
+        const mismatches = shapeMismatches(desired, liveShape);
+        if (mismatches.length > 0) {
+            throw new Error(
+                `A cluster named ${name} already exists in project ${this.definition.project_id} but does not match ` +
+                `the definition: ${mismatches.join("; ")}. Refusing to adopt it. Use another name, or change the ` +
+                `definition to match the existing cluster.`
+            );
+        }
+
+        const ownership = clusterOwnership(live.tags, ownerTagValue(this.path));
+        const owned = ownership === "owned";
+
+        if (instanceSizeDiffers(desired, liveShape)) {
+            if (!owned) {
+                throw new Error(
+                    `A cluster named ${name} already exists in project ${this.definition.project_id} with instance size ` +
+                    `${liveShape.instanceSize}, but the definition asks for ${desired.instanceSize}. It was not created by ` +
+                    `this entity, so it will not be resized. Use another name, or set instance_size to ${liveShape.instanceSize}.`
+                );
+            }
+            this.reconcileClusterConfig(live);
+        }
+
+        if (owned) {
+            cli.output(`Cluster ${name} already exists and carries this entity's owner tag; resuming management of it.`);
+        } else {
+            cli.output(
+                `Cluster ${name} already exists and was not created by this entity ` +
+                `(${ownership === "foreign" ? "owner tag names another entity" : "no owner tag"}). ` +
+                `Adopting it as existing: it will not be deleted with this stack.`
+            );
+        }
+
+        this.state = {
+            ...this.state,
+            id: live.id || live.name || name,
+            name: live.name || name,
+            connection_standard: live.connectionStrings?.standard,
+            connection_srv: live.connectionStrings?.standardSrv,
+            existing: !owned
+        };
+    }
+
+    /**
+     * POST a new cluster with the owner tag. The Atlas docs list `tags` on the create
+     * body of both /clusters (all tiers) and /flexClusters, but if Atlas rejects the tag
+     * (400 naming tags) the cluster is created untagged rather than not at all. An
+     * untagged cluster found again after a state loss is adopted as `existing: true`,
+     * so the fallback can leave a cluster behind on stack delete, never delete someone
+     * else's.
+     */
+    private postNewCluster(body: Record<string, unknown>): any {
+        const tags = this.ownerTags();
+        if (tags.length === 0) {
+            return this.makeRequest("POST", this.clustersCollectionPath(), body);
+        }
+        try {
+            return this.makeRequest("POST", this.clustersCollectionPath(), { ...body, tags });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (atlasErrorStatus(error) !== 400 || !/tag/i.test(message)) {
+                throw error;
+            }
+            cli.output(
+                `Warning: Atlas rejected the owner tag on cluster ${this.definition.name} (${message}). ` +
+                `Creating it without the tag; if this entity's state is lost later, the cluster will be ` +
+                `adopted as existing and not deleted with the stack.`
+            );
+            return this.makeRequest("POST", this.clustersCollectionPath(), body);
+        }
+    }
+
     /** Create a Flex cluster via the /flexClusters endpoint. */
     private createFlexCluster(): void {
         const body: Record<string, unknown> = {
@@ -187,13 +308,14 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
                 "regionName": this.definition.region
             }
         };
-
-        const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
+        const resObj = this.postNewCluster(body);
 
         this.state = {
+            ...this.state,
             // Flex clusters are identified by name; fall back to name if no id is returned.
             id: resObj.id || resObj.name || this.definition.name,
-            name: resObj.name || this.definition.name
+            name: resObj.name || this.definition.name,
+            existing: false
         };
     }
 
@@ -230,12 +352,13 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         if (this.isDedicatedTier()) {
             body.backupEnabled = true;
         }
-
-        const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
+        const resObj = this.postNewCluster(body);
 
         this.state = {
+            ...this.state,
             id: resObj.id,
-            name: resObj.name
+            name: resObj.name,
+            existing: false
         };
     }
 
