@@ -505,17 +505,28 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
     }
 
     /**
-     * Validate if the cluster tier supports backup operations
-     * Backups are only available for M10+ (dedicated) clusters
+     * Throw for an action that changes backups (create-snapshot, restore, delete-snapshot)
+     * on a tier without on-demand backups. Only M10+ (dedicated) clusters have them.
      */
-    private validateBackupSupport(): void {
+    private validateBackupSupport(actionName: string): void {
         if (!this.isDedicatedTier()) {
             throw new Error(
-                `Backup operations are not supported for cluster tier ${this.definition.instance_size}. ` +
-                `On-demand backups require a dedicated cluster (M10 or higher). ` +
-                `Flex clusters receive automatic snapshots that are not managed via these actions.`
+                `${actionName} is not available on the ${this.definition.instance_size} tier: ` +
+                `on-demand backups need a dedicated cluster (M10 or higher).`
             );
         }
+    }
+
+    /**
+     * Print why there is nothing to show on a tier without on-demand backups. Read-only
+     * backup actions call this and return successfully on M0/Flex: "nothing there" is the
+     * true answer, matching get-backup-info.
+     */
+    private backupUnsupportedNote(): void {
+        cli.output(`\n⚠️  Note: Backups require a dedicated cluster (M10 or higher).`);
+        cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
+        cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
+        cli.output(`\n==================================================`);
     }
 
     /**
@@ -597,7 +608,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`==================================================`);
 
         // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        this.validateBackupSupport("create-snapshot");
 
         if (!this.state.id) {
             throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
@@ -662,10 +673,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
 
         if (!this.isDedicatedTier()) {
             cli.output(`\nTotal snapshots available: 0`);
-            cli.output(`\n⚠️  Note: Backups require a dedicated cluster (M10 or higher).`);
-            cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
-            cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
-            cli.output(`\n==================================================`);
+            this.backupUnsupportedNote();
             return;
         }
 
@@ -751,7 +759,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Project ID: ${this.definition.project_id}`);
 
         // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        this.validateBackupSupport("restore");
 
         if (!this.state.id) {
             throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
@@ -862,8 +870,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Cluster: ${this.definition.name}`);
         cli.output(`==================================================`);
 
-        // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        if (!this.isDedicatedTier()) {
+            cli.output(`\nNo restore jobs exist on this tier.`);
+            this.backupUnsupportedNote();
+            return;
+        }
 
         const jobId = (args?.job_id || args?.jobId) as string | undefined; // Support both for backward compatibility
         if (!jobId) {
@@ -940,8 +951,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Project ID: ${this.definition.project_id}`);
         cli.output(`==================================================`);
 
-        // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        if (!this.isDedicatedTier()) {
+            cli.output(`\nTotal restore jobs: 0`);
+            this.backupUnsupportedNote();
+            return;
+        }
 
         const limit = Number(args?.limit) || 10;
 
@@ -1013,8 +1027,11 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Cluster: ${this.definition.name}`);
         cli.output(`Project ID: ${this.definition.project_id}`);
 
-        // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        if (!this.isDedicatedTier()) {
+            cli.output(`\nNo snapshots exist on this tier.`);
+            this.backupUnsupportedNote();
+            return;
+        }
 
         const snapshotId = (args?.snapshot_id || args?.snapshotId) as string | undefined;
 
@@ -1090,7 +1107,7 @@ export class Cluster extends MongoDBAtlasEntity<ClusterDefinition, ClusterState>
         cli.output(`Project ID: ${this.definition.project_id}`);
 
         // Validate cluster tier supports backups
-        this.validateBackupSupport();
+        this.validateBackupSupport("delete-snapshot");
 
         const snapshotId = (args?.snapshot_id || args?.snapshotId) as string | undefined;
 
