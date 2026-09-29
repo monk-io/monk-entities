@@ -62,6 +62,35 @@ tests:
     expect:
       exitCode: 0
 
+  # === Backup actions on M0 (ENG-838) ===
+  # Read-only backup actions report "nothing here" with a note and succeed;
+  # actions that would change backups fail with the tier message.
+  - name: "list-snapshots on M0 reports the tier note"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/list-snapshots"
+    expect:
+      exitCode: 0
+      contains:
+        - "Total snapshots available: 0"
+        - "Backups require a dedicated cluster (M10 or higher)"
+
+  - name: "list-restore-jobs on M0 reports the tier note"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/list-restore-jobs"
+    expect:
+      exitCode: 0
+      contains:
+        - "Total restore jobs: 0"
+        - "Backups require a dedicated cluster (M10 or higher)"
+
+  - name: "create-snapshot on M0 fails with the tier message"
+    action: "do"
+    target: "mongodb-test-stack/dev-cluster/create-snapshot"
+    expect:
+      exitCode: 1
+      contains:
+        - "create-snapshot is not available on the M0 tier"
+
   - name: "Wait for connection test to exit"
     action: "wait"
     target: "mongodb-test-stack/dev-connection-test"

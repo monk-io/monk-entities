@@ -413,7 +413,7 @@ MongoDB Atlas clusters (M10 and higher) support on-demand backup snapshots via c
 - **FLEX clusters:** Replaced the retired M2/M5 shared tiers (M2/M5 reached End-of-Life 2026-01-22). Receive automatic snapshots; not managed via these on-demand actions
 - **Flex clusters:** Automatic daily snapshots (cannot be disabled)
 - **M10+ clusters:** Full Cloud Backup support with on-demand snapshots via API
-- On M0 and Flex, `list-snapshots` reports an empty list with a note instead of failing; the other backup actions fail with an error explaining the M10 requirement
+- On M0 and Flex, the read-only backup actions (`list-snapshots`, `list-restore-jobs`, `get-restore-status`, `describe-snapshot`) report that there is nothing to show, with a note, and succeed. The actions that change backups (`create-snapshot`, `restore`, `delete-snapshot`) fail with a one-line error naming the M10 requirement
 - **During restore:** Cluster becomes read-only until restore completes
 
 #### Get Backup Info
