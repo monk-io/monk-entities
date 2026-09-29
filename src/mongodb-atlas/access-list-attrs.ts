@@ -53,6 +53,19 @@ export function sameDeleteAfter(a?: string, b?: string): boolean {
     return Math.abs(ta - tb) < DELETE_AFTER_TOLERANCE_MS;
 }
 
+/**
+ * Whether an entry's configured expiry has passed: true only when `deleteAfter` parses
+ * and is at or before `nowMs`. Atlas removes such an entry by design, so it must not be
+ * re-added. No expiry, or an unparseable one, counts as not expired.
+ */
+export function deleteAfterExpired(deleteAfter: string | undefined, nowMs: number): boolean {
+    if (blank(deleteAfter)) {
+        return false;
+    }
+    const t = Date.parse(String(deleteAfter));
+    return !isNaN(t) && t <= nowMs;
+}
+
 /** Compare the desired attributes with the live record's. An absent comment equals an empty one. */
 export function accessListAttributeDrift(desired: AccessListAttributes, live: AccessListAttributes): AccessListAttributeDrift {
     const desiredComment = blank(desired.comment) ? "" : String(desired.comment);
