@@ -27,7 +27,7 @@ ip-access-list-entry:
       Works with:
       - `mongodb-atlas/project` - the project whose access list this entry belongs to
       - `mongodb-atlas/cluster` - grants the network access clusters in the project rely on
-    version-hash: 29b216211990
+    version-hash: 5270e17ddee7
   schema:
     secret_ref:
       type: string
@@ -74,6 +74,14 @@ ip-access-list-entry:
     comment:
       type: string
       description: Comment stored on the entry
+    delete_after:
+      type: string
+      description: 'Expiry (ISO-8601) stored on the entry, if any'
+    expired:
+      type: boolean
+      description: |-
+        True once delete_after has passed and Atlas has removed the entry as
+        configured; the entity then leaves it removed instead of re-adding it
   lifecycle:
     sync: <<< ip-access-list-entry-sync.js
     get-info: ''
@@ -90,3 +98,4 @@ ip-access-list-entry:
     - monkec/base
     - cli
     - mongodb-atlas/access-list-key
+    - mongodb-atlas/access-list-attrs

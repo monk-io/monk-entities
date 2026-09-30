@@ -58,6 +58,11 @@ const cli = require("cli");
 const accessListKey = require("mongodb-atlas/access-list-key");
 const accessListRecordKey = accessListKey.accessListRecordKey;
 const normalizeAccessListKey = accessListKey.normalizeAccessListKey;
+const accessListAttrs = require("mongodb-atlas/access-list-attrs");
+const accessListAttributeDrift = accessListAttrs.accessListAttributeDrift;
+const deleteAfterExpired = accessListAttrs.deleteAfterExpired;
+const describeAttributeDrift = accessListAttrs.describeAttributeDrift;
+const hasAttributeDrift = accessListAttrs.hasAttributeDrift;
 var LIST_PAGE_SIZE = 500;
 var MAX_CREATE_ATTEMPTS = 4;
 var VERIFY_DELAYS_MS = [1500, 3e3];
@@ -187,6 +192,7 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
         entry_value: entry.value,
         kind: entry.kind,
         comment: this.definition.comment,
+        delete_after: this.definition.delete_after,
         existing: false
       };
       return;
@@ -210,6 +216,7 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
         entry_value: entry.value,
         kind: entry.kind,
         comment: existing.comment,
+        delete_after: existing.deleteAfterDate,
         existing: true
       };
       return;
@@ -228,6 +235,7 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
     if (normalizeAccessListKey(desired.value) === normalizeAccessListKey(this.state.entry_value)) {
       this.state.entry_value = desired.value;
       this.state.kind = desired.kind;
+      this.reconcileAttributes(desired);
       return;
     }
     if (!this.state.existing) {
@@ -240,6 +248,96 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       }
     }
     this.adoptOrCreate(desired);
+  }
+  /** True when the definition's delete_after is at or before now. */
+  expiredAsConfigured() {
+    return deleteAfterExpired(this.definition.delete_after, Date.now());
+  }
+  desiredAttributes() {
+    return { comment: this.definition.comment, deleteAfterDate: this.definition.delete_after };
+  }
+  refreshAttributesFromLive(live) {
+    this.state.comment = live.comment;
+    this.state.delete_after = live.deleteAfterDate;
+  }
+  /**
+   * Apply comment/delete_after changes to an entry whose value is unchanged.
+   *
+   * Atlas has no single-entry PATCH, and its docs don't say whether POSTing an entry
+   * that already exists updates its comment or expiry. So: re-POST the entry, read it
+   * back, and if Atlas kept the old values, delete and recreate it. Removing an expiry
+   * goes straight to delete-and-recreate, since a POST without deleteAfterDate is not
+   * documented to clear one. An adopted entry (`existing: true`) belongs to someone
+   * else and is never modified; the change is reported as not applied.
+   */
+  reconcileAttributes(desired) {
+    const key = normalizeAccessListKey(desired.value);
+    const live = this.findEntry(key);
+    if (!live) {
+      if (this.expiredAsConfigured()) {
+        cli.output(
+          `IP access list entry ${desired.value} expired as configured (delete_after ${this.definition.delete_after}) and was removed by Atlas; not re-adding it. Set a future delete_after, or remove it, to restore access.`
+        );
+        this.state.expired = true;
+        this.state.comment = void 0;
+        this.state.delete_after = this.definition.delete_after;
+        return;
+      }
+      if (this.state.existing) {
+        cli.output(
+          `WARNING: IP access list entry ${desired.value} was adopted (existing: true) and is no longer in project ${this.definition.project_id}. Not re-creating it; add it in Atlas, or remove it from this stack and redeploy so this entity creates and owns it.`
+        );
+        return;
+      }
+      cli.output(`IP access list entry ${desired.value} not found in project ${this.definition.project_id}, re-adding it`);
+      this.adoptOrCreate(desired);
+      return;
+    }
+    this.state.expired = false;
+    const want = this.desiredAttributes();
+    const drift = accessListAttributeDrift(want, live);
+    if (!hasAttributeDrift(drift)) {
+      this.refreshAttributesFromLive(live);
+      return;
+    }
+    const change = describeAttributeDrift(drift, want, live);
+    if (this.state.existing) {
+      cli.output(
+        `WARNING: IP access list entry ${desired.value} was not created by this entity (existing: true), so the change to ${change} was NOT applied. Change it in Atlas directly, or remove the entry and let this entity create it.`
+      );
+      this.refreshAttributesFromLive(live);
+      return;
+    }
+    cli.output(`Updating IP access list entry ${desired.value}: ${change}`);
+    if (!drift.clearsDeleteAfter) {
+      this.makeRequest("POST", this.collectionPath(), [this.entryBody(desired)]);
+      const after = this.findEntry(key);
+      if (after && !hasAttributeDrift(accessListAttributeDrift(want, after))) {
+        this.refreshAttributesFromLive(after);
+        return;
+      }
+      cli.output(`Atlas kept the old values after re-adding the entry; deleting and recreating it`);
+    }
+    cli.output(
+      `WARNING: recreating IP access list entry ${desired.value}. Connections from it are refused until the new entry is active (usually a few seconds).`
+    );
+    try {
+      this.makeRequest("DELETE", this.entryPath(desired.value));
+    } catch (error) {
+      if (!this.isResourceGoneError(error)) {
+        throw error;
+      }
+    }
+    this.createEntry(desired, key);
+    const recreated = this.findEntry(key);
+    if (recreated && hasAttributeDrift(accessListAttributeDrift(want, recreated))) {
+      throw new Error(
+        `IP access list entry ${desired.value} was recreated but Atlas reports ${describeAttributeDrift(accessListAttributeDrift(want, recreated), want, recreated)}`
+      );
+    }
+    if (recreated) {
+      this.refreshAttributesFromLive(recreated);
+    }
   }
   delete() {
     if (!this.state.entry_value) {
@@ -254,6 +352,10 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
     }
     const data = this.checkResourceExists(this.entryPath(this.state.entry_value));
     if (data && (data.ipAddress || data.cidrBlock || data.awsSecurityGroup)) {
+      return true;
+    }
+    if (this.expiredAsConfigured()) {
+      cli.output(`IP access list entry ${this.state.entry_value} expired as configured (delete_after ${this.definition.delete_after})`);
       return true;
     }
     if (!this.state.existing) {
@@ -271,6 +373,9 @@ var _IpAccessListEntry = class _IpAccessListEntry extends (_a = MongoDBAtlasEnti
       throw new Error("IP access list entry value is not available");
     }
     const data = this.checkResourceExists(this.entryPath(this.state.entry_value));
+    if (!data && this.expiredAsConfigured()) {
+      return true;
+    }
     if (!data) {
       throw new Error(`IP access list entry ${this.state.entry_value} not found`);
     }

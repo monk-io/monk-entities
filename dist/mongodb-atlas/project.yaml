@@ -20,7 +20,7 @@ project:
       Works with:
       - `mongodb-atlas/cluster` - Create database clusters in this project
       - `mongodb-atlas/user` - Create database users for access control
-    version-hash: 29b216211990
+    version-hash: 5270e17ddee7
   schema:
     secret_ref:
       type: string

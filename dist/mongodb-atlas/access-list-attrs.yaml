@@ -1,7 +1,7 @@
 namespace: mongodb-atlas
 
-common:
+access-list-attrs:
   defines: module
   metadata:
     version-hash: 5270e17ddee7
-  source: <<< common.js
+  source: <<< access-list-attrs.js

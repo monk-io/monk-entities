@@ -3,5 +3,5 @@ namespace: mongodb-atlas
 access-list-key:
   defines: module
   metadata:
-    version-hash: 29b216211990
+    version-hash: 5270e17ddee7
   source: <<< access-list-key.js
