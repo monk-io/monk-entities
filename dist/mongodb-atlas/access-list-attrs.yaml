@@ -3,5 +3,5 @@ namespace: mongodb-atlas
 access-list-attrs:
   defines: module
   metadata:
-    version-hash: 5270e17ddee7
+    version-hash: c85bb342af92
   source: <<< access-list-attrs.js

@@ -1,7 +1,7 @@
 namespace: mongodb-atlas
 
-common:
+cluster-identity:
   defines: module
   metadata:
     version-hash: c85bb342af92
-  source: <<< common.js
+  source: <<< cluster-identity.js

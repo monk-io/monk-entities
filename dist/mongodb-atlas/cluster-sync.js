@@ -57,6 +57,14 @@ const base = require("monkec/base");
 const action = base.action;
 const common = require("mongodb-atlas/common");
 const BILLING_API_VERSION = common.BILLING_API_VERSION;
+const clusterIdentity = require("mongodb-atlas/cluster-identity");
+const OWNER_TAG_KEY = clusterIdentity.OWNER_TAG_KEY;
+const atlasErrorStatus = clusterIdentity.atlasErrorStatus;
+const clusterOwnership = clusterIdentity.clusterOwnership;
+const instanceSizeDiffers = clusterIdentity.instanceSizeDiffers;
+const liveClusterShape = clusterIdentity.liveClusterShape;
+const ownerTagValue = clusterIdentity.ownerTagValue;
+const shapeMismatches = clusterIdentity.shapeMismatches;
 var _getActualCost_dec, _costs_dec, _getCostEstimate_dec, _deleteSnapshot_dec, _describeSnapshot_dec, _listRestoreJobs_dec, _getRestoreStatus_dec, _restoreCluster_dec, _listSnapshots_dec, _createSnapshot_dec, _getBackupInfo_dec, _a, _init;
 var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_dec = [action("get-backup-info")], _createSnapshot_dec = [action("create-snapshot")], _listSnapshots_dec = [action("list-snapshots")], _restoreCluster_dec = [action("restore")], _getRestoreStatus_dec = [action("get-restore-status")], _listRestoreJobs_dec = [action("list-restore-jobs")], _describeSnapshot_dec = [action("describe-snapshot")], _deleteSnapshot_dec = [action("delete-snapshot")], _getCostEstimate_dec = [action("get-cost-estimate")], _costs_dec = [action("costs")], _getActualCost_dec = [action("get-actual-cost")], _a) {
   constructor() {
@@ -93,9 +101,23 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
   clusterResourcePath() {
     return `${this.clustersCollectionPath()}/${this.definition.name}`;
   }
-  /** Create a new MongoDB Atlas cluster (Flex, free, or dedicated). */
+  /**
+   * Create the cluster (Flex, free, or dedicated), or take over one that already has
+   * this name.
+   *
+   * update() calls create() whenever `state.id` is missing, so a lost state must not
+   * lead to a second POST for a cluster that exists. The name is looked up first; only
+   * a real 404 proceeds to create. A cluster that exists is adopted when its tier
+   * family, provider and region match the definition (otherwise this throws). It
+   * counts as this entity's own (`existing: false`, deleted with the stack) only when
+   * it carries this entity's owner tag, stamped on every cluster it creates.
+   */
   create() {
-    if (this.isFlexTier()) {
+    this.state.applied_ips = this.state.applied_ips ?? [];
+    const live = this.findResource(this.clusterResourcePath());
+    if (live) {
+      this.adoptExistingCluster(live);
+    } else if (this.isFlexTier()) {
       this.createFlexCluster();
     } else {
       this.createClusterResource();
@@ -103,6 +125,83 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
     this.state.project_id = this.definition.project_id;
     this.state.tier_family = this.tierFamily();
     this.reconcileIPAccessList();
+  }
+  /** The shape the definition asks for, comparable with liveClusterShape(). */
+  desiredShape() {
+    return {
+      family: this.tierFamily(),
+      provider: this.definition.provider,
+      region: this.definition.region,
+      instanceSize: this.isDedicatedTier() ? this.definition.instance_size : void 0
+    };
+  }
+  /** Owner tag for the create body; empty when this entity has no path to stamp. */
+  ownerTags() {
+    const value = ownerTagValue(this.path);
+    return value ? [{ key: OWNER_TAG_KEY, value }] : [];
+  }
+  /** Take over a cluster found by name (see create()). */
+  adoptExistingCluster(live) {
+    const name = this.definition.name;
+    const desired = this.desiredShape();
+    const liveShape = liveClusterShape(live, this.isFlexTier());
+    const mismatches = shapeMismatches(desired, liveShape);
+    if (mismatches.length > 0) {
+      throw new Error(
+        `A cluster named ${name} already exists in project ${this.definition.project_id} but does not match the definition: ${mismatches.join("; ")}. Refusing to adopt it. Use another name, or change the definition to match the existing cluster.`
+      );
+    }
+    const ownership = clusterOwnership(live.tags, ownerTagValue(this.path));
+    const owned = ownership === "owned";
+    if (instanceSizeDiffers(desired, liveShape)) {
+      if (!owned) {
+        throw new Error(
+          `A cluster named ${name} already exists in project ${this.definition.project_id} with instance size ${liveShape.instanceSize}, but the definition asks for ${desired.instanceSize}. It was not created by this entity, so it will not be resized. Use another name, or set instance_size to ${liveShape.instanceSize}.`
+        );
+      }
+      this.reconcileClusterConfig(live);
+    }
+    if (owned) {
+      cli.output(`Cluster ${name} already exists and carries this entity's owner tag; resuming management of it.`);
+    } else {
+      cli.output(
+        `Cluster ${name} already exists and was not created by this entity (${ownership === "foreign" ? "owner tag names another entity" : "no owner tag"}). Adopting it as existing: it will not be deleted with this stack.`
+      );
+    }
+    this.state = {
+      ...this.state,
+      id: live.id || live.name || name,
+      name: live.name || name,
+      connection_standard: live.connectionStrings?.standard,
+      connection_srv: live.connectionStrings?.standardSrv,
+      existing: !owned
+    };
+  }
+  /**
+   * POST a new cluster with the owner tag. The Atlas docs list `tags` on the create
+   * body of both /clusters (all tiers) and /flexClusters, but if Atlas rejects the tag
+   * (400 naming tags) the cluster is created untagged rather than not at all. An
+   * untagged cluster found again after a state loss is adopted as `existing: true`,
+   * so the fallback can leave a cluster behind on stack delete, never delete someone
+   * else's.
+   */
+  postNewCluster(body) {
+    const tags = this.ownerTags();
+    if (tags.length === 0) {
+      return this.makeRequest("POST", this.clustersCollectionPath(), body);
+    }
+    try {
+      return this.makeRequest("POST", this.clustersCollectionPath(), { ...body, tags });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (atlasErrorStatus(error) !== 400 || !/tag/i.test(message)) {
+        throw error;
+      }
+      cli.output(
+        `Warning: Atlas rejected the owner tag on cluster ${this.definition.name} (${message}). Creating it without the tag; if this entity's state is lost later, the cluster will be adopted as existing and not deleted with the stack.`
+      );
+      return this.makeRequest("POST", this.clustersCollectionPath(), body);
+    }
   }
   /** Create a Flex cluster via the /flexClusters endpoint. */
   createFlexCluster() {
@@ -113,11 +212,13 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
         "regionName": this.definition.region
       }
     };
-    const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
+    const resObj = this.postNewCluster(body);
     this.state = {
+      ...this.state,
       // Flex clusters are identified by name; fall back to name if no id is returned.
       id: resObj.id || resObj.name || this.definition.name,
-      name: resObj.name || this.definition.name
+      name: resObj.name || this.definition.name,
+      existing: false
     };
   }
   /** Create a free (M0/TENANT) or dedicated (M10+) cluster via the /clusters endpoint. */
@@ -148,10 +249,12 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
     if (this.isDedicatedTier()) {
       body.backupEnabled = true;
     }
-    const resObj = this.makeRequest("POST", this.clustersCollectionPath(), body);
+    const resObj = this.postNewCluster(body);
     this.state = {
+      ...this.state,
       id: resObj.id,
-      name: resObj.name
+      name: resObj.name,
+      existing: false
     };
   }
   accessListCollectionPath() {
@@ -361,15 +464,28 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
     return true;
   }
   /**
-   * Validate if the cluster tier supports backup operations
-   * Backups are only available for M10+ (dedicated) clusters
+   * Throw for an action that changes backups (create-snapshot, restore, delete-snapshot)
+   * on a tier without on-demand backups. Only M10+ (dedicated) clusters have them.
    */
-  validateBackupSupport() {
+  validateBackupSupport(actionName) {
     if (!this.isDedicatedTier()) {
       throw new Error(
-        `Backup operations are not supported for cluster tier ${this.definition.instance_size}. On-demand backups require a dedicated cluster (M10 or higher). Flex clusters receive automatic snapshots that are not managed via these actions.`
+        `${actionName} is not available on the ${this.definition.instance_size} tier: on-demand backups need a dedicated cluster (M10 or higher).`
       );
     }
+  }
+  /**
+   * Print why there is nothing to show on a tier without on-demand backups. Read-only
+   * backup actions call this and return successfully on M0/Flex: "nothing there" is the
+   * true answer, matching get-backup-info.
+   */
+  backupUnsupportedNote() {
+    cli.output(`
+\u26A0\uFE0F  Note: Backups require a dedicated cluster (M10 or higher).`);
+    cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
+    cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
+    cli.output(`
+==================================================`);
   }
   getBackupInfo(_args) {
     cli.output(`==================================================`);
@@ -419,7 +535,7 @@ var _Cluster = class _Cluster extends (_a = MongoDBAtlasEntity, _getBackupInfo_d
     cli.output(`Creating backup snapshot for cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
     cli.output(`==================================================`);
-    this.validateBackupSupport();
+    this.validateBackupSupport("create-snapshot");
     if (!this.state.id) {
       throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
     }
@@ -462,12 +578,7 @@ Note: Snapshot creation may take several minutes depending on cluster size.`);
     if (!this.isDedicatedTier()) {
       cli.output(`
 Total snapshots available: 0`);
-      cli.output(`
-\u26A0\uFE0F  Note: Backups require a dedicated cluster (M10 or higher).`);
-      cli.output(`   Current tier ${this.definition.instance_size} does not support on-demand backups.`);
-      cli.output(`   Flex clusters receive automatic snapshots that are not managed via these actions.`);
-      cli.output(`
-==================================================`);
+      this.backupUnsupportedNote();
       return;
     }
     if (!this.state.id) {
@@ -527,7 +638,7 @@ Total snapshots available: ${totalCount}`);
     cli.output(`==================================================`);
     cli.output(`Cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
-    this.validateBackupSupport();
+    this.validateBackupSupport("restore");
     if (!this.state.id) {
       throw new Error("Cluster ID is not available. Ensure the cluster is created and ready.");
     }
@@ -616,7 +727,12 @@ Restoring to Point-in-Time: ${restoreDate}`);
     cli.output(`Checking restore job status`);
     cli.output(`Cluster: ${this.definition.name}`);
     cli.output(`==================================================`);
-    this.validateBackupSupport();
+    if (!this.isDedicatedTier()) {
+      cli.output(`
+No restore jobs exist on this tier.`);
+      this.backupUnsupportedNote();
+      return;
+    }
     const jobId = args?.job_id || args?.jobId;
     if (!jobId) {
       throw new Error(
@@ -679,7 +795,12 @@ To find job IDs, run: monk do namespace/cluster list-restore-jobs`
     cli.output(`Listing restore jobs for cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
     cli.output(`==================================================`);
-    this.validateBackupSupport();
+    if (!this.isDedicatedTier()) {
+      cli.output(`
+Total restore jobs: 0`);
+      this.backupUnsupportedNote();
+      return;
+    }
     const limit = Number(args?.limit) || 10;
     try {
       const response = this.makeRequest(
@@ -734,7 +855,12 @@ ${statusIcon} Restore Job #${i + 1}`);
     cli.output(`==================================================`);
     cli.output(`Cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
-    this.validateBackupSupport();
+    if (!this.isDedicatedTier()) {
+      cli.output(`
+No snapshots exist on this tier.`);
+      this.backupUnsupportedNote();
+      return;
+    }
     const snapshotId = args?.snapshot_id || args?.snapshotId;
     if (!snapshotId) {
       throw new Error(
@@ -792,7 +918,7 @@ To find snapshot IDs, run: monk do namespace/cluster/list-snapshots`
     cli.output(`==================================================`);
     cli.output(`Cluster: ${this.definition.name}`);
     cli.output(`Project ID: ${this.definition.project_id}`);
-    this.validateBackupSupport();
+    this.validateBackupSupport("delete-snapshot");
     const snapshotId = args?.snapshot_id || args?.snapshotId;
     if (!snapshotId) {
       throw new Error(

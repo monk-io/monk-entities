@@ -105,6 +105,15 @@ function getToken(secretRef) {
 
 // input/mongodb-atlas/atlasBase.ts
 var import_cli = __toESM(require("cli"));
+
+// input/mongodb-atlas/clusterIdentity.ts
+function atlasErrorStatus(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = /API error: (\d{3})\b/.exec(message);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+// input/mongodb-atlas/atlasBase.ts
 var MongoDBAtlasEntity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -196,6 +205,22 @@ var MongoDBAtlasEntity = class extends import_base.MonkEntity {
       return this.makeRequest("GET", path);
     } catch (error) {
       return null;
+    }
+  }
+  /**
+   * GET a resource, returning null only when Atlas answers 404. Unlike
+   * checkResourceExists, any other failure (auth, permission, rate limit, outage,
+   * network) throws, so a caller deciding "absent, so create it" never acts on a read
+   * that simply failed.
+   */
+  findResource(path) {
+    try {
+      return this.makeRequest("GET", path);
+    } catch (error) {
+      if (atlasErrorStatus(error) === 404) {
+        return null;
+      }
+      throw error;
     }
   }
   /**
