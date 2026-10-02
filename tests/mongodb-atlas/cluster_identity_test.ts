@@ -12,14 +12,27 @@ import {
     shapeMismatches,
 } from "../../src/mongodb-atlas/cluster-identity.ts";
 
-// Same shape makeRequest produces.
+// Shape of makeRequest's own `!response.ok` error.
 const err = (status: number, body = "{}") =>
     new Error(`MongoDB Atlas GET request to /groups/p/clusters/c failed: MongoDB Atlas API error: ${status} ERR. Body: ${body}`);
+
+// Shape actually seen at runtime: the Monk http builtin sets `error` on a non-2xx
+// response, so HttpClient throws before makeRequest's own check runs.
+const clientErr = (status: number, body = "{}") =>
+    new Error(
+        `MongoDB Atlas GET request to /groups/p/clusters/c failed: GET request to ` +
+        `"https://cloud.mongodb.com/api/atlas/v2/groups/p/clusters/c" failed: unexpected response code ${status}. ${body}`,
+    );
 
 Deno.test("atlasErrorStatus reads the HTTP status", () => {
     assert.equal(atlasErrorStatus(err(404, '{"errorCode":"CLUSTER_NOT_FOUND"}')), 404);
     assert.equal(atlasErrorStatus(err(401)), 401);
     assert.equal(atlasErrorStatus(err(503)), 503);
+});
+
+Deno.test("atlasErrorStatus reads the status from HttpClient's error", () => {
+    assert.equal(atlasErrorStatus(clientErr(404, '{"errorCode":"CLUSTER_NOT_FOUND"}')), 404);
+    assert.equal(atlasErrorStatus(clientErr(400, '{"errorCode":"INVALID_TAG"}')), 400);
 });
 
 Deno.test("atlasErrorStatus is null without an HTTP response", () => {
