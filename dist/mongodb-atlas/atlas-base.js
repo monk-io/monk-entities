@@ -109,7 +109,7 @@ var import_cli = __toESM(require("cli"));
 // input/mongodb-atlas/clusterIdentity.ts
 function atlasErrorStatus(error) {
   const message = error instanceof Error ? error.message : String(error);
-  const match = /API error: (\d{3})\b/.exec(message);
+  const match = /(?:API error:|unexpected response code) (\d{3})\b/.exec(message);
   return match ? parseInt(match[1], 10) : null;
 }
 

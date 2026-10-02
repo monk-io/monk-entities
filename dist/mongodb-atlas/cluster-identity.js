@@ -33,7 +33,7 @@ var OWNER_TAG_KEY = "monk-entity-path";
 var TAG_MAX_LENGTH = 255;
 function atlasErrorStatus(error) {
   const message = error instanceof Error ? error.message : String(error);
-  const match = /API error: (\d{3})\b/.exec(message);
+  const match = /(?:API error:|unexpected response code) (\d{3})\b/.exec(message);
   return match ? parseInt(match[1], 10) : null;
 }
 function ownerTagValue(path) {

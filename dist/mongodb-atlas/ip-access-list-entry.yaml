@@ -27,7 +27,7 @@ ip-access-list-entry:
       Works with:
       - `mongodb-atlas/project` - the project whose access list this entry belongs to
       - `mongodb-atlas/cluster` - grants the network access clusters in the project rely on
-    version-hash: c85bb342af92
+    version-hash: 4e11b07eacee
   schema:
     secret_ref:
       type: string
