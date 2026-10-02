@@ -13,13 +13,15 @@ const TAG_MAX_LENGTH = 255;
 export type TierFamily = "free" | "flex" | "dedicated";
 
 /**
- * HTTP status carried by an error from MongoDBAtlasEntity.makeRequest
- * ("... MongoDB Atlas API error: 404 ..."), or null when the request never got an
- * HTTP response (network failure, timeout) or the message has another shape.
+ * HTTP status carried by an error from MongoDBAtlasEntity.makeRequest, or null when the
+ * request never got an HTTP response (network failure, timeout) or the message has
+ * another shape. On a non-2xx response the Monk http builtin sets
+ * `error = "unexpected response code 404"` and HttpClient throws with that text before
+ * makeRequest's own "MongoDB Atlas API error: 404 ..." check runs, so both forms count.
  */
 export function atlasErrorStatus(error: unknown): number | null {
     const message = error instanceof Error ? error.message : String(error);
-    const match = /API error: (\d{3})\b/.exec(message);
+    const match = /(?:API error:|unexpected response code) (\d{3})\b/.exec(message);
     return match ? parseInt(match[1], 10) : null;
 }
 
