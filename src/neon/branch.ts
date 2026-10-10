@@ -1,6 +1,7 @@
 import { action, Args } from "monkec/base";
 import { NeonEntity, NeonEntityDefinition, NeonEntityState } from "./neon-base.ts";
 import cli from "cli";
+import { ensureCreated } from "monkec/resilience";
 
 /**
  * Defines the immutable configuration properties for a Neon branch entity.
@@ -155,13 +156,24 @@ export class Branch extends NeonEntity<NeonBranchDefinition, NeonBranchState> {
             ]
         };
 
-        const response = this.makeRequest(
-            "POST",
-            `/projects/${this.definition.project_id}/branches`,
-            branchData
-        );
+        const branches = `/projects/${this.definition.project_id}/branches`;
+        const name = this.definition.name;
+        // A branch is found by its name; one Neon names itself can't be.
+        const { resource: response, adopted } = ensureCreated<any>({
+            find: () => {
+                if (!name) return undefined;
+                const branch = (this.makeRequest("GET", branches)?.branches ?? []).find((b: any) => b.name === name);
+                return branch ? { branch } : undefined;
+            },
+            create: () => this.makeRequest("POST", branches, branchData),
+            what: `Neon branch ${name ?? ""}`.trim(),
+        });
 
-        const branch = response.branch;
+        const branch = response?.branch;
+        if (!branch?.id) {
+            throw new Error(`Neon answered the branch create without a branch: ${JSON.stringify(response).slice(0, 200)}`);
+        }
+        this.state.existing = adopted;
         this.state.id = branch.id;
         this.state.name = branch.name;
         this.state.current_state = branch.current_state;

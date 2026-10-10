@@ -1,0 +1,467 @@
+{
+  "interactions": [
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "annotations": {
+          "br-orange-truth-b5sl7yoe": {
+            "created_at": "2026-10-10T10:06:25Z",
+            "object": {
+              "id": "br-orange-truth-b5sl7yoe",
+              "type": "console/branch"
+            },
+            "updated_at": "2026-10-10T10:06:25Z",
+            "value": {
+              "environment": "production"
+            }
+          }
+        },
+        "branches": [
+          {
+            "active_time_seconds": 0,
+            "compute_time_seconds": 0,
+            "cpu_used_sec": 0,
+            "created_at": "2026-10-10T10:06:24Z",
+            "created_by": {
+              "image": "redacted-1",
+              "name": "redacted-2"
+            },
+            "creation_source": "console",
+            "current_state": "ready",
+            "data_transfer_bytes": 0,
+            "default": true,
+            "id": "br-orange-truth-b5sl7yoe",
+            "init_source": "parent-data",
+            "logical_size": 31686656,
+            "name": "production",
+            "primary": true,
+            "project_id": "cool-scene-78033773",
+            "project_slug": "cool-scene-78033773",
+            "protected": false,
+            "slug": "br-orange-truth-b5sl7yoe",
+            "state_changed_at": "2026-10-10T10:06:26Z",
+            "updated_at": "2026-10-10T10:11:46Z",
+            "written_data_bytes": 0
+          }
+        ],
+        "pagination": {
+          "sort_by": "updated_at",
+          "sort_order": "DESC"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 create",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/branches"
+    },
+    {
+      "body": {
+        "branch": {
+          "name": "monk-entities-test-branch"
+        },
+        "endpoints": [
+          {
+            "settings": {
+              "pg_settings": {}
+            },
+            "type": "read_write"
+          }
+        ]
+      },
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "POST",
+      "response": {
+        "branch": {
+          "active_time_seconds": 0,
+          "compute_time_seconds": 0,
+          "cpu_used_sec": 0,
+          "created_at": "2026-10-10T10:19:31Z",
+          "created_by": {
+            "image": "redacted-1",
+            "name": "redacted-2"
+          },
+          "creation_source": "console",
+          "current_state": "init",
+          "data_transfer_bytes": 0,
+          "default": false,
+          "id": "br-mute-fog-b5r2hmov",
+          "init_source": "parent-data",
+          "name": "monk-entities-test-branch",
+          "parent_id": "br-orange-truth-b5sl7yoe",
+          "parent_lsn": "0/1B530D8",
+          "pending_state": "ready",
+          "primary": false,
+          "project_id": "cool-scene-78033773",
+          "project_slug": "cool-scene-78033773",
+          "protected": false,
+          "slug": "br-mute-fog-b5r2hmov",
+          "state_changed_at": "2026-10-10T10:19:31Z",
+          "updated_at": "2026-10-10T10:19:31Z",
+          "written_data_bytes": 0
+        },
+        "connection_uris": [
+          {
+            "connection_parameters": {
+              "database": "redacted-3",
+              "host": "redacted-4",
+              "password": "redacted-5",
+              "pooler_host": "redacted-6",
+              "role": "redacted-7"
+            },
+            "connection_uri": "redacted-8"
+          }
+        ],
+        "databases": [
+          {
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:06:24Z",
+            "id": 1260935,
+            "name": "neondb",
+            "owner_name": "neondb_owner",
+            "updated_at": "2026-10-10T10:06:24Z"
+          }
+        ],
+        "endpoints": [
+          {
+            "autoscaling_limit_max_cu": 2,
+            "autoscaling_limit_min_cu": 0.25,
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "branch_slug": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:31Z",
+            "creation_source": "console",
+            "current_state": "init",
+            "disabled": false,
+            "group": {
+              "allow_readable_secondaries": false,
+              "computes": [
+                {
+                  "binding_id": "hty",
+                  "compute_host": "ep-blue-sun-b5g8vt66-hty.c-7.us-east-2.aws.neon.tech",
+                  "compute_pooled_host": "ep-blue-sun-b5g8vt66-hty-pooler.c-7.us-east-2.aws.neon.tech",
+                  "created_at": "2026-10-10T10:19:31Z",
+                  "current_state": "init",
+                  "pending_state": "active",
+                  "role": "read_write",
+                  "updated_at": "2026-10-10T10:19:31Z"
+                }
+              ],
+              "size": {
+                "max": 1,
+                "min": 1
+              }
+            },
+            "host": "ep-blue-sun-b5g8vt66.c-7.us-east-2.aws.neon.tech",
+            "hosts": {
+              "read_write_host": "ep-blue-sun-b5g8vt66.c-7.us-east-2.aws.neon.tech",
+              "read_write_pooled_host": "ep-blue-sun-b5g8vt66-pooler.c-7.us-east-2.aws.neon.tech"
+            },
+            "id": "ep-blue-sun-b5g8vt66",
+            "passwordless_access": true,
+            "pending_state": "active",
+            "pooler_enabled": false,
+            "pooler_mode": "transaction",
+            "project_id": "cool-scene-78033773",
+            "project_slug": "cool-scene-78033773",
+            "provisioner": "k8s-neonvm",
+            "proxy_host": "c-7.us-east-2.aws.neon.tech",
+            "region_id": "aws-us-east-2",
+            "settings": {
+              "pg_settings": {}
+            },
+            "slug": "ep-blue-sun-b5g8vt66",
+            "suspend_timeout_seconds": 0,
+            "type": "read_write",
+            "updated_at": "2026-10-10T10:19:31Z"
+          }
+        ],
+        "operations": [
+          {
+            "action": "create_branch",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:31Z",
+            "failures_count": 0,
+            "id": "a6dccd18-efdc-4170-a8af-755e0d9d8871",
+            "project_id": "cool-scene-78033773",
+            "status": "running",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:31Z"
+          },
+          {
+            "action": "timeline_update_protected_config",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:31Z",
+            "failures_count": 0,
+            "id": "0291a5e8-5a76-4416-b49b-889776a0887b",
+            "project_id": "cool-scene-78033773",
+            "status": "scheduling",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:31Z"
+          },
+          {
+            "action": "start_compute",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:31Z",
+            "endpoint_id": "ep-blue-sun-b5g8vt66",
+            "failures_count": 0,
+            "id": "277eaa39-8361-47d6-b7d3-9f6064aecb96",
+            "project_id": "cool-scene-78033773",
+            "status": "scheduling",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:31Z"
+          },
+          {
+            "action": "epc_sync",
+            "created_at": "2026-10-10T10:19:31Z",
+            "failures_count": 0,
+            "id": "50ddf213-7fd2-4b13-9ca5-894599542124",
+            "project_id": "cool-scene-78033773",
+            "status": "scheduling",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:31Z"
+          }
+        ],
+        "roles": [
+          {
+            "authentication_method": "password",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:06:24Z",
+            "name": "neondb_owner",
+            "protected": false,
+            "updated_at": "2026-10-10T10:06:24Z"
+          }
+        ]
+      },
+      "status": 201,
+      "step": "branch-1 create",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/branches"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "operation": {
+          "action": "create_branch",
+          "branch_id": "br-mute-fog-b5r2hmov",
+          "created_at": "2026-10-10T10:19:31Z",
+          "failures_count": 0,
+          "id": "a6dccd18-efdc-4170-a8af-755e0d9d8871",
+          "project_id": "cool-scene-78033773",
+          "status": "running",
+          "total_duration_ms": 50,
+          "updated_at": "2026-10-10T10:19:31Z"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 start",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/operations/a6dccd18-efdc-4170-a8af-755e0d9d8871"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "operation": {
+          "action": "create_branch",
+          "branch_id": "br-mute-fog-b5r2hmov",
+          "created_at": "2026-10-10T10:19:31Z",
+          "failures_count": 0,
+          "id": "a6dccd18-efdc-4170-a8af-755e0d9d8871",
+          "project_id": "cool-scene-78033773",
+          "status": "finished",
+          "total_duration_ms": 516,
+          "updated_at": "2026-10-10T10:19:32Z"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 start",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/operations/a6dccd18-efdc-4170-a8af-755e0d9d8871"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "operation": {
+          "action": "timeline_update_protected_config",
+          "branch_id": "br-mute-fog-b5r2hmov",
+          "created_at": "2026-10-10T10:19:31Z",
+          "failures_count": 0,
+          "id": "0291a5e8-5a76-4416-b49b-889776a0887b",
+          "project_id": "cool-scene-78033773",
+          "status": "finished",
+          "total_duration_ms": 546,
+          "updated_at": "2026-10-10T10:19:32Z"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 start",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/operations/0291a5e8-5a76-4416-b49b-889776a0887b"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "operation": {
+          "action": "start_compute",
+          "branch_id": "br-mute-fog-b5r2hmov",
+          "created_at": "2026-10-10T10:19:31Z",
+          "endpoint_id": "ep-blue-sun-b5g8vt66",
+          "failures_count": 0,
+          "id": "277eaa39-8361-47d6-b7d3-9f6064aecb96",
+          "project_id": "cool-scene-78033773",
+          "status": "finished",
+          "total_duration_ms": 1179,
+          "updated_at": "2026-10-10T10:19:33Z"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 start",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/operations/277eaa39-8361-47d6-b7d3-9f6064aecb96"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "operation": {
+          "action": "epc_sync",
+          "created_at": "2026-10-10T10:19:31Z",
+          "failures_count": 0,
+          "id": "50ddf213-7fd2-4b13-9ca5-894599542124",
+          "project_id": "cool-scene-78033773",
+          "status": "finished",
+          "total_duration_ms": 1205,
+          "updated_at": "2026-10-10T10:19:33Z"
+        }
+      },
+      "status": 200,
+      "step": "branch-1 start",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/operations/50ddf213-7fd2-4b13-9ca5-894599542124"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "GET",
+      "response": {
+        "annotation": {
+          "object": {
+            "id": "",
+            "type": ""
+          },
+          "value": {}
+        },
+        "branch": {
+          "active_time_seconds": 0,
+          "compute_time_seconds": 0,
+          "cpu_used_sec": 0,
+          "created_at": "2026-10-10T10:19:31Z",
+          "created_by": {
+            "image": "redacted-1",
+            "name": "redacted-2"
+          },
+          "creation_source": "console",
+          "current_state": "ready",
+          "data_transfer_bytes": 0,
+          "default": false,
+          "id": "br-mute-fog-b5r2hmov",
+          "init_source": "parent-data",
+          "name": "monk-entities-test-branch",
+          "parent_id": "br-orange-truth-b5sl7yoe",
+          "parent_lsn": "0/1B530D8",
+          "parent_timestamp": "2026-10-10T10:11:45Z",
+          "primary": false,
+          "project_id": "cool-scene-78033773",
+          "project_slug": "cool-scene-78033773",
+          "protected": false,
+          "slug": "br-mute-fog-b5r2hmov",
+          "state_changed_at": "2026-10-10T10:19:32Z",
+          "updated_at": "2026-10-10T10:19:33Z",
+          "written_data_bytes": 0
+        }
+      },
+      "status": 200,
+      "step": "branch-1 check-readiness",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/branches/br-mute-fog-b5r2hmov"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      "method": "DELETE",
+      "response": {
+        "branch": {
+          "active_time_seconds": 0,
+          "compute_time_seconds": 0,
+          "cpu_used_sec": 0,
+          "created_at": "2026-10-10T10:19:31Z",
+          "created_by": {
+            "image": "redacted-1",
+            "name": "redacted-2"
+          },
+          "creation_source": "console",
+          "current_state": "ready",
+          "data_transfer_bytes": 0,
+          "default": false,
+          "id": "br-mute-fog-b5r2hmov",
+          "init_source": "parent-data",
+          "name": "monk-entities-test-branch",
+          "parent_id": "br-orange-truth-b5sl7yoe",
+          "parent_lsn": "0/1B530D8",
+          "parent_timestamp": "2026-10-10T10:11:45Z",
+          "pending_state": "storage_deleted",
+          "primary": false,
+          "project_id": "cool-scene-78033773",
+          "protected": false,
+          "slug": "br-mute-fog-b5r2hmov",
+          "state_changed_at": "2026-10-10T10:19:32Z",
+          "updated_at": "2026-10-10T10:19:34Z",
+          "written_data_bytes": 0
+        },
+        "operations": [
+          {
+            "action": "suspend_compute",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:34Z",
+            "endpoint_id": "ep-blue-sun-b5g8vt66",
+            "failures_count": 0,
+            "id": "d659adc7-981d-4bf8-b181-eada6aa15342",
+            "project_id": "cool-scene-78033773",
+            "status": "running",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:34Z"
+          },
+          {
+            "action": "delete_timeline",
+            "branch_id": "br-mute-fog-b5r2hmov",
+            "created_at": "2026-10-10T10:19:34Z",
+            "failures_count": 0,
+            "id": "078783ae-13f0-4577-8ae2-029954e000be",
+            "project_id": "cool-scene-78033773",
+            "status": "scheduling",
+            "total_duration_ms": 0,
+            "updated_at": "2026-10-10T10:19:34Z"
+          }
+        ]
+      },
+      "status": 200,
+      "step": "branch-1 purge",
+      "url": "https://console.neon.tech/api/v2/projects/cool-scene-78033773/branches/br-mute-fog-b5r2hmov"
+    }
+  ],
+  "recorded": "2026-10-10T10:19:31Z",
+  "vars": {
+    "NEON_PROJECT_ID": "cool-scene-78033773"
+  }
+}

@@ -5,6 +5,7 @@
     "imports": {
         "monkec/base": "./src/lib/modules/base.d.ts",
         "monkec/http-client": "./src/lib/modules/http-client.d.ts",
+        "monkec/resilience": "./src/monkec/resilience.ts",
         "cli": "./src/lib/builtins/cli.d.ts",
         "core": "./src/lib/builtins/core.d.ts",
         "http": "./src/lib/builtins/http.d.ts",

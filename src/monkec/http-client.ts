@@ -26,6 +26,43 @@ export interface HttpClientOptions {
   parseJson?: boolean;
   /** Whether to automatically stringify JSON requests (default: true) */
   stringifyJson?: boolean;
+  /**
+   * Whether every non-empty response body must be JSON (default: false).
+   * A body that isn't, like a proxy's HTML error page, throws an HttpError
+   * of kind "malformed" instead of being returned as a string that later
+   * code reads fields from.
+   */
+  expectJson?: boolean;
+}
+
+/**
+ * A request that failed throws an Error named "HttpError" with these
+ * properties, so code can tell a 404 from a timeout (see
+ * monkec/resilience's httpFailure):
+ *
+ * - status: the status the API answered with; 0 if no answer came
+ * - kind: "status" (an error status), "transport" (no answer came) or
+ *   "malformed" (with expectJson, a body that isn't JSON)
+ * - method, url, body (the response body) and headers
+ */
+function httpError(
+  message: string,
+  kind: "status" | "transport" | "malformed",
+  method: string,
+  url: string,
+  status: number,
+  body: string,
+  headers: Record<string, string>
+): Error {
+  const err: any = new Error(message);
+  err.name = "HttpError";
+  err.kind = kind;
+  err.status = status;
+  err.method = method;
+  err.url = url;
+  err.body = body;
+  err.headers = headers;
+  return err;
 }
 
 /**
@@ -120,6 +157,7 @@ export class HttpClient {
       timeout: options.timeout || 30000,
       parseJson: options.parseJson !== false,
       stringifyJson: options.stringifyJson !== false,
+      expectJson: options.expectJson === true,
     };
 
     // Set default JSON headers if not provided
@@ -297,24 +335,29 @@ export class HttpClient {
         response = http.do(fullUrl, request);
       }
     } catch (error) {
-      throw new Error(
+      throw httpError(
         `${normalizedMethod} request to "${fullUrl}" failed during execution: ${
           error instanceof Error ? error.message : "Unknown network error"
-        }`
+        }`,
+        "transport", normalizedMethod, fullUrl, 0, "", {}
       );
     }
 
-    // Check for errors
+    // Check for errors: a status of 0 means no response came at all.
     if (response.error) {
-      throw new Error(
+      const status = response.statusCode || 0;
+      throw httpError(
         `${normalizedMethod} request to "${fullUrl}" failed: ${response.error}. ` +
-          response.body
+          (response.body || ""),
+        status === 0 ? "transport" : "status",
+        normalizedMethod, fullUrl, status, response.body || "", response.headers || {}
       );
     }
 
     // Parse the response
+    let parsed: HttpClientResponse<T>;
     try {
-      return this.parseResponse<T>(response);
+      parsed = this.parseResponse<T>(response);
     } catch (error) {
       throw new Error(
         `${normalizedMethod} request to "${fullUrl}" succeeded but response parsing failed: ${
@@ -322,6 +365,22 @@ export class HttpClient {
         }`
       );
     }
+    if (this.options.expectJson && parsed.raw.trim() !== "" && typeof parsed.data === "string") {
+      let ok = true;
+      try {
+        parsed.data = JSON.parse(parsed.raw);
+      } catch (_e) {
+        ok = false;
+      }
+      if (!ok) {
+        throw httpError(
+          `${normalizedMethod} request to "${fullUrl}" answered ${parsed.statusCode} with a body that isn't JSON: ` +
+            parsed.raw.slice(0, 200),
+          "malformed", normalizedMethod, fullUrl, parsed.statusCode, parsed.raw, parsed.headers
+        );
+      }
+    }
+    return parsed;
   }
 
   /**
