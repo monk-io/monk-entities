@@ -27,11 +27,12 @@ jobs:
           echo "monk nightly $(curl -sSfL https://monkreleases.blob.core.windows.net/nightly/linux/latest-version)"
 
       # monk entity is new; until a nightly has it, say so rather than fail
-      # every pull request.
+      # every pull request. (An unknown command prints help and exits 0, so
+      # look for one of its flags.)
       - name: Check for monk entity
         id: monk
         run: |
-          if monk entity test --help >/dev/null 2>&1; then
+          if monk entity test --help 2>&1 | grep -q -- '--explore'; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::This monk nightly has no 'monk entity'; packages were not checked or tested."
@@ -43,7 +44,10 @@ jobs:
         if: steps.monk.outputs.available == 'true'
         run: |
           all=$(find src -mindepth 1 -maxdepth 1 -type d ! -name lib | sort | tr '\n' ' ')
-          tested=$(for d in $all; do ls "$d"/test/*.test.ts >/dev/null 2>&1 && printf '%s ' "$d"; done)
+          tested=""
+          for d in $all; do
+            if compgen -G "$d/test/*.test.ts" >/dev/null; then tested="$tested$d "; fi
+          done
           echo "all=$all" >> "$GITHUB_OUTPUT"
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
           echo "packages: $(wc -w <<< "$all"), with tests: ${tested:-none}"
