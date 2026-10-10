@@ -18,7 +18,7 @@ e2e("a branch serves an app that connects to it", (c) => {
 
     const branch = c.entity(Branch, "neon-e2e/branch");
     expect(branch.state.name).toBe(`e2e-${c.id}`);
-    expect(branch.state.current_state).toBe("ready");
+    expect(branch.ready).toBe(true);
     expect(branch.state.existing).toBe(false);
     expect(c.entity(Role, "neon-e2e/role").state.name).toBe("app_user");
     expect(c.entity(Database, "neon-e2e/database").state.name).toBe("appdb");
