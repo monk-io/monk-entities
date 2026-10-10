@@ -194,3 +194,54 @@ hold on the normal run only; guard them with `if (!t.exploring)`. Use
 one failure itself can opt out with `test(name, fn, { explore: false })`.
 
 For handling failures in entity code, see `doc/resilience.md`.
+
+## End-to-end tests (`--e2e`)
+
+Offline tests check an entity's logic. End-to-end tests check that a real
+setup works on a real Monk cluster: several entities wired together and an
+app that uses what they made. They live in `src/<package>/test/*.e2e.ts`,
+with the monk YAML they run next to them (e.g. `test/e2e/*.yaml`).
+
+```bash
+NEON_API_KEY=... NEON_PROJECT_ID=... monk entity test --e2e src/neon
+monk entity test --e2e --socket tcp://host:2137 src/neon   # another cluster
+monk entity test --e2e --keep src/neon                     # leave a failed run in place
+```
+
+The package is built and loaded on the cluster, with the packages it imports
+(`--dist` loads the repository's `dist/` instead, for clusters that run the
+bundled build). Each test then drives the cluster as the monk CLI does:
+
+```ts
+import { e2e, expect } from "monk/e2e";
+import { Branch } from "../branch.ts";
+
+e2e("a branch serves an app that connects to it", (c) => {
+    c.secret("neon-api-key", c.env("NEON_API_KEY", { secret: true }));
+    c.load("e2e/branch-app.yaml", { vars: { project_id: c.env("NEON_PROJECT_ID") } });
+    c.run("neon-e2e/stack");
+    c.waitReady("neon-e2e/stack", { timeout: 900 });
+    expect(c.entity(Branch, "neon-e2e/branch").ready).toBe(true);
+    c.waitLogs("neon-e2e/probe", "db-ok", { timeout: 600 });
+    c.do("neon-e2e/branch", "get-branch-details");
+});
+```
+
+- `c.load(file, { vars })` loads monk YAML relative to the test, filling in
+  `{{ name }}` placeholders; `{{ id }}` is the run's own suffix, for names
+  outside Monk (a branch name) that runs must not share.
+- Each run gives the namespaces it loads a suffix (`neon-e2e-3f9a1c`) so runs
+  don't collide; tests keep using the names the YAML has.
+- `c.run`, `c.update`, `c.do`, `c.describe`, `c.logs` and `c.delete` do what
+  `monk run`, `update`, `do`, `describe`, `logs` and `delete --force` do.
+  `c.run` waits until what it ran is ready, unless `{ wait: false }`.
+- `c.entity(Class, path)` is a running entity with its state typed by its
+  class; `c.waitReady` and `c.waitLogs` poll until a condition holds.
+- `c.env(name)` reads the environment (it must be set unless given a
+  `fallback`); `{ secret: true }` keeps the value out of what is printed.
+- When a test ends, passed or failed, whatever it ran is deleted (entities
+  delete what they made), and the secrets it set and templates it loaded are
+  removed. `--keep` leaves a failed run in place to look into.
+
+End-to-end tests create real resources and take minutes; they don't run on
+pull requests.
