@@ -137,11 +137,17 @@ export class Database extends MonkEntity<NeonDatabaseDefinition, NeonDatabaseSta
         const fullUrl = `${this.baseUrl}${path}`;
         const response = http.do(fullUrl, options);
 
+        // No status means no response came at all (a timeout, a dropped
+        // connection); an empty body, nothing to parse (Neon answers some
+        // deletes that way).
+        if (!response.statusCode) {
+            throw new Error(`Neon ${method} ${path} failed: ${response.error || "no response"}`);
+        }
         if (response.statusCode >= 400) {
             throw new Error(`Neon API error: ${response.statusCode} ${response.status} - ${response.body}`);
         }
 
-        return JSON.parse(response.body);
+        return response.body ? JSON.parse(response.body) : {};
     }
 
     override create(): void {
