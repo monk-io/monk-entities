@@ -1,5 +1,9 @@
 # Entity Testing Framework
 
+> This page covers YAML scenario tests run against a Monk daemon. For fast,
+> offline tests of a package's entities (fakes, recordings of real APIs and
+> fault exploration), see [entity-test.md](entity-test.md).
+
 The Monk Entity Compiler includes a comprehensive testing framework for functional testing of entities using the Monk runtime. This framework allows you to test entity lifecycle, custom actions, secrets management, and integration scenarios.
 
 ## Quick Start
