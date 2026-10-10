@@ -1,6 +1,6 @@
 ---
 name: entity-write-tests
-description: Generate integration test files for a MonkEC entity package. Reads the implemented entity source code, extracts entities/actions/definitions, and produces stack-template.yaml, stack-integration.test.yaml, and env.example. Use after /entity-implement when code exists but tests need writing or improving.
+description: Generate test files for a MonkEC entity package. Reads the implemented entity source code, extracts entities/actions/definitions, and produces offline tests (test/*.test.ts, run by monk entity test) plus stack-template.yaml, stack-integration.test.yaml, and env.example for daemon integration tests. Use after /entity-implement when code exists but tests need writing or improving.
 argument-hint: "[package] - e.g., 'neon' or 'aws-s3'"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(*), Agent
 ---
@@ -54,6 +54,40 @@ Focus on:
 - Timeout values appropriate for the resource type
 - How secrets are configured
 - Cleanup order (reverse of creation)
+
+## Step 2b: Write offline tests (test/<entity>.test.ts)
+
+These run in seconds with `monk entity test src/<package>`, need no cluster,
+and run on every pull request. Read `doc/entity-test.md` first, and use
+`src/neon/test/branch.test.ts` as the model.
+
+For each entity, write `test/<entity>.test.ts` with:
+
+1. **A lifecycle test** that answers requests with `t.recorded(<API base URL>)`:
+   create, start, `waitReady()`, each action, update if supported, delete.
+   Read account details with `t.env("NAME", "fallback")` and credentials with
+   `t.env("NAME", "fallback", { secret: true })`. Set the API key as the
+   instance's own secret (`o.secret(...)`).
+2. **Failure cases built on that recording** with
+   `t.recorded(base, { from: "<lifecycle test name>" })` plus handlers
+   (`t.http.use` + `withJson`, `api.fault(...)`), covering at least:
+   - the resource already exists (adopted, left in place on delete)
+   - delete of a resource that is already gone (404) succeeds
+   - the API asks to wait (429/423/503) and the entity waits it out
+   - an async operation the API reports as failed fails the step clearly
+   Mark them `{ explore: false }`.
+3. If creates can be lost (ambiguous failure), the `rememberCreated` handler
+   pattern from the neon test, so replays behave like the API would.
+
+Then:
+- If credentials are available, record it:
+  `<VARS>=... monk entity test --record src/<package>`, read the recording
+  for anything private, and commit it. If not, say so; the lifecycle test
+  fails until someone records it. Don't hand-write recordings.
+- Run `monk entity test --explore src/<package>`. Each violation (crash,
+  stuck, duplicate, runaway, leak) is a bug in the entity: fix it with
+  `monkec/resilience` (`doc/resilience.md`) rather than accepting it. Then
+  write `test/faults.snap` with `--explore --update` and commit it.
 
 ## Step 3: Generate test template and test files
 
@@ -300,10 +334,13 @@ After writing the files, verify:
 8. **Variable names are snake_case** — in stack-template.yaml, variable keys must be snake_case (e.g., `clerk_secret_ref`) with `env:` mapping to the uppercase name (e.g., `CLERK_SECRET_KEY`). Never use UPPER_CASE as the variable name itself.
 9. **No hardcoded credentials** — use `<- secret("name")` for all keys/tokens, even "publishable" ones.
 
+10. **Offline tests pass**: `monk entity check src/<package>` and `monk entity test --explore src/<package>` succeed.
+
 ## Done
 
 Report to the user:
-- Test files created
+- Test files created, and whether the offline tests' recording was made
+- Fault exploration results (violations found and fixed)
 - Entity coverage: which entities and actions are tested
 - Dependency chain if applicable
 - Suggested next step: `/entity-test <package>` for manual testing or `/entity-test-integration <package>` for automated tests
