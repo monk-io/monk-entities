@@ -356,26 +356,37 @@ export class ApiManager extends HttpEntity<
 
 ## Error Handling
 
-The HttpClient will throw errors in the following cases:
+Every request that doesn't succeed throws: network failures, timeouts, and
+**every non-2xx status**. A returned response always has `ok: true`, so
+checking `response.ok` or `response.statusCode` after a call never sees an
+error status.
 
-- Network errors or request failures
-- Timeouts
+The thrown `Error` is named `HttpError` and says how the request failed:
 
-HTTP error status codes (4xx, 5xx) do not throw errors. Instead, check the `ok` property of the response:
+| Property | |
+|---|---|
+| `status` | the status the API answered with; `0` if no answer came |
+| `kind` | `"status"`, `"transport"` (timeout, reset) or `"malformed"` (see `expectJson`) |
+| `method`, `url` | the request |
+| `body`, `headers` | the response, if any |
 
 ```typescript
-const response = client.get("/api/data");
+import { httpFailure } from "monkec/resilience";
 
-if (!response.ok) {
-  console.error(`Request failed: ${response.status} ${response.statusCode}`);
-  // Handle error based on status code
-  if (response.statusCode === 404) {
-    console.log("Resource not found");
-  } else if (response.statusCode >= 500) {
-    console.log("Server error");
-  }
+try {
+  return client.get(`/users/${id}`).data;
+} catch (e) {
+  if (httpFailure(e)?.status === 404) return undefined; // not there
+  throw e;
 }
 ```
+
+With `expectJson: true` in the client options, a response body that isn't
+JSON (a proxy's HTML error page, say) throws an `HttpError` of kind
+`"malformed"` instead of coming back as a string.
+
+For retries, creates that mustn't be repeated and deletes of resources that
+may be gone, see [resilience.md](resilience.md).
 
 ## Best Practices
 
