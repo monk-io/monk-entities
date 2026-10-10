@@ -1,0 +1,37 @@
+# Fault exploration outcomes, written by monk entity test --explore --update.
+# A change to any of them fails the exploration until accepted again.
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | 429 => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | 500 => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | 503 => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | lost => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | malformed => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | reset => recovered
+a branch goes through its lifecycle | branch-1 check-readiness | GET console.neon.tech/api/v2/projects/:id/branches/:id | timeout => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | 429 => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | 500 => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | 503 => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | lost => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | malformed => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | reset => recovered
+a branch goes through its lifecycle | branch-1 create | GET console.neon.tech/api/v2/projects/:id/branches | timeout => recovered
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | 429 => recovered
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | 500 => converged
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | 503 => recovered
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | lost => recovered
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | malformed => recovered
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | reset => converged
+a branch goes through its lifecycle | branch-1 create | POST console.neon.tech/api/v2/projects/:id/branches | timeout => converged
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | 429 => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | 500 => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | 503 => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | lost => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | malformed => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | reset => recovered
+a branch goes through its lifecycle | branch-1 purge | DELETE console.neon.tech/api/v2/projects/:id/branches/:id | timeout => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | 429 => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | 500 => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | 503 => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | lost => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | malformed => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | reset => recovered
+a branch goes through its lifecycle | branch-1 start | GET console.neon.tech/api/v2/projects/:id/operations/:id | timeout => recovered

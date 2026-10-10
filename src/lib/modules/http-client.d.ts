@@ -6,7 +6,18 @@ export interface HttpClientOptions {
   timeout?: number;
   parseJson?: boolean;
   stringifyJson?: boolean;
+  /**
+   * Whether every non-empty response body must be JSON (default: false).
+   * One that isn't throws an HttpError of kind "malformed".
+   */
+  expectJson?: boolean;
 }
+
+/**
+ * The properties of the Error, named "HttpError", that a failed request
+ * throws: status (0 if no answer came), kind ("status", "transport" or
+ * "malformed"), method, url, body and headers. See monkec/resilience.
+ */
 
 export interface HttpClientRequestOptions {
   headers?: Record<string, string>;

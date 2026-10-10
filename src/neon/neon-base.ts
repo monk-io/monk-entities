@@ -1,5 +1,6 @@
 import { MonkEntity } from "monkec/base";
-import { HttpClient } from "monkec/http-client";
+import { HttpClient, HttpMethod } from "monkec/http-client";
+import { retry, isRetryable, deleteIfExists } from "monkec/resilience";
 import { getApiKey } from "./common.ts";
 import cli from "cli";
 
@@ -69,6 +70,7 @@ export abstract class NeonEntity<
             },
             parseJson: true,
             stringifyJson: true,
+            expectJson: true,
         });
     }
 
@@ -97,123 +99,59 @@ export abstract class NeonEntity<
      * Helper method to make authenticated HTTP requests with consistent error handling
      */
     protected makeRequest(method: string, path: string, body?: any): any {
-        try {
-            const fullUrl = `${this.baseUrl}${path}`;
-            cli.output(`🔧 Making ${method} request to: ${fullUrl}`);
-
-            if (body) {
-                cli.output(`📦 Request body: ${JSON.stringify(body, null, 2)}`);
-            }
-
-            const maxLockedAttempts = 10;
-            const lockedDelayMs = 5000;
-            let lockedAttempts = 0;
-            let response: any;
-
-            while (true) {
-                response = this.httpClient.request(method as any, path, {
-                    body,
-                    headers: {
-                        "Authorization": `Bearer ${this.apiKey}`,
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                    }
-                });
-
-                cli.output(`📡 Response status: ${response.statusCode}`);
-
-                if (response.statusCode !== 423 || lockedAttempts >= maxLockedAttempts) {
-                    break;
-                }
-
-                lockedAttempts++;
-                cli.output(`🔒 Neon returned 423 (conflicting operations in progress); retrying ${lockedAttempts}/${maxLockedAttempts} in ${lockedDelayMs / 1000}s...`);
-                sleep(lockedDelayMs);
-            }
-
-            if (!response.ok) {
-                cli.output(`❌ Error response body: ${response.data}`);
-                throw new Error(`Neon API error: ${response.statusCode} ${response.status} - ${response.data}`);
-            }
-            
-            // Handle JSON parsing issue in Goja runtime
-            let responseData = response.data;
-            if (typeof responseData === 'string') {
-                try {
-                    responseData = JSON.parse(responseData);
-                } catch (e) {
-                    // If parsing fails, return the string as-is
-                }
-            }
-            
-            return responseData;
-        } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`Neon ${method} request to ${path} failed: ${error.message}`);
-            }
-            throw error;
+        cli.output(`🔧 Making ${method} request to: ${this.baseUrl}${path}`);
+        if (body) {
+            cli.output(`📦 Request body: ${JSON.stringify(body, null, 2)}`);
         }
+        // Neon answers 423 while a project has operations running; those,
+        // rate limits and, for requests safe to repeat, failures that may
+        // have gone through are retried.
+        const response = retry(() => this.httpClient.request(method as HttpMethod, path, { body }), {
+            attempts: 10,
+            delayMs: 2000,
+            maxDelayMs: 10000,
+            when: (e) => isRetryable(e, method),
+            what: `Neon ${method} ${path}`,
+        });
+        cli.output(`📡 Response status: ${response.statusCode}`);
+        return response.data;
     }
 
     /**
-     * Helper method to check if a resource exists by making a GET request
-     * Returns the resource data if it exists, null otherwise
-     */
-    protected checkResourceExists(path: string): any | null {
-        try {
-            return this.makeRequest("GET", path);
-        } catch (error) {
-            // Resource doesn't exist or other error
-            return null;
-        }
-    }
-
-    /**
-     * Helper method to handle resource deletion with proper existing resource checks
+     * Deletes a resource, unless the entity adopted it rather than created
+     * it. A resource already gone counts as deleted.
      */
     protected deleteResource(path: string, resourceName: string): void {
         if (this.state.existing) {
             cli.output(`${resourceName} wasn't created by this entity, skipping delete`);
             return;
         }
-
-        try {
-            this.makeRequest("DELETE", path);
+        if (deleteIfExists(() => this.makeRequest("DELETE", path))) {
             cli.output(`Successfully deleted ${resourceName}`);
-        } catch (error) {
-            throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } else {
+            cli.output(`${resourceName} was already deleted`);
         }
     }
 
     /**
-     * Helper method to wait for operations to complete
+     * Waits for an operation to finish; throws if it fails, or doesn't
+     * finish in time.
      */
     protected waitForOperation(project_id: string, operation_id: string, maxAttempts: number = 40, delayMs: number = 2000): void {
         if (!operation_id) return;
 
-        let attempts = 0;
-
-        while (attempts < maxAttempts) {
-            try {
-                const operationData = this.makeRequest("GET", `/projects/${project_id}/operations/${operation_id}`);
-                
-                if (operationData.operation) {
-                    if (operationData.operation.status === "finished" || operationData.operation.status === "completed") {
-                        cli.output(`✅ Operation ${operation_id} completed successfully`);
-                        return;
-                    }
-                    
-                    if (operationData.operation.status === "failed") {
-                        throw new Error(`Operation failed: ${operationData.operation.error || 'Unknown error'}`);
-                    }
-                }
-            } catch (error) {
-                // Continue waiting
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const data = this.makeRequest("GET", `/projects/${project_id}/operations/${operation_id}`);
+            const status = data?.operation?.status;
+            if (status === "finished" || status === "completed") {
+                cli.output(`✅ Operation ${operation_id} completed successfully`);
+                return;
             }
-
-            attempts++;
-            if (attempts < maxAttempts) {
-                cli.output(`⏳ Waiting for operation ${operation_id} to complete... (attempt ${attempts}/${maxAttempts})`);
+            if (status === "failed" || status === "error" || status === "cancelled") {
+                throw new Error(`Neon operation ${operation_id} ${status}: ${data.operation.error || "no details"}`);
+            }
+            if (attempt < maxAttempts) {
+                cli.output(`⏳ Waiting for operation ${operation_id} to complete... (attempt ${attempt}/${maxAttempts})`);
                 sleep(delayMs);
             }
         }
