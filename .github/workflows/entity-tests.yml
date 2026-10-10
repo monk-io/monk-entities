@@ -1,0 +1,57 @@
+name: Entity tests
+
+# Type-checks every package and runs the offline tests of those that have
+# them (src/<package>/test/*.test.ts), with fault exploration: nothing here
+# reaches a real API or needs a Monk cluster.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install monk (nightly)
+        run: |
+          mkdir -p "$RUNNER_TEMP/monk"
+          curl -sSfL https://monkreleases.blob.core.windows.net/nightly/linux/monk-amd64-latest.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP/monk" monk
+          echo "$RUNNER_TEMP/monk" >> "$GITHUB_PATH"
+          echo "monk nightly $(curl -sSfL https://monkreleases.blob.core.windows.net/nightly/linux/latest-version)"
+
+      # monk entity is new; until a nightly has it, say so rather than fail
+      # every pull request.
+      - name: Check for monk entity
+        id: monk
+        run: |
+          if monk entity test --help >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::This monk nightly has no 'monk entity'; packages were not checked or tested."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Packages
+        id: packages
+        if: steps.monk.outputs.available == 'true'
+        run: |
+          all=$(find src -mindepth 1 -maxdepth 1 -type d ! -name lib | sort | tr '\n' ' ')
+          tested=$(for d in $all; do ls "$d"/test/*.test.ts >/dev/null 2>&1 && printf '%s ' "$d"; done)
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+          echo "packages: $(wc -w <<< "$all"), with tests: ${tested:-none}"
+
+      - name: Type-check packages
+        if: steps.monk.outputs.available == 'true'
+        run: monk entity check ${{ steps.packages.outputs.all }}
+
+      - name: Run tests and explore faults
+        if: steps.monk.outputs.available == 'true' && steps.packages.outputs.tested != ''
+        run: monk entity test -v --explore ${{ steps.packages.outputs.tested }}
