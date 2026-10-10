@@ -1,0 +1,145 @@
+# A Neon branch in an existing project, a role and a database on it, and an
+# app that connects to the database and reports whether it can.
+# Used by branch-app.e2e.ts; {{ project_id }} and {{ id }} are filled in
+# when it is loaded.
+namespace: neon-e2e
+
+branch:
+  defines: neon/branch
+  secret_ref: neon-api-key
+  project_id: "{{ project_id }}"
+  name: e2e-{{ id }}
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+
+role:
+  defines: neon/role
+  secret_ref: neon-api-key
+  project_id: "{{ project_id }}"
+  branch_id: <- connection-target("branch") entity-state get-member("id")
+  name: app_user
+  can_login: true
+  password_secret_name: neon-e2e-{{ id }}-password
+  permitted-secrets:
+    neon-api-key: true
+    neon-e2e-{{ id }}-password: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    branch:
+      runnable: neon-e2e/branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-e2e/branch
+      timeout: 300
+
+database:
+  defines: neon/database
+  secret_ref: neon-api-key
+  project_id: "{{ project_id }}"
+  branch_id: <- connection-target("branch") entity-state get-member("id")
+  name: appdb
+  owner_name: <- connection-target("role") entity-state get-member("name")
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    branch:
+      runnable: neon-e2e/branch
+      service: data
+    role:
+      runnable: neon-e2e/role
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-e2e/branch
+        - neon-e2e/role
+      timeout: 300
+
+compute:
+  defines: neon/compute
+  secret_ref: neon-api-key
+  project_id: "{{ project_id }}"
+  branch_id: <- connection-target("branch") entity-state get-member("id")
+  compute_type: read_write
+  permitted-secrets:
+    neon-api-key: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    branch:
+      runnable: neon-e2e/branch
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-e2e/branch
+      timeout: 300
+
+probe:
+  defines: runnable
+  connections:
+    compute:
+      runnable: neon-e2e/compute
+      service: data
+    role:
+      runnable: neon-e2e/role
+      service: data
+    database:
+      runnable: neon-e2e/database
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - neon-e2e/compute
+        - neon-e2e/role
+        - neon-e2e/database
+      timeout: 600
+  permitted-secrets:
+    neon-e2e-{{ id }}-password: true
+  variables:
+    db_host:
+      env: DB_HOST
+      value: <- connection-target("compute") entity-state get-member("host")
+      type: string
+    db_user:
+      env: DB_USER
+      value: <- connection-target("role") entity-state get-member("name")
+      type: string
+    db_password:
+      env: DB_PASSWORD
+      value: <- secret("neon-e2e-{{ id }}-password")
+      type: string
+    db_name:
+      env: DB_NAME
+      value: <- connection-target("database") entity-state get-member("name")
+      type: string
+  containers:
+    probe:
+      image: postgres:16-alpine
+      restart: always
+      bash: |
+        url="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST/$DB_NAME?sslmode=require"
+        while true; do
+          if psql "$url" -tAc 'select 1' >/dev/null 2>&1; then echo db-ok; else echo db-unreachable; fi
+          sleep 10
+        done
+
+stack:
+  defines: group
+  members:
+    - neon-e2e/branch
+    - neon-e2e/role
+    - neon-e2e/database
+    - neon-e2e/compute
+    - neon-e2e/probe
