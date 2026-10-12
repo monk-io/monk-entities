@@ -84,10 +84,13 @@ var _Database = class _Database extends (_a = MonkEntity, _updateDatabase_dec = 
     }
     const fullUrl = `${this.baseUrl}${path}`;
     const response = http.do(fullUrl, options);
+    if (!response.statusCode) {
+      throw new Error(`Neon ${method} ${path} failed: ${response.error || "no response"}`);
+    }
     if (response.statusCode >= 400) {
       throw new Error(`Neon API error: ${response.statusCode} ${response.status} - ${response.body}`);
     }
-    return JSON.parse(response.body);
+    return response.body ? JSON.parse(response.body) : {};
   }
   create() {
     const databaseData = {

@@ -3,5 +3,5 @@ namespace: neon
 neon-base:
   defines: module
   metadata:
-    version-hash: 57ecad3450b6
+    version-hash: 26cde8656b07
   source: <<< neon-base.js

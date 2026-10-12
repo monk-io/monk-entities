@@ -36,6 +36,17 @@ __export(http_client_exports, {
 });
 module.exports = __toCommonJS(http_client_exports);
 var import_http = __toESM(require("http"));
+function httpError(message, kind, method, url, status, body, headers) {
+  const err = new Error(message);
+  err.name = "HttpError";
+  err.kind = kind;
+  err.status = status;
+  err.method = method;
+  err.url = url;
+  err.body = body;
+  err.headers = headers;
+  return err;
+}
 var HttpClient = class {
   /**
    * Create a new HTTP client with the specified options
@@ -71,7 +82,8 @@ var HttpClient = class {
       headers: options.headers || {},
       timeout: options.timeout || 3e4,
       parseJson: options.parseJson !== false,
-      stringifyJson: options.stringifyJson !== false
+      stringifyJson: options.stringifyJson !== false,
+      expectJson: options.expectJson === true
     };
     if (this.options.stringifyJson && !this.options.headers["Content-Type"]) {
       this.options.headers["Content-Type"] = "application/json";
@@ -194,22 +206,56 @@ var HttpClient = class {
         response = import_http.default.do(fullUrl, request);
       }
     } catch (error) {
-      throw new Error(
-        `${normalizedMethod} request to "${fullUrl}" failed during execution: ${error instanceof Error ? error.message : "Unknown network error"}`
+      throw httpError(
+        `${normalizedMethod} request to "${fullUrl}" failed during execution: ${error instanceof Error ? error.message : "Unknown network error"}`,
+        "transport",
+        normalizedMethod,
+        fullUrl,
+        0,
+        "",
+        {}
       );
     }
     if (response.error) {
-      throw new Error(
-        `${normalizedMethod} request to "${fullUrl}" failed: ${response.error}. ` + response.body
+      const status = response.statusCode || 0;
+      throw httpError(
+        `${normalizedMethod} request to "${fullUrl}" failed: ${response.error}. ` + (response.body || ""),
+        status === 0 ? "transport" : "status",
+        normalizedMethod,
+        fullUrl,
+        status,
+        response.body || "",
+        response.headers || {}
       );
     }
+    let parsed;
     try {
-      return this.parseResponse(response);
+      parsed = this.parseResponse(response);
     } catch (error) {
       throw new Error(
         `${normalizedMethod} request to "${fullUrl}" succeeded but response parsing failed: ${error instanceof Error ? error.message : "Unknown parsing error"}`
       );
     }
+    if (this.options.expectJson && parsed.raw.trim() !== "" && typeof parsed.data === "string") {
+      let ok = true;
+      try {
+        parsed.data = JSON.parse(parsed.raw);
+      } catch (_e) {
+        ok = false;
+      }
+      if (!ok) {
+        throw httpError(
+          `${normalizedMethod} request to "${fullUrl}" answered ${parsed.statusCode} with a body that isn't JSON: ` + parsed.raw.slice(0, 200),
+          "malformed",
+          normalizedMethod,
+          fullUrl,
+          parsed.statusCode,
+          parsed.raw,
+          parsed.headers
+        );
+      }
+    }
+    return parsed;
   }
   /**
    * Build the full URL with base URL and query parameters

@@ -1,0 +1,8 @@
+namespace: monkec
+
+resilience:
+  defines: module
+  metadata:
+    version: 0.1.0
+    version-hash: 290efd453dd5
+  source: <<< resilience.js

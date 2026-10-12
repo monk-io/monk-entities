@@ -22,7 +22,7 @@ branch:
       - `neon/project` - The parent project containing this branch
       - `neon/database` - Create databases on this branch
       - `neon/compute` - Configure compute endpoints for the branch
-    version-hash: 57ecad3450b6
+    version-hash: 26cde8656b07
   schema:
     secret_ref:
       type: string
@@ -119,3 +119,4 @@ branch:
     - monkec/base
     - neon/neon-base
     - cli
+    - monkec/resilience

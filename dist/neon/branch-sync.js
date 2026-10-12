@@ -54,6 +54,8 @@ const action = base.action;
 const neonBase = require("neon/neon-base");
 const NeonEntity = neonBase.NeonEntity;
 const cli = require("cli");
+const resilience = require("monkec/resilience");
+const ensureCreated = resilience.ensureCreated;
 var _getBranch_dec, _a, _init;
 var _Branch = class _Branch extends (_a = NeonEntity, _getBranch_dec = [action("Get branch details")], _a) {
   constructor() {
@@ -79,12 +81,22 @@ var _Branch = class _Branch extends (_a = NeonEntity, _getBranch_dec = [action("
         }
       ]
     };
-    const response = this.makeRequest(
-      "POST",
-      `/projects/${this.definition.project_id}/branches`,
-      branchData
-    );
-    const branch = response.branch;
+    const branches = `/projects/${this.definition.project_id}/branches`;
+    const name = this.definition.name;
+    const { resource: response, adopted } = ensureCreated({
+      find: /* @__PURE__ */ __name(() => {
+        if (!name) return void 0;
+        const branch2 = (this.makeRequest("GET", branches)?.branches ?? []).find((b) => b.name === name);
+        return branch2 ? { branch: branch2 } : void 0;
+      }, "find"),
+      create: /* @__PURE__ */ __name(() => this.makeRequest("POST", branches, branchData), "create"),
+      what: `Neon branch ${name ?? ""}`.trim()
+    });
+    const branch = response?.branch;
+    if (!branch?.id) {
+      throw new Error(`Neon answered the branch create without a branch: ${JSON.stringify(response).slice(0, 200)}`);
+    }
+    this.state.existing = adopted;
     this.state.id = branch.id;
     this.state.name = branch.name;
     this.state.current_state = branch.current_state;

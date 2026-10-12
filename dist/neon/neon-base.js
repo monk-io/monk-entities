@@ -37,6 +37,7 @@ __export(neon_base_exports, {
 module.exports = __toCommonJS(neon_base_exports);
 var import_base = require("monkec/base");
 var import_http_client = require("monkec/http-client");
+var import_resilience = require("monkec/resilience");
 
 // input/neon/common.ts
 var import_secret = __toESM(require("secret"));
@@ -82,7 +83,8 @@ var NeonEntity = class extends import_base.MonkEntity {
         "Content-Type": "application/json"
       },
       parseJson: true,
-      stringifyJson: true
+      stringifyJson: true,
+      expectJson: true
     });
   }
   /**
@@ -101,101 +103,53 @@ var NeonEntity = class extends import_base.MonkEntity {
    * Helper method to make authenticated HTTP requests with consistent error handling
    */
   makeRequest(method, path, body) {
-    try {
-      const fullUrl = `${this.baseUrl}${path}`;
-      import_cli.default.output(`\u{1F527} Making ${method} request to: ${fullUrl}`);
-      if (body) {
-        import_cli.default.output(`\u{1F4E6} Request body: ${JSON.stringify(body, null, 2)}`);
-      }
-      const maxLockedAttempts = 10;
-      const lockedDelayMs = 5e3;
-      let lockedAttempts = 0;
-      let response;
-      while (true) {
-        response = this.httpClient.request(method, path, {
-          body,
-          headers: {
-            "Authorization": `Bearer ${this.apiKey}`,
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-          }
-        });
-        import_cli.default.output(`\u{1F4E1} Response status: ${response.statusCode}`);
-        if (response.statusCode !== 423 || lockedAttempts >= maxLockedAttempts) {
-          break;
-        }
-        lockedAttempts++;
-        import_cli.default.output(`\u{1F512} Neon returned 423 (conflicting operations in progress); retrying ${lockedAttempts}/${maxLockedAttempts} in ${lockedDelayMs / 1e3}s...`);
-        sleep(lockedDelayMs);
-      }
-      if (!response.ok) {
-        import_cli.default.output(`\u274C Error response body: ${response.data}`);
-        throw new Error(`Neon API error: ${response.statusCode} ${response.status} - ${response.data}`);
-      }
-      let responseData = response.data;
-      if (typeof responseData === "string") {
-        try {
-          responseData = JSON.parse(responseData);
-        } catch (e) {
-        }
-      }
-      return responseData;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Neon ${method} request to ${path} failed: ${error.message}`);
-      }
-      throw error;
+    import_cli.default.output(`\u{1F527} Making ${method} request to: ${this.baseUrl}${path}`);
+    if (body) {
+      import_cli.default.output(`\u{1F4E6} Request body: ${JSON.stringify(body, null, 2)}`);
     }
+    const response = (0, import_resilience.retry)(() => this.httpClient.request(method, path, { body }), {
+      attempts: 10,
+      delayMs: 2e3,
+      maxDelayMs: 1e4,
+      when: (e) => (0, import_resilience.isRetryable)(e, method),
+      what: `Neon ${method} ${path}`
+    });
+    import_cli.default.output(`\u{1F4E1} Response status: ${response.statusCode}`);
+    return response.data;
   }
   /**
-   * Helper method to check if a resource exists by making a GET request
-   * Returns the resource data if it exists, null otherwise
-   */
-  checkResourceExists(path) {
-    try {
-      return this.makeRequest("GET", path);
-    } catch (error) {
-      return null;
-    }
-  }
-  /**
-   * Helper method to handle resource deletion with proper existing resource checks
+   * Deletes a resource, unless the entity adopted it rather than created
+   * it. A resource already gone counts as deleted.
    */
   deleteResource(path, resourceName) {
     if (this.state.existing) {
       import_cli.default.output(`${resourceName} wasn't created by this entity, skipping delete`);
       return;
     }
-    try {
-      this.makeRequest("DELETE", path);
+    if ((0, import_resilience.deleteIfExists)(() => this.makeRequest("DELETE", path))) {
       import_cli.default.output(`Successfully deleted ${resourceName}`);
-    } catch (error) {
-      throw new Error(`Failed to delete ${resourceName}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } else {
+      import_cli.default.output(`${resourceName} was already deleted`);
     }
   }
   /**
-   * Helper method to wait for operations to complete
+   * Waits for an operation to finish; throws if it fails, or doesn't
+   * finish in time.
    */
   waitForOperation(project_id, operation_id, maxAttempts = 40, delayMs = 2e3) {
     if (!operation_id) return;
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-      try {
-        const operationData = this.makeRequest("GET", `/projects/${project_id}/operations/${operation_id}`);
-        if (operationData.operation) {
-          if (operationData.operation.status === "finished" || operationData.operation.status === "completed") {
-            import_cli.default.output(`\u2705 Operation ${operation_id} completed successfully`);
-            return;
-          }
-          if (operationData.operation.status === "failed") {
-            throw new Error(`Operation failed: ${operationData.operation.error || "Unknown error"}`);
-          }
-        }
-      } catch (error) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const data = this.makeRequest("GET", `/projects/${project_id}/operations/${operation_id}`);
+      const status = data?.operation?.status;
+      if (status === "finished" || status === "completed") {
+        import_cli.default.output(`\u2705 Operation ${operation_id} completed successfully`);
+        return;
       }
-      attempts++;
-      if (attempts < maxAttempts) {
-        import_cli.default.output(`\u23F3 Waiting for operation ${operation_id} to complete... (attempt ${attempts}/${maxAttempts})`);
+      if (status === "failed" || status === "error" || status === "cancelled") {
+        throw new Error(`Neon operation ${operation_id} ${status}: ${data.operation.error || "no details"}`);
+      }
+      if (attempt < maxAttempts) {
+        import_cli.default.output(`\u23F3 Waiting for operation ${operation_id} to complete... (attempt ${attempt}/${maxAttempts})`);
         sleep(delayMs);
       }
     }
