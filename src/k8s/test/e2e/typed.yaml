@@ -1,0 +1,194 @@
+# An app on a Kubernetes cluster made of typed entities, without any
+# Kubernetes YAML: a namespace, settings in a ConfigMap (one of them taken
+# from the cluster entity's state), a Secret from a Monk secret, a job that
+# checks both reach a pod's environment, a Deployment that serves a page
+# from a config file and keeps a volume, and a Monk runnable that reaches
+# it. Used by typed.e2e.ts; {{ id }} is filled in when it is loaded.
+namespace: k8s-typed
+
+cluster:
+  defines: k8s/cluster
+  kubeconfig_secret: k8s-e2e-kubeconfig
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+
+ns:
+  defines: k8s/kube-namespace
+  name: k8s-typed-{{ id }}
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/cluster
+      timeout: 120
+
+settings:
+  defines: k8s/config-map
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("ns") entity-state get-member("name")
+  data:
+    GREETING: hello from monk
+    KUBE_VERSION: <- connection-target("cluster") entity-state get-member("version")
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+    ns:
+      runnable: k8s-typed/ns
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/ns
+      timeout: 120
+
+creds:
+  defines: k8s/secret
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("ns") entity-state get-member("name")
+  secrets:
+    API_TOKEN: k8s-typed-token
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+    k8s-typed-token: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+    ns:
+      runnable: k8s-typed/ns
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/ns
+      timeout: 120
+
+check-env:
+  defines: k8s/job
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("ns") entity-state get-member("name")
+  image: busybox:1.36
+  env_config_map: <- connection-target("settings") entity-state get-member("name")
+  env_secret: <- connection-target("creds") entity-state get-member("name")
+  script: |
+    test "$GREETING" = "hello from monk" && test -n "$KUBE_VERSION" && test "$API_TOKEN" = "t0ken-{{ id }}" && echo env-ok
+  backoff_limit: 0
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+    ns:
+      runnable: k8s-typed/ns
+      service: data
+    settings:
+      runnable: k8s-typed/settings
+      service: data
+    creds:
+      runnable: k8s-typed/creds
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/settings
+        - k8s-typed/creds
+      timeout: 120
+
+web:
+  defines: k8s/deployment
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("ns") entity-state get-member("name")
+  image: nginx:1.27-alpine
+  replicas: 2
+  ports: [80]
+  service_type: NodePort
+  readiness_path: /
+  config_files:
+    index:
+      path: /usr/share/nginx/html/index.html
+      contents: k8s-typed-ok
+  storage:
+    data:
+      path: /data
+      size: 100Mi
+  delete_volumes: true
+  memory: 32Mi
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+    ns:
+      runnable: k8s-typed/ns
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/check-env
+      timeout: 300
+
+probe:
+  defines: runnable
+  connections:
+    web:
+      runnable: k8s-typed/web
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/web
+      timeout: 600
+  variables:
+    endpoint:
+      env: ENDPOINT
+      value: <- connection-target("web") entity-state get-member("endpoint")
+      type: string
+  containers:
+    probe:
+      image: curlimages/curl:8.10.1
+      restart: always
+      bash: |
+        while true; do
+          if curl -sf "http://$ENDPOINT/" | grep -q "k8s-typed-ok"; then echo typed-ok; else echo typed-unreachable; fi
+          sleep 5
+        done
+
+stack:
+  defines: group
+  members:
+    - k8s-typed/cluster
+    - k8s-typed/ns
+    - k8s-typed/settings
+    - k8s-typed/creds
+    - k8s-typed/check-env
+    - k8s-typed/web
+    - k8s-typed/probe

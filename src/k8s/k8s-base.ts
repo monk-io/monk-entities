@@ -103,8 +103,11 @@ export function retryable(err: unknown): boolean {
 export abstract class K8sEntity<D extends K8sConnection, S extends object> extends MonkEntity<D, S> {
     private resolved?: Cluster;
 
+    // These are public, not protected: the runtime's type checker refuses a
+    // protected call from a generic subclass such as K8sObjects.
+
     /** The cluster, as the k8s module takes it. */
-    protected cluster(): Cluster {
+    cluster(): Cluster {
         if (this.resolved) return this.resolved;
         const d = this.definition;
         const c: Cluster = {};
@@ -131,13 +134,14 @@ export abstract class K8sEntity<D extends K8sConnection, S extends object> exten
     }
 
     /** Runs fn, retrying failures the API may get over. */
-    protected k8s<T>(what: string, fn: (c: Cluster) => T): T {
+    k8s<T>(what: string, fn: (c: Cluster) => T): T {
         const c = this.cluster();
-        return retry(() => fn(c), { when: retryable, what });
+        // A call may take a minute; retries leave room for the rest of it.
+        return retry(() => fn(c), { when: retryable, what, budgetMs: 20000 });
     }
 
     /** The namespace objects that name none go to. */
-    protected defaultNamespace(): string {
+    defaultNamespace(): string {
         return this.k8s("reading the default namespace", (c) => k8s.namespace(c));
     }
 }
@@ -155,7 +159,7 @@ export interface NodeInfo {
 export function listNodes(c: Cluster): NodeInfo[] {
     let nodes: any[];
     try {
-        nodes = retry(() => k8s.list(c, { apiVersion: "v1", kind: "Node" }), { when: retryable, what: "listing nodes" });
+        nodes = retry(() => k8s.list(c, { apiVersion: "v1", kind: "Node" }), { when: retryable, what: "listing nodes", budgetMs: 20000 });
     } catch (e) {
         if ((e as any)?.name === "HttpError" && ((e as any).status === 403 || (e as any).status === 401)) return [];
         throw e;

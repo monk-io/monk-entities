@@ -91,7 +91,7 @@ test("objects that leave the manifest are deleted on update", (t) => {
     expect(stored(api.state)).toEqual(["configmaps/default/a"]);
     expect(api.state.objects.get("configmaps/default/a").data.k).toBe("2");
     expect((r.state.objects ?? []).length).toBe(1);
-    expect(r.output.join("\n")).toContain("deleted ConfigMap default/b: it left the manifest");
+    expect(r.output.join("\n")).toContain("deleted ConfigMap default/b: it is no longer wanted");
 });
 
 test("an object Monk did not create is refused, unless adopted, and adopted ones stay", (t) => {
@@ -200,7 +200,7 @@ test("restart rolls deployments with a field manager of its own", (t) => {
 test("a manifest that names an object twice is refused", (t) => {
     t.use(kube);
     const r = resource(t, "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\n---\napiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\n");
-    expect(() => r.create()).toThrow(/manifest has ConfigMap default\/a twice/);
+    expect(() => r.create()).toThrow(/ConfigMap default\/a is given twice/);
 }, { explore: false });
 
 test("a cluster reports its version and keeps its connection for wiring", (t) => {

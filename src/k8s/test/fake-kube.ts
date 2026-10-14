@@ -20,7 +20,11 @@ const BUILTIN: Kind[] = [
     { group: "", version: "v1", kind: "Node", plural: "nodes", namespaced: false },
     { group: "", version: "v1", kind: "ConfigMap", plural: "configmaps", namespaced: true },
     { group: "", version: "v1", kind: "Service", plural: "services", namespaced: true },
+    { group: "", version: "v1", kind: "Secret", plural: "secrets", namespaced: true },
+    { group: "", version: "v1", kind: "PersistentVolumeClaim", plural: "persistentvolumeclaims", namespaced: true },
     { group: "apps", version: "v1", kind: "Deployment", plural: "deployments", namespaced: true },
+    { group: "apps", version: "v1", kind: "StatefulSet", plural: "statefulsets", namespaced: true },
+    { group: "networking.k8s.io", version: "v1", kind: "Ingress", plural: "ingresses", namespaced: true },
     { group: "batch", version: "v1", kind: "Job", plural: "jobs", namespaced: true },
     { group: "apiextensions.k8s.io", version: "v1", kind: "CustomResourceDefinition", plural: "customresourcedefinitions", namespaced: false },
 ];
@@ -43,6 +47,10 @@ export function stored(s: KubeState): string[] {
 
 function status(code: number, reason: string, message: string): Response {
     return json(code, { kind: "Status", apiVersion: "v1", status: "Failure", reason, message, code });
+}
+
+function utf8base64(s: string): string {
+    return btoa(encodeURIComponent(s).replace(/%([0-9A-F]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16))));
 }
 
 function gv(k: Kind): string {
@@ -72,6 +80,17 @@ function progress(obj: any, reads: number): void {
             obj.status = reads < 2
                 ? { observedGeneration: gen, replicas: want, updatedReplicas: want, availableReplicas: 0 }
                 : { observedGeneration: gen, replicas: want, updatedReplicas: want, availableReplicas: want, readyReplicas: want };
+            break;
+        case "StatefulSet":
+            obj.status = reads < 2
+                ? { observedGeneration: gen, replicas: want, readyReplicas: 0, currentRevision: "r1", updateRevision: "r1" }
+                : { observedGeneration: gen, replicas: want, readyReplicas: want, currentRevision: "r1", updateRevision: "r1" };
+            break;
+        case "Job":
+            obj.status = reads < 2 ? { active: 1 } : { succeeded: obj.spec?.completions ?? 1, conditions: [{ type: "Complete", status: "True" }] };
+            break;
+        case "Ingress":
+            if (reads >= 1) obj.status = { loadBalancer: { ingress: [{ ip: "203.0.113.9" }] } };
             break;
         case "Service":
             if (obj.spec?.type === "LoadBalancer" && reads >= 2) obj.status = { loadBalancer: { ingress: [{ ip: "203.0.113.7" }] } };
@@ -106,6 +125,13 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
             if (merged.spec.type === "NodePort" || merged.spec.type === "LoadBalancer") {
                 merged.spec.ports = (merged.spec.ports ?? []).map((p: any, i: number) => ({ nodePort: 30080 + i, ...p }));
             }
+        }
+        if (kind.kind === "Secret" && merged.stringData) {
+            // As the API server does: stringData is written into data.
+            const data: Record<string, string> = {};
+            for (const [k, v] of Object.entries(merged.stringData)) data[k] = utf8base64(String(v));
+            merged.data = data;
+            delete merged.stringData;
         }
         delete merged.status;
         s.objects.set(key, merged);
