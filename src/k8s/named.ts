@@ -68,12 +68,19 @@ export function digest(v: unknown): string {
     return crypto.sha256(JSON.stringify(v)).slice(0, 16);
 }
 
-/** v as a map of strings, with numbers and booleans written out. */
-export function strings(v: Record<string, unknown> | undefined): Record<string, string> {
+/**
+ * v as a map of strings, with numbers and booleans written out. Monk keeps
+ * a definition's maps as a tree, so a key with slashes, as labels and
+ * annotations have (app.kubernetes.io/name), comes back nested; it is
+ * joined up again here.
+ */
+export function strings(v: Record<string, unknown> | undefined, prefix = ""): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [k, x] of Object.entries(v ?? {})) {
         if (x === undefined || x === null) continue;
-        out[k] = typeof x === "string" ? x : String(x);
+        const key = prefix ? `${prefix}/${k}` : k;
+        if (typeof x === "object" && !Array.isArray(x)) Object.assign(out, strings(x as Record<string, unknown>, key));
+        else out[key] = typeof x === "string" ? x : String(x);
     }
     return out;
 }

@@ -138,6 +138,8 @@ web:
       size: 100Mi
   delete_volumes: true
   memory: 32Mi
+  labels:
+    app.kubernetes.io/part-of: k8s-typed   # a key with slashes, which Monk keeps nested
   permitted-secrets:
     k8s-e2e-kubeconfig: true
   services:
@@ -155,6 +157,31 @@ web:
       runnables:
         - k8s-typed/check-env
       timeout: 300
+
+by-label:
+  defines: k8s/lookup
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("ns") entity-state get-member("name")
+  api_version: apps/v1
+  kind: Deployment
+  label_selector: app.kubernetes.io/part-of=k8s-typed
+  fields:
+    - name: replicas
+      path: spec.replicas
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  connections:
+    cluster:
+      runnable: k8s-typed/cluster
+      service: data
+    ns:
+      runnable: k8s-typed/ns
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-typed/web
+      timeout: 600
 
 probe:
   defines: runnable
@@ -191,4 +218,5 @@ stack:
     - k8s-typed/creds
     - k8s-typed/check-env
     - k8s-typed/web
+    - k8s-typed/by-label
     - k8s-typed/probe

@@ -35,6 +35,8 @@ const WEB = {
     readiness_path: "/healthz",
     cpu: "100m",
     memory: "128Mi",
+    labels: { "app.kubernetes.io/part-of": "shop" },
+    node_selector: { "kubernetes.io/arch": "arm64" },
 };
 
 test("a deployment comes with its service, secret, files and volume", (t) => {
@@ -78,6 +80,9 @@ test("a deployment comes with its service, secret, files and volume", (t) => {
         { name: "tmp", emptyDir: {} },
     ]);
     expect(dep.metadata.labels["app.kubernetes.io/managed-by"]).toBe("monk");
+    // Keys with slashes come back from Monk nested; they are joined again.
+    expect(dep.metadata.labels["app.kubernetes.io/part-of"]).toBe("shop");
+    expect(dep.spec.template.spec.nodeSelector).toEqual({ "kubernetes.io/arch": "arm64" });
 
     const svc = api.state.objects.get("services/shop/web");
     expect(svc.spec.ports).toEqual([
