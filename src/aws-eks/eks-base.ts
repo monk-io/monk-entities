@@ -31,9 +31,14 @@ export function isNotFound(err: unknown): boolean {
 /** The tag that says which Monk entity made a resource. */
 export const OWNER_TAG = "monk.io/owner";
 
-/** A token that makes AWS carry out a create once however often it is sent. */
+/**
+ * A token that makes AWS carry out a create once however often it is sent.
+ * EKS takes 33 to 126 characters.
+ */
 export function requestToken(): string {
-    return `monk-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+    let random = "";
+    while (random.length < 32) random += Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, "0");
+    return `monk-${Date.now().toString(36)}-${random.slice(0, 32)}`;
 }
 
 /** o without its undefined fields, for request bodies. */

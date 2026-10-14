@@ -1,7 +1,7 @@
 # An EKS cluster and an app on it, from an empty AWS account, in one
 # `monk run aws-eks-example/stack`: a VPC with two public subnets, the IAM
-# roles EKS needs, the cluster, a node group, the EBS CSI driver and a
-# default storage class, and a web app behind a load balancer.
+# roles EKS needs, the cluster, a node group, the EBS CSI driver (with its
+# permissions through EKS Pod Identity) and a default storage class, and a web app behind a load balancer.
 #
 # Everything uses the Monk cluster's AWS credentials; no kubeconfig. The
 # cluster takes 10 to 15 minutes, the nodes a few more.
@@ -152,7 +152,6 @@ node-role:
     - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
     - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
     - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-    - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
   services:
     data:
       protocol: custom
@@ -221,11 +220,14 @@ nodes:
         - aws-eks-example/node-role
       timeout: 1800
 
-ebs:
+# Pods get AWS permissions through EKS Pod Identity: the agent add-on, and
+# a role that trusts it, given to the EBS CSI driver's service account.
+# (Pods on managed nodes can not reach the node role.)
+pod-identity:
   defines: aws-eks/addon
   region: us-east-1
   cluster_name: <- connection-target("eks") entity-state get-member("name")
-  name: aws-ebs-csi-driver
+  name: eks-pod-identity-agent
   services:
     data:
       protocol: custom
@@ -237,6 +239,49 @@ ebs:
     wait-for:
       runnables:
         - aws-eks-example/nodes
+      timeout: 1200
+
+ebs-role:
+  defines: aws-iam/iam-role
+  region: us-east-1
+  role_name: shop-eks-ebs-csi
+  assume_role_policy_document:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Principal:
+          Service: pods.eks.amazonaws.com
+        Action:
+          - sts:AssumeRole
+          - sts:TagSession
+  attached_policies:
+    - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+  services:
+    data:
+      protocol: custom
+
+ebs:
+  defines: aws-eks/addon
+  region: us-east-1
+  cluster_name: <- connection-target("eks") entity-state get-member("name")
+  name: aws-ebs-csi-driver
+  service_account_roles:
+    ebs-csi-controller-sa: <- connection-target("ebs-role") entity-state get-member("role_arn")
+  services:
+    data:
+      protocol: custom
+  connections:
+    eks:
+      runnable: aws-eks-example/eks
+      service: data
+    ebs-role:
+      runnable: aws-eks-example/ebs-role
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - aws-eks-example/pod-identity
+        - aws-eks-example/ebs-role
       timeout: 1200
 
 # From here on, the k8s entities: the cluster is reached by name, with the
@@ -301,6 +346,7 @@ web:
     cache:
       path: /var/cache/nginx
       size: 1Gi
+  delete_volumes: true            # an example: its EBS volume goes with it
   services:
     data:
       protocol: custom
@@ -326,6 +372,8 @@ stack:
     - aws-eks-example/node-role
     - aws-eks-example/eks
     - aws-eks-example/nodes
+    - aws-eks-example/pod-identity
+    - aws-eks-example/ebs-role
     - aws-eks-example/ebs
     - aws-eks-example/k8s
     - aws-eks-example/storage-class
