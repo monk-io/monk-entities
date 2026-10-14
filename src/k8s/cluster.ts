@@ -1,7 +1,7 @@
 import { action, Args } from "monkec/base";
 import k8s from "k8s";
 import cli from "cli";
-import { K8sEntity, K8sConnection, CONNECTION_FIELDS } from "./k8s-base.ts";
+import { K8sEntity, K8sConnection, CONNECTION_FIELDS, NodeInfo, listNodes, nodeAddress } from "./k8s-base.ts";
 
 /**
  * A Kubernetes cluster Monk works on.
@@ -29,6 +29,16 @@ export interface ClusterState {
      * @description Namespace objects that name none go to
      */
     default_namespace?: string;
+
+    /**
+     * @description The nodes and their addresses (empty when the credentials may not list nodes)
+     */
+    nodes?: NodeInfo[];
+
+    /**
+     * @description Address of a ready node: its ExternalIP if nodes have one, else its InternalIP
+     */
+    node_address?: string;
 
     /** @description Connection: secret holding the kubeconfig */
     kubeconfig_secret?: string;
@@ -69,6 +79,7 @@ export interface ClusterState {
  * ## State Fields for Composition
  * - `state.version` - Kubernetes version of the API server
  * - `state.default_namespace` - namespace objects that name none go to
+ * - `state.nodes`, `state.node_address` - the nodes, and an address to reach node ports at
  * - `state.kubeconfig_secret`, `state.server`, `state.eks_cluster`, ... - the connection, as given
  *
  * ## Composing with Other Entities
@@ -114,6 +125,8 @@ export class Cluster extends K8sEntity<ClusterDefinition, ClusterState> {
         this.state.version = v.gitVersion;
         this.state.platform = v.platform;
         this.state.default_namespace = this.defaultNamespace();
+        this.state.nodes = listNodes(this.cluster());
+        this.state.node_address = nodeAddress(this.state.nodes);
         const d = this.definition as any;
         const s = this.state as any;
         for (const f of CONNECTION_FIELDS) {

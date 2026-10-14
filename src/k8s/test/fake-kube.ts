@@ -17,6 +17,7 @@ interface Kind {
 
 const BUILTIN: Kind[] = [
     { group: "", version: "v1", kind: "Namespace", plural: "namespaces", namespaced: false },
+    { group: "", version: "v1", kind: "Node", plural: "nodes", namespaced: false },
     { group: "", version: "v1", kind: "ConfigMap", plural: "configmaps", namespaced: true },
     { group: "", version: "v1", kind: "Service", plural: "services", namespaced: true },
     { group: "apps", version: "v1", kind: "Deployment", plural: "deployments", namespaced: true },
@@ -33,6 +34,11 @@ export interface KubeState {
     nextUid: number;
     /** The field managers applies came from, in order. */
     managers: string[];
+}
+
+/** The keys of what the fake holds besides its nodes, sorted. */
+export function stored(s: KubeState): string[] {
+    return [...s.objects.keys()].filter((k) => !k.startsWith("nodes/")).sort();
 }
 
 function status(code: number, reason: string, message: string): Response {
@@ -95,7 +101,12 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
         merged.metadata.annotations = { ...(live?.metadata?.annotations ?? {}), ...(obj.metadata.annotations ?? {}) };
         merged.metadata.uid = live?.metadata?.uid ?? `uid-${++s.nextUid}`;
         merged.metadata.generation = (live?.metadata?.generation ?? 0) + 1;
-        if (kind.kind === "Service") merged.spec = { clusterIP: "10.96.0.10", ...(merged.spec ?? {}) };
+        if (kind.kind === "Service") {
+            merged.spec = { clusterIP: "10.96.0.10", ...(merged.spec ?? {}) };
+            if (merged.spec.type === "NodePort" || merged.spec.type === "LoadBalancer") {
+                merged.spec.ports = (merged.spec.ports ?? []).map((p: any, i: number) => ({ nodePort: 30080 + i, ...p }));
+            }
+        }
         delete merged.status;
         s.objects.set(key, merged);
         s.reads.set(key, 0);
@@ -112,9 +123,13 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
     }
     if (!live) return status(404, "NotFound", `${kind.plural} "${p.name}" not found`);
     if (req.method === "GET") {
-        const reads = (s.reads.get(key) ?? 0) + 1;
-        s.reads.set(key, reads);
-        progress(live, reads);
+        // Only what was applied here comes up; objects a test put in
+        // place stay as they are.
+        if (s.reads.has(key)) {
+            const reads = (s.reads.get(key) ?? 0) + 1;
+            s.reads.set(key, reads);
+            progress(live, reads);
+        }
         return json(200, live);
     }
     if (req.method === "DELETE") {
@@ -145,6 +160,13 @@ function list(s: KubeState, req: Request, group: string, version: string): Respo
 
 export const kube = fakeApi<KubeState>(KUBE, () => {
     const st: KubeState = { objects: new Map(), reads: new Map(), kinds: [...BUILTIN], nextUid: 0, managers: [] };
+    // Two nodes; the first is not ready.
+    for (const [name, ip, ready] of [["node-a", "10.0.0.1", "False"], ["node-b", "10.0.0.2", "True"]]) {
+        st.objects.set(`nodes//${name}`, {
+            apiVersion: "v1", kind: "Node", metadata: { name, uid: `uid-${name}` },
+            status: { addresses: [{ type: "InternalIP", address: ip }, { type: "Hostname", address: name }], conditions: [{ type: "Ready", status: ready }] },
+        });
+    }
     const state = () => st;
     return { state: st, routes: {
         "GET /version": () => json(200, { major: "1", minor: "31", gitVersion: "v1.31.0", platform: "linux/amd64" }),

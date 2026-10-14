@@ -1,7 +1,7 @@
 import { action, Args } from "monkec/base";
 import k8s from "k8s";
 import cli from "cli";
-import { K8sEntity, K8sConnection } from "./k8s-base.ts";
+import { K8sEntity, K8sConnection, listNodes, nodeAddress, defined } from "./k8s-base.ts";
 import { readiness } from "./readiness.ts";
 
 /** The annotation that says which Monk entity manages an object. */
@@ -36,6 +36,11 @@ export interface ResourceDefinition extends K8sConnection {
      * @description Field manager for server-side apply (default monk)
      */
     field_manager?: string;
+
+    /**
+     * @description Which node address node_address is: ExternalIP, InternalIP or Hostname (default ExternalIP if nodes have one, else InternalIP)
+     */
+    node_address_type?: string;
 }
 
 /**
@@ -86,10 +91,34 @@ export interface ResourceState {
      * @description Node port of the first Service's first port, for NodePort and LoadBalancer Services
      */
     node_port?: number;
+
+    /**
+     * @description Address of a ready node, where node_port is reachable
+     */
+    node_address?: string;
+
+    /**
+     * @description Host to reach the first Service at from outside the cluster when it can be: its load balancer, else a node (with node_port), else its cluster IP
+     */
+    host?: string;
+
+    /**
+     * @description Port that goes with host
+     */
+    port?: number;
+
+    /**
+     * @description host:port
+     */
+    endpoint?: string;
 }
 
 function describe(o: { kind: string; name: string; namespace?: string }): string {
     return `${o.kind} ${o.namespace ? o.namespace + "/" : ""}${o.name}`;
+}
+
+function ref(o: ManagedObject) {
+    return defined({ apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace });
 }
 
 function sameObject(a: ManagedObject, b: ManagedObject): boolean {
@@ -131,6 +160,9 @@ function applyOrder(kind: string): number {
  * - `state.cluster_ip` - cluster IP of the first Service
  * - `state.load_balancer` - external address of the first LoadBalancer Service
  * - `state.node_port` - node port of the first Service, for clusters without load balancers
+ * - `state.node_address` - address of a ready node, where the node port is reachable
+ * - `state.host`, `state.port`, `state.endpoint` - the best way in to the first Service:
+ *   its load balancer, else a node and the node port, else its cluster IP
  * - `state.objects` - what the entity manages, with UIDs
  *
  * ## Composing with Other Entities
@@ -159,7 +191,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
                 continue;
             }
             const removed = this.k8s(`deleting ${describe(o)}`, (c) =>
-                k8s.remove(c, { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace }));
+                k8s.remove(c, ref(o)));
             cli.output(removed ? `deleted ${describe(o)}` : `${describe(o)} was already deleted`);
         }
         this.state.objects = [];
@@ -169,17 +201,16 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
     override checkReadiness(): boolean {
         if (this.definition.wait === false) return true;
         // A check that fails keeps no state, so what is awaited is printed.
-        this.state.cluster_ip = undefined;
-        this.state.load_balancer = undefined;
-        this.state.node_port = undefined;
+        this.service = undefined;
         let waitingFor: string | undefined;
         for (const o of this.state.objects ?? []) {
             const live = this.k8s(`reading ${describe(o)}`, (c) =>
-                k8s.read(c, { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace }));
+                k8s.read(c, ref(o)));
             this.noteOutputs(live);
             const r = readiness(live);
             if (!r.ready && waitingFor === undefined) waitingFor = `${describe(o)}: ${r.reason}`;
         }
+        this.noteEndpoint();
         this.state.ready = waitingFor === undefined;
         if (waitingFor !== undefined) cli.output(`waiting for ${waitingFor}`);
         return this.state.ready;
@@ -190,7 +221,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
     status(_args?: Args): void {
         for (const o of this.state.objects ?? []) {
             const live = this.k8s(`reading ${describe(o)}`, (c) =>
-                k8s.read(c, { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace }));
+                k8s.read(c, ref(o)));
             const r = readiness(live);
             cli.output(`${describe(o)}: ${r.ready ? "ready" : r.reason}${o.adopted ? " (adopted)" : ""}`);
         }
@@ -203,7 +234,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
             if (args?.name && args.name !== o.name) continue;
             if (args?.kind && args.kind !== o.kind) continue;
             const live = this.k8s(`reading ${describe(o)}`, (c) =>
-                k8s.read(c, { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace }));
+                k8s.read(c, ref(o)));
             cli.output(JSON.stringify(live, null, 2));
         }
     }
@@ -218,7 +249,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
             // neither undoes nor fights it.
             this.k8s(`restarting ${describe(o)}`, (c) => k8s.apply(c, {
                 apiVersion: o.api_version, kind: o.kind,
-                metadata: { name: o.name, namespace: o.namespace },
+                metadata: defined({ name: o.name, namespace: o.namespace }),
                 spec: { template: { metadata: { annotations: { "kubectl.kubernetes.io/restartedAt": at } } } },
             }, { fieldManager: "monk-restart" }));
             cli.output(`restarting ${describe(o)}`);
@@ -238,9 +269,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
         const fieldManager = this.definition.field_manager ?? "monk";
         let defaultNs: string | undefined;
         const managed: ManagedObject[] = [];
-        this.state.cluster_ip = undefined;
-        this.state.load_balancer = undefined;
-        this.state.node_port = undefined;
+        this.service = undefined;
 
         for (const obj of ordered) {
             if (!obj.apiVersion || !obj.kind || !obj.metadata?.name) {
@@ -277,11 +306,12 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
                 continue;
             }
             this.k8s(`deleting ${describe(p)}`, (c) =>
-                k8s.remove(c, { apiVersion: p.api_version, kind: p.kind, name: p.name, namespace: p.namespace }));
+                k8s.remove(c, ref(p)));
             cli.output(`deleted ${describe(p)}: it left the manifest`);
         }
         this.state.objects = managed;
         this.state.ready = false;
+        this.noteEndpoint();
     }
 
     /**
@@ -290,7 +320,7 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
      */
     private claim(o: ManagedObject): boolean {
         const live = this.k8s(`reading ${describe(o)}`, (c) =>
-            k8s.read(c, { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace }));
+            k8s.read(c, ref(o)));
         if (live === null) return false;
         const owner = live.metadata?.annotations?.[OWNER];
         if (owner === this.path) return false; // made by this entity before its state was lost
@@ -312,12 +342,37 @@ export class Resource extends K8sEntity<ResourceDefinition, ResourceState> {
         throw new Error(`${describe(o)} was not established within a minute`);
     }
 
-    /** Keeps the addresses the first Service reports. */
+    /** The first Service, as last read. */
+    private service?: any;
+
     private noteOutputs(obj: any): void {
-        if (obj?.kind !== "Service" || this.state.cluster_ip !== undefined) return;
-        this.state.cluster_ip = obj.spec?.clusterIP;
-        this.state.node_port = obj.spec?.ports?.[0]?.nodePort;
-        const ingress = obj.status?.loadBalancer?.ingress?.[0];
-        if (ingress) this.state.load_balancer = ingress.hostname ?? ingress.ip;
+        if (obj?.kind === "Service" && this.service === undefined) this.service = obj;
+    }
+
+    /** Fills in the ways to reach the first Service. */
+    private noteEndpoint(): void {
+        const svc = this.service;
+        const port = svc?.spec?.ports?.[0];
+        const ingress = svc?.status?.loadBalancer?.ingress?.[0];
+        this.state.cluster_ip = svc?.spec?.clusterIP;
+        this.state.load_balancer = ingress ? (ingress.hostname ?? ingress.ip) : undefined;
+        this.state.node_port = port?.nodePort;
+        this.state.node_address = undefined;
+        if (port?.nodePort !== undefined) {
+            this.state.node_address = nodeAddress(listNodes(this.cluster()), this.definition.node_address_type);
+        }
+        this.state.host = undefined;
+        this.state.port = undefined;
+        if (this.state.load_balancer) {
+            this.state.host = this.state.load_balancer;
+            this.state.port = port?.port;
+        } else if (this.state.node_address && this.state.node_port) {
+            this.state.host = this.state.node_address;
+            this.state.port = this.state.node_port;
+        } else if (this.state.cluster_ip && this.state.cluster_ip !== "None") {
+            this.state.host = this.state.cluster_ip;
+            this.state.port = port?.port;
+        }
+        this.state.endpoint = this.state.host && this.state.port ? `${this.state.host}:${this.state.port}` : undefined;
     }
 }
