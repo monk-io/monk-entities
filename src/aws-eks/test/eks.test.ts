@@ -192,6 +192,45 @@ test("an add-on is installed, updated, and one that came with the cluster stays"
     expect(api.state.addons.has("shop/vpc-cni")).toBe(true);
 });
 
+test("an add-on's service accounts get their roles through Pod Identity", (t) => {
+    aws(t);
+    const api = t.use(eks);
+    activeCluster(t);
+    const role = (n: string) => `arn:aws:iam::123456789012:role/${n}`;
+    const def = (roles?: Record<string, string>) => ({ region: "us-east-1", cluster_name: "shop", name: "aws-ebs-csi-driver", service_account_roles: roles });
+    const ebs = t.entity(Addon, def({ "ebs-csi-controller-sa": role("ebs") }));
+    ebs.create();
+    const live = () => api.state.addons.get("shop/aws-ebs-csi-driver");
+    expect(live().podIdentity).toEqual({ "ebs-csi-controller-sa": role("ebs") });
+    ebs.waitReady();
+
+    ebs.redefine(def({ "ebs-csi-controller-sa": role("ebs-2") }));
+    ebs.update();
+    ebs.waitReady();
+    expect(live().podIdentity).toEqual({ "ebs-csi-controller-sa": role("ebs-2") });
+    expect(live().status).toBe("ACTIVE");
+
+    ebs.redefine(def());
+    ebs.update();
+    ebs.waitReady();
+    expect(live().podIdentity).toEqual({});
+});
+
+test("a change to an add-on that is still being created follows once it is done", (t) => {
+    aws(t);
+    const api = t.use(eks);
+    activeCluster(t);
+    const ebs = t.entity(Addon, { region: "us-east-1", cluster_name: "shop", name: "aws-ebs-csi-driver" });
+    ebs.create();
+    // Created without roles, and failing for it.
+    api.state.addons.get("shop/aws-ebs-csi-driver").status = "CREATE_FAILED";
+    ebs.redefine({ region: "us-east-1", cluster_name: "shop", name: "aws-ebs-csi-driver", service_account_roles: { "ebs-csi-controller-sa": "arn:aws:iam::123456789012:role/ebs" } });
+    ebs.update();
+    ebs.waitReady();
+    expect(api.state.addons.get("shop/aws-ebs-csi-driver").podIdentity).toEqual({ "ebs-csi-controller-sa": "arn:aws:iam::123456789012:role/ebs" });
+    expect(ebs.state.status).toBe("ACTIVE");
+});
+
 test("an access entry grants one policy, scoped to namespaces", (t) => {
     aws(t);
     const api = t.use(eks);

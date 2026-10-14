@@ -30,8 +30,22 @@ function progress(s: EKSState, key: string, obj: any, after = 2): void {
     if (obj.status === "CREATING" || obj.status === "UPDATING") obj.status = "ACTIVE";
 }
 
+/**
+ * Gives an add-on Pod Identity roles; EKS reports them only as association
+ * ARNs, kept by service account in podIdentity.
+ */
+function setPodIdentity(s: EKSState, a: any, list: { serviceAccount: string; roleArn: string }[]): void {
+    a.podIdentity = {};
+    a.podIdentityAssociations = [];
+    for (const p of list) {
+        a.podIdentity[p.serviceAccount] = p.roleArn;
+        a.podIdentityAssociations.push(`arn:aws:eks:us-east-1:123456789012:podidentityassociation/${a.clusterName}/a-${p.serviceAccount}`);
+    }
+}
+
 function token(s: EKSState, req: Request, make: () => Response): Response {
     const t = req.json().clientRequestToken;
+    if (t !== undefined && (t.length < 33 || t.length > 126)) return error(400, "InvalidParameterException", "The client request token parameter must be between 33 and 126 characters.");
     if (t && s.tokens.has(t)) return s.tokens.get(t);
     const res = make();
     if (t && res.status < 300) s.tokens.set(t, res);
@@ -270,6 +284,7 @@ export const eks = fakeApi<EKSState>(EKS, () => {
             if (!st.clusters.has(req.params.name)) return error(404, "ResourceNotFoundException", "no cluster");
             if (st.addons.has(key)) return error(409, "ResourceInUseException", "Addon already exists");
             const a = { addonName: b.addonName, clusterName: req.params.name, status: "CREATING", addonVersion: b.addonVersion ?? "v1.40.0-eksbuild.1", serviceAccountRoleArn: b.serviceAccountRoleArn, configurationValues: b.configurationValues };
+            setPodIdentity(st, a, b.podIdentityAssociations ?? []);
             st.addons.set(key, a);
             return json(200, { addon: a });
         }),
@@ -277,8 +292,10 @@ export const eks = fakeApi<EKSState>(EKS, () => {
         "POST /clusters/:name/addons/:addon/update": (req) => token(st, req, () => {
             const a = st.addons.get(`${req.params.name}/${req.params.addon}`);
             if (!a) return error(404, "ResourceNotFoundException", "no addon");
+            if (a.status === "CREATING" || a.status === "UPDATING") return error(409, "ResourceInUseException", `Addon ${req.params.addon} is ${a.status}`);
             const b = req.json();
             if (b.addonVersion) a.addonVersion = b.addonVersion;
+            if (b.podIdentityAssociations !== undefined) setPodIdentity(st, a, b.podIdentityAssociations);
             if (b.configurationValues !== undefined) a.configurationValues = b.configurationValues;
             if (b.serviceAccountRoleArn !== undefined) a.serviceAccountRoleArn = b.serviceAccountRoleArn;
             a.status = "UPDATING";

@@ -15,7 +15,7 @@ with monkec.
 |---|---|
 | `aws-eks/cluster` | The control plane. Ready when ACTIVE (10 to 15 minutes). Version upgrades and endpoint, network and logging changes are applied in place. Action: `status`. |
 | `aws-eks/node-group` | A managed node group. Size, labels and version change in place. Action: `status`. |
-| `aws-eks/addon` | An EKS add-on, e.g. `aws-ebs-csi-driver` for volumes. Add-ons that came with the cluster are left in place on delete. |
+| `aws-eks/addon` | An EKS add-on, e.g. `aws-ebs-csi-driver` for volumes. `service_account_roles` gives its service accounts IAM roles through EKS Pod Identity (with the `eks-pod-identity-agent` add-on); pods on managed nodes can not reach the node role. Add-ons that came with the cluster are left in place on delete. |
 | `aws-eks/access-entry` | Lets an IAM user or role in with an EKS access policy, cluster-wide or for some namespaces. |
 
 ## One stack, from VPC to app

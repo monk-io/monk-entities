@@ -1,6 +1,9 @@
 import cli from "cli";
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./iam-base.ts";
 
+/** The tag that says which Monk entity made a role. */
+const OWNER_TAG = "monk.io/owner";
+
 /**
  * Definition interface for AWS IAM Role entity.
  * Configures role properties including trust policy and attached managed policies.
@@ -109,6 +112,18 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         return this.definition.role_name;
     }
 
+    /** The entity path in the role's owner tag, if it has one. */
+    private roleOwner(): string | undefined {
+        const res = this.makeAWSRequest("POST", "ListRoleTags", { RoleName: this.definition.role_name });
+        const body: string = res?.rawBody ?? "";
+        const tag = /<member>\s*<Key>([^<]*)<\/Key>\s*<Value>([^<]*)<\/Value>\s*<\/member>/g;
+        let m: RegExpExecArray | null;
+        while ((m = tag.exec(body)) !== null) {
+            if (m[1] === OWNER_TAG) return m[2];
+        }
+        return undefined;
+    }
+
     private customJSONStringify(obj: any): string {
         // Custom JSON stringifier to handle Goja runtime indexed arrays (! notation) and convert to proper JSON
         if (obj === null) return "null";
@@ -165,11 +180,12 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
         const existing = this.checkRoleExists(this.definition.role_name);
         
         if (existing?.Role) {
+            // A role this entity made before, on an earlier run, is still its own.
             this.state = {
                 role_arn: existing.Role.Arn,
                 role_id: existing.Role.RoleId,
                 create_date: existing.Role.CreateDate,
-                existing: true
+                existing: this.roleOwner() !== this.path
             };
             
             // Manage policy attachments for existing role
@@ -199,14 +215,12 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
             params.MaxSessionDuration = this.definition.max_session_duration;
         }
 
-        // Add tags if specified
-        if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
-            let tagIndex = 1;
-            for (const [key, value] of Object.entries(this.definition.tags)) {
-                params[`Tags.member.${tagIndex}.Key`] = key;
-                params[`Tags.member.${tagIndex}.Value`] = value;
-                tagIndex++;
-            }
+        // Tags, with the one that says this entity made the role.
+        let tagIndex = 1;
+        for (const [key, value] of Object.entries({ ...(this.definition.tags ?? {}), [OWNER_TAG]: this.path })) {
+            params[`Tags.member.${tagIndex}.Key`] = key;
+            params[`Tags.member.${tagIndex}.Value`] = value;
+            tagIndex++;
         }
 
         try {
