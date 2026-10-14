@@ -7,6 +7,7 @@ import { e2e, expect } from "monk/e2e";
 import { Deployment } from "../deployment.ts";
 import { Job } from "../job.ts";
 import { ConfigMap } from "../config-map.ts";
+import { Lookup } from "../lookup.ts";
 
 e2e("an app made of typed entities serves a Monk runnable", (c) => {
     c.secret("k8s-e2e-kubeconfig", c.env("K8S_E2E_KUBECONFIG", { secret: true }));
@@ -28,6 +29,11 @@ e2e("an app made of typed entities serves a Monk runnable", (c) => {
     expect(web.state.ready_replicas).toBe(2);
     expect(web.state.endpoint).toBe(`${web.state.node_address}:${web.state.node_port}`);
     expect((web.state.objects ?? []).map((o) => o.kind)).toEqual(["Deployment", "Service", "ConfigMap", "PersistentVolumeClaim"]);
+
+    // The label's key has slashes; it reached the cluster whole.
+    const byLabel = c.entity(Lookup, "k8s-typed/by-label").state as any;
+    expect(byLabel.found).toBe(true);
+    expect(byLabel.name).toBe("web");
 
     c.waitLogs("k8s-typed/probe", "typed-ok", { timeout: 300 });
     c.do("k8s-typed/web", "status");
