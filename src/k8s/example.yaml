@@ -1,0 +1,73 @@
+# A cluster and an app on it. The kubeconfig is a Monk secret:
+#
+#   monk secrets add -g k8s-kubeconfig="$(cat ~/.kube/config)"
+#
+# EKS and GKE clusters need no kubeconfig: set eks_cluster/eks_region or
+# gke_cluster/gke_location instead, and Monk's own cloud credentials are used.
+namespace: k8s-example
+
+cluster:
+  defines: k8s/cluster
+  kubeconfig_secret: k8s-kubeconfig
+  namespace: shop
+  permitted-secrets:
+    k8s-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+
+app:
+  defines: k8s/resource
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("cluster") entity-state get-member("default_namespace")
+  manifest: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: shop
+    ---
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: web
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: {app: web}
+      template:
+        metadata:
+          labels: {app: web}
+        spec:
+          containers:
+            - name: web
+              image: nginx:1.27-alpine
+              ports: [{containerPort: 80}]
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: web
+    spec:
+      type: LoadBalancer
+      selector: {app: web}
+      ports: [{port: 80}]
+  permitted-secrets:
+    k8s-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-example/cluster
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-example/cluster
+      timeout: 120
+
+stack:
+  defines: group
+  members:
+    - k8s-example/cluster
+    - k8s-example/app

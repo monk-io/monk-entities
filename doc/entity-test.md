@@ -42,6 +42,9 @@ test("create places an order", (t) => {
   Each runs in a fresh runtime, as on a cluster; state is kept between steps,
   and a step that throws keeps the state from before it.
 - `o.waitReady(attempts)` checks readiness until the instance is ready.
+- `o.redefine({ ...o.definition, replicas: 3 })` changes the definition, as
+  editing a stack before `monk update` does; state is kept, so a following
+  `o.update()` sees the change.
 - A step that throws, or that makes a request nothing answers, throws from
   the test. Assert on failures with `expect(() => o.create()).toThrow(/…/)`.
 - `o.output` is what the last step printed; `t.http.requests()` lists the
@@ -179,7 +182,7 @@ fails is run again, as the next reconcile would. Each case ends as one of:
 | differs | the test's own assertions failed |
 | crash | the step failed with a programming error (e.g. a `TypeError` from reading a failed response) |
 | stuck | the step's re-run failed too |
-| duplicate | the API was changed more often than on the normal run (a create repeated after a lost response) |
+| duplicate | the API was changed more often than on the normal run (a create repeated after a lost response); PUT, DELETE, server-side apply and JSON merge patch requests don't count, since sending them again changes nothing |
 | runaway | a step made too many requests, or slept too long |
 | leak | a secret appeared in output or an error |
 

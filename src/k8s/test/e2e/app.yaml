@@ -1,0 +1,99 @@
+# A Kubernetes cluster, an app on it (namespace, Deployment, NodePort
+# Service), and a Monk runnable that reaches the app through the node port.
+# Used by k8s.e2e.ts; {{ id }} and {{ node }} are filled in when it is loaded.
+namespace: k8s-e2e
+
+cluster:
+  defines: k8s/cluster
+  kubeconfig_secret: k8s-e2e-kubeconfig
+  namespace: k8s-e2e-{{ id }}
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+
+app:
+  defines: k8s/resource
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: <- connection-target("cluster") entity-state get-member("default_namespace")
+  manifest: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: k8s-e2e-{{ id }}
+    ---
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: web
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: {app: web}
+      template:
+        metadata:
+          labels: {app: web}
+        spec:
+          containers:
+            - name: web
+              image: nginx:1.27-alpine
+              ports: [{containerPort: 80}]
+              readinessProbe:
+                httpGet: {path: /, port: 80}
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: web
+    spec:
+      type: NodePort
+      selector: {app: web}
+      ports: [{port: 80, targetPort: 80}]
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  services:
+    data:
+      protocol: custom
+  connections:
+    cluster:
+      runnable: k8s-e2e/cluster
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-e2e/cluster
+      timeout: 120
+
+probe:
+  defines: runnable
+  connections:
+    app:
+      runnable: k8s-e2e/app
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-e2e/app
+      timeout: 600
+  variables:
+    node_port:
+      env: NODE_PORT
+      value: <- connection-target("app") entity-state get-member("node_port")
+      type: int
+  containers:
+    probe:
+      image: curlimages/curl:8.10.1
+      restart: always
+      bash: |
+        while true; do
+          if curl -sf "http://{{ node }}:$NODE_PORT/" | grep -q "Welcome to nginx"; then echo k8s-ok; else echo k8s-unreachable; fi
+          sleep 5
+        done
+
+stack:
+  defines: group
+  members:
+    - k8s-e2e/cluster
+    - k8s-e2e/app
+    - k8s-e2e/probe
