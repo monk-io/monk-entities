@@ -22,7 +22,7 @@ sg:
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   group_name: demo-sg
-  description: Demo security group
+  group_description: Demo security group
   ingress:
     - ip_protocol: tcp
       from_port: 80

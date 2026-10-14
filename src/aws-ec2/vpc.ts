@@ -1,4 +1,4 @@
-import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./ec2-base.ts";
+import { AWSEC2Entity, AWSEC2Definition, AWSEC2State, xmlValue } from "./ec2-base.ts";
 
 /**
  * Definition interface for AWS EC2 VPC entity.
@@ -77,16 +77,7 @@ export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 			throw new Error("cidr_block is required to create a VPC");
 		}
 
-		const resp = this.makeEC2Request('CreateVpc', {
-			CidrBlock: this.definition.cidr_block
-		});
-		const body = resp.body || '';
-		// EC2 Query API uses lowercase tag names (vpcId). Support both just in case.
-		const idMatch = /<vpcId>(vpc-[^<]+)<\/vpcId>/i.exec(body);
-		if (!idMatch) {
-			throw new Error("Failed to parse VpcId from CreateVpc response");
-		}
-		const vpcId = idMatch[1];
+		const vpcId = this.findOwnId('DescribeVpcs', 'vpcId') || this.make();
 
 		// Apply attributes
 		if (this.definition.enable_dns_support !== undefined) {
@@ -102,30 +93,36 @@ export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 			});
 		}
 
-		// Tags
-		if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
-			const tagParams: Record<string, any> = {
-				'ResourceId.1': vpcId,
-			};
-			let idx = 1;
-			for (const [k, v] of Object.entries(this.definition.tags)) {
-				tagParams[`Tag.${idx}.Key`] = k;
-				tagParams[`Tag.${idx}.Value`] = v;
-				idx++;
-			}
-			this.makeEC2Request('CreateTags', tagParams);
-		}
-
 		this.state.existing = false;
 		this.state.vpc_id = vpcId;
 		this.state.cidr_block = this.definition.cidr_block;
 		this.state.state = 'available';
 	}
 
+	override update(): void {
+		const vpcId = this.getVpcId();
+		if (!vpcId) throw new Error("VPC ID is missing");
+		if (this.state.existing) return; // an adopted VPC is not changed
+		if (this.definition.enable_dns_support !== undefined) {
+			this.makeEC2Request('ModifyVpcAttribute', {
+				VpcId: vpcId,
+				'EnableDnsSupport.Value': String(this.definition.enable_dns_support)
+			});
+		}
+		if (this.definition.enable_dns_hostnames !== undefined) {
+			this.makeEC2Request('ModifyVpcAttribute', {
+				VpcId: vpcId,
+				'EnableDnsHostnames.Value': String(this.definition.enable_dns_hostnames)
+			});
+		}
+		this.setTags(vpcId, this.definition.tags);
+	}
+
 	override delete(): void {
 		if (!this.state.vpc_id) return;
 		if (this.state.existing) return; // do not delete adopted resources
-		this.makeEC2Request('DeleteVpc', { VpcId: this.state.vpc_id });
+		const vpcId = this.state.vpc_id;
+		this.deleteIfExists('InvalidVpcID.NotFound', () => this.makeEC2Request('DeleteVpc', { VpcId: vpcId }));
 		this.state.vpc_id = undefined;
 		this.state.state = undefined;
 	}
@@ -156,12 +153,24 @@ export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
 		return true;
 	}
 
+	/** Creates the VPC, tagged with its owner so a lost response can be recovered from. */
+	private make(): string {
+		const resp = this.makeEC2Request('CreateVpc', {
+			CidrBlock: this.definition.cidr_block,
+			...this.tagSpecification('vpc', this.ownTags(this.definition.tags)),
+		});
+		const id = xmlValue(resp.body || '', 'vpcId');
+		if (!id) throw new Error("Failed to parse VpcId from CreateVpc response");
+		return id;
+	}
+
 	private describeVpcById(vpcId: string): { vpcId: string; state: string; cidr: string } | null {
 		const resp = this.makeEC2Request('DescribeVpcs', { 'VpcId.1': vpcId });
 		const body = resp.body || '';
 		const idMatch = /<vpcId>(vpc-[^<]+)<\/vpcId>/i.exec(body);
 		if (!idMatch) return null;
-		const stateMatch = /<State>(.*?)<\/State>/.exec(body);
+		// The VPC's own state comes before those of its CIDR associations.
+		const stateMatch = /<state>([^<]*)<\/state>/.exec(body);
 		const cidrMatch = /<CidrBlock>(.*?)<\/CidrBlock>/i.exec(body);
 		return { vpcId: idMatch[1], state: stateMatch ? stateMatch[1] : 'available', cidr: cidrMatch ? cidrMatch[1] : '' };
 	}

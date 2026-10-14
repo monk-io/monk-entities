@@ -1,4 +1,4 @@
-import { AWSEC2Entity, AWSEC2Definition, AWSEC2State } from "./ec2-base.ts";
+import { AWSEC2Entity, AWSEC2Definition, AWSEC2State, xmlValue } from "./ec2-base.ts";
 
 export interface SubnetDefinition extends AWSEC2Definition {
 	vpc_id: string;
@@ -12,6 +12,8 @@ export interface SubnetState extends AWSEC2State {
 	subnet_id?: string;
 	state?: string;
 	cidr_block?: string;
+	/** @description Availability zone the subnet is in */
+	availability_zone?: string;
 }
 
 /**
@@ -48,13 +50,7 @@ export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 			createParams.AvailabilityZone = this.definition.availability_zone;
 		}
 
-		const resp = this.makeEC2Request('CreateSubnet', createParams);
-		const body = resp.body || '';
-		const idMatch = /<subnetId>(subnet-[^<]+)<\/subnetId>/i.exec(body);
-		if (!idMatch) {
-			throw new Error("Failed to parse SubnetId from CreateSubnet response");
-		}
-		const subnetId = idMatch[1];
+		const subnetId = this.findOwnId('DescribeSubnets', 'subnetId') || this.make(createParams);
 
 		if (this.definition.map_public_ip_on_launch !== undefined) {
 			this.makeEC2Request('ModifySubnetAttribute', {
@@ -63,27 +59,30 @@ export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 			});
 		}
 
-		if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
-			let idx = 1;
-			const tagParams: Record<string, any> = { 'ResourceId.1': subnetId };
-			for (const [k, v] of Object.entries(this.definition.tags)) {
-				tagParams[`Tag.${idx}.Key`] = k;
-				tagParams[`Tag.${idx}.Value`] = v;
-				idx++;
-			}
-			this.makeEC2Request('CreateTags', tagParams);
-		}
-
 		this.state.existing = false;
 		this.state.subnet_id = subnetId;
 		this.state.cidr_block = this.definition.cidr_block;
 		this.state.state = 'available';
 	}
 
+	override update(): void {
+		const subnetId = this.state.subnet_id;
+		if (!subnetId) throw new Error("Subnet ID is missing");
+		if (this.state.existing) return;
+		if (this.definition.map_public_ip_on_launch !== undefined) {
+			this.makeEC2Request('ModifySubnetAttribute', {
+				SubnetId: subnetId,
+				'MapPublicIpOnLaunch.Value': String(this.definition.map_public_ip_on_launch)
+			});
+		}
+		this.setTags(subnetId, this.definition.tags);
+	}
+
 	override delete(): void {
 		if (!this.state.subnet_id) return;
 		if (this.state.existing) return;
-		this.makeEC2Request('DeleteSubnet', { SubnetId: this.state.subnet_id });
+		const subnetId = this.state.subnet_id;
+		this.deleteIfExists('InvalidSubnetID.NotFound', () => this.makeEC2Request('DeleteSubnet', { SubnetId: subnetId }));
 		this.state.subnet_id = undefined;
 	}
 
@@ -93,6 +92,7 @@ export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 		if (!info) return false;
 		this.state.state = info.state;
 		this.state.cidr_block = info.cidr;
+		this.state.availability_zone = info.az;
 		return info.state === 'available';
 	}
 
@@ -111,14 +111,23 @@ export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
 		return true;
 	}
 
-	private describeSubnetById(subnetId: string): { subnetId: string; state: string; cidr: string } | null {
+	/** Creates the subnet, tagged with its owner so a lost response can be recovered from. */
+	private make(params: Record<string, any>): string {
+		const resp = this.makeEC2Request('CreateSubnet', { ...params, ...this.tagSpecification('subnet', this.ownTags(this.definition.tags)) });
+		const id = xmlValue(resp.body || '', 'subnetId');
+		if (!id) throw new Error("Failed to parse SubnetId from CreateSubnet response");
+		return id;
+	}
+
+	private describeSubnetById(subnetId: string): { subnetId: string; state: string; cidr: string; az: string } | null {
 		const resp = this.makeEC2Request('DescribeSubnets', { 'SubnetId.1': subnetId });
 		const body = resp.body || '';
 		const idMatch = /<subnetId>(subnet-[^<]+)<\/subnetId>/i.exec(body);
 		if (!idMatch) return null;
 		const stateMatch = /<state>(.*?)<\/state>/i.exec(body);
 		const cidrMatch = /<cidrBlock>(.*?)<\/cidrBlock>/i.exec(body);
-		return { subnetId: idMatch[1], state: stateMatch ? stateMatch[1] : 'available', cidr: cidrMatch ? cidrMatch[1] : '' };
+		const azMatch = /<availabilityZone>([^<]*)<\/availabilityZone>/.exec(body);
+		return { subnetId: idMatch[1], state: stateMatch ? stateMatch[1] : 'available', cidr: cidrMatch ? cidrMatch[1] : '', az: azMatch ? azMatch[1] : '' };
 	}
 }
 

@@ -1,0 +1,4 @@
+REPO aws-eks
+DESCRIPTION Amazon EKS clusters, node groups, add-ons and access entries, made with Monk's AWS credentials and ready for the k8s entities.
+HOSTING managed
+TAGS aws,eks,kubernetes,k8s

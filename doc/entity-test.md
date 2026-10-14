@@ -182,7 +182,7 @@ fails is run again, as the next reconcile would. Each case ends as one of:
 | differs | the test's own assertions failed |
 | crash | the step failed with a programming error (e.g. a `TypeError` from reading a failed response) |
 | stuck | the step's re-run failed too |
-| duplicate | the API was changed more often than on the normal run (a create repeated after a lost response); PUT, DELETE, server-side apply and JSON merge patch requests don't count, since sending them again changes nothing |
+| duplicate | the API was changed more often than on the normal run (a create repeated after a lost response). What sending again changes nothing doesn't count: PUT, DELETE, server-side apply and JSON merge patch requests; requests resent with the same idempotency token (an `Idempotency-Key` header, AWS's `clientRequestToken` or `ClientToken`); and, for APIs that send every call to one path (AWS Query and JSON APIs), calls that read or set (`Describe*`, `Get*`, `List*`, `Modify*`, `Put*`, `CreateTags`, ...), which are told apart by `Action` or `X-Amz-Target` |
 | runaway | a step made too many requests, or slept too long |
 | leak | a secret appeared in output or an error |
 
