@@ -81,6 +81,17 @@ export const CONNECTION_FIELDS = [
     "eks_cluster", "eks_region", "gke_cluster", "gke_location", "gke_project", "namespace",
 ] as const;
 
+/**
+ * o without its undefined fields. The runtime passes an undefined field to
+ * the k8s module as the string "undefined", so fields that may be unset
+ * go through this.
+ */
+export function defined<T extends object>(o: T): T {
+    const out: any = {};
+    for (const [k, v] of Object.entries(o)) if (v !== undefined) out[k] = v;
+    return out;
+}
+
 /** Errors worth trying again: Kubernetes requests here are all idempotent. */
 export function retryable(err: unknown): boolean {
     return isRetryable(err, "PUT");
@@ -110,7 +121,7 @@ export abstract class K8sEntity<D extends K8sConnection, S extends object> exten
         }
         if (d.gke_cluster) {
             if (!d.gke_location) throw new Error("gke_cluster needs gke_location");
-            c.gke = { name: d.gke_cluster, location: d.gke_location, project: d.gke_project };
+            c.gke = defined({ name: d.gke_cluster, location: d.gke_location, project: d.gke_project });
         }
         if (!c.kubeconfig && !c.server && !c.eks && !c.gke) {
             throw new Error("no cluster to talk to: set kubeconfig_secret, server, eks_cluster or gke_cluster");
@@ -129,4 +140,41 @@ export abstract class K8sEntity<D extends K8sConnection, S extends object> exten
     protected defaultNamespace(): string {
         return this.k8s("reading the default namespace", (c) => k8s.namespace(c));
     }
+}
+
+/** A node and the addresses it reports. */
+export interface NodeInfo {
+    name: string;
+    ready: boolean;
+    internal_ip?: string;
+    external_ip?: string;
+    hostname?: string;
+}
+
+/** The cluster's nodes; empty when the credentials may not list them. */
+export function listNodes(c: Cluster): NodeInfo[] {
+    let nodes: any[];
+    try {
+        nodes = retry(() => k8s.list(c, { apiVersion: "v1", kind: "Node" }), { when: retryable, what: "listing nodes" });
+    } catch (e) {
+        if ((e as any)?.name === "HttpError" && ((e as any).status === 403 || (e as any).status === 401)) return [];
+        throw e;
+    }
+    return nodes.map((n) => {
+        const addr = (type: string) => (n.status?.addresses ?? []).find((a: any) => a.type === type)?.address;
+        const ready = (n.status?.conditions ?? []).some((c: any) => c.type === "Ready" && c.status === "True");
+        return { name: n.metadata.name, ready, internal_ip: addr("InternalIP"), external_ip: addr("ExternalIP"), hostname: addr("Hostname") };
+    });
+}
+
+/**
+ * The address to reach a node port at: the first ready node's address of
+ * type (ExternalIP, InternalIP or Hostname), or by default its ExternalIP
+ * if any node has one, else its InternalIP.
+ */
+export function nodeAddress(nodes: NodeInfo[], type?: string): string | undefined {
+    const ready = nodes.filter((n) => n.ready);
+    const pick = (t: string) => ready.map((n) => (t === "ExternalIP" ? n.external_ip : t === "InternalIP" ? n.internal_ip : n.hostname)).find((a) => a);
+    if (type) return pick(type);
+    return pick("ExternalIP") ?? pick("InternalIP");
 }

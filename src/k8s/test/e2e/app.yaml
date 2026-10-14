@@ -1,6 +1,8 @@
 # A Kubernetes cluster, an app on it (namespace, Deployment, NodePort
-# Service), and a Monk runnable that reaches the app through the node port.
-# Used by k8s.e2e.ts; {{ id }} and {{ node }} are filled in when it is loaded.
+# Service), a lookup of something Monk didn't make, and a Monk runnable that
+# reaches the app at the endpoint k8s/resource found for it (a node's
+# address and the node port). Used by k8s.e2e.ts; {{ id }} is filled in when
+# it is loaded.
 namespace: k8s-e2e
 
 cluster:
@@ -77,23 +79,48 @@ probe:
         - k8s-e2e/app
       timeout: 600
   variables:
-    node_port:
-      env: NODE_PORT
-      value: <- connection-target("app") entity-state get-member("node_port")
-      type: int
+    endpoint:
+      env: ENDPOINT
+      value: <- connection-target("app") entity-state get-member("endpoint")
+      type: string
   containers:
     probe:
       image: curlimages/curl:8.10.1
       restart: always
       bash: |
         while true; do
-          if curl -sf "http://{{ node }}:$NODE_PORT/" | grep -q "Welcome to nginx"; then echo k8s-ok; else echo k8s-unreachable; fi
+          if curl -sf "http://$ENDPOINT/" | grep -q "Welcome to nginx"; then echo k8s-ok; else echo k8s-unreachable; fi
           sleep 5
         done
+
+api:
+  defines: k8s/lookup
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  api_version: v1
+  kind: Service
+  name: kubernetes
+  namespace: default
+  fields:
+    - name: ip
+      path: spec.clusterIP
+    - name: port
+      path: spec.ports.0.port
+  permitted-secrets:
+    k8s-e2e-kubeconfig: true
+  connections:
+    cluster:
+      runnable: k8s-e2e/cluster
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - k8s-e2e/cluster
+      timeout: 120
 
 stack:
   defines: group
   members:
     - k8s-e2e/cluster
     - k8s-e2e/app
+    - k8s-e2e/api
     - k8s-e2e/probe

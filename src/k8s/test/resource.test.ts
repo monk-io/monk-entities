@@ -4,7 +4,8 @@
 import { test, expect, Test } from "monk/test";
 import { Resource, OWNER } from "../resource.ts";
 import { Cluster } from "../cluster.ts";
-import { kube, KUBE } from "./fake-kube.ts";
+import { Lookup } from "../lookup.ts";
+import { kube, KUBE, stored } from "./fake-kube.ts";
 
 const APP = `
 apiVersion: apps/v1
@@ -60,7 +61,7 @@ test("a manifest is applied, becomes ready, and is deleted", (t) => {
     expect(r.state.load_balancer).toBe("203.0.113.7");
 
     r.delete();
-    expect(api.state.objects.size).toBe(0);
+    expect(stored(api.state).length).toBe(0);
     if (!t.exploring) {
         expect(t.http.requests().filter((q) => q.startsWith("DELETE"))).toEqual([
             `DELETE ${KUBE}/api/v1/namespaces/shop/services/web -> 200`,
@@ -83,11 +84,11 @@ test("objects that leave the manifest are deleted on update", (t) => {
     const two = "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\ndata: {k: '1'}\n---\napiVersion: v1\nkind: ConfigMap\nmetadata: {name: b}\n";
     const r = resource(t, two);
     r.create();
-    expect([...api.state.objects.keys()].sort()).toEqual(["configmaps/default/a", "configmaps/default/b"]);
+    expect(stored(api.state)).toEqual(["configmaps/default/a", "configmaps/default/b"]);
 
     r.redefine({ ...r.definition, manifest: "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\ndata: {k: '2'}\n" });
     r.update();
-    expect([...api.state.objects.keys()]).toEqual(["configmaps/default/a"]);
+    expect(stored(api.state)).toEqual(["configmaps/default/a"]);
     expect(api.state.objects.get("configmaps/default/a").data.k).toBe("2");
     expect((r.state.objects ?? []).length).toBe(1);
     expect(r.output.join("\n")).toContain("deleted ConfigMap default/b: it left the manifest");
@@ -121,7 +122,7 @@ test("an object another entity manages is refused, even with adopt", (t) => {
     resource(t, manifest).create();
     const other = resource(t, manifest, { adopt: true });
     expect(() => other.create()).toThrow(/ConfigMap default\/shared is managed by .*resource.*; one object cannot have two owners/);
-    expect(api.state.objects.size).toBe(1);
+    expect(stored(api.state).length).toBe(1);
 }, { explore: false });
 
 test("a CRD and its custom resources apply together", (t) => {
@@ -146,7 +147,7 @@ spec:
     expect(api.state.objects.get("widgets/default/w").size).toBe(3);
     r.waitReady();
     r.delete();
-    expect(api.state.objects.size).toBe(0);
+    expect(stored(api.state).length).toBe(0);
 });
 
 test("a kubeconfig in a secret is used, with its context's namespace", (t) => {
@@ -211,6 +212,79 @@ test("a cluster reports its version and keeps its connection for wiring", (t) =>
     expect(c.state.default_namespace).toBe("apps");
     expect(c.state.server).toBe(KUBE);
     expect(c.state.token_secret).toBe("kube-token");
+    expect((c.state.nodes ?? []).map((n) => `${n.name} ${n.internal_ip} ${n.ready}`)).toEqual(["node-a 10.0.0.1 false", "node-b 10.0.0.2 true"]);
+    expect(c.state.node_address).toBe("10.0.0.2");
     c.waitReady();
     c.do("namespaces");
 });
+
+test("a NodePort Service is reached at a ready node", (t) => {
+    t.use(kube);
+    const r = resource(t, "apiVersion: v1\nkind: Service\nmetadata: {name: web}\nspec: {type: NodePort, selector: {app: web}, ports: [{port: 80}]}\n");
+    r.create();
+    expect(r.state.node_port).toBe(30080);
+    expect(r.state.node_address).toBe("10.0.0.2");
+    expect(r.state.endpoint).toBe("10.0.0.2:30080");
+});
+
+test("a LoadBalancer Service is reached at its load balancer once it has one", (t) => {
+    t.use(kube);
+    const r = resource(t, APP);
+    r.create();
+    expect(r.state.endpoint).toBe("10.0.0.2:30080");
+    r.waitReady();
+    expect(r.state.endpoint).toBe("203.0.113.7:80");
+});
+
+test("node addresses are left out when the credentials may not list nodes", (t) => {
+    const api = t.use(kube);
+    api.fault("GET /api/v1/nodes", 403, { body: { kind: "Status", reason: "Forbidden", message: "nodes is forbidden" } });
+    const r = resource(t, "apiVersion: v1\nkind: Service\nmetadata: {name: web}\nspec: {type: NodePort, ports: [{port: 80}]}\n");
+    r.create();
+    expect(r.state.node_port).toBe(30080);
+    expect(r.state.node_address ?? undefined).toBe(undefined);
+    expect(r.state.endpoint).toBe("10.96.0.10:80");
+}, { explore: false });
+
+test("a lookup reads what Monk does not manage, by name or labels", (t) => {
+    const api = t.use(kube);
+    api.state.objects.set("services/ingress/controller", {
+        apiVersion: "v1", kind: "Service",
+        metadata: { name: "controller", namespace: "ingress", uid: "uid-ctl", labels: { app: "ingress" } },
+        spec: { type: "LoadBalancer", clusterIP: "10.96.1.1", ports: [{ port: 443 }] },
+        status: { loadBalancer: { ingress: [{ hostname: "lb.example.com" }] } },
+    });
+    const byName = t.entity(Lookup, {
+        server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "Service", name: "controller", namespace: "ingress",
+        fields: [{ name: "address", path: "status.loadBalancer.ingress.0.hostname" }, { name: "port", path: "spec.ports.0.port" }, { name: "missing", path: "spec.nope" }],
+    });
+    byName.secret("kube-token", "test-token");
+    byName.create();
+    byName.waitReady();
+    expect(byName.state.found).toBe(true);
+    const st = byName.state as any;
+    expect([st.address, st.port, st.missing]).toEqual(["lb.example.com", "443", undefined]);
+
+    const byLabels = t.entity(Lookup, {
+        server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "Service", label_selector: "app=ingress", all_namespaces: true,
+        fields: [{ name: "ip", path: "spec.clusterIP" }],
+    });
+    byLabels.secret("kube-token", "test-token");
+    byLabels.create();
+    expect(byLabels.state.name).toBe("controller");
+    expect((byLabels.state as any).ip).toBe("10.96.1.1");
+
+    byName.delete();
+    expect(api.state.objects.has("services/ingress/controller")).toBe(true);
+});
+
+test("a lookup is not ready until its object exists", (t) => {
+    const api = t.use(kube);
+    const l = t.entity(Lookup, { server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "ConfigMap", name: "later" });
+    l.secret("kube-token", "test-token");
+    l.create();
+    expect(l.state.found).toBe(false);
+    expect(() => l.checkReadiness()).toThrow(/not ready/);
+    api.state.objects.set("configmaps/default/later", { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "later", namespace: "default" } });
+    l.waitReady();
+}, { explore: false });

@@ -14,6 +14,7 @@ module; it is not built with monkec.
 |---|---|
 | `k8s/cluster` | Checks that Monk can reach a cluster, reports its version, and keeps how to reach it for other entities to wire to. Actions: `namespaces`, `kinds`. |
 | `k8s/resource` | Applies a YAML manifest (any kinds, CRDs and custom resources included) with server-side apply and keeps the objects as it says. Actions: `status`, `get`, `restart`. |
+| `k8s/lookup` | Reads an object Monk doesn't manage, by name or label selector, and copies the fields you name into state. Never writes. Action: `get`. |
 
 ## Reaching a cluster
 
@@ -50,8 +51,38 @@ namespace, else `default`.
   when complete, LoadBalancer Services when they have an address, CRDs when
   established, anything else by its `Ready` or `Available` condition.
   `wait: false` skips it.
-- State for wiring: `cluster_ip`, `load_balancer` and `node_port` of the
-  first Service, and `objects` with their UIDs.
+- State for wiring, from the first Service: `endpoint` (`host:port`) with
+  `host` and `port`, the best way in: its load balancer, else a ready
+  node's address and the node port, else its cluster IP. Also
+  `cluster_ip`, `load_balancer`, `node_port`, `node_address` (a ready
+  node's ExternalIP, else InternalIP; `node_address_type` picks), and
+  `objects` with their UIDs. Node addresses need permission to list
+  nodes; without it they are left out.
+
+## Querying the cluster
+
+`k8s/cluster` lists the nodes into `state.nodes` (name, ready, internal_ip,
+external_ip) and `state.node_address`. For anything else, `k8s/lookup`:
+
+```yaml
+ingress:
+  defines: k8s/lookup
+  kubeconfig_secret: k8s-kubeconfig
+  api_version: v1
+  kind: Service
+  label_selector: app.kubernetes.io/name=ingress-nginx
+  all_namespaces: true
+  fields:
+    - name: address
+      path: status.loadBalancer.ingress.0.ip
+  permitted-secrets:
+    k8s-kubeconfig: true
+```
+
+Each field lands in state under its name, as a string
+(`entity-state get-member("address")`); objects and lists as JSON. The
+lookup is ready once the object exists (`wait_ready: true` waits for it to
+be ready by its kind's rules), and reads it again on every readiness check.
 
 See `example.yaml`.
 
