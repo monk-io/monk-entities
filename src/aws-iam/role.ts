@@ -1,3 +1,4 @@
+import cli from "cli";
 import { AWSIAMEntity, AWSIAMDefinition, AWSIAMState } from "./iam-base.ts";
 
 /**
@@ -263,6 +264,11 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
 
     override delete(): void {
         if (!this.state.role_arn) {
+            return;
+        }
+        // A role that existed before this entity is someone else's.
+        if (this.state.existing) {
+            cli.output(`IAM Role ${this.definition.role_name} existed before; leaving it in place`);
             return;
         }
 

@@ -3,10 +3,18 @@
 This module provides basic EC2 networking entities for composing AWS stacks:
 
 - VPC (create/adopt, attributes, tags)
-- Subnet (create, attributes, tags)
+- Subnet (create, attributes, tags; reports its availability zone)
 - Security Group (create/adopt, ingress/egress rules, tags)
+- Internet Gateway (create, attach to a VPC)
+- Route Table (routes to gateways, subnet associations, kept in line with the definition)
 
 These entities use the EC2 Query API directly via the built-in HTTP client.
+
+What they make is tagged `monk.io/owner` with the entity's path, so a
+create whose response was lost finds what it made instead of making a
+second one. Deleting something already gone counts as done. Tag keys with
+slashes (`kubernetes.io/role/elb`) work. `aws-eks/example.yaml` builds a VPC
+for EKS from these.
 
 ## Examples
 

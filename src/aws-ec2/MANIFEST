@@ -1,4 +1,4 @@
 REPO aws-ec2
-DESCRIPTION Compute capacity and networking primitives (VPC, subnets, security groups).
+DESCRIPTION Networking primitives: VPCs, subnets, security groups, internet gateways and route tables.
 HOSTING managed
-TAGS aws,compute,ec2,vpc,subnet,security-group
+TAGS aws,compute,ec2,vpc,subnet,security-group,internet-gateway,route-table
