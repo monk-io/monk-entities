@@ -1,0 +1,4 @@
+REPO k8s
+DESCRIPTION Kubernetes objects managed next to the rest of a stack, on any cluster: kind, k3s, on-prem, EKS, GKE or AKS.
+HOSTING managed
+TAGS kubernetes,k8s,containers
