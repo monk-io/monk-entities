@@ -15,6 +15,19 @@ module; it is not built with monkec.
 | `k8s/cluster` | Checks that Monk can reach a cluster, reports its version, and keeps how to reach it for other entities to wire to. Actions: `namespaces`, `kinds`. |
 | `k8s/resource` | Applies a YAML manifest (any kinds, CRDs and custom resources included) with server-side apply and keeps the objects as it says. Actions: `status`, `get`, `restart`. |
 | `k8s/lookup` | Reads an object Monk doesn't manage, by name or label selector, and copies the fields you name into state. Never writes. Action: `get`. |
+| `k8s/deployment` | A Deployment from a few settings: image, ports (with a Service), env, `secret_env` from Monk secrets, `config_files`, `storage`, a readiness check. |
+| `k8s/stateful-set` | The same as a StatefulSet, with a volume per pod and a headless Service for pod DNS names. |
+| `k8s/job` | A container that runs to completion; the entity is ready when it has. A changed definition runs a new Job. |
+| `k8s/config-map` | Settings, often from other entities' state through ArrowScript. |
+| `k8s/secret` | Monk secrets copied into a Kubernetes Secret. |
+| `k8s/service` | A Service in front of an app's pods, e.g. a LoadBalancer for a Deployment. |
+| `k8s/ingress` | HTTP routing from a host to a Service, with cert-manager TLS if asked. |
+| `k8s/kube-namespace` | A Namespace (`namespace` itself is a word Monk templates keep). |
+| `k8s/volume` | A PersistentVolumeClaim several workloads can share. |
+
+All but `k8s/cluster` and `k8s/lookup` manage objects the same way (below)
+and have the actions `status`, `get` (Secret values hidden), `restart` and
+`apply`.
 
 ## Reaching a cluster
 
@@ -34,7 +47,7 @@ Every entity takes the same connection fields; give one of:
 `namespace` is where objects that name none go; otherwise the context's
 namespace, else `default`.
 
-## How k8s/resource manages objects
+## How objects are managed
 
 - Objects are applied in the manifest's order, except that Namespaces and
   CRDs go first; custom resources wait for their CRD to be established.
@@ -58,6 +71,52 @@ namespace, else `default`.
   node's ExternalIP, else InternalIP; `node_address_type` picks), and
   `objects` with their UIDs. Node addresses need permission to list
   nodes; without it they are left out.
+
+## Typed entities
+
+The typed entities write the Kubernetes objects for you, so a stack needs
+no Kubernetes YAML and every setting can be ArrowScript:
+
+```yaml
+web:
+  defines: k8s/deployment
+  kubeconfig_secret: <- connection-target("cluster") entity-state get-member("kubeconfig_secret")
+  namespace: shop
+  image: nginx:1.27-alpine
+  replicas: 2
+  ports: ["80:8080"]            # Service port 80 to container port 8080
+  service_type: LoadBalancer
+  env:
+    DB_HOST: <- connection-target("db") entity-state get-member("address")
+  secret_env:
+    DB_PASSWORD: shop-db-password  # a Monk secret, kept in a Kubernetes Secret
+  config_files:
+    site:
+      path: /etc/nginx/conf.d/default.conf
+      contents: |
+        server { listen 8080; location / { proxy_pass http://app:3000; } }
+  storage:
+    cache:
+      path: /var/cache/nginx
+      size: 1Gi
+  readiness_path: /
+  permitted-secrets:
+    k8s-kubeconfig: true
+    shop-db-password: true
+```
+
+- The object is named after the entity unless `name` says otherwise; every
+  object gets `app.kubernetes.io/name` and `app.kubernetes.io/managed-by:
+  monk`, and pods are selected by the first.
+- `override` takes YAML merged into the main object, for any field the
+  entity has no setting for (maps merge, lists replace).
+- Changing `config_files` or the values of `secret_env` restarts the pods.
+  Monk skips an update when the definition hasn't changed, so after
+  changing a Monk secret run `monk do <entity>/apply`.
+- `storage` and `k8s/volume` claims are kept when the entity is deleted, as
+  Monk keeps a runnable's volumes; `delete_volumes: true` deletes them.
+- `files` and `volumes` are words Monk templates keep for runnables, hence
+  `config_files` and `storage`.
 
 ## Querying the cluster
 
