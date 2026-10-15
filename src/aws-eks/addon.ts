@@ -79,6 +79,8 @@ export interface AddonState {
 export class Addon extends EKSEntity<AddonDefinition, AddonState> {
     static readiness = { period: 10, initialDelay: 10, attempts: 60 };
 
+    static deletion = { period: 10, attempts: 60 };
+
     override create(): void {
         const d = this.definition;
         const existing = this.describe();
@@ -117,8 +119,18 @@ export class Addon extends EKSEntity<AddonDefinition, AddonState> {
             cli.output(`add-on ${this.definition.name} was installed before; leaving it in place`);
             return;
         }
-        this.remove(`removing add-on ${this.definition.name}`, this.path_());
+        this.startDelete(`removing add-on ${this.definition.name}`, this.path_(), () => this.describe()?.status);
         this.state.status = "DELETING";
+    }
+
+    override checkDeleted(): boolean {
+        if (this.state.adopted) return true;
+        const live = this.describe();
+        if (!live) return true;
+        const issues = (live.health?.issues ?? []).map((i: any) => `${i.code}: ${i.message}`).join("; ");
+        if (live.status === "DELETE_FAILED") throw new Error(`add-on ${this.definition.name} failed to delete${issues ? `: ${issues}` : ""}`);
+        cli.output(`add-on ${this.definition.name} is ${live.status}`);
+        return false;
     }
 
     override checkReadiness(): boolean {

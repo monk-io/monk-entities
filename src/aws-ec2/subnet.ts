@@ -36,6 +36,8 @@ export interface SubnetState extends AWSEC2State {
  * - `aws-rds/db-subnet-group` - Group subnets for RDS
  */
 export class Subnet extends AWSEC2Entity<SubnetDefinition, SubnetState> {
+	/** Deleting fails with DependencyViolation while what uses it goes: retried for up to 10 minutes. */
+	static deletion = { period: 15, attempts: 40 };
 
 	protected getSubnetId(): string | undefined {
 		return this.state.subnet_id;

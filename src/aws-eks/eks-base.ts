@@ -130,6 +130,20 @@ export abstract class EKSEntity<D extends EKSDefinition, S extends object> exten
         }
     }
 
+    /**
+     * Starts deleting a resource whose status says DELETING once it is
+     * under way; deleting it again then counts as done. False when it was
+     * already gone.
+     */
+    protected startDelete(what: string, path: string, status: () => string | undefined): boolean {
+        try {
+            return this.remove(what, path);
+        } catch (err) {
+            if (awsErrorType(err) === "ResourceInUseException" && status() === "DELETING") return true;
+            throw err;
+        }
+    }
+
     /** DELETEs path; false when it was already gone. */
     protected remove(what: string, path: string): boolean {
         try {

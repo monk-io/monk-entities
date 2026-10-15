@@ -65,6 +65,9 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
     
     // Customize readiness check parameters
     static readonly readiness = { period: 5, initialDelay: 5, attempts: 10 };
+
+    // A role in use (an EKS node group's instance profile) can be deleted once it is let go: up to 10 minutes
+    static readonly deletion = { period: 15, attempts: 40 };
     
     override checkReadiness(): boolean {
         try {
@@ -304,7 +307,16 @@ export class IAMRole extends AWSIAMEntity<IAMRoleDefinition, IAMRoleState> {
                 RoleName: this.definition.role_name
             });
         } catch (error) {
-            throw new Error(`Failed to delete IAM Role ${this.definition.role_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            if (message.includes("NoSuchEntity")) {
+                cli.output(`IAM Role ${this.definition.role_name} was already deleted`);
+                return;
+            }
+            // Deleting is retried until whatever holds the role lets go of it.
+            if (message.includes("DeleteConflict")) {
+                throw new Error(`IAM Role ${this.definition.role_name} is still in use, e.g. by an instance profile`);
+            }
+            throw new Error(`Failed to delete IAM Role ${this.definition.role_name}: ${message}`);
         }
     }
 

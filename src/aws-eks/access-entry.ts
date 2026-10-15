@@ -62,6 +62,8 @@ export interface AccessEntryState {
  * - `state.username` - the principal's Kubernetes user name
  */
 export class AccessEntry extends EKSEntity<AccessEntryDefinition, AccessEntryState> {
+    static deletion = { period: 10, attempts: 60 };
+
     override create(): void {
         this.state.adopted = !!this.find("reading access entry", this.entryPath())?.accessEntry;
         this.apply();
@@ -78,6 +80,11 @@ export class AccessEntry extends EKSEntity<AccessEntryDefinition, AccessEntrySta
         }
         // Deleting the entry removes its policy associations too.
         this.remove(`removing access for ${this.definition.principal_arn}`, this.entryPath());
+    }
+
+    override checkDeleted(): boolean {
+        if (this.state.adopted) return true;
+        return !this.find("reading access entry", this.entryPath())?.accessEntry;
     }
 
     override checkReadiness(): boolean {

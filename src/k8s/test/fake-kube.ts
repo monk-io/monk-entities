@@ -1,8 +1,9 @@
 // A fake Kubernetes API server for the k8s package's tests: discovery,
 // server-side apply, reads, paged lists and deletes, for a few built-in
 // kinds and whatever kinds the CRDs applied to it define. Workloads become
-// ready after a couple of reads, and LoadBalancer Services get an address,
-// as on a real cluster.
+// ready after a couple of reads, LoadBalancer Services get an address, and
+// deleted LoadBalancer Services and PersistentVolumeClaims linger, held by
+// their finalizers, for a read, as on a real cluster.
 import { fakeApi, json, Request, Response } from "monk/test";
 
 export const KUBE = "https://kube.test";
@@ -38,6 +39,15 @@ export interface KubeState {
     nextUid: number;
     /** The field managers applies came from, in order. */
     managers: string[];
+    /** Deleted objects that finalizers still hold: reads until they go. */
+    terminating: Map<string, number>;
+}
+
+/** The finalizer that holds an object of this kind when it is deleted, if any. */
+function finalizer(obj: any): string | undefined {
+    if (obj.kind === "Service" && obj.spec?.type === "LoadBalancer") return "service.kubernetes.io/load-balancer-cleanup";
+    if (obj.kind === "PersistentVolumeClaim") return "kubernetes.io/pvc-protection";
+    return undefined;
 }
 
 /** The keys of what the fake holds besides its nodes, sorted. */
@@ -149,6 +159,15 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
     }
     if (!live) return status(404, "NotFound", `${kind.plural} "${p.name}" not found`);
     if (req.method === "GET") {
+        const left = s.terminating.get(key);
+        if (left !== undefined) {
+            if (left <= 1) {
+                s.terminating.delete(key);
+                s.objects.delete(key);
+                return status(404, "NotFound", `${kind.plural} "${p.name}" not found`);
+            }
+            s.terminating.set(key, left - 1);
+        }
         // Only what was applied here comes up; objects a test put in
         // place stay as they are.
         if (s.reads.has(key)) {
@@ -159,6 +178,16 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
         return json(200, live);
     }
     if (req.method === "DELETE") {
+        // Finalizers keep the object, marked for deletion, until they
+        // have released what it stands for.
+        const held = finalizer(live);
+        if (held) {
+            if (!s.terminating.has(key)) {
+                live.metadata = { ...live.metadata, deletionTimestamp: "2026-01-01T00:00:00Z", finalizers: [held] };
+                s.terminating.set(key, 2);
+            }
+            return json(200, live);
+        }
         s.objects.delete(key);
         if (kind.kind === "CustomResourceDefinition") {
             s.kinds = s.kinds.filter((k) => !(k.group === live.spec.group && k.plural === live.spec.names.plural));
@@ -185,7 +214,7 @@ function list(s: KubeState, req: Request, group: string, version: string): Respo
 }
 
 export const kube = fakeApi<KubeState>(KUBE, () => {
-    const st: KubeState = { objects: new Map(), reads: new Map(), kinds: [...BUILTIN], nextUid: 0, managers: [] };
+    const st: KubeState = { objects: new Map(), reads: new Map(), kinds: [...BUILTIN], nextUid: 0, managers: [], terminating: new Map() };
     // Two nodes; the first is not ready.
     for (const [name, ip, ready] of [["node-a", "10.0.0.1", "False"], ["node-b", "10.0.0.2", "True"]]) {
         st.objects.set(`nodes//${name}`, {

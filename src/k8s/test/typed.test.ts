@@ -142,6 +142,9 @@ test("volumes stay when the entity is deleted, unless delete_volumes", (t) => {
     d.redefine({ ...WEB, delete_volumes: true });
     d.update();
     d.delete();
+    // The claim goes once its volume is released.
+    expect(stored(api.state)).toEqual(["persistentvolumeclaims/shop/web-cache"]);
+    d.waitDeleted();
     expect(stored(api.state)).toEqual([]);
 });
 

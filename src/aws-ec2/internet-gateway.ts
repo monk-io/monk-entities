@@ -44,6 +44,8 @@ export interface InternetGatewayState extends AWSEC2State {
  * - `aws-ec2/route-table` - Route 0.0.0.0/0 to it
  */
 export class InternetGateway extends AWSEC2Entity<InternetGatewayDefinition, InternetGatewayState> {
+	/** Deleting fails with DependencyViolation while what uses it goes: retried for up to 10 minutes. */
+	static deletion = { period: 15, attempts: 40 };
 
 	override create(): void {
 		const id = this.findOwnId('DescribeInternetGateways', 'internetGatewayId') || this.make();

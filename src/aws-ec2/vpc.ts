@@ -54,6 +54,8 @@ export interface VPCState extends AWSEC2State {
  * - `aws-lambda/function` - Connect Lambda to VPC resources
  */
 export class VPC extends AWSEC2Entity<VPCDefinition, VPCState> {
+	/** Deleting fails with DependencyViolation while what uses it goes: retried for up to 10 minutes. */
+	static deletion = { period: 15, attempts: 40 };
 
 	protected getVpcId(): string | undefined {
 		return this.definition.vpc_id || this.state.vpc_id;
