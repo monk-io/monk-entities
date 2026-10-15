@@ -30,10 +30,36 @@ aws-eks/cluster ── aws-eks/node-group ── aws-eks/addon (EBS CSI)
 k8s/cluster, k8s/resource (gp3 StorageClass), k8s/deployment (LoadBalancer)
 ```
 
+### Before you run it
+
+- **AWS credentials on the Monk cluster.** Every resource is made with
+  them, and the identity they belong to becomes the EKS cluster's admin.
+  Add them in the Monk dashboard or with `monk cluster provider add -p AWS`.
+- **The packages the stack uses, loaded.** From a checkout of this
+  repository, build them and load each one:
+
+  ```bash
+  monk entity build -o dist src/monkec src/aws-ec2 src/aws-iam src/aws-eks src/k8s
+  for p in monkec aws-ec2 aws-iam aws-eks k8s; do monk load dist/$p/MANIFEST; done
+  ```
+
+- **A Monk recent enough for the k8s module and deletes that wait**
+  (`checkDeleted`): the nightly, or a release after October 2026.
+
+The example uses us-east-1, a cluster named `shop` and fixed IAM role
+names, so one copy runs per AWS account; change them in `example.yaml` for
+another.
+
+### Run it
+
 ```bash
 monk load src/aws-eks/example.yaml
 monk run aws-eks-example/stack
 ```
+
+The cluster takes 10 to 15 minutes, the nodes a few more. `monk delete
+aws-eks-example/stack` removes it all again, each resource after the ones
+that depend on it.
 
 ## How the entities behave
 
