@@ -82,9 +82,8 @@ export const CONNECTION_FIELDS = [
 ] as const;
 
 /**
- * o without its undefined fields. The runtime passes an undefined field to
- * the k8s module as the string "undefined", so fields that may be unset
- * go through this.
+ * o without its undefined fields, for an object the k8s module passes on
+ * as it is, where an undefined field would arrive as null.
  */
 export function defined<T extends object>(o: T): T {
     const out: any = {};
@@ -103,11 +102,8 @@ export function retryable(err: unknown): boolean {
 export abstract class K8sEntity<D extends K8sConnection, S extends object> extends MonkEntity<D, S> {
     private resolved?: Cluster;
 
-    // These are public, not protected: the runtime's type checker refuses a
-    // protected call from a generic subclass such as K8sObjects.
-
     /** The cluster, as the k8s module takes it. */
-    cluster(): Cluster {
+    protected cluster(): Cluster {
         if (this.resolved) return this.resolved;
         const d = this.definition;
         const c: Cluster = {};
@@ -124,7 +120,7 @@ export abstract class K8sEntity<D extends K8sConnection, S extends object> exten
         }
         if (d.gke_cluster) {
             if (!d.gke_location) throw new Error("gke_cluster needs gke_location");
-            c.gke = defined({ name: d.gke_cluster, location: d.gke_location, project: d.gke_project });
+            c.gke = { name: d.gke_cluster, location: d.gke_location, project: d.gke_project };
         }
         if (!c.kubeconfig && !c.server && !c.eks && !c.gke) {
             throw new Error("no cluster to talk to: set kubeconfig_secret, server, eks_cluster or gke_cluster");
@@ -134,14 +130,14 @@ export abstract class K8sEntity<D extends K8sConnection, S extends object> exten
     }
 
     /** Runs fn, retrying failures the API may get over. */
-    k8s<T>(what: string, fn: (c: Cluster) => T): T {
+    protected k8s<T>(what: string, fn: (c: Cluster) => T): T {
         const c = this.cluster();
         // A call may take a minute; retries leave room for the rest of it.
         return retry(() => fn(c), { when: retryable, what, budgetMs: 20000 });
     }
 
     /** The namespace objects that name none go to. */
-    defaultNamespace(): string {
+    protected defaultNamespace(): string {
         return this.k8s("reading the default namespace", (c) => k8s.namespace(c));
     }
 }

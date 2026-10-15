@@ -48,7 +48,7 @@ test("a manifest is applied, becomes ready, and is deleted", (t) => {
     const r = resource(t, APP);
     r.create();
     // The namespace first, whatever the manifest's order.
-    expect((r.state.objects ?? []).map((o) => `${o.kind} ${o.namespace ?? ""}/${o.name}`)).toEqual([
+    expect(r.state.objects?.map((o) => `${o.kind} ${o.namespace ?? ""}/${o.name}`)).toEqual([
         "Namespace /shop", "Deployment shop/web", "Service shop/web",
     ]);
     expect(r.state.cluster_ip).toBe("10.96.0.10");
@@ -116,7 +116,7 @@ test("objects that leave the manifest are deleted on update", (t) => {
     r.update();
     expect(stored(api.state)).toEqual(["configmaps/default/a"]);
     expect(api.state.objects.get("configmaps/default/a").data.k).toBe("2");
-    expect((r.state.objects ?? []).length).toBe(1);
+    expect(r.state.objects?.length).toBe(1);
     expect(r.output.join("\n")).toContain("deleted ConfigMap default/b: it is no longer wanted");
 });
 
@@ -133,8 +133,8 @@ test("an object Monk did not create is refused, unless adopted, and adopted ones
 
     const r = resource(t, manifest, { adopt: true });
     r.create();
-    expect((r.state.objects ?? [])[0].adopted).toBe(true);
-    expect((r.state.objects ?? [])[0].uid).toBe("uid-old");
+    expect(r.state.objects?.[0].adopted).toBe(true);
+    expect(r.state.objects?.[0].uid).toBe("uid-old");
     expect(api.state.objects.get("configmaps/default/settings").data.mode).toBe("monk");
 
     r.delete();
@@ -169,7 +169,7 @@ spec:
   versions: [{name: v1, served: true, storage: true}]
 `);
     r.create();
-    expect((r.state.objects ?? []).map((o) => o.kind)).toEqual(["CustomResourceDefinition", "Widget"]);
+    expect(r.state.objects?.map((o) => o.kind)).toEqual(["CustomResourceDefinition", "Widget"]);
     expect(api.state.objects.get("widgets/default/w").size).toBe(3);
     r.waitReady();
     r.delete();
@@ -238,7 +238,7 @@ test("a cluster reports its version and keeps its connection for wiring", (t) =>
     expect(c.state.default_namespace).toBe("apps");
     expect(c.state.server).toBe(KUBE);
     expect(c.state.token_secret).toBe("kube-token");
-    expect((c.state.nodes ?? []).map((n) => `${n.name} ${n.internal_ip} ${n.ready}`)).toEqual(["node-a 10.0.0.1 false", "node-b 10.0.0.2 true"]);
+    expect(c.state.nodes?.map((n) => `${n.name} ${n.internal_ip} ${n.ready}`)).toEqual(["node-a 10.0.0.1 false", "node-b 10.0.0.2 true"]);
     expect(c.state.node_address).toBe("10.0.0.2");
     c.waitReady();
     c.do("namespaces");

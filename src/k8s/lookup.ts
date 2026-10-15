@@ -1,7 +1,7 @@
 import { action, Args } from "monkec/base";
 import k8s from "k8s";
 import cli from "cli";
-import { K8sEntity, K8sConnection, defined } from "./k8s-base.ts";
+import { K8sEntity, K8sConnection } from "./k8s-base.ts";
 import { readiness } from "./readiness.ts";
 
 /**
@@ -133,12 +133,12 @@ export class Lookup extends K8sEntity<LookupDefinition, LookupState> {
         if (!d.name && !d.label_selector) throw new Error("set name or label_selector");
         let obj: any = null;
         if (d.name) {
-            obj = this.k8s(`reading ${this.what()}`, (c) => k8s.read(c, defined({ apiVersion: d.api_version, kind: d.kind, name: d.name!, namespace: d.namespace })));
+            obj = this.k8s(`reading ${this.what()}`, (c) => k8s.read(c, { apiVersion: d.api_version, kind: d.kind, name: d.name!, namespace: d.namespace }));
         } else {
-            const all = this.k8s(`listing ${this.what()}`, (c) => k8s.list(c, defined({
+            const all = this.k8s(`listing ${this.what()}`, (c) => k8s.list(c, {
                 apiVersion: d.api_version, kind: d.kind, namespace: d.namespace,
                 allNamespaces: d.all_namespaces, labelSelector: d.label_selector,
-            })));
+            }));
             this.state.matches = all.length;
             obj = all[0] ?? null;
         }

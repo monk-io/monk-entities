@@ -1,7 +1,6 @@
 // Tests for the typed object entities (k8s/deployment, k8s/stateful-set,
 // k8s/job, k8s/config-map, k8s/secret, k8s/service, k8s/ingress,
-// k8s/kube-namespace, k8s/volume), against the fake API server. They
-// avoid expect().not, which the runtime's type checker cannot resolve yet.
+// k8s/kube-namespace, k8s/volume), against the fake API server.
 import { test, expect, Test } from "monk/test";
 import { Deployment } from "../deployment.ts";
 import { StatefulSet } from "../stateful-set.ts";
@@ -125,7 +124,7 @@ test("changed secret values and files restart the pods, unchanged ones do not", 
 
     d.redefine({ ...WEB, config_files: { conf: { path: "/etc/nginx/conf.d/default.conf", contents: "server { listen 8080; }" } } });
     d.update();
-    expect(pod()["monk.io/files"] === files).toBe(false);
+    expect(pod()["monk.io/files"]).not.toBe(files);
 });
 
 test("volumes stay when the entity is deleted, unless delete_volumes", (t) => {
@@ -156,7 +155,7 @@ test("get hides a secret's values", (t) => {
     d.do("get", { kind: "Secret" });
     const out = d.output.join("\n");
     expect(out).toContain("(hidden)");
-    expect(out.includes(btoa("hunter2"))).toBe(false);
+    expect(out).not.toContain(btoa("hunter2"));
 }, { explore: false });
 
 test("a deployment without ports has no service, and service_type none drops it", (t) => {
@@ -237,7 +236,7 @@ test("a job is ready when it completes, and a change runs a new one", (t) => {
 
     j.redefine({ ...CONN, name: "migrate", image: "app:2", command: ["./migrate"] });
     j.update();
-    expect(j.state.name === first).toBe(false);
+    expect(j.state.name).not.toBe(first);
     expect(stored(api.state)).toEqual([`jobs/default/${j.state.name}`]);
 });
 
@@ -253,7 +252,7 @@ test("a config map and a secret from Monk secrets", (t) => {
     const live = api.state.objects.get("secrets/default/creds");
     expect(live.type).toBe("Opaque");
     expect(live.data).toEqual({ user: btoa("app"), password: btoa("hunter2") });
-    expect(JSON.stringify(s.state).includes("hunter2")).toBe(false);
+    expect(JSON.stringify(s.state)).not.toContain("hunter2");
 
     s.delete();
     expect(api.state.objects.has("secrets/default/creds")).toBe(false);

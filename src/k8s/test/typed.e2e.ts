@@ -28,7 +28,7 @@ e2e("an app made of typed entities serves a Monk runnable", (c) => {
     expect(web.state.name).toBe("web");
     expect(web.state.ready_replicas).toBe(2);
     expect(web.state.endpoint).toBe(`${web.state.node_address}:${web.state.node_port}`);
-    expect((web.state.objects ?? []).map((o) => o.kind)).toEqual(["Deployment", "Service", "ConfigMap", "PersistentVolumeClaim"]);
+    expect(web.state.objects?.map((o) => o.kind)).toEqual(["Deployment", "Service", "ConfigMap", "PersistentVolumeClaim"]);
 
     // The label's key has slashes; it reached the cluster whole.
     const byLabel = c.entity(Lookup, "k8s-typed/by-label").state as any;
