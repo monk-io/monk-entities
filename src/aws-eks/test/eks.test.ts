@@ -72,7 +72,7 @@ test("a cluster that exists is refused unless adopted, and an adopted one stays"
     const adopter = t.entity(Cluster, { ...CLUSTER, adopt: true });
     adopter.create();
     expect(adopter.state.adopted).toBe(true);
-    adopter.delete();
+    adopter.waitDeleted(1);
     expect(api.state.clusters.has("shop")).toBe(true);
 }, { explore: false });
 
@@ -167,9 +167,34 @@ test("a cluster with node groups is deleted after them", (t) => {
     n.waitReady();
     expect(() => c.delete()).toThrow(/still has node groups/);
     n.delete();
+    // The node group takes a while to go, and holds the cluster up until it has.
+    if (!t.exploring) expect(() => n.checkDeleted()).toThrow(/not deleted yet/);
+    expect(() => c.delete()).toThrow(/still has node groups/);
+    // As Monk deletes them: the node group, then the cluster, each until it is gone.
+    n.waitDeleted();
+    expect(api.state.nodegroups.size).toBe(0);
     c.delete();
-    expect(api.state.clusters.get("shop")?.status ?? "gone").toBe("DELETING");
+    expect(api.state.clusters.get("shop").status).toBe("DELETING");
+    if (!t.exploring) expect(() => c.checkDeleted()).toThrow(/not deleted yet/);
+    c.waitDeleted();
+    expect(api.state.clusters.has("shop")).toBe(false);
 });
+
+test("deleting what is being deleted already is done, and a failed node group delete says why", (t) => {
+    aws(t);
+    const api = t.use(eks);
+    activeCluster(t);
+    const n = t.entity(NodeGroup, NODES);
+    n.create();
+    n.waitReady();
+    n.delete();
+    n.delete();
+    expect(api.state.nodegroups.get("shop/general").status).toBe("DELETING");
+    const live = api.state.nodegroups.get("shop/general");
+    live.status = "DELETE_FAILED";
+    live.health = { issues: [{ code: "Ec2SecurityGroupDeletionFailure", message: "the security group is in use" }] };
+    expect(() => n.checkDeleted()).toThrow(/failed to delete: Ec2SecurityGroupDeletionFailure/);
+}, { explore: false });
 
 test("an add-on is installed, updated, and one that came with the cluster stays", (t) => {
     aws(t);
@@ -183,12 +208,14 @@ test("an add-on is installed, updated, and one that came with the cluster stays"
     ebs.update();
     expect(api.state.addons.get("shop/aws-ebs-csi-driver").addonVersion).toBe("v1.41.0-eksbuild.1");
     ebs.delete();
+    expect(api.state.addons.get("shop/aws-ebs-csi-driver").status).toBe("DELETING");
+    ebs.waitDeleted();
     expect(api.state.addons.has("shop/aws-ebs-csi-driver")).toBe(false);
 
     const cni = t.entity(Addon, { region: "us-east-1", cluster_name: "shop", name: "vpc-cni" });
     cni.create();
     expect(cni.state.adopted).toBe(true);
-    cni.delete();
+    cni.waitDeleted(1);
     expect(api.state.addons.has("shop/vpc-cni")).toBe(true);
 });
 
@@ -248,6 +275,6 @@ test("an access entry grants one policy, scoped to namespaces", (t) => {
     const now = Array.from(granted().keys());
     expect(now).toEqual(["arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"]);
 
-    a.delete();
+    a.waitDeleted();
     expect(api.state.entries.size).toBe(0);
 });

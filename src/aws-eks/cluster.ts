@@ -112,9 +112,8 @@ export interface ClusterState {
  * so the entity starts them one after another and is ready when the
  * cluster matches its definition.
  *
- * Deleting the entity deletes the cluster, which EKS refuses while it has
- * node groups: delete those first. Deletion takes some minutes more after
- * the entity is gone; the VPC can only go after it.
+ * Deleting the entity deletes the cluster once its node groups are gone,
+ * and waits the minutes AWS takes to finish, so the VPC can go after it.
  *
  * ## Secrets
  * - Reads: none (authenticated via AWS provider)
@@ -135,6 +134,9 @@ export interface ClusterState {
 export class Cluster extends EKSEntity<ClusterDefinition, ClusterState> {
     /** Clusters take 10 to 15 minutes to create: up to 30. */
     static readiness = { period: 20, initialDelay: 30, attempts: 90 };
+
+    /** Deleting takes some minutes, after the node groups: up to 30. */
+    static deletion = { period: 20, attempts: 90 };
 
     override create(): void {
         const d = this.definition;
@@ -196,16 +198,25 @@ export class Cluster extends EKSEntity<ClusterDefinition, ClusterState> {
             return;
         }
         try {
-            if (this.remove(`deleting cluster ${this.definition.name}`, this.base())) {
+            if (this.startDelete(`deleting cluster ${this.definition.name}`, this.base(), () => this.describe()?.status)) {
                 cli.output(`deleting EKS cluster ${this.definition.name}; AWS takes some minutes to finish`);
             }
         } catch (err) {
+            // Retried until the node groups are gone.
             if (awsErrorType(err) === "ResourceInUseException") {
-                throw new Error(`EKS cluster ${this.definition.name} still has node groups or add-ons being deleted; delete again in a few minutes`);
+                throw new Error(`EKS cluster ${this.definition.name} still has node groups`);
             }
             throw err;
         }
         this.state.status = "DELETING";
+    }
+
+    override checkDeleted(): boolean {
+        if (this.state.adopted) return true;
+        const live = this.describe();
+        if (!live) return true;
+        cli.output(`EKS cluster ${this.definition.name} is ${live.status}`);
+        return false;
     }
 
     override checkReadiness(): boolean {

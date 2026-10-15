@@ -140,6 +140,9 @@ export class NodeGroup extends EKSEntity<NodeGroupDefinition, NodeGroupState> {
     /** Node groups take a few minutes to create: up to 20. */
     static readiness = { period: 15, initialDelay: 30, attempts: 80 };
 
+    /** Draining and terminating the nodes takes some minutes: up to 30. */
+    static deletion = { period: 20, attempts: 90 };
+
     override create(): void {
         const d = this.definition;
         const existing = this.describe();
@@ -189,10 +192,19 @@ export class NodeGroup extends EKSEntity<NodeGroupDefinition, NodeGroupState> {
     }
 
     override delete(): void {
-        if (this.remove(`deleting node group ${this.definition.name}`, this.path_())) {
-            cli.output(`deleting EKS node group ${this.definition.name}; AWS takes some minutes to finish, and the cluster can only be deleted after`);
+        if (this.startDelete(`deleting node group ${this.definition.name}`, this.path_(), () => this.describe()?.status)) {
+            cli.output(`deleting EKS node group ${this.definition.name}; AWS takes some minutes to finish`);
         }
         this.state.status = "DELETING";
+    }
+
+    override checkDeleted(): boolean {
+        const live = this.describe();
+        if (!live) return true;
+        const issues = (live.health?.issues ?? []).map((i: any) => `${i.code}: ${i.message}`).join("; ");
+        if (live.status === "DELETE_FAILED") throw new Error(`node group ${this.definition.name} failed to delete${issues ? `: ${issues}` : ""}`);
+        cli.output(`node group ${this.definition.name} is ${live.status}`);
+        return false;
     }
 
     override checkReadiness(): boolean {

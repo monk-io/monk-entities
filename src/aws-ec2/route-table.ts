@@ -79,6 +79,8 @@ interface LiveRoute {
  * - `aws-ec2/vpc`, `aws-ec2/subnet`, `aws-ec2/internet-gateway`
  */
 export class RouteTable extends AWSEC2Entity<RouteTableDefinition, RouteTableState> {
+	/** Deleting fails with DependencyViolation while what uses it goes: retried for up to 10 minutes. */
+	static deletion = { period: 15, attempts: 40 };
 
 	override create(): void {
 		const id = this.findOwnId('DescribeRouteTables', 'routeTableId') || this.make();

@@ -38,10 +38,13 @@ test("create places an order", (t) => {
   against the built schema when the first step runs. `o.state` is typed by
   the class's State.
 - Steps: `o.create()`, `o.start()`, `o.stop()`, `o.update()`, `o.delete()`,
-  `o.checkReadiness()`, `o.checkLiveness()`, `o.do("action", { arg: "v" })`.
-  Each runs in a fresh runtime, as on a cluster; state is kept between steps,
-  and a step that throws keeps the state from before it.
+  `o.checkReadiness()`, `o.checkLiveness()`, `o.checkDeleted()`,
+  `o.do("action", { arg: "v" })`. Each runs in a fresh runtime, as on a
+  cluster; state is kept between steps, and a step that throws keeps the
+  state from before it.
 - `o.waitReady(attempts)` checks readiness until the instance is ready.
+- `o.waitDeleted(attempts)` deletes as Monk does: runs `delete()` until it
+  succeeds, then `checkDeleted()` until the instance is gone.
 - `o.redefine({ ...o.definition, replicas: 3 })` changes the definition, as
   editing a stack before `monk update` does; state is kept, so a following
   `o.update()` sees the change.
@@ -54,6 +57,25 @@ test("create places an order", (t) => {
   `t.secret(key, value)` a global one (the instance needs it in
   `permitted-secrets`). Cloud credentials: `t.provider("aws", {...})`.
 - Every test starts from nothing: no instances, handlers or secrets.
+
+### Deletion
+
+`delete()` starts deleting and returns; it must be safe to run again (what
+is gone or already being deleted counts as done). An entity whose resources
+take a while to go implements `checkDeleted(): boolean`, which Monk calls
+until it returns true; state it changes is kept only then. A `delete()`
+that throws is retried. Both run on the class's schedule:
+
+```ts
+static deletion = { period: 20, attempts: 90 };  // seconds between tries, tries
+```
+
+The default is `{ period: 10, attempts: 60 }` with `checkDeleted`; without
+either, `delete()` is tried every 5 seconds for a minute and the instance is
+gone once it succeeds. When the tries run out, the
+instance is kept as being deleted; deleting it again picks up where it left
+off. In tests, `o.waitDeleted()` runs the whole thing; `o.checkDeleted()`
+throws while the instance is not gone, for asserting that it waits.
 
 ## Answering requests
 

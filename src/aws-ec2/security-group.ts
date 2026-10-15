@@ -43,6 +43,8 @@ export interface SecurityGroupState extends AWSEC2State {
  * - `aws-lambda/function` - Assign to Lambda functions in VPC
  */
 export class SecurityGroup extends AWSEC2Entity<SecurityGroupDefinition, SecurityGroupState> {
+	/** Deleting fails with DependencyViolation while what uses it goes: retried for up to 10 minutes. */
+	static deletion = { period: 15, attempts: 40 };
 
 	override create(): void {
 		// If adopting existing SG by ID

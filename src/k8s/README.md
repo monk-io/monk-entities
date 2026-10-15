@@ -58,7 +58,9 @@ namespace, else `default`.
   that exists without it is refused unless `adopt: true`; an object another
   entity owns is always refused.
 - `monk update` re-applies the manifest and deletes the objects that left it.
-- Deleting the entity deletes the objects it created, in reverse order.
+- Deleting the entity deletes the objects it created, in reverse order, and
+  waits until they are gone: finalizers keep a LoadBalancer Service until
+  its load balancer is released, and a claim until its volume is.
   Adopted objects stay; `on_delete: orphan` keeps everything.
 - Readiness: Deployments, StatefulSets and DaemonSets when rolled out, Jobs
   when complete, LoadBalancer Services when they have an address, CRDs when

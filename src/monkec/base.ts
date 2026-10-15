@@ -9,6 +9,7 @@ const BuiltinActions = [
     "update",
     "check-readiness",
     "check-liveness",
+    "check-deleted",
 ] as const;
 
 export type Args = Record<string, string>;
@@ -285,6 +286,15 @@ export abstract class MonkEntity<D extends object, S extends object> {
                     return true;
                 }
                 break;
+            case "check-deleted":
+                if (this.isMethodImplemented("checkDeleted")) {
+                    const isDeleted = (this as any)["checkDeleted"].call(this);
+                    if (!isDeleted) {
+                        throw new Error("not deleted yet");
+                    }
+                    return true;
+                }
+                break;
         }
         return false;
     }
@@ -403,6 +413,12 @@ export abstract class MonkEntity<D extends object, S extends object> {
      * Subclasses may implement to enable liveness checks
      */
     checkLiveness?(): boolean;
+
+    /**
+     * Checks if what delete() started is gone
+     * Subclasses may implement to have deletion wait for it
+     */
+    checkDeleted?(): boolean;
 
     /**
      * Whether base-level idempotent update short-circuiting by definition hash is enabled.

@@ -61,6 +61,9 @@ test("a manifest is applied, becomes ready, and is deleted", (t) => {
     expect(r.state.load_balancer).toBe("203.0.113.7");
 
     r.delete();
+    // The Service stays until its load balancer is released.
+    expect(stored(api.state)).toEqual(["services/shop/web"]);
+    r.waitDeleted();
     expect(stored(api.state).length).toBe(0);
     if (!t.exploring) {
         expect(t.http.requests().filter((q) => q.startsWith("DELETE"))).toEqual([
@@ -70,6 +73,29 @@ test("a manifest is applied, becomes ready, and is deleted", (t) => {
         ]);
     }
 });
+
+test("a delete is not done while finalizers hold an object", (t) => {
+    const api = t.use(kube);
+    const r = resource(t, APP);
+    r.create();
+    r.delete();
+    // A delete run again still waits for what the first one removed.
+    r.delete();
+    expect(() => r.checkDeleted()).toThrow(/not deleted yet/);
+    expect(r.output.join("\n")).toContain("waiting for Service shop/web to go (finalizers: service.kubernetes.io/load-balancer-cleanup)");
+    r.checkDeleted();
+    expect(stored(api.state)).toEqual([]);
+}, { explore: false });
+
+test("an object made again under the same name does not hold a delete up", (t) => {
+    const api = t.use(kube);
+    const r = resource(t, APP);
+    r.create();
+    r.delete();
+    api.state.terminating.clear();
+    api.state.objects.get("services/shop/web").metadata = { name: "web", namespace: "shop", uid: "uid-other" };
+    r.checkDeleted();
+}, { explore: false });
 
 test("readiness says what it is waiting for", (t) => {
     t.use(kube);

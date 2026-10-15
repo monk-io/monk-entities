@@ -73,6 +73,11 @@ export interface ObjectsState {
     ready?: boolean;
 
     /**
+     * @description The objects a delete removed, until the cluster has let go of them
+     */
+    deleting?: ManagedObject[];
+
+    /**
      * @description Cluster IP of the first Service
      */
     cluster_ip?: string;
@@ -152,6 +157,13 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
     /** Rollouts pull images and attach volumes: up to five minutes. */
     static readiness = { period: 5, initialDelay: 2, attempts: 60 };
 
+    /**
+     * Finalizers hold objects until what they stand for is released (a
+     * LoadBalancer Service's load balancer, a claimed volume): up to ten
+     * minutes.
+     */
+    static deletion = { period: 5, attempts: 120 };
+
     /** The objects the entity should keep, as Kubernetes takes them. */
     protected abstract desired(): any[];
 
@@ -169,6 +181,8 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
             cli.output(`leaving ${objects.length} objects in place (on_delete: orphan)`);
             return;
         }
+        // A delete run again still waits for what the last one removed.
+        const deleting: ManagedObject[] = [...(this.state.deleting ?? [])];
         for (const o of [...objects].reverse()) {
             if (o.adopted) {
                 cli.output(`${describe(o)} was adopted; leaving it in place`);
@@ -181,9 +195,31 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
             const removed = this.k8s(`deleting ${describe(o)}`, (c) =>
                 k8s.remove(c, ref(o)));
             cli.output(removed ? `deleted ${describe(o)}` : `${describe(o)} was already deleted`);
+            if (!deleting.some((d) => sameObject(d, o))) deleting.push(o);
         }
         this.state.objects = [];
         this.state.ready = false;
+        this.state.deleting = deleting;
+    }
+
+    /**
+     * Whether the objects the delete removed are gone. Kubernetes keeps an
+     * object with finalizers until they have run, so this waits for a
+     * LoadBalancer Service's load balancer or a claim's volume to be
+     * released too.
+     */
+    override checkDeleted(): boolean {
+        for (const o of this.state.deleting ?? []) {
+            const live = this.k8s(`reading ${describe(o)}`, (c) =>
+                k8s.read(c, ref(o)));
+            // One of the same name made since is another object.
+            if (live === null || (o.uid && live.metadata?.uid && live.metadata.uid !== o.uid)) continue;
+            const finalizers: string[] = live.metadata?.finalizers ?? [];
+            cli.output(`waiting for ${describe(o)} to go${finalizers.length > 0 ? ` (finalizers: ${finalizers.join(", ")})` : ""}`);
+            return false;
+        }
+        this.state.deleting = undefined;
+        return true;
     }
 
     override checkReadiness(): boolean {
@@ -323,6 +359,7 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
         }
         this.state.objects = managed;
         this.state.ready = false;
+        this.state.deleting = undefined;
         this.noteEndpoint();
     }
 

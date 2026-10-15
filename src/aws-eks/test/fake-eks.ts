@@ -1,6 +1,7 @@
 // A fake EKS API for the aws-eks package's tests: clusters, node groups,
 // add-ons and access entries. Clusters and node groups become ACTIVE after
-// a couple of reads, as on AWS some minutes after they are created.
+// a couple of reads, as on AWS some minutes after they are created, and
+// what is deleted stays DELETING for a couple of reads before it is gone.
 import { fakeApi, json, Request, Response } from "monk/test";
 
 export const EKS = "https://eks.us-east-1.amazonaws.com";
@@ -30,6 +31,21 @@ function progress(s: EKSState, key: string, obj: any, after = 2): void {
     if (obj.status === "CREATING" || obj.status === "UPDATING") obj.status = "ACTIVE";
 }
 
+/** Counts a read of a DELETING resource; true once it is gone. */
+function gone(s: EKSState, key: string): boolean {
+    const reads = (s.reads.get(key) ?? 0) + 1;
+    s.reads.set(key, reads);
+    return reads > 2;
+}
+
+/** Starts deleting a resource; deleting it again is refused, as by EKS. */
+function startDelete(s: EKSState, key: string, obj: any, what: string): Response | undefined {
+    if (obj.status === "DELETING") return error(409, "ResourceInUseException", `${what} is already being deleted`);
+    obj.status = "DELETING";
+    s.reads.set(key, 0);
+    return undefined;
+}
+
 /**
  * Gives an add-on Pod Identity roles; EKS reports them only as association
  * ARNs, kept by service account in podIdentity.
@@ -57,20 +73,22 @@ function clusterRoute(s: EKSState, req: Request): Response {
     const found = s.clusters.get(name);
     if (req.method === "GET") {
         if (!found) return error(404, "ResourceNotFoundException", `No cluster found for name: ${name}.`);
-        if (found.status === "DELETING") {
+        if (found.status === "DELETING" && gone(s, `cluster/${name}`)) {
+            // Its add-ons and access entries go with it.
             s.clusters.delete(name);
-            return json(200, { cluster: found });
+            for (const k of [...s.addons.keys()]) if (k.startsWith(`${name}/`)) s.addons.delete(k);
+            for (const k of [...s.entries.keys()]) if (k.startsWith(`${name} `)) s.entries.delete(k);
+            return error(404, "ResourceNotFoundException", `No cluster found for name: ${name}.`);
         }
         progress(s, `cluster/${name}`, found);
         return json(200, { cluster: found });
     }
     if (req.method === "DELETE") {
         if (!found) return error(404, "ResourceNotFoundException", `No cluster found for name: ${name}.`);
-        if ([...s.nodegroups.keys()].some((k) => k.startsWith(`${name}/`))) {
+        if (found.status !== "DELETING" && [...s.nodegroups.keys()].some((k) => k.startsWith(`${name}/`))) {
             return error(409, "ResourceInUseException", `Cluster has nodegroups attached`);
         }
-        found.status = "DELETING";
-        return json(200, { cluster: found });
+        return startDelete(s, `cluster/${name}`, found, `Cluster ${name}`) ?? json(200, { cluster: found });
     }
     return error(405, "InvalidRequestException", req.method);
 }
@@ -80,12 +98,15 @@ function nodegroup(s: EKSState, req: Request): Response {
     const found = s.nodegroups.get(key);
     if (!found) return error(404, "ResourceNotFoundException", `No node group found for name: ${req.params.ng}.`);
     if (req.method === "GET") {
+        if (found.status === "DELETING" && gone(s, `nodegroup/${key}`)) {
+            s.nodegroups.delete(key);
+            return error(404, "ResourceNotFoundException", `No node group found for name: ${req.params.ng}.`);
+        }
         progress(s, `nodegroup/${key}`, found);
         return json(200, { nodegroup: found });
     }
     if (req.method === "DELETE") {
-        s.nodegroups.delete(key);
-        return json(200, { nodegroup: { ...found, status: "DELETING" } });
+        return startDelete(s, `nodegroup/${key}`, found, `Nodegroup ${req.params.ng}`) ?? json(200, { nodegroup: found });
     }
     return error(405, "InvalidRequestException", req.method);
 }
@@ -95,12 +116,15 @@ function addon(s: EKSState, req: Request): Response {
     const found = s.addons.get(key);
     if (!found) return error(404, "ResourceNotFoundException", `No addon: ${req.params.addon} found in cluster: ${req.params.name}`);
     if (req.method === "GET") {
+        if (found.status === "DELETING" && gone(s, `addon/${key}`)) {
+            s.addons.delete(key);
+            return error(404, "ResourceNotFoundException", `No addon: ${req.params.addon} found in cluster: ${req.params.name}`);
+        }
         progress(s, `addon/${key}`, found, 1);
         return json(200, { addon: found });
     }
     if (req.method === "DELETE") {
-        s.addons.delete(key);
-        return json(200, { addon: { ...found, status: "DELETING" } });
+        return startDelete(s, `addon/${key}`, found, `Addon ${req.params.addon}`) ?? json(200, { addon: found });
     }
     return error(405, "InvalidRequestException", req.method);
 }

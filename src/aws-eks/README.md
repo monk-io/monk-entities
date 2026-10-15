@@ -47,10 +47,12 @@ monk run aws-eks-example/stack
   the first change the cluster or node group needs, and its readiness
   check starts the next one when that is done. The entity is ready when
   everything matches its definition.
-- **Deletes start, and AWS finishes.** An entity call may take a minute,
-  so deletes don't wait. EKS refuses to delete a cluster while node groups
-  are still being deleted. If so, the entity says so; run the delete again
-  a few minutes later. The VPC can only go after the cluster.
+- **Deletes wait until AWS is done.** Each entity starts its delete and
+  Monk then checks until the resource is gone, so one `monk delete` takes
+  a stack down in order: node groups, then the cluster, then the VPC. EKS
+  refuses to delete a cluster while it has node groups; the cluster's
+  delete is retried until they are gone. Anything that can't be deleted in
+  time is kept and reported; run `monk delete` again later, or `--nuke` it.
 - **Versions are strings.** Quote them (`version: "1.30"`); YAML reads
   1.30 as the number 1.3.
 - **Tags and labels with slashes work.** Monk keeps a definition's maps as
