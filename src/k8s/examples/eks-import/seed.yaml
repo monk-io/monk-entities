@@ -1,0 +1,121 @@
+# EKS import demo, part 2: an app deployed the way a team without Monk would.
+# A Job with cluster-admin runs Helm (podinfo with its Redis cache) and
+# kubectl (a worker, its settings and an API key) into namespace shop.
+# Monk manages only this seeder in namespace import-seed; what the Job makes
+# belongs to Helm and kubectl, which is what the import is meant to find.
+namespace: eks-import-demo
+
+seed:
+  defines: k8s/resource
+  eks_cluster: <- connection-target("eks") entity-state get-member("name")
+  eks_region: <- connection-target("eks") entity-state get-member("region")
+  manifest: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: import-seed
+    ---
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: seeder
+      namespace: import-seed
+    ---
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: import-seed-seeder
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: cluster-admin
+    subjects:
+      - kind: ServiceAccount
+        name: seeder
+        namespace: import-seed
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: seed
+      namespace: import-seed
+    data:
+      seed.sh: |
+        set -eu
+        kubectl create namespace shop --dry-run=client -o yaml | kubectl apply -f -
+        helm upgrade --install web oci://ghcr.io/stefanprodan/charts/podinfo \
+          --version 6.11.0 --namespace shop \
+          --set replicaCount=2 --set redis.enabled=true \
+          --wait --timeout 10m
+        kubectl apply -n shop -f /seed/worker.yaml
+        kubectl -n shop rollout status deploy/worker --timeout=5m
+        echo seeded
+      worker.yaml: |
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: worker-settings
+        data:
+          QUEUE: orders
+          BATCH: "20"
+        ---
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: api-key
+        stringData:
+          API_KEY: demo-not-a-real-key
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: worker
+          labels: {app: worker}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels: {app: worker}
+          template:
+            metadata:
+              labels: {app: worker}
+            spec:
+              containers:
+                - name: worker
+                  image: busybox:1.37
+                  command: ["sh", "-c", "while true; do echo working on $QUEUE; sleep 60; done"]
+                  envFrom:
+                    - configMapRef: {name: worker-settings}
+                    - secretRef: {name: api-key}
+    ---
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: seed
+      namespace: import-seed
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: seeder
+          restartPolicy: Never
+          containers:
+            - name: seed
+              image: alpine/k8s:1.34.12
+              command: ["sh", "/seed/seed.sh"]
+              volumeMounts:
+                - {name: seed, mountPath: /seed}
+          volumes:
+            - name: seed
+              configMap: {name: seed}
+  services:
+    data:
+      protocol: custom
+  connections:
+    eks:
+      runnable: eks-import-demo/eks
+      service: data
+  depends:
+    wait-for:
+      runnables:
+        - eks-import-demo/k8s
+      timeout: 1200
