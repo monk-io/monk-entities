@@ -52,7 +52,7 @@ monk run aws-eks-example/stack
   a stack down in order: node groups, then the cluster, then the VPC. EKS
   refuses to delete a cluster while it has node groups; the cluster's
   delete is retried until they are gone. Anything that can't be deleted in
-  time is kept and reported; run `monk delete` again later, or `--nuke` it.
+  time is kept and reported; run `monk delete` again later, or `monk delete --forget` to stop tracking it.
 - **Versions are strings.** Quote them (`version: "1.30"`); YAML reads
   1.30 as the number 1.3.
 - **Tags and labels with slashes work.** Monk keeps a definition's maps as

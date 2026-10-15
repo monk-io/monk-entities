@@ -10,7 +10,7 @@
 # order, the app first and the VPC last, each waiting until what it depends
 # on is gone (AWS takes some minutes for the node group and the cluster).
 # Anything that can't be deleted is kept and reported; run `monk delete`
-# again later, or `--nuke` to drop it from Monk.
+# again later, or `--forget` to drop it from Monk.
 namespace: aws-eks-example
 
 vpc:
