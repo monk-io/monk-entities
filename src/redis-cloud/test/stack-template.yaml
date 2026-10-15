@@ -197,15 +197,15 @@ essentials-connection-test:
       type: string
     redis_addr:
       env: REDIS_ADDR
-      value: <- connection-target("db") entity-state get-member("publicEndpoint")
+      value: <- connection-target("db") entity-state get-member("public_endpoint")
       type: string
     redis_host:
       env: REDIS_HOST
-      value: <- connection-target("db") entity-state get-member("publicEndpointHost")
+      value: <- connection-target("db") entity-state get-member("public_endpoint_host")
       type: string
     redis_port:
       env: REDIS_PORT
-      value: <- connection-target("db") entity-state get-member("publicEndpointPort")
+      value: <- connection-target("db") entity-state get-member("public_endpoint_port")
       type: string
   containers:
     redis-test:

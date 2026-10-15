@@ -231,17 +231,17 @@ export interface EssentialsDatabaseState extends RedisCloudEntityState {
     /**
      * Public endpoint for the database (host:port format)
      */
-    publicEndpoint?: string;
+    public_endpoint?: string;
 
     /**
      * Public endpoint host
      */
-    publicEndpointHost?: string;
+    public_endpoint_host?: string;
 
     /**
      * Public endpoint port
      */
-    publicEndpointPort?: string;
+    public_endpoint_port?: string;
 
     /**
      * Task ID for database creation (temporary, used during creation)
@@ -282,13 +282,13 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
             this.state.id = existingDatabase.databaseId;
             this.state.name = existingDatabase.name;
             this.state.username = "default";
-            this.state.publicEndpoint = existingDatabase.publicEndpoint;
+            this.state.public_endpoint = existingDatabase.publicEndpoint;
             
             // Parse publicEndpoint to extract host and port
             if (existingDatabase.publicEndpoint) {
                 const endpointParts = existingDatabase.publicEndpoint.split(":");
-                this.state.publicEndpointHost = endpointParts[0];
-                this.state.publicEndpointPort = endpointParts[1];
+                this.state.public_endpoint_host = endpointParts[0];
+                this.state.public_endpoint_port = endpointParts[1];
             }
             
             cli.output(`✅ Using existing Essentials database: ${existingDatabase.name} (${existingDatabase.databaseId})`);
@@ -415,13 +415,13 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
             
             if (databaseData) {
                 this.state.username = "default";
-                this.state.publicEndpoint = databaseData.publicEndpoint;
+                this.state.public_endpoint = databaseData.publicEndpoint;
                 
                 // Parse publicEndpoint to extract host and port
                 if (databaseData.publicEndpoint) {
                     const endpointParts = databaseData.publicEndpoint.split(":");
-                    this.state.publicEndpointHost = endpointParts[0];
-                    this.state.publicEndpointPort = endpointParts[1];
+                    this.state.public_endpoint_host = endpointParts[0];
+                    this.state.public_endpoint_port = endpointParts[1];
                 }
                 
                 cli.output(`✅ Essentials database ready: ${this.state.name} (${databaseData.status})`);
@@ -474,13 +474,13 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
         const databaseData = this.checkResourceExists(`/fixed/subscriptions/${this.definition.subscription_id}/databases/${this.state.id}`);
         
         if (databaseData) {
-            this.state.publicEndpoint = databaseData.publicEndpoint;
+            this.state.public_endpoint = databaseData.publicEndpoint;
             
             // Parse publicEndpoint to extract host and port
             if (databaseData.publicEndpoint) {
                 const endpointParts = databaseData.publicEndpoint.split(":");
-                this.state.publicEndpointHost = endpointParts[0];
-                this.state.publicEndpointPort = endpointParts[1];
+                this.state.public_endpoint_host = endpointParts[0];
+                this.state.public_endpoint_port = endpointParts[1];
             }
         }
     }
@@ -527,13 +527,13 @@ export class EssentialsDatabase extends RedisCloudEntity<EssentialsDatabaseDefin
 
         // Database is ready when status is "active"
         if (databaseData.status === "active") {
-            this.state.publicEndpoint = databaseData.publicEndpoint;
+            this.state.public_endpoint = databaseData.publicEndpoint;
             
             // Parse publicEndpoint to extract host and port
             if (databaseData.publicEndpoint) {
                 const endpointParts = databaseData.publicEndpoint.split(":");
-                this.state.publicEndpointHost = endpointParts[0];
-                this.state.publicEndpointPort = endpointParts[1];
+                this.state.public_endpoint_host = endpointParts[0];
+                this.state.public_endpoint_port = endpointParts[1];
             }
             
             return true;
