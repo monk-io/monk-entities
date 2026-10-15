@@ -27,12 +27,12 @@ e2e("an app applied to a cluster serves a Monk runnable", (c) => {
     expect(cluster.state.version).toMatch(/^v1\./);
     const app = c.entity(Resource, "k8s-e2e/app");
     expect(app.ready).toBe(true);
-    expect((app.state.objects ?? []).map((o) => `${o.kind} ${o.name}`)).toEqual([
+    expect(app.state.objects?.map((o) => `${o.kind} ${o.name}`)).toEqual([
         `Namespace k8s-e2e-${c.id}`, "Deployment web", "Service web",
     ]);
     expect(app.state.node_port).toBeGreaterThan(29999);
     expect(app.state.endpoint).toBe(`${cluster.state.node_address}:${app.state.node_port}`);
-    expect((cluster.state.nodes ?? []).length).toBeGreaterThan(0);
+    expect(cluster.state.nodes?.length).toBeGreaterThan(0);
 
     const api = c.entity(Lookup, "k8s-e2e/api").state as any;
     expect(api.found).toBe(true);

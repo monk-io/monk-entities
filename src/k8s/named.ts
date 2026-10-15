@@ -54,7 +54,7 @@ export function dnsName(s: string): string {
 /** Copies b into a: maps merge, anything else replaces. */
 export function merge(a: any, b: any): any {
     if (!isMap(a) || !isMap(b)) return b;
-    const out: any = { ...a };
+    const out = { ...a };
     for (const [k, v] of Object.entries(b)) out[k] = k in out ? merge(out[k], v) : v;
     return out;
 }

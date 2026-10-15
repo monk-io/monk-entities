@@ -135,7 +135,7 @@ test("a route table routes to the gateway, follows its definition, and lets go o
     const live = () => api.state.tables.get(id);
     expect(live()?.routes.map((r) => `${r.destination} ${r.gateway}`)).toEqual(["10.0.0.0/16 local", `0.0.0.0/0 ${igw}`, `192.168.0.0/16 ${igw}`]);
     expect([...(live()?.associations.values() ?? [])].sort()).toEqual([net.a, net.b]);
-    expect((rt.state.associations ?? []).length).toBe(2);
+    expect(rt.state.associations?.length).toBe(2);
 
     rt.redefine({ region: REGION, vpc_id: net.vpc, routes: [{ destination_cidr_block: "0.0.0.0/0", gateway_id: igw }], subnet_ids: [net.a] });
     rt.update();

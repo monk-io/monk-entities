@@ -121,7 +121,7 @@ export function describe(o: { kind: string; name: string; namespace?: string }):
 function redacted(obj: any): any {
     if (obj?.kind !== "Secret") return obj;
     const hide = (m: any) => (m ? Object.fromEntries(Object.keys(m).map((k) => [k, "(hidden)"])) : m);
-    const out: any = { ...obj, data: hide(obj.data), stringData: hide(obj.stringData) };
+    const out = { ...obj, data: hide(obj.data), stringData: hide(obj.stringData) };
     if (out.metadata?.annotations?.["kubectl.kubernetes.io/last-applied-configuration"]) {
         out.metadata = { ...out.metadata, annotations: { ...out.metadata.annotations, "kubectl.kubernetes.io/last-applied-configuration": "(hidden)" } };
     }
@@ -130,7 +130,7 @@ function redacted(obj: any): any {
 }
 
 function ref(o: ManagedObject) {
-    return defined({ apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace });
+    return { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace };
 }
 
 function sameObject(a: ManagedObject, b: ManagedObject): boolean {
