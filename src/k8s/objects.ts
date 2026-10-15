@@ -13,6 +13,11 @@ export const OWNER = "monk.io/owner";
  */
 export interface ObjectsDefinition extends K8sConnection {
     /**
+     * @description manage (default): apply the objects and keep them as defined. observe: only map objects that exist; never apply, change or delete them
+     */
+    mode?: string;
+
+    /**
      * @description Take over objects that already exist and Monk did not create (default false)
      */
     adopt?: boolean;
@@ -55,6 +60,10 @@ export interface ManagedObject {
     uid?: string;
     /** @description Whether it existed before Monk managed it */
     adopted?: boolean;
+    /** @description What was last seen of it: replicas and images, ports, keys */
+    summary?: string;
+    /** @description Whether it was not found when last read */
+    gone?: boolean;
 }
 
 /**
@@ -76,6 +85,11 @@ export interface ObjectsState {
      * @description The objects a delete removed, until the cluster has let go of them
      */
     deleting?: ManagedObject[];
+
+    /**
+     * @description Changes seen to the objects, newest last: when, what, from what to what
+     */
+    changes?: string[];
 
     /**
      * @description Cluster IP of the first Service
@@ -129,6 +143,42 @@ function redacted(obj: any): any {
     return out;
 }
 
+/** How many change lines state keeps. */
+const MAX_CHANGES = 20;
+
+/** What there is to tell of an object at a glance, to see it change. */
+export function summarize(obj: any): string {
+    const spec = obj?.spec ?? {};
+    const parts: string[] = [];
+    switch (obj?.kind) {
+        case "Deployment":
+        case "StatefulSet":
+        case "DaemonSet": {
+            if (spec.replicas !== undefined) parts.push(`replicas=${spec.replicas}`);
+            const images = (spec.template?.spec?.containers ?? []).map((c: any) => c.image);
+            parts.push(`images=${images.join(",")}`);
+            break;
+        }
+        case "Service": {
+            const ingress = obj.status?.loadBalancer?.ingress?.[0];
+            parts.push(`type=${spec.type ?? "ClusterIP"}`);
+            parts.push(`ports=${(spec.ports ?? []).map((p: any) => `${p.port}/${p.protocol ?? "TCP"}`).join(",")}`);
+            if (ingress) parts.push(`address=${ingress.hostname ?? ingress.ip}`);
+            break;
+        }
+        case "ConfigMap":
+        case "Secret":
+            parts.push(`keys=${Object.keys({ ...(obj.data ?? {}), ...(obj.binaryData ?? {}) }).sort().join(",")}`);
+            break;
+        case "Ingress":
+            parts.push(`hosts=${(spec.rules ?? []).map((r: any) => r.host ?? "*").join(",")}`);
+            break;
+    }
+    const generation = obj?.metadata?.generation;
+    if (parts.length === 0 && generation !== undefined) parts.push(`generation=${generation}`);
+    return parts.join(" ");
+}
+
 function ref(o: ManagedObject) {
     return { apiVersion: o.api_version, kind: o.kind, name: o.name, namespace: o.namespace };
 }
@@ -168,15 +218,23 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
     protected abstract desired(): any[];
 
     override create(): void {
-        this.applyAll();
+        if (this.observing()) this.observeAll();
+        else this.applyAll();
     }
 
     override update(): void {
-        this.applyAll();
+        if (this.observing()) this.observeAll();
+        else this.applyAll();
     }
 
     override delete(): void {
         const objects = this.state.objects ?? [];
+        if (this.observing()) {
+            cli.output(`forgetting ${objects.length} observed objects; they stay on the cluster`);
+            this.state.objects = [];
+            this.state.ready = false;
+            return;
+        }
         if ((this.definition.on_delete ?? "delete") === "orphan") {
             cli.output(`leaving ${objects.length} objects in place (on_delete: orphan)`);
             return;
@@ -256,7 +314,45 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
      */
     @action("apply")
     reapply(_args?: Args): void {
+        this.refuseObserved("apply");
         this.applyAll();
+    }
+
+    /**
+     * Reads the objects again and notes what changed since they were last
+     * read: replicas, images, ports, keys, an object gone or back.
+     */
+    @action("refresh")
+    refresh(_args?: Args): void {
+        const at = new Date().toISOString();
+        const changes = [...(this.state.changes ?? [])];
+        this.firstService = undefined;
+        const objects: ManagedObject[] = [];
+        for (const o of this.state.objects ?? []) {
+            const live = this.k8s(`reading ${describe(o)}`, (c) =>
+                k8s.read(c, ref(o)));
+            const next: ManagedObject = { ...o };
+            if (live === null) {
+                if (!o.gone) changes.push(`${at} ${describe(o)}: gone`);
+                next.gone = true;
+            } else {
+                const summary = summarize(live);
+                if (o.gone) changes.push(`${at} ${describe(o)}: back`);
+                else if (o.uid && live.metadata?.uid && live.metadata.uid !== o.uid) changes.push(`${at} ${describe(o)}: made again`);
+                else if (o.summary !== undefined && summary !== o.summary) changes.push(`${at} ${describe(o)}: ${o.summary ?? ""} -> ${summary}`);
+                next.gone = undefined;
+                next.uid = live.metadata?.uid;
+                next.summary = summary;
+                this.noteOutputs(live);
+                this.observe(live);
+            }
+            objects.push(next);
+        }
+        const fresh = changes.length - (this.state.changes ?? []).length;
+        cli.output(fresh === 0 ? "no changes" : changes.slice(-fresh).join("\n"));
+        this.state.objects = objects;
+        this.state.changes = changes.slice(-MAX_CHANGES);
+        this.noteEndpoint();
     }
 
     /** Shows whether each object is ready. */
@@ -285,6 +381,7 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
     /** Restarts the pods of the Deployments, StatefulSets and DaemonSets, as kubectl rollout restart does. */
     @action("restart")
     restart(_args?: Args): void {
+        this.refuseObserved("restart");
         const at = new Date().toISOString();
         for (const o of this.state.objects ?? []) {
             if (o.kind !== "Deployment" && o.kind !== "StatefulSet" && o.kind !== "DaemonSet") continue;
@@ -297,6 +394,60 @@ export abstract class K8sObjects<D extends ObjectsDefinition, S extends ObjectsS
             }, { fieldManager: "monk-restart" }));
             cli.output(`restarting ${describe(o)}`);
         }
+    }
+
+    private observing(): boolean {
+        const mode = this.definition.mode ?? "manage";
+        if (mode !== "manage" && mode !== "observe") throw new Error(`mode is manage or observe, not ${mode}`);
+        return mode === "observe";
+    }
+
+    private refuseObserved(what: string): void {
+        if (this.observing()) throw new Error(`${what} changes the objects, and this entity only observes them (mode: observe)`);
+    }
+
+    /**
+     * Maps the desired objects onto what is on the cluster, changing
+     * nothing. Each must exist. They are noted as adopted, so that turning
+     * the entity to manage takes them over and still leaves them in place
+     * when it is deleted.
+     */
+    private observeAll(): void {
+        const desired = this.desired();
+        if (desired.length === 0) throw new Error("no objects to observe");
+        const previous = this.state.objects ?? [];
+        let defaultNs: string | undefined;
+        const observed: ManagedObject[] = [];
+        this.firstService = undefined;
+        for (const obj of desired) {
+            if (!obj.apiVersion || !obj.kind || !obj.metadata?.name) {
+                throw new Error(`object without apiVersion, kind and metadata.name: ${JSON.stringify(obj).slice(0, 200)}`);
+            }
+            const res = this.k8s(`looking up ${obj.apiVersion} ${obj.kind}`, (c) => k8s.resource(c, obj.apiVersion, obj.kind));
+            const namespace = res.namespaced ? (obj.metadata.namespace ?? (defaultNs ??= this.defaultNamespace())) : undefined;
+            const entry: ManagedObject = { api_version: obj.apiVersion, kind: obj.kind, name: obj.metadata.name, namespace, adopted: true };
+            if (observed.some((m) => sameObject(m, entry))) throw new Error(`${describe(entry)} is given twice`);
+            const live = this.k8s(`reading ${describe(entry)}`, (c) => k8s.read(c, ref(entry)));
+            if (live === null) {
+                throw new Error(`${describe(entry)} does not exist; mode: observe only maps objects that do`);
+            }
+            const owner = live.metadata?.annotations?.[OWNER];
+            if (owner && owner !== this.path) cli.output(`${describe(entry)} is managed by ${owner}`);
+            entry.uid = live.metadata?.uid;
+            entry.summary = summarize(live);
+            const known = previous.find((p) => sameObject(p, entry));
+            if (known && known.summary !== undefined && known.summary !== entry.summary) {
+                this.state.changes = [...(this.state.changes ?? []), `${new Date().toISOString()} ${describe(entry)}: ${known.summary} -> ${entry.summary}`].slice(-MAX_CHANGES);
+            }
+            observed.push(entry);
+            cli.output(`observing ${describe(entry)}${entry.summary ? `: ${entry.summary}` : ""}`);
+            this.noteOutputs(live);
+            this.observe(live);
+        }
+        this.state.objects = observed;
+        this.state.ready = false;
+        this.state.deleting = undefined;
+        this.noteEndpoint();
     }
 
     /** Applies the desired objects, then deletes what is no longer desired. */
