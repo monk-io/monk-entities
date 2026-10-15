@@ -157,6 +157,18 @@ ReplicaSets and Pods of a Deployment) and what the cluster keeps for
 itself, and notes what manages each: `helm:<release>`, `argocd:<app>`,
 `flux:<kustomization>`, or Monk.
 
+With a Monk CLI that has `monk import k8s`, one command does it all. It
+runs a temporary inventory, writes the template, and removes the inventory:
+
+```bash
+monk import k8s -n shop --kubeconfig-secret k8s-kubeconfig -o shop.yaml
+monk load shop.yaml
+monk run imported-shop/stack
+```
+
+`--run` loads and runs it straight away, `--as` names the Monk namespace,
+and `--every 60` refreshes every minute. By hand, the same goes:
+
 ```yaml
 namespace: import
 
