@@ -207,6 +207,9 @@ values, in a group per Helm release inside one `stack`. Each is in
 - a Service's `host`, `port`, `endpoint` and `load_balancer` are in state
   as for any `k8s/resource`, so Monk workloads can connect to it.
 
+[`examples/eks-import`](examples/eks-import) walks through it on EKS: an app installed with Helm
+and kubectl, imported, then changed outside Monk.
+
 The inventory's own `refresh` lists the namespace again and says which
 objects appeared or went (`state.new_objects`, `state.gone_objects`).
 
