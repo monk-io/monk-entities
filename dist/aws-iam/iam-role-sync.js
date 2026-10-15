@@ -6,8 +6,10 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // input/aws-iam/role.ts
+const cli = require("cli");
 const iamBase = require("aws-iam/iam-base");
 const AWSIAMEntity = iamBase.AWSIAMEntity;
+var OWNER_TAG = "monk.io/owner";
 var _IAMRole = class _IAMRole extends AWSIAMEntity {
   checkReadiness() {
     try {
@@ -39,6 +41,17 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
   }
   getRoleName() {
     return this.definition.role_name;
+  }
+  /** The entity path in the role's owner tag, if it has one. */
+  roleOwner() {
+    const res = this.makeAWSRequest("POST", "ListRoleTags", { RoleName: this.definition.role_name });
+    const body = res?.rawBody ?? "";
+    const tag = /<member>\s*<Key>([^<]*)<\/Key>\s*<Value>([^<]*)<\/Value>\s*<\/member>/g;
+    let m;
+    while ((m = tag.exec(body)) !== null) {
+      if (m[1] === OWNER_TAG) return m[2];
+    }
+    return void 0;
   }
   customJSONStringify(obj) {
     if (obj === null) return "null";
@@ -85,7 +98,7 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
         role_arn: existing.Role.Arn,
         role_id: existing.Role.RoleId,
         create_date: existing.Role.CreateDate,
-        existing: true
+        existing: this.roleOwner() !== this.path
       };
       this.managePolicyAttachments();
       return;
@@ -104,13 +117,11 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
     if (this.definition.max_session_duration) {
       params.MaxSessionDuration = this.definition.max_session_duration;
     }
-    if (this.definition.tags && Object.keys(this.definition.tags).length > 0) {
-      let tagIndex = 1;
-      for (const [key, value] of Object.entries(this.definition.tags)) {
-        params[`Tags.member.${tagIndex}.Key`] = key;
-        params[`Tags.member.${tagIndex}.Value`] = value;
-        tagIndex++;
-      }
+    let tagIndex = 1;
+    for (const [key, value] of Object.entries({ ...this.definition.tags ?? {}, [OWNER_TAG]: this.path })) {
+      params[`Tags.member.${tagIndex}.Key`] = key;
+      params[`Tags.member.${tagIndex}.Value`] = value;
+      tagIndex++;
     }
     try {
       const response = this.makeAWSRequest("POST", "CreateRole", params);
@@ -154,6 +165,10 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
     if (!this.state.role_arn) {
       return;
     }
+    if (this.state.existing) {
+      cli.output(`IAM Role ${this.definition.role_name} existed before; leaving it in place`);
+      return;
+    }
     try {
       const attachedPolicies = this.getAttachedPolicies();
       for (const policyArn of attachedPolicies) {
@@ -167,7 +182,15 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
         RoleName: this.definition.role_name
       });
     } catch (error) {
-      throw new Error(`Failed to delete IAM Role ${this.definition.role_name}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("NoSuchEntity")) {
+        cli.output(`IAM Role ${this.definition.role_name} was already deleted`);
+        return;
+      }
+      if (message.includes("DeleteConflict")) {
+        throw new Error(`IAM Role ${this.definition.role_name} is still in use, e.g. by an instance profile`);
+      }
+      throw new Error(`Failed to delete IAM Role ${this.definition.role_name}: ${message}`);
     }
   }
   checkRoleExists(roleName) {
@@ -271,6 +294,8 @@ var _IAMRole = class _IAMRole extends AWSIAMEntity {
 __name(_IAMRole, "IAMRole");
 // Customize readiness check parameters
 __publicField(_IAMRole, "readiness", { period: 5, initialDelay: 5, attempts: 10 });
+// A role in use (an EKS node group's instance profile) can be deleted once it is let go: up to 10 minutes
+__publicField(_IAMRole, "deletion", { period: 15, attempts: 40 });
 var IAMRole = _IAMRole;
 
 

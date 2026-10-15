@@ -1,0 +1,97 @@
+namespace: aws-ec2
+route-table:
+  defines: entity
+  metadata:
+    name: RouteTable
+    description: |-
+      AWS EC2 Route Table entity.
+      Creates a route table in a VPC with the given routes, and makes the given
+      subnets use it. Typically routes 0.0.0.0/0 to an internet gateway to make
+      subnets public. Updates add, replace and remove routes and subnets to
+      match the definition.
+
+      The route table is tagged monk.io/owner with the entity's path; a create
+      whose response was lost finds it by that tag rather than making another.
+
+      ## Secrets
+      - Reads: none (authenticated via AWS provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.route_table_id` - Route table ID
+
+      ## Composing with Other Entities
+      Works with:
+      - `aws-ec2/vpc`, `aws-ec2/subnet`, `aws-ec2/internet-gateway`
+    version-hash: ed2256049d8a
+  schema:
+    region:
+      type: string
+      description: 'AWS region, e.g. us-east-1'
+    vpc_id:
+      type: string
+      description: VPC the route table belongs to
+    routes:
+      type: array
+      items:
+        type: object
+        properties:
+          destination_cidr_block:
+            type: string
+            description: 'Destination CIDR block, e.g. 0.0.0.0/0'
+          gateway_id:
+            type: string
+            description: Internet gateway (or virtual private gateway) to send it to
+          nat_gateway_id:
+            type: string
+            description: NAT gateway to send it to
+        required:
+          - destination_cidr_block
+        additionalProperties: false
+      description: Routes besides the VPC's local one
+    subnet_ids:
+      type: array
+      items:
+        type: string
+      description: Subnets that use this route table
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+        description: Resource tags
+      description: Resource tags
+    required:
+      - region
+      - vpc_id
+  state-schema:
+    existing:
+      type: boolean
+      description: Whether the resource existed before this entity managed it; such resources are left in place on delete
+    route_table_id:
+      type: string
+      description: Route table ID
+    associations:
+      type: array
+      items:
+        type: object
+        properties:
+          subnet_id:
+            type: string
+            description: Subnet ID
+          association_id:
+            type: string
+            description: Association ID
+        required:
+          - subnet_id
+          - association_id
+        additionalProperties: false
+      description: Subnets that use the route table
+  lifecycle:
+    sync: <<< route-table-sync.js
+  checks:
+    readiness:
+      period: 5
+      initialDelay: 2
+      attempts: 10
+  requires:
+    - aws-ec2/ec2-base

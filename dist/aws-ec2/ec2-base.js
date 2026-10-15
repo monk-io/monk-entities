@@ -32,11 +32,48 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 // input/aws-ec2/ec2Base.ts
 var ec2_base_exports = {};
 __export(ec2_base_exports, {
-  AWSEC2Entity: () => AWSEC2Entity
+  AWSEC2Entity: () => AWSEC2Entity,
+  OWNER_TAG: () => OWNER_TAG,
+  ec2ErrorCode: () => ec2ErrorCode,
+  flatStrings: () => flatStrings,
+  xmlItems: () => xmlItems,
+  xmlValue: () => xmlValue
 });
 module.exports = __toCommonJS(ec2_base_exports);
 var import_base = require("monkec/base");
 var import_aws = __toESM(require("cloud/aws"));
+var OWNER_TAG = "monk.io/owner";
+function ec2ErrorCode(err) {
+  if (typeof err !== "object" || err === null) return void 0;
+  const code = err.code;
+  return typeof code === "string" ? code : void 0;
+}
+function flatStrings(m, prefix = "") {
+  const out = {};
+  for (const [k, v] of Object.entries(m || {})) {
+    const key = prefix ? `${prefix}/${k}` : k;
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+      const inner = flatStrings(v, key);
+      for (const ik of Object.keys(inner)) out[ik] = inner[ik];
+    } else if (v !== void 0 && v !== null) {
+      out[key] = String(v);
+    }
+  }
+  return out;
+}
+function xmlValue(xml, tag) {
+  const m = new RegExp(`<${tag}>([^<]*)</${tag}>`).exec(xml);
+  return m ? m[1] : void 0;
+}
+function xmlItems(xml, set) {
+  const m = new RegExp(`<${set}>([\\s\\S]*?)</${set}>`).exec(xml);
+  if (!m) return [];
+  const items = [];
+  const re = /<item>([\s\S]*?)<\/item>/g;
+  let it;
+  while ((it = re.exec(m[1])) !== null) items.push(it[1]);
+  return items;
+}
 var AWSEC2Entity = class extends import_base.MonkEntity {
   constructor() {
     super(...arguments);
@@ -45,6 +82,11 @@ var AWSEC2Entity = class extends import_base.MonkEntity {
   before() {
     this.region = this.definition.region;
   }
+  /**
+   * Makes an EC2 Query API request. Errors are thrown as an Error with
+   * the AWS error code (code) and how the request failed (status, kind),
+   * as monkec/resilience reads them.
+   */
   makeEC2Request(action, params = {}) {
     const url = `https://ec2.${this.region}.amazonaws.com/`;
     const formParams = {
@@ -61,20 +103,38 @@ var AWSEC2Entity = class extends import_base.MonkEntity {
       },
       body: formBody
     });
+    if (!response.statusCode) {
+      throw this.failure(`AWS EC2 ${action} failed: ${response.error || "no response"}`, "transport", 0, url, "", void 0);
+    }
     if (response.statusCode >= 400) {
-      let errorMessage = `AWS EC2 API error: ${response.statusCode} ${response.status}`;
-      try {
-        const messageMatch = /<Message>(.*?)<\/Message>/.exec(response.body);
-        if (messageMatch) errorMessage += ` - ${messageMatch[1]}`;
-        const codeMatch = /<Code>(.*?)<\/Code>/.exec(response.body);
-        if (codeMatch) errorMessage += ` (${codeMatch[1]})`;
-      } catch (_e) {
-        errorMessage += ` - Raw: ${response.body}`;
-      }
-      throw new Error(errorMessage);
+      const body = response.body || "";
+      const code = xmlValue(body, "Code");
+      const message = xmlValue(body, "Message");
+      let text = `AWS EC2 ${action} failed: ${response.statusCode}`;
+      if (message) text += ` - ${message}`;
+      if (code) text += ` (${code})`;
+      throw this.failure(text, "status", response.statusCode, url, body, code);
+    }
+    if ((response.body || "").indexOf(`<${action}Response`) < 0) {
+      throw this.failure(`AWS EC2 ${action} answered with something that is not its response`, "malformed", response.statusCode, url, response.body || "", void 0);
     }
     return response;
   }
+  failure(message, kind, status, url, body, code) {
+    const err = new Error(message);
+    err.kind = kind;
+    err.status = status;
+    err.method = "POST";
+    err.url = url;
+    err.body = body;
+    err.headers = {};
+    if (code) err.code = code;
+    return err;
+  }
+  /**
+   * Adds params in the EC2 query form: a list is Name.1, Name.2, ...;
+   * an object in a list is Name.1.Field.
+   */
   addParamsToFormData(formParams, params, prefix = "") {
     for (const [key, value] of Object.entries(params)) {
       const paramKey = prefix ? `${prefix}.${key}` : key;
@@ -84,9 +144,9 @@ var AWSEC2Entity = class extends import_base.MonkEntity {
       if (Array.isArray(value)) {
         value.forEach((item, index) => {
           if (typeof item === "object") {
-            this.addParamsToFormData(formParams, item, `${paramKey}.member.${index + 1}`);
+            this.addParamsToFormData(formParams, item, `${paramKey}.${index + 1}`);
           } else {
-            formParams[`${paramKey}.member.${index + 1}`] = String(item);
+            formParams[`${paramKey}.${index + 1}`] = String(item);
           }
         });
       } else if (typeof value === "object") {
@@ -96,8 +156,63 @@ var AWSEC2Entity = class extends import_base.MonkEntity {
       }
     }
   }
+  /** The tags a new resource gets: the definition's, and the owner tag. */
+  ownTags(tags) {
+    const out = flatStrings(tags);
+    out[OWNER_TAG] = this.path;
+    return out;
+  }
+  /** TagSpecification params that tag a resource of type as it is created. */
+  tagSpecification(resourceType, tags) {
+    const params = { "TagSpecification.1.ResourceType": resourceType };
+    let idx = 1;
+    for (const [k, v] of Object.entries(tags)) {
+      params[`TagSpecification.1.Tag.${idx}.Key`] = k;
+      params[`TagSpecification.1.Tag.${idx}.Value`] = v;
+      idx++;
+    }
+    return params;
+  }
+  /** Sets tags on a resource. */
+  setTags(resourceId, tags) {
+    const flat = flatStrings(tags);
+    if (Object.keys(flat).length === 0) return;
+    const params = { "ResourceId.1": resourceId };
+    let idx = 1;
+    for (const [k, v] of Object.entries(flat)) {
+      params[`Tag.${idx}.Key`] = k;
+      params[`Tag.${idx}.Value`] = v;
+      idx++;
+    }
+    this.makeEC2Request("CreateTags", params);
+  }
+  /**
+   * The ID of the resource this entity made before, found by its owner tag
+   * with a Describe action: a create whose response was lost made it.
+   */
+  findOwnId(describeAction, idElement) {
+    const resp = this.makeEC2Request(describeAction, this.ownerFilter());
+    return xmlValue(resp.body || "", idElement);
+  }
+  /** Runs del, which counts as done if the resource is already gone (notFoundCode). */
+  deleteIfExists(notFoundCode, del) {
+    try {
+      del();
+    } catch (err) {
+      if (ec2ErrorCode(err) !== notFoundCode) throw err;
+    }
+  }
+  /** Filter params that find resources this entity made, by its owner tag. */
+  ownerFilter() {
+    return { "Filter.1.Name": `tag:${OWNER_TAG}`, "Filter.1.Value.1": this.path };
+  }
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  AWSEC2Entity
+  AWSEC2Entity,
+  OWNER_TAG,
+  ec2ErrorCode,
+  flatStrings,
+  xmlItems,
+  xmlValue
 });

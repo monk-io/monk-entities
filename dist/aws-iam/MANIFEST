@@ -1,5 +1,5 @@
 REPO aws-iam
-VERSION_HASH 8b63de20f0b6
+VERSION_HASH a636063f7aa3
 DESCRIPTION AWS identity and access management (users, roles, policies).
 HOSTING managed
 TAGS aws,iam,identity,policy,role,user

@@ -20,7 +20,7 @@ iam-policy:
       Works with:
       - `aws-iam/role` - Attach policy to roles
       - `aws-iam/user` - Attach policy to users
-    version-hash: 8b63de20f0b6
+    version-hash: a636063f7aa3
   schema:
     region:
       type: string

@@ -23,10 +23,11 @@ vpc:
       - `aws-ec2/security-group` - Define network access rules
       - `aws-rds/instance` - Place databases in VPC subnets
       - `aws-lambda/function` - Connect Lambda to VPC resources
-    version-hash: 3320bf43b59d
+    version-hash: ed2256049d8a
   schema:
     region:
       type: string
+      description: 'AWS region, e.g. us-east-1'
     vpc_id:
       type: string
     cidr_block:
@@ -44,6 +45,7 @@ vpc:
   state-schema:
     existing:
       type: boolean
+      description: Whether the resource existed before this entity managed it; such resources are left in place on delete
     vpc_id:
       type: string
       description: VPC ID

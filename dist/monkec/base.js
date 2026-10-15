@@ -217,6 +217,15 @@ var MonkEntity = class _MonkEntity {
           return true;
         }
         break;
+      case "check-deleted":
+        if (this.isMethodImplemented("checkDeleted")) {
+          const isDeleted = this["checkDeleted"].call(this);
+          if (!isDeleted) {
+            throw new Error("not deleted yet");
+          }
+          return true;
+        }
+        break;
     }
     return false;
   }
