@@ -1,4 +1,5 @@
-import { NamedObjects, NamedDefinition, NamedState, strings } from "./named.ts";
+import { NamedObjects, NamedDefinition, NamedState } from "./named.ts";
+import { serviceObjects } from "./builders.ts";
 
 /**
  * A Service in front of pods.
@@ -16,7 +17,7 @@ export interface ServiceDefinition extends NamedDefinition {
     selector?: Record<string, string>;
 
     /**
-     * @description Ports: 80, or 80:8080 to send port 80 to the pods' 8080, with /udp for UDP
+     * @description Ports: 80, or 80:8080 to send port 80 to the pods' 8080, with /udp for UDP; http=80:8080 names the port (default tcp-80), =80 leaves it unnamed
      */
     ports: (number | string)[];
 
@@ -48,21 +49,6 @@ export class Service extends NamedObjects<ServiceDefinition, NamedState> {
     }
 
     protected build(name: string): any[] {
-        const d = this.definition;
-        const selector = d.selector ? strings(d.selector) : d.app ? { "app.kubernetes.io/name": d.app } : undefined;
-        if (!selector) throw new Error("a Service needs app or selector");
-        const ports = (d.ports ?? []).map((p) => {
-            const s = String(p).trim();
-            const m = /^(?:(\d+):)?(\d+)(?:\/(tcp|udp|sctp))?$/i.exec(s);
-            if (!m) throw new Error(`port "${s}" is not like 80, 80:8080 or 53/udp`);
-            const target = Number(m[2]);
-            const protocol = (m[3] ?? "tcp").toUpperCase();
-            const port = m[1] ? Number(m[1]) : target;
-            return { name: `${protocol.toLowerCase()}-${port}`, port, targetPort: target, protocol };
-        });
-        if (ports.length === 0) throw new Error("a Service needs ports");
-        const type = d.service_type ?? "ClusterIP";
-        const spec: any = type.toLowerCase() === "headless" ? { clusterIP: "None", selector, ports } : { type, selector, ports };
-        return [{ apiVersion: "v1", kind: "Service", metadata: { name }, spec }];
+        return serviceObjects(name, this.definition);
     }
 }

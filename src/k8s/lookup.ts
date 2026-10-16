@@ -30,7 +30,7 @@ export interface LookupDefinition extends K8sConnection {
     label_selector?: string;
     /** @description Look in every namespace (with label_selector) */
     all_namespaces?: boolean;
-    /** @description Values to copy into state, each under its own key */
+    /** @description Values to copy into state.values, each under its own name */
     fields?: LookupField[];
     /** @description Ready only when the object is ready by its kind's rules, not just when it exists (default false) */
     wait_ready?: boolean;
@@ -49,14 +49,11 @@ export interface LookupState {
     namespace?: string;
     /** @description Kubernetes UID */
     uid?: string;
-    /** @description The state keys the fields went to */
-    field_names?: string[];
     /** @description How many objects matched label_selector */
     matches?: number;
+    /** @description The fields asked for, by name; objects and lists keep their shape */
+    values?: Record<string, unknown>;
 }
-
-/** State keys the lookup uses itself. */
-const RESERVED = ["found", "name", "namespace", "uid", "matches", "field_names", "definition_hash"];
 
 /** The value at a dot path; array items by index. */
 export function pick(obj: any, path: string): unknown {
@@ -84,7 +81,7 @@ export function pick(obj: any, path: string): unknown {
  * - Writes: none
  *
  * ## State Fields for Composition
- * - `state.<name>` - each field asked for, as a string, under its name
+ * - `state.values.<name>` - each field asked for, under its name
  * - `state.found`, `state.name`, `state.namespace`, `state.uid`
  *
  * ## Composing with Other Entities
@@ -146,17 +143,12 @@ export class Lookup extends K8sEntity<LookupDefinition, LookupState> {
         this.state.name = obj?.metadata?.name;
         this.state.namespace = obj?.metadata?.namespace;
         this.state.uid = obj?.metadata?.uid;
-        const st = this.state as Record<string, unknown>;
-        for (const k of this.state.field_names ?? []) delete st[k];
-        const names: string[] = [];
+        const values: Record<string, unknown> = {};
         for (const f of d.fields ?? []) {
-            if (RESERVED.indexOf(f.name) >= 0) throw new Error(`field name ${f.name} is taken by the lookup's own state`);
-            names.push(f.name);
             const v = obj ? pick(obj, f.path) : undefined;
-            if (v === undefined || v === null) continue;
-            st[f.name] = typeof v === "object" ? JSON.stringify(v) : String(v);
+            if (v !== undefined && v !== null) values[f.name] = v;
         }
-        this.state.field_names = names;
+        this.state.values = values;
         return obj;
     }
 }

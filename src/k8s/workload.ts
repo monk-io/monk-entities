@@ -46,6 +46,16 @@ export interface WorkloadDefinition extends NamedDefinition {
     image: string;
 
     /**
+     * @description Name of the container (defaults to the object's name)
+     */
+    container_name?: string;
+
+    /**
+     * @description Labels that pick the pods (default app.kubernetes.io/name: the object's name); the pods get them too
+     */
+    selector?: Record<string, string>;
+
+    /**
      * @description Command to run instead of the image's entrypoint
      */
     command?: string[];
@@ -81,7 +91,7 @@ export interface WorkloadDefinition extends NamedDefinition {
     env_secret?: string;
 
     /**
-     * @description Ports the container listens on: 8080, or 80:8080 to expose container port 8080 as port 80, with /udp for UDP
+     * @description Ports the container listens on: 8080, or 80:8080 to expose container port 8080 as port 80, with /udp for UDP; http=8080 names the port (default tcp-8080), =8080 leaves it unnamed
      */
     ports?: (number | string)[];
 
@@ -176,18 +186,35 @@ export interface Port {
     port: number;
     target: number;
     protocol: string;
+    /** Empty for an unnamed port. */
     name: string;
 }
 
+/**
+ * A port setting: [name=][port:]target[/protocol]. Without name= the port
+ * is named <protocol>-<named>, where named is the target for a workload
+ * and the port for a Service; with name= and nothing before it, unnamed.
+ */
+export function parsePort(p: number | string, named: "port" | "target"): Port {
+    const s = String(p).trim();
+    const m = /^(?:([a-z0-9-]*)=)?(?:(\d+):)?(\d+)(?:\/(tcp|udp|sctp))?$/i.exec(s);
+    if (!m) throw new Error(`port "${s}" is not like 8080, 80:8080, 53/udp or http=80:8080`);
+    const target = Number(m[3]);
+    const protocol = (m[4] ?? "tcp").toUpperCase();
+    const port = m[2] ? Number(m[2]) : target;
+    const name = m[1] ?? `${protocol.toLowerCase()}-${named === "port" ? port : target}`;
+    return { port, target, protocol, name };
+}
+
+/** p without an empty name. */
+export function named<T extends { name?: string }>(p: T): T {
+    if (p.name !== "") return p;
+    const { name: _n, ...rest } = p;
+    return rest as T;
+}
+
 function parsePorts(ports: (number | string)[] | undefined): Port[] {
-    return (ports ?? []).map((p) => {
-        const s = String(p).trim();
-        const m = /^(?:(\d+):)?(\d+)(?:\/(tcp|udp|sctp))?$/i.exec(s);
-        if (!m) throw new Error(`port "${s}" is not like 8080, 80:8080 or 53/udp`);
-        const target = Number(m[2]);
-        const protocol = (m[3] ?? "tcp").toUpperCase();
-        return { port: m[1] ? Number(m[1]) : target, target, protocol, name: `${protocol.toLowerCase()}-${target}` };
-    });
+    return (ports ?? []).map((p) => parsePort(p, "target"));
 }
 
 /** s as Kubernetes keeps it in a Secret's data: UTF-8, base64-encoded. */
@@ -221,11 +248,11 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
         const claimTemplates: any[] = [];
         const annotations = strings(d.pod_annotations);
 
-        const container: any = { name, image: d.image };
+        const container: any = { name: d.container_name ?? name, image: d.image };
         if (d.script) container.command = ["/bin/sh", "-c", d.script];
         else if (d.command) container.command = d.command.map(String);
         if (d.args) container.args = d.args.map(String);
-        if (ports.length > 0) container.ports = ports.map((p) => ({ name: p.name, containerPort: p.target, protocol: p.protocol }));
+        if (ports.length > 0) container.ports = ports.map((p) => named({ name: p.name, containerPort: p.target, protocol: p.protocol }));
 
         const env: any[] = Object.entries(strings(d.env)).map(([k, v]) => ({ name: k, value: v }));
         const secretEnv = strings(d.secret_env);
@@ -303,9 +330,24 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
         if (d.image_pull_secret) spec.imagePullSecrets = [{ name: d.image_pull_secret }];
         if (d.node_selector) spec.nodeSelector = strings(d.node_selector);
 
-        const metadata: any = { labels: this.labels(name) };
+        const metadata: any = { labels: { ...this.labels(name), ...this.podSelector(name) } };
         if (Object.keys(annotations).length > 0) metadata.annotations = annotations;
         return { template: { metadata, spec }, objects, claimTemplates, ports };
+    }
+
+    /** A Deployment of the pods, and what goes with it; the Deployment first. */
+    protected deploymentObjects(name: string, replicas: number | undefined): any[] {
+        const pod = this.pod(name, false);
+        const hasClaims = pod.objects.some((o) => o.kind === "PersistentVolumeClaim");
+        const spec: any = {
+            replicas: replicas ?? 1,
+            selector: this.selector(name),
+            template: pod.template,
+        };
+        if (hasClaims) spec.strategy = { type: "Recreate" };
+        const deployment = { apiVersion: "apps/v1", kind: "Deployment", metadata: { name }, spec };
+        const svc = this.serviceFor(name, pod.ports);
+        return [deployment, ...(svc ? [svc] : []), ...pod.objects];
     }
 
     /** The Service in front of the pods, unless there are no ports or service_type is none. */
@@ -316,14 +358,19 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
             apiVersion: "v1", kind: "Service", metadata: { name },
             spec: {
                 type,
-                selector: { "app.kubernetes.io/name": name },
-                ports: ports.map((p) => ({ name: p.name, port: p.port, targetPort: p.target, protocol: p.protocol })),
+                selector: this.podSelector(name),
+                ports: ports.map((p) => named({ name: p.name, port: p.port, targetPort: p.target, protocol: p.protocol })),
             },
         };
     }
 
     protected selector(name: string): any {
-        return { matchLabels: { "app.kubernetes.io/name": name } };
+        return { matchLabels: this.podSelector(name) };
+    }
+
+    /** The labels that pick the pods. */
+    protected podSelector(name: string): Record<string, string> {
+        return this.definition.selector ? strings(this.definition.selector) : { "app.kubernetes.io/name": name };
     }
 
     protected keeps(o: ManagedObject): boolean {

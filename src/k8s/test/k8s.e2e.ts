@@ -36,8 +36,8 @@ e2e("an app applied to a cluster serves a Monk runnable", (c) => {
 
     const api = c.entity(Lookup, "k8s-e2e/api").state as any;
     expect(api.found).toBe(true);
-    expect(api.port).toBe("443");
-    expect(api.ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+    expect(api.values.port).toBe(443);
+    expect(api.values.ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
 
     c.waitLogs("k8s-e2e/probe", "k8s-ok", { timeout: 300 });
     c.do("k8s-e2e/app", "status");

@@ -1,5 +1,6 @@
 import { NamedObjects, NamedDefinition, NamedState } from "./named.ts";
 import { ManagedObject } from "./objects.ts";
+import { volumeObjects } from "./builders.ts";
 
 /**
  * A volume pods can mount.
@@ -47,11 +48,7 @@ export class Volume extends NamedObjects<VolumeDefinition, NamedState> {
     }
 
     protected build(name: string): any[] {
-        const d = this.definition;
-        if (!d.size) throw new Error("size is required");
-        const spec: any = { accessModes: [d.access_mode ?? "ReadWriteOnce"], resources: { requests: { storage: d.size } } };
-        if (d.storage_class) spec.storageClassName = d.storage_class;
-        return [{ apiVersion: "v1", kind: "PersistentVolumeClaim", metadata: { name }, spec }];
+        return volumeObjects(name, this.definition);
     }
 
     protected keeps(_o: ManagedObject): boolean {

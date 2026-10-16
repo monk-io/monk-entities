@@ -1,4 +1,4 @@
-import { Workload, WorkloadDefinition, WorkloadState } from "./workload.ts";
+import { Workload, WorkloadDefinition, WorkloadState, named } from "./workload.ts";
 
 /**
  * Pods of a StatefulSet.
@@ -72,8 +72,8 @@ export class StatefulSet extends Workload<StatefulSetDefinition, StatefulSetStat
             apiVersion: "v1", kind: "Service", metadata: { name: pods },
             spec: {
                 clusterIP: "None",
-                selector: { "app.kubernetes.io/name": name },
-                ports: pod.ports.map((p) => ({ name: p.name, port: p.target, protocol: p.protocol })),
+                selector: this.podSelector(name),
+                ports: pod.ports.map((p) => named({ name: p.name, port: p.target, protocol: p.protocol })),
                 publishNotReadyAddresses: true,
             },
         };
