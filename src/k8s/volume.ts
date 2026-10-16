@@ -1,32 +1,6 @@
-import { NamedDefinition, NamedState } from "./named.ts";
+import { NamedState } from "./named.ts";
 import { ManagedObject } from "./objects.ts";
-import { VolumeObjects } from "./builders.ts";
-
-/**
- * A volume pods can mount.
- * @interface VolumeDefinition
- */
-export interface VolumeDefinition extends NamedDefinition {
-    /**
-     * @description Size, e.g. 10Gi
-     */
-    size: string;
-
-    /**
-     * @description Storage class (default: the cluster's default)
-     */
-    storage_class?: string;
-
-    /**
-     * @description ReadWriteOnce (default), ReadWriteMany, ReadOnlyMany or ReadWriteOncePod
-     */
-    access_mode?: string;
-
-    /**
-     * @description Delete the volume and its data when the entity is deleted (default false: it is kept, as Monk keeps a runnable's volumes)
-     */
-    delete_volumes?: boolean;
-}
+import { VolumeObjects, VolumeDefinition } from "./builders.ts";
 
 /**
  * @description A PersistentVolumeClaim: a volume pods can mount.

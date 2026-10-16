@@ -38,10 +38,32 @@ export function asManifest(obj: any): any {
         delete out.data;
         delete out.stringData;
     }
-    if (obj.kind === "Service" && out.spec && out.spec.clusterIP !== "None") {
-        // Allocated by the cluster; None (headless) is asked for.
-        const { clusterIP: _ip, clusterIPs: _ips, ...spec } = out.spec;
+    if (obj.kind === "Service" && out.spec) {
+        // Allocated by the cluster unless someone asked for it; None
+        // (headless) is always asked for.
+        const spec = { ...out.spec };
+        for (const f of ["clusterIP", "clusterIPs"]) {
+            if (setBy(obj, f) !== true) delete spec[f];
+        }
         out.spec = spec;
     }
     return out;
+}
+
+/**
+ * Whether someone asked for spec field f of live, rather than the cluster
+ * filling it in: true, false, or undefined when live has no managedFields
+ * to tell by. A field the cluster allocates (a Service's IPs, a NodePort)
+ * has no manager unless one set it; a claim the cluster bound to a volume
+ * carries pv.kubernetes.io/bound-by-controller, whatever the distribution
+ * calls its controllers.
+ */
+export function setBy(live: any, f: string): boolean | undefined {
+    const spec = live.spec ?? {};
+    if (!JSON.stringify(spec).includes(`"${f}":`)) return false;
+    if (f === "clusterIP" && spec.clusterIP === "None") return true;
+    if (f === "volumeName") return live.metadata?.annotations?.["pv.kubernetes.io/bound-by-controller"] !== "yes";
+    const managed: any[] | undefined = live.metadata?.managedFields;
+    if (!managed) return undefined;
+    return managed.some((m) => JSON.stringify(m.fieldsV1 ?? {}).includes(`"f:${f}"`));
 }

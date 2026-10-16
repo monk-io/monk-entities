@@ -11,7 +11,7 @@ import { readiness } from "./readiness.ts";
 export interface LookupField {
     /** @description State key to put the value under */
     name: string;
-    /** @description Dot path in the object, e.g. status.loadBalancer.ingress.0.ip */
+    /** @description Dot path in the object, e.g. status.loadBalancer.ingress.0.ip; a key with dots in brackets, e.g. metadata.labels["app.kubernetes.io/name"] */
     path: string;
 }
 
@@ -55,14 +55,31 @@ export interface LookupState {
     values?: Record<string, unknown>;
 }
 
-/** The value at a dot path; array items by index. */
+/**
+ * The value at a dot path; array items by index, and a key that has dots
+ * of its own in brackets: metadata.labels["app.kubernetes.io/name"].
+ */
 export function pick(obj: any, path: string): unknown {
     let v: any = obj;
-    for (const part of path.split(".")) {
+    for (const part of pathParts(path)) {
         if (v === null || v === undefined) return undefined;
         v = Array.isArray(v) ? v[Number(part)] : v[part];
     }
     return v;
+}
+
+/** The keys of a path: a.b.0, a["b.c"], a[0]. */
+export function pathParts(path: string): string[] {
+    const parts: string[] = [];
+    const re = /\[\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\d+)\s*\]|[^.[\]]+/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(path)) !== null) {
+        const q = m[1];
+        if (q === undefined) parts.push(m[0]);
+        else if (/^\d+$/.test(q)) parts.push(q);
+        else parts.push(q.startsWith('"') ? JSON.parse(q) : q.slice(1, -1).replace(/\\(.)/g, "$1"));
+    }
+    return parts;
 }
 
 /**

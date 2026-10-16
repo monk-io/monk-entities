@@ -1,6 +1,6 @@
-import { isMap } from "./named.ts";
+import { isMap, keyOrder } from "./named.ts";
 import { ConfigMapObjects, DeploymentObjects, ServiceObjects, VolumeObjects } from "./builders.ts";
-import { asManifest } from "./manifest.ts";
+import { asManifest, setBy } from "./manifest.ts";
 
 // What each typed entity would apply, rendered by the class the entity
 // itself extends; these are not entities of their own.
@@ -58,8 +58,8 @@ export function typedFor(live: any, connection: Record<string, unknown>): Choice
     const kind = KINDS[key];
     if (!kind) return NOT_LIFTED[key] ? { reason: NOT_LIFTED[key] } : {};
     const m = asManifest(live);
-    const pinned = PINNED.filter((f) => setBySomeone(live, f));
-    if (pinned.length > 0) return { reason: `${kind.type} has no setting for ${pinned.join(", ")}, which was set by hand` };
+    const why = pinned(live, kind.type);
+    if (why) return { reason: why };
     const fields = kind.lift(m);
     if (typeof fields === "string") return { reason: `${kind.type}: ${fields}` };
     const script = arrowScript(fields);
@@ -91,26 +91,23 @@ function some(paths: string[]): string {
 
 /**
  * Fields the cluster picks when nobody does, but someone may set: a
- * NodePort, a Service's IP, the volume a claim binds. A typed entity has no
- * setting for them, so an object that has one set by hand stays a
- * k8s/resource, whose manifest keeps it.
+ * NodePort, a Service's IPs and IP families, the volume a claim binds. A
+ * typed entity has no setting for them, so an object that has one set by
+ * hand stays a k8s/resource, whose manifest keeps it.
  */
-const PINNED = ["nodePort", "healthCheckNodePort", "clusterIP", "volumeName"];
+const PINNED = ["nodePort", "healthCheckNodePort", "clusterIP", "clusterIPs", "ipFamilyPolicy", "ipFamilies", "volumeName"];
 
-/** The cluster's own controllers, which bind claims and the like. */
-const CLUSTER_MANAGERS = ["kube-controller-manager", "kube-scheduler"];
-
-/**
- * Whether a manager other than the cluster's own owns field f anywhere in
- * live. Without managed fields there is no telling, so it counts as set.
- */
-function setBySomeone(live: any, f: string): boolean {
-    const managed: any[] | undefined = live.metadata?.managedFields;
-    const present = JSON.stringify(live.spec ?? {}).includes(`"${f}":`);
-    if (!present) return false;
-    if (f === "clusterIP" && live.spec?.clusterIP === "None") return false;
-    if (!managed) return true;
-    return managed.some((m) => !CLUSTER_MANAGERS.includes(m.manager) && JSON.stringify(m.fieldsV1 ?? {}).includes(`"f:${f}"`));
+/** Why live needs a setting its typed entity lacks, if it does. */
+function pinned(live: any, type: string): string | undefined {
+    if (live.kind === "Service" && live.spec?.clusterIP === "None") {
+        // Headless: the typed entity asks for None itself.
+        live = { ...live, spec: { ...live.spec, clusterIP: undefined, clusterIPs: undefined } };
+    }
+    const byHand = PINNED.filter((f) => setBy(live, f) === true);
+    if (byHand.length > 0) return `${type} has no setting for ${byHand.join(", ")}, which was set by hand`;
+    const unknown = PINNED.filter((f) => setBy(live, f) === undefined);
+    if (unknown.length > 0) return `${type} has no setting for ${unknown.join(", ")}, and with no managedFields there is no telling whether the cluster picked it`;
+    return undefined;
 }
 
 /** The path of the first string in v that Monk would read as ArrowScript. */
@@ -134,7 +131,7 @@ function arrowScript(v: unknown, path = ""): string | undefined {
 
 /** Whether names are in the order Monk keeps a map's keys in. */
 function inOrder(names: string[]): boolean {
-    return names.every((n, i) => i === 0 || names[i - 1] < n);
+    return names.every((n, i) => i === 0 || keyOrder(names[i - 1], n) < 0);
 }
 
 /** The settings every typed entity takes from metadata. */
@@ -377,6 +374,8 @@ function yamlKey(k: string): string {
  * block, other values as JSON, which YAML reads the same.
  */
 export function yamlField(key: string, v: unknown, indent: string): string[] {
+    const script = arrowScript(v, key);
+    if (script) throw new Error(`${script} starts with <-, which Monk would read as ArrowScript`);
     const k = `${indent}${yamlKey(key)}:`;
     if (isMap(v)) {
         if (!filled(v)) return [`${k} {}`];

@@ -4,7 +4,8 @@
 import { test, expect, Test } from "monk/test";
 import { Resource, OWNER } from "../resource.ts";
 import { Cluster } from "../cluster.ts";
-import { Lookup } from "../lookup.ts";
+import { Lookup, pick } from "../lookup.ts";
+import { sorted } from "../named.ts";
 import { kube, KUBE, stored } from "./fake-kube.ts";
 
 const APP = `
@@ -329,6 +330,22 @@ test("a lookup drops the fields it kept at the top of state before values", (t) 
     expect([after.mode, after.field_names]).toEqual([undefined, undefined]);
     expect(l.state.values).toEqual({ mode: "fast" });
 }, { explore: false });
+
+test("a lookup path reaches keys with dots in them through brackets", () => {
+    const obj = { metadata: { labels: { "app.kubernetes.io/name": "cache", app: { x: 1 } } }, spec: { ports: [{ port: 80 }, { port: 443 }] } };
+    expect(pick(obj, 'metadata.labels["app.kubernetes.io/name"]')).toBe("cache");
+    expect(pick(obj, "metadata.labels['app.kubernetes.io/name']")).toBe("cache");
+    expect(pick(obj, "metadata.labels.app.x")).toBe(1);
+    expect(pick(obj, "spec.ports.1.port")).toBe(443);
+    expect(pick(obj, "spec.ports[1].port")).toBe(443);
+    expect(pick(obj, "spec.nothing.here")).toBeUndefined();
+});
+
+test("map settings come out in the order an object lists their keys", () => {
+    const m = { b: 1, "10": 2, a: 3, "9": 4 };
+    expect(Object.keys(m)).toEqual(["9", "10", "b", "a"]);
+    expect(sorted(m).map(([k]) => k)).toEqual(["9", "10", "a", "b"]);
+});
 
 test("a lookup is not ready until its object exists", (t) => {
     const api = t.use(kube);

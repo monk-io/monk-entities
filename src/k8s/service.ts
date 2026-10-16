@@ -1,31 +1,5 @@
-import { NamedDefinition, NamedState } from "./named.ts";
-import { ServiceObjects } from "./builders.ts";
-
-/**
- * A Service in front of pods.
- * @interface ServiceDefinition
- */
-export interface ServiceDefinition extends NamedDefinition {
-    /**
-     * @description Pods to send traffic to, by their app.kubernetes.io/name label: the name of a k8s/deployment or k8s/stateful-set
-     */
-    app?: string;
-
-    /**
-     * @description Pods to send traffic to, by labels (instead of app)
-     */
-    selector?: Record<string, string>;
-
-    /**
-     * @description Ports: 80, or 80:8080 to send port 80 to the pods' 8080, with /udp for UDP; http=80:8080 names the port (default tcp-80), =80 leaves it unnamed
-     */
-    ports: (number | string)[];
-
-    /**
-     * @description ClusterIP (default), NodePort, LoadBalancer or Headless
-     */
-    service_type?: string;
-}
+import { NamedState } from "./named.ts";
+import { ServiceObjects, ServiceDefinition } from "./builders.ts";
 
 /**
  * @description A Service.
