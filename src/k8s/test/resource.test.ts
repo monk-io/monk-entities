@@ -282,14 +282,19 @@ test("a lookup reads what Monk does not manage, by name or labels", (t) => {
     });
     const byName = t.entity(Lookup, {
         server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "Service", name: "controller", namespace: "ingress",
-        fields: [{ name: "address", path: "status.loadBalancer.ingress.0.hostname" }, { name: "port", path: "spec.ports.0.port" }, { name: "missing", path: "spec.nope" }],
+        fields: [
+            { name: "address", path: "status.loadBalancer.ingress.0.hostname" },
+            { name: "port", path: "spec.ports.0.port" },
+            { name: "ports", path: "spec.ports" },
+            { name: "missing", path: "spec.nope" },
+        ],
     });
     byName.secret("kube-token", "test-token");
     byName.create();
     byName.waitReady();
     expect(byName.state.found).toBe(true);
-    const st = byName.state as any;
-    expect([st.address, st.port, st.missing]).toEqual(["lb.example.com", "443", undefined]);
+    // Under values, with objects and lists as they are, not as JSON.
+    expect(byName.state.values).toEqual({ address: "lb.example.com", port: 443, ports: [{ port: 443 }] });
 
     const byLabels = t.entity(Lookup, {
         server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "Service", label_selector: "app=ingress", all_namespaces: true,
@@ -298,7 +303,12 @@ test("a lookup reads what Monk does not manage, by name or labels", (t) => {
     byLabels.secret("kube-token", "test-token");
     byLabels.create();
     expect(byLabels.state.name).toBe("controller");
-    expect((byLabels.state as any).ip).toBe("10.96.1.1");
+    expect(byLabels.state.values).toEqual({ ip: "10.96.1.1" });
+
+    // A field that is gone from the object is gone from values.
+    api.state.objects.get("services/ingress/controller").status = {};
+    byName.waitReady();
+    expect(byName.state.values).toEqual({ port: 443, ports: [{ port: 443 }] });
 
     byName.delete();
     expect(api.state.objects.has("services/ingress/controller")).toBe(true);

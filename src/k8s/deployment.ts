@@ -55,17 +55,7 @@ export class Deployment extends Workload<DeploymentDefinition, DeploymentState> 
     }
 
     protected build(name: string): any[] {
-        const pod = this.pod(name, false);
-        const hasClaims = pod.objects.some((o) => o.kind === "PersistentVolumeClaim");
-        const spec: any = {
-            replicas: this.definition.replicas ?? 1,
-            selector: this.selector(name),
-            template: pod.template,
-        };
-        if (hasClaims) spec.strategy = { type: "Recreate" };
-        const deployment = { apiVersion: "apps/v1", kind: "Deployment", metadata: { name }, spec };
-        const svc = this.serviceFor(name, pod.ports);
-        return [deployment, ...(svc ? [svc] : []), ...pod.objects];
+        return this.deploymentObjects(name, this.definition.replicas);
     }
 
     protected observeMain(obj: any): void {

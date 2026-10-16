@@ -18,6 +18,11 @@ export interface NamedDefinition extends ObjectsDefinition {
     labels?: Record<string, string>;
 
     /**
+     * @description Add app.kubernetes.io/name and app.kubernetes.io/managed-by: monk to the objects' labels (default true); false leaves the labels as given, as an imported object has them
+     */
+    standard_labels?: boolean;
+
+    /**
      * @description Annotations added to the main object
      */
     annotations?: Record<string, string>;
@@ -101,7 +106,8 @@ export abstract class NamedObjects<D extends NamedDefinition, S extends NamedSta
         for (const o of objects) {
             o.metadata = o.metadata ?? {};
             if (ns && o.kind !== "Namespace") o.metadata.namespace = o.metadata.namespace ?? ns;
-            o.metadata.labels = { ...this.labels(name), ...(o.metadata.labels ?? {}) };
+            const labels = { ...this.labels(name), ...(o.metadata.labels ?? {}) };
+            if (Object.keys(labels).length > 0) o.metadata.labels = labels;
         }
         if (this.definition.annotations) {
             main.metadata.annotations = { ...(main.metadata.annotations ?? {}), ...strings(this.definition.annotations) };
@@ -136,6 +142,12 @@ export abstract class NamedObjects<D extends NamedDefinition, S extends NamedSta
 
     /** Labels every object gets. Public: see K8sEntity.cluster. */
     labels(name: string): Record<string, string> {
+        if (this.definition.standard_labels === false) return strings(this.definition.labels);
         return { ...strings(this.definition.labels), "app.kubernetes.io/name": name, "app.kubernetes.io/managed-by": "monk" };
+    }
+
+    /** The objects this entity would apply, main object first; changes nothing on the cluster. */
+    manifests(): any[] {
+        return this.desired();
     }
 }

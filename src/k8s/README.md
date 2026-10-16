@@ -110,7 +110,13 @@ web:
 
 - The object is named after the entity unless `name` says otherwise; every
   object gets `app.kubernetes.io/name` and `app.kubernetes.io/managed-by:
-  monk`, and pods are selected by the first.
+  monk`, and pods are selected by the first. `standard_labels: false`
+  leaves those labels out, `selector` picks the pods by other labels (they
+  get them too), and `container_name` names the container; an import uses
+  these to describe objects made elsewhere as they are.
+- A port is `8080`, `80:8080` (port 80 to container port 8080) or `53/udp`,
+  named `tcp-8080` by default; `http=80:8080` names it, `=80:8080` leaves it
+  unnamed.
 - `override` takes YAML merged into the main object, for any field the
   entity has no setting for (maps merge, lists replace).
 - Changing `config_files` or the values of `secret_env` restarts the pods.
@@ -141,9 +147,12 @@ ingress:
     k8s-kubeconfig: true
 ```
 
-Each field lands in state under its name, as a string
-(`entity-state get-member("address")`); objects and lists as JSON. The
-lookup is ready once the object exists (`wait_ready: true` waits for it to
+Each field lands in `state.values` under its name, with objects and lists
+as they are in the object. Through a connection to the lookup named
+`ingress`, read it with `@ingress.state.values.address` (the `@` form
+needs a monkd from 16 October 2026 or later), or
+`connection-target("ingress") entity-state get-member("values") get-member("address")`.
+A field the object does not have is left out. The lookup is ready once the object exists (`wait_ready: true` waits for it to
 be ready by its kind's rules), and reads it again on every readiness check.
 
 See `example.yaml`.
@@ -193,10 +202,25 @@ monk load shop.yaml
 monk run imported-shop/stack
 ```
 
-The template has one `k8s/resource` per object, holding its manifest as
-the cluster has it, without status, fields the cluster set, or Secret
-values, in a group per Helm release inside one `stack`. Each is in
-`mode: observe`:
+The template has one entity per object, in a group per Helm release
+inside one `stack`. A Deployment, Service, ConfigMap or
+PersistentVolumeClaim gets its typed entity (`k8s/deployment`,
+`k8s/service`, `k8s/config-map`, `k8s/volume`) when that entity, with the
+settings read off the object, renders it exactly as the cluster has it:
+every field it would set has the cluster's value, and every other field is
+one the cluster fills in by default. Anything else is a `k8s/resource`
+holding the manifest as the cluster has it, without status, fields the
+cluster set, or Secret values, under a comment that says why its typed
+entity could not take it:
+
+```yaml
+deployment-api:
+  # k8s/resource: k8s/deployment has no setting for spec.template.spec.containers.0.livenessProbe
+  defines: k8s/resource
+```
+
+`typed=false` on `template` writes a `k8s/resource` for every object. Each
+entity is in `mode: observe`:
 
 - it maps an object that exists and never applies, changes or deletes it;
   deleting the entity only forgets it;
@@ -216,7 +240,10 @@ objects appeared or went (`state.new_objects`, `state.gone_objects`).
 Setting `mode: manage` on an observed entity and running `monk update`
 takes its objects over: Monk applies the manifest from then on, and the
 objects stay on the cluster when the entity is deleted, as adopted ones
-do. Leave objects that Argo CD or Flux manages in observe mode: two tools
+do. For a typed entity from an import that first apply changes nothing
+but the `monk.io/owner` annotation (a Deployment counts that as a new
+generation; its pods are not replaced), and from then on its settings are
+the ones to edit. Leave objects that Argo CD or Flux manages in observe mode: two tools
 applying the same fields undo each other.
 
 ## Tests

@@ -19,7 +19,7 @@ function seed(t: Test) {
     put("services/shop/web", {
         apiVersion: "v1", kind: "Service",
         metadata: { name: "web", namespace: "shop", uid: "uid-svc" },
-        spec: { type: "LoadBalancer", clusterIP: "10.96.0.12", clusterIPs: ["10.96.0.12"], selector: { app: "web" }, ports: [{ port: 80, protocol: "TCP" }] },
+        spec: { type: "LoadBalancer", clusterIP: "10.96.0.12", clusterIPs: ["10.96.0.12"], selector: { app: "web" }, ports: [{ port: 80, targetPort: 80, protocol: "TCP" }] },
         status: { loadBalancer: { ingress: [{ hostname: "web.elb.example.com" }] } },
     });
     put("configmaps/shop/settings", { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "settings", namespace: "shop", uid: "uid-cm" }, data: { mode: "fast" } });
@@ -195,6 +195,14 @@ test("an inventory writes a template that observes each object", (t) => {
     expect(yaml).toContain('  server: "' + KUBE + '"');
     expect(yaml).toContain('  token_secret: "kube-token"');
     expect(yaml).toContain('  permitted-secrets:\n    "kube-token": true\n');
+    // Typed where the typed entity renders the object as it is, else k8s/resource and why.
+    expect(yaml).toContain("deployment-web:\n  defines: k8s/deployment\n");
+    expect(yaml).toContain('  image: "nginx:1.27"\n  selector:\n    app: "web"\n  replicas: 2\n');
+    expect(yaml).toContain("service-web:\n  defines: k8s/service\n");
+    expect(yaml).toContain('  service_type: "LoadBalancer"\n  selector:\n    app: "web"\n  ports: ["=80"]\n');
+    expect(yaml).toContain("configmap-settings:\n  defines: k8s/config-map\n");
+    expect(yaml).toContain("secret-db:\n  # k8s/resource: k8s/secret would need the values in Monk; they stay on the cluster\n  defines: k8s/resource\n");
+    expect(yaml).toContain("  # managed by helm:cache\n  # k8s/resource: k8s/stateful-set makes a headless Service of its own\n  defines: k8s/resource\n");
     // Secret values stay on the cluster; what the cluster set is left out.
     expect(yaml).not.toContain("c2VjcmV0");
     expect(yaml).not.toContain("10.96.0.12");
@@ -213,7 +221,7 @@ test("the manifests an inventory writes observe the same objects", (t) => {
     const api = seed(t);
     const inv = inventory(t);
     inv.create();
-    inv.do("template");
+    inv.do("template", { typed: "false" });
     const yaml = inv.output.at(-1) ?? "";
     // Each entity's manifest, taken back out of the template, maps its object.
     const blocks = yaml.split("\n  manifest: |\n").slice(1).map((b) => b.split("\n  crons:")[0].split("\n").map((l) => l.slice(4)).join("\n"));

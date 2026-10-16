@@ -13,7 +13,7 @@ and two t3.medium nodes in us-east-1).
 | `cluster.yaml` | The EKS cluster `import-demo`: VPC, subnets, IAM roles, cluster, node group. |
 | `seed.yaml` | The "other team": a Job with cluster-admin installs podinfo and its Redis cache with Helm (release `web`), and a worker with its ConfigMap and Secret with kubectl, into namespace `shop`. |
 | `change.yaml` | A change made outside Monk: `helm upgrade` to 3 replicas, `kubectl set image` on the worker, and the worker's ConfigMap deleted. |
-| `shop.generated.yaml` | What `monk import k8s` wrote from that namespace, for reference. |
+| `shop.generated.yaml` | What `monk import k8s` wrote from that namespace, for reference, before imports wrote typed entities: today the Deployments, Services and ConfigMaps that a typed entity renders as they are come out as `k8s/deployment`, `k8s/service` and `k8s/config-map`. |
 
 Load the packages first (see `src/aws-eks/README.md`, "Before you run it").
 
