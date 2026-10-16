@@ -1,6 +1,6 @@
-import { NamedObjects, NamedDefinition, NamedState } from "./named.ts";
+import { NamedDefinition, NamedState } from "./named.ts";
 import { ManagedObject } from "./objects.ts";
-import { volumeObjects } from "./builders.ts";
+import { VolumeObjects } from "./builders.ts";
 
 /**
  * A volume pods can mount.
@@ -42,15 +42,7 @@ export interface VolumeDefinition extends NamedDefinition {
  * ## State Fields for Composition
  * - `state.name` - the claim, for a workload's volumes.<name>.claim
  */
-export class Volume extends NamedObjects<VolumeDefinition, NamedState> {
-    protected kind(): string {
-        return "PersistentVolumeClaim";
-    }
-
-    protected build(name: string): any[] {
-        return volumeObjects(name, this.definition);
-    }
-
+export class Volume extends VolumeObjects<VolumeDefinition, NamedState> {
     protected keeps(_o: ManagedObject): boolean {
         return !this.definition.delete_volumes;
     }

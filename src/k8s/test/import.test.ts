@@ -18,7 +18,7 @@ function seed(t: Test) {
     });
     put("services/shop/web", {
         apiVersion: "v1", kind: "Service",
-        metadata: { name: "web", namespace: "shop", uid: "uid-svc" },
+        metadata: { name: "web", namespace: "shop", uid: "uid-svc", managedFields: [{ manager: "kubectl-expose", operation: "Update", fieldsV1: { "f:spec": { "f:ports": {}, "f:selector": {}, "f:type": {} } } }] },
         spec: { type: "LoadBalancer", clusterIP: "10.96.0.12", clusterIPs: ["10.96.0.12"], selector: { app: "web" }, ports: [{ port: 80, targetPort: 80, protocol: "TCP" }] },
         status: { loadBalancer: { ingress: [{ hostname: "web.elb.example.com" }] } },
     });
@@ -221,7 +221,7 @@ test("the manifests an inventory writes observe the same objects", (t) => {
     const api = seed(t);
     const inv = inventory(t);
     inv.create();
-    inv.do("template", { typed: "false" });
+    inv.do("template", { typed: "False" });
     const yaml = inv.output.at(-1) ?? "";
     // Each entity's manifest, taken back out of the template, maps its object.
     const blocks = yaml.split("\n  manifest: |\n").slice(1).map((b) => b.split("\n  crons:")[0].split("\n").map((l) => l.slice(4)).join("\n"));

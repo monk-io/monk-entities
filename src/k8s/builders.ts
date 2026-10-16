@@ -1,8 +1,53 @@
-import { strings } from "./named.ts";
-import { parsePort, named } from "./workload.ts";
+import { NamedObjects, NamedDefinition, NamedState, strings } from "./named.ts";
+import { Workload, WorkloadDefinition, WorkloadState, parsePort, named } from "./workload.ts";
 
-// What the typed object entities apply, from their settings. Kept apart from
-// the entities so that an import can render an object as an entity would.
+// What the typed object entities apply, from their settings. Each entity
+// extends its class here, and an import renders objects through the same
+// class, so the two cannot drift apart.
+
+/** What k8s/deployment applies. */
+export abstract class DeploymentObjects<D extends WorkloadDefinition & { replicas?: number }, S extends WorkloadState> extends Workload<D, S> {
+    protected kind(): string {
+        return "Deployment";
+    }
+
+    protected build(name: string): any[] {
+        return this.deploymentObjects(name, this.definition.replicas);
+    }
+}
+
+/** What k8s/service applies. */
+export abstract class ServiceObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+    protected kind(): string {
+        return "Service";
+    }
+
+    protected build(name: string): any[] {
+        return serviceObjects(name, this.definition as any);
+    }
+}
+
+/** What k8s/config-map applies. */
+export abstract class ConfigMapObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+    protected kind(): string {
+        return "ConfigMap";
+    }
+
+    protected build(name: string): any[] {
+        return configMapObjects(name, this.definition as any);
+    }
+}
+
+/** What k8s/volume applies. */
+export abstract class VolumeObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+    protected kind(): string {
+        return "PersistentVolumeClaim";
+    }
+
+    protected build(name: string): any[] {
+        return volumeObjects(name, this.definition as any);
+    }
+}
 
 /** A k8s/config-map's objects. */
 export function configMapObjects(name: string, d: { data?: Record<string, unknown> }): any[] {

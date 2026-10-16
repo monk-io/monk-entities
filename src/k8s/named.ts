@@ -64,8 +64,18 @@ export function merge(a: any, b: any): any {
     return out;
 }
 
-function isMap(v: any): boolean {
+export function isMap(v: any): v is Record<string, any> {
     return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * The entries of a map setting sorted by key. Monk keeps a definition's
+ * maps as a tree and hands them back sorted, so an entity sorts them too:
+ * a list made from one (variables, volumes) is in the same order before
+ * and after the template is loaded.
+ */
+export function sorted(v: { [key: string]: any } | undefined): [string, any][] {
+    return Object.entries(v ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 /** A short hash of a value, to roll pods when what they read at start changes. */

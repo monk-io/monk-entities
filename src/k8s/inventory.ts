@@ -164,7 +164,7 @@ export class Inventory extends K8sEntity<InventoryDefinition, InventoryState> {
         const every = Number(args?.every ?? 120);
         if (!Number.isInteger(every) || every < 30) throw new Error("every is a whole number of seconds, at least 30");
 
-        const typed = String(args?.typed ?? "true") !== "false";
+        const typed = !["false", "0", "no", "off"].includes(String(args?.typed ?? "true").trim().toLowerCase());
 
         const settings: Record<string, unknown> = {};
         const connection: string[] = [];

@@ -143,6 +143,11 @@ export class Lookup extends K8sEntity<LookupDefinition, LookupState> {
         this.state.name = obj?.metadata?.name;
         this.state.namespace = obj?.metadata?.namespace;
         this.state.uid = obj?.metadata?.uid;
+        // Before values, each field had a key of its own, listed in
+        // field_names; those would stay at their last values.
+        const old = this.state as Record<string, unknown>;
+        for (const k of (old.field_names as string[] | undefined) ?? []) delete old[k];
+        delete old.field_names;
         const values: Record<string, unknown> = {};
         for (const f of d.fields ?? []) {
             const v = obj ? pick(obj, f.path) : undefined;

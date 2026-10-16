@@ -314,6 +314,22 @@ test("a lookup reads what Monk does not manage, by name or labels", (t) => {
     expect(api.state.objects.has("services/ingress/controller")).toBe(true);
 });
 
+test("a lookup drops the fields it kept at the top of state before values", (t) => {
+    const api = t.use(kube);
+    api.state.objects.set("configmaps/default/settings", { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "settings", namespace: "default" }, data: { mode: "fast" } });
+    const l = t.entity(Lookup, { server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "ConfigMap", name: "settings", fields: [{ name: "mode", path: "data.mode" }] });
+    l.secret("kube-token", "test-token");
+    l.create();
+    // As an older lookup left it.
+    const st = l.state as any;
+    st.mode = "stale";
+    st.field_names = ["mode"];
+    l.update();
+    const after = l.state as any;
+    expect([after.mode, after.field_names]).toEqual([undefined, undefined]);
+    expect(l.state.values).toEqual({ mode: "fast" });
+}, { explore: false });
+
 test("a lookup is not ready until its object exists", (t) => {
     const api = t.use(kube);
     const l = t.entity(Lookup, { server: KUBE, token_secret: "kube-token", api_version: "v1", kind: "ConfigMap", name: "later" });

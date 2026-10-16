@@ -1,4 +1,5 @@
-import { Workload, WorkloadDefinition, WorkloadState } from "./workload.ts";
+import { WorkloadDefinition, WorkloadState } from "./workload.ts";
+import { DeploymentObjects } from "./builders.ts";
 
 /**
  * Pods of a Deployment.
@@ -49,15 +50,7 @@ export interface DeploymentState extends WorkloadState {
  * - `k8s/cluster` - wire the connection fields to its state
  * - `k8s/ingress` - `service: <- connection-target("web") entity-state get-member("name")`
  */
-export class Deployment extends Workload<DeploymentDefinition, DeploymentState> {
-    protected kind(): string {
-        return "Deployment";
-    }
-
-    protected build(name: string): any[] {
-        return this.deploymentObjects(name, this.definition.replicas);
-    }
-
+export class Deployment extends DeploymentObjects<DeploymentDefinition, DeploymentState> {
     protected observeMain(obj: any): void {
         this.state.ready_replicas = obj.status?.readyReplicas ?? 0;
     }

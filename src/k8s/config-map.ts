@@ -1,5 +1,5 @@
-import { NamedObjects, NamedDefinition, NamedState } from "./named.ts";
-import { configMapObjects } from "./builders.ts";
+import { NamedDefinition, NamedState } from "./named.ts";
+import { ConfigMapObjects } from "./builders.ts";
 
 /**
  * Settings, as a ConfigMap.
@@ -25,12 +25,4 @@ export interface ConfigMapDefinition extends NamedDefinition {
  * ## State Fields for Composition
  * - `state.name`, `state.namespace` - the ConfigMap
  */
-export class ConfigMap extends NamedObjects<ConfigMapDefinition, NamedState> {
-    protected kind(): string {
-        return "ConfigMap";
-    }
-
-    protected build(name: string): any[] {
-        return configMapObjects(name, this.definition);
-    }
-}
+export class ConfigMap extends ConfigMapObjects<ConfigMapDefinition, NamedState> {}

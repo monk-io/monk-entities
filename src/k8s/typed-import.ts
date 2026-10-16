@@ -1,42 +1,13 @@
-import { NamedObjects, NamedState } from "./named.ts";
-import { Workload, WorkloadState } from "./workload.ts";
-import { configMapObjects, serviceObjects, volumeObjects } from "./builders.ts";
+import { isMap } from "./named.ts";
+import { ConfigMapObjects, DeploymentObjects, ServiceObjects, VolumeObjects } from "./builders.ts";
 import { asManifest } from "./manifest.ts";
 
-// What each typed entity would apply, rendered from its settings by the
-// same code; these are not entities of their own.
-class DeploymentRender extends Workload<any, WorkloadState> {
-    protected kind(): string {
-        return "Deployment";
-    }
-    protected build(name: string): any[] {
-        return this.deploymentObjects(name, this.definition.replicas);
-    }
-}
-class ServiceRender extends NamedObjects<any, NamedState> {
-    protected kind(): string {
-        return "Service";
-    }
-    protected build(name: string): any[] {
-        return serviceObjects(name, this.definition);
-    }
-}
-class ConfigMapRender extends NamedObjects<any, NamedState> {
-    protected kind(): string {
-        return "ConfigMap";
-    }
-    protected build(name: string): any[] {
-        return configMapObjects(name, this.definition);
-    }
-}
-class VolumeRender extends NamedObjects<any, NamedState> {
-    protected kind(): string {
-        return "PersistentVolumeClaim";
-    }
-    protected build(name: string): any[] {
-        return volumeObjects(name, this.definition);
-    }
-}
+// What each typed entity would apply, rendered by the class the entity
+// itself extends; these are not entities of their own.
+class DeploymentRender extends DeploymentObjects<any, any> {}
+class ServiceRender extends ServiceObjects<any, any> {}
+class ConfigMapRender extends ConfigMapObjects<any, any> {}
+class VolumeRender extends VolumeObjects<any, any> {}
 
 /** A typed entity for an object: its type and its settings. */
 export interface Typed {
@@ -87,8 +58,12 @@ export function typedFor(live: any, connection: Record<string, unknown>): Choice
     const kind = KINDS[key];
     if (!kind) return NOT_LIFTED[key] ? { reason: NOT_LIFTED[key] } : {};
     const m = asManifest(live);
+    const pinned = PINNED.filter((f) => setBySomeone(live, f));
+    if (pinned.length > 0) return { reason: `${kind.type} has no setting for ${pinned.join(", ")}, which was set by hand` };
     const fields = kind.lift(m);
     if (typeof fields === "string") return { reason: `${kind.type}: ${fields}` };
+    const script = arrowScript(fields);
+    if (script) return { reason: `${kind.type}: ${script} starts with <-, which Monk would read as ArrowScript` };
     let rendered: any[];
     try {
         const ent = new kind.entity({ ...connection, ...fields, mode: "observe" }, {}, { path: `import/${m.metadata.name}` });
@@ -112,6 +87,54 @@ export function typedFor(live: any, connection: Record<string, unknown>): Choice
 
 function some(paths: string[]): string {
     return paths.length <= 3 ? paths.join(", ") : `${paths.slice(0, 3).join(", ")} and ${paths.length - 3} more`;
+}
+
+/**
+ * Fields the cluster picks when nobody does, but someone may set: a
+ * NodePort, a Service's IP, the volume a claim binds. A typed entity has no
+ * setting for them, so an object that has one set by hand stays a
+ * k8s/resource, whose manifest keeps it.
+ */
+const PINNED = ["nodePort", "healthCheckNodePort", "clusterIP", "volumeName"];
+
+/** The cluster's own controllers, which bind claims and the like. */
+const CLUSTER_MANAGERS = ["kube-controller-manager", "kube-scheduler"];
+
+/**
+ * Whether a manager other than the cluster's own owns field f anywhere in
+ * live. Without managed fields there is no telling, so it counts as set.
+ */
+function setBySomeone(live: any, f: string): boolean {
+    const managed: any[] | undefined = live.metadata?.managedFields;
+    const present = JSON.stringify(live.spec ?? {}).includes(`"${f}":`);
+    if (!present) return false;
+    if (f === "clusterIP" && live.spec?.clusterIP === "None") return false;
+    if (!managed) return true;
+    return managed.some((m) => !CLUSTER_MANAGERS.includes(m.manager) && JSON.stringify(m.fieldsV1 ?? {}).includes(`"f:${f}"`));
+}
+
+/** The path of the first string in v that Monk would read as ArrowScript. */
+function arrowScript(v: unknown, path = ""): string | undefined {
+    if (typeof v === "string") return v.trimStart().startsWith("<-") ? path : undefined;
+    if (Array.isArray(v)) {
+        for (let i = 0; i < v.length; i++) {
+            const p = arrowScript(v[i], `${path}[${i}]`);
+            if (p) return p;
+        }
+        return undefined;
+    }
+    if (isMap(v)) {
+        for (const [k, x] of Object.entries(v)) {
+            const p = arrowScript(x, path ? `${path}.${k}` : k);
+            if (p) return p;
+        }
+    }
+    return undefined;
+}
+
+/** Whether names are in the order Monk keeps a map's keys in. */
+function inOrder(names: string[]): boolean {
+    return names.every((n, i) => i === 0 || names[i - 1] < n);
 }
 
 /** The settings every typed entity takes from metadata. */
@@ -139,6 +162,11 @@ function liftDeployment(m: any): Record<string, unknown> | string {
     if (c.args) f.args = c.args;
 
     const env: Record<string, string> = {};
+    // Variables and volumes are maps in the template, which Monk keeps
+    // sorted, so the entity writes them sorted; other orders would change.
+    if (!inOrder((c.env ?? []).map((e: any) => e.name))) return "its variables are not in alphabetical order, as it keeps them";
+    if (!inOrder((c.volumeMounts ?? []).map((v: any) => v.name))) return "its volumes are not in alphabetical order, as it keeps them";
+    if (!inOrder((pod.volumes ?? []).map((v: any) => v.name))) return "its volumes are not in alphabetical order, as it keeps them";
     for (const e of c.env ?? []) {
         if (e.valueFrom) return `variable ${e.name} is read from a ${Object.keys(e.valueFrom)[0]}`;
         env[e.name] = e.value ?? "";
@@ -260,7 +288,6 @@ const DEFAULTS: Record<string, unknown> = {
     "spec.template.spec.containers.*.readinessProbe.timeoutSeconds": 1,
     "spec.template.spec.containers.*.readinessProbe.successThreshold": 1,
     "spec.template.spec.containers.*.readinessProbe.httpGet.scheme": "HTTP",
-    "spec.template.spec.volumes.*.configMap.defaultMode": 420,
     "spec.sessionAffinity": "None",
     "spec.internalTrafficPolicy": "Cluster",
     "spec.externalTrafficPolicy": "Cluster",
@@ -269,7 +296,10 @@ const DEFAULTS: Record<string, unknown> = {
     "spec.volumeMode": "Filesystem",
 };
 
-/** Fields the cluster allocates or picks, whatever their value. */
+/**
+ * Fields the cluster allocates or picks, whatever their value; the ones
+ * someone may pin (PINNED) are checked before an object gets this far.
+ */
 const ALLOCATED = ["spec.clusterIPs", "spec.ipFamilies", "spec.ipFamilyPolicy", "spec.ports.*.nodePort", "spec.healthCheckNodePort", "spec.volumeName"];
 
 /** Whether the cluster put value at path in parent by itself. */
@@ -318,10 +348,6 @@ function show(path: string[]): string {
     return path.map((s) => (/^[A-Za-z0-9_-]+$/.test(s) ? s : JSON.stringify(s))).join(".");
 }
 
-function isMap(v: unknown): v is Record<string, any> {
-    return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
 /** Whether v is more than nothing: a map or list with something in it, or a value. */
 function filled(v: unknown): boolean {
     if (v === undefined || v === null) return false;
@@ -337,9 +363,12 @@ function canonical(v: unknown): string {
     return JSON.stringify(v ?? null);
 }
 
+/** Words YAML 1.1 reads as a boolean or null rather than a string. */
+const YAML_WORDS = /^(y|yes|n|no|true|false|on|off|null)$/i;
+
 /** A template key: plain when YAML reads it back as written, else quoted. */
 function yamlKey(k: string): string {
-    return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(k) ? k : JSON.stringify(k);
+    return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(k) && !YAML_WORDS.test(k) ? k : JSON.stringify(k);
 }
 
 /**
