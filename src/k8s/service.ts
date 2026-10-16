@@ -1,5 +1,5 @@
-import { NamedObjects, NamedDefinition, NamedState } from "./named.ts";
-import { serviceObjects } from "./builders.ts";
+import { NamedDefinition, NamedState } from "./named.ts";
+import { ServiceObjects } from "./builders.ts";
 
 /**
  * A Service in front of pods.
@@ -43,12 +43,4 @@ export interface ServiceDefinition extends NamedDefinition {
  * - `state.host`, `state.port`, `state.endpoint` - the best way in: its load balancer, else a node and the node port, else its cluster IP
  * - `state.cluster_ip`, `state.load_balancer`, `state.node_port`, `state.node_address`
  */
-export class Service extends NamedObjects<ServiceDefinition, NamedState> {
-    protected kind(): string {
-        return "Service";
-    }
-
-    protected build(name: string): any[] {
-        return serviceObjects(name, this.definition);
-    }
-}
+export class Service extends ServiceObjects<ServiceDefinition, NamedState> {}

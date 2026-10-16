@@ -3,8 +3,11 @@ import { OWNER } from "./objects.ts";
 /** Fields the cluster sets, which a manifest leaves out. */
 const SET_BY_CLUSTER = ["uid", "resourceVersion", "generation", "creationTimestamp", "managedFields", "ownerReferences", "selfLink", "deletionTimestamp", "deletionGracePeriodSeconds"];
 const ANNOTATIONS_BY_TOOLS = ["kubectl.kubernetes.io/last-applied-configuration", "deployment.kubernetes.io/revision", OWNER];
-/** Annotations the cluster's volume controllers leave, by prefix. */
-const ANNOTATION_PREFIXES_BY_CLUSTER = ["pv.kubernetes.io/", "volume.kubernetes.io/", "volume.beta.kubernetes.io/"];
+/**
+ * Annotations the volume controllers leave on a claim, by prefix; the
+ * legacy volume.beta.kubernetes.io/storage-class is a user's and stays.
+ */
+const CLAIM_ANNOTATIONS_BY_CLUSTER = ["pv.kubernetes.io/", "volume.kubernetes.io/", "volume.beta.kubernetes.io/storage-provisioner"];
 const FINALIZERS_BY_CLUSTER = ["kubernetes.io/pvc-protection"];
 
 /**
@@ -18,7 +21,8 @@ export function asManifest(obj: any): any {
     if (metadata.annotations) {
         const annotations: Record<string, string> = {};
         for (const [k, v] of Object.entries(metadata.annotations as Record<string, string>)) {
-            if (ANNOTATIONS_BY_TOOLS.includes(k) || ANNOTATION_PREFIXES_BY_CLUSTER.some((p) => k.startsWith(p))) continue;
+            if (ANNOTATIONS_BY_TOOLS.includes(k)) continue;
+            if (obj.kind === "PersistentVolumeClaim" && CLAIM_ANNOTATIONS_BY_CLUSTER.some((p) => k.startsWith(p))) continue;
             annotations[k] = v;
         }
         if (Object.keys(annotations).length === 0) delete metadata.annotations;

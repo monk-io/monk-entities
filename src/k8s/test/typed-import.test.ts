@@ -47,7 +47,11 @@ function deployment(): any {
 function service(): any {
     return {
         apiVersion: "v1", kind: "Service",
-        metadata: { name: "web", namespace: "shop", uid: "uid-svc", resourceVersion: "815", creationTimestamp: "2026-10-16T09:00:01Z", labels: { app: "web" } },
+        metadata: {
+            name: "web", namespace: "shop", uid: "uid-svc", resourceVersion: "815", creationTimestamp: "2026-10-16T09:00:01Z", labels: { app: "web" },
+            // What kubectl set; the cluster IP was allocated, so nobody owns it.
+            managedFields: [{ manager: "kubectl-expose", operation: "Update", fieldsV1: { "f:metadata": { "f:labels": { "f:app": {} } }, "f:spec": { "f:ports": { "k:{\"port\":80,\"protocol\":\"TCP\"}": { "f:port": {}, "f:protocol": {}, "f:targetPort": {} } }, "f:selector": {}, "f:sessionAffinity": {}, "f:type": {} } } }],
+        },
         spec: {
             ports: [{ port: 80, protocol: "TCP", targetPort: 8080 }],
             selector: { app: "web" },
@@ -79,6 +83,11 @@ function claim(): any {
             name: "data", namespace: "shop", uid: "uid-pvc",
             annotations: { "pv.kubernetes.io/bind-completed": "yes", "volume.kubernetes.io/storage-provisioner": "rancher.io/local-path", "volume.kubernetes.io/selected-node": "kind-control-plane" },
             finalizers: ["kubernetes.io/pvc-protection"],
+            // Bound by the cluster's binder, not by whoever made the claim.
+            managedFields: [
+                { manager: "kubectl-client-side-apply", operation: "Update", fieldsV1: { "f:spec": { "f:accessModes": {}, "f:resources": { "f:requests": { "f:storage": {} } }, "f:volumeMode": {} } } },
+                { manager: "kube-controller-manager", operation: "Update", fieldsV1: { "f:spec": { "f:volumeName": {} } } },
+            ],
         },
         spec: { accessModes: ["ReadWriteOnce"], resources: { requests: { storage: "1Gi" } }, storageClassName: "standard", volumeMode: "Filesystem", volumeName: "pvc-0b7e" },
         status: { phase: "Bound", capacity: { storage: "1Gi" } },
@@ -138,6 +147,33 @@ test("an object a typed entity cannot render as it is falls back, saying why", (
     fromSecret.spec.template.spec.containers[0].env = [{ name: "TOKEN", valueFrom: { secretKeyRef: { name: "db", key: "token" } } }];
     expect(reason(fromSecret)).toBe("k8s/deployment: variable TOKEN is read from a secretKeyRef");
 
+    // Variables in an order other than the one Monk keeps a map in.
+    const unsorted = deployment();
+    unsorted.spec.template.spec.containers[0].env = [{ name: "ZED", value: "1" }, { name: "ALPHA", value: "2" }];
+    expect(reason(unsorted)).toBe("k8s/deployment: its variables are not in alphabetical order, as it keeps them");
+    const alphabetical = deployment();
+    alphabetical.spec.template.spec.containers[0].env = [{ name: "ALPHA", value: "2" }, { name: "ZED", value: "1" }];
+    expect(typedFor(alphabetical, CONNECTION).typed?.fields.env).toEqual({ ALPHA: "2", ZED: "1" });
+
+    // What someone pinned, and a typed entity has no setting for.
+    const nodePort = service();
+    nodePort.spec.type = "NodePort";
+    nodePort.spec.ports[0].nodePort = 30080;
+    expect(typedFor(nodePort, CONNECTION).typed?.fields.service_type).toBe("NodePort");
+    nodePort.metadata.managedFields[0].fieldsV1["f:spec"]["f:ports"]['k:{"port":80,"protocol":"TCP"}']["f:nodePort"] = {};
+    expect(reason(nodePort)).toBe("k8s/service has no setting for nodePort, which was set by hand");
+    const bound = claim();
+    bound.metadata.managedFields[0].fieldsV1["f:spec"]["f:volumeName"] = {};
+    expect(reason(bound)).toBe("k8s/volume has no setting for volumeName, which was set by hand");
+    const unknown = service();
+    delete unknown.metadata.managedFields;
+    expect(reason(unknown)).toBe("k8s/service has no setting for clusterIP, which was set by hand");
+
+    // A value Monk would run as ArrowScript stays inside a manifest.
+    const script = configMap();
+    script.data.greeting = "<- not a script";
+    expect(reason(script)).toBe("k8s/config-map: data.greeting starts with <-, which Monk would read as ArrowScript");
+
     const named = service();
     named.spec.ports[0].targetPort = "http";
     expect(reason(named)).toBe("k8s/service: port 80 sends to a port named http");
@@ -190,9 +226,12 @@ test("a typed entity from an import, switched to manage, applies the object as i
 test("the settings an import writes read back as they were written", () => {
     const fields = typedFor(configMap(), CONNECTION).typed!.fields;
     fields.labels = { "app.kubernetes.io/part-of": "shop", tier: "1" };
+    // Words YAML 1.1 reads as booleans stay strings.
+    (fields.data as any).on = "yes";
+    (fields.data as any).NO = "off";
     fields.env = { GREETING: "it's \"fine\"", EMPTY: "" };
     const yaml = ["thing:", ...Object.entries(fields).flatMap(([k, v]) => yamlField(k, v, "  "))].join("\n");
-    expect(yaml).toContain('  data:\n    mode: "fast"\n    nginx.conf: |\n      server {\n        listen 8080;\n      }\n');
+    expect(yaml).toContain('  data:\n    mode: "fast"\n    nginx.conf: |\n      server {\n        listen 8080;\n      }\n    "on": "yes"\n    "NO": "off"\n');
     expect(k8s.parse(yaml)[0].thing).toEqual(fields);
 });
 

@@ -1,6 +1,6 @@
 import k8s from "k8s";
 import secret from "secret";
-import { NamedObjects, NamedDefinition, NamedState, strings, digest, dnsName } from "./named.ts";
+import { NamedObjects, NamedDefinition, NamedState, strings, digest, dnsName, sorted } from "./named.ts";
 import { ManagedObject } from "./objects.ts";
 
 /**
@@ -254,12 +254,12 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
         if (d.args) container.args = d.args.map(String);
         if (ports.length > 0) container.ports = ports.map((p) => named({ name: p.name, containerPort: p.target, protocol: p.protocol }));
 
-        const env: any[] = Object.entries(strings(d.env)).map(([k, v]) => ({ name: k, value: v }));
+        const env: any[] = sorted(strings(d.env)).map(([k, v]) => ({ name: k, value: v }));
         const secretEnv = strings(d.secret_env);
         if (Object.keys(secretEnv).length > 0) {
             const sname = `${name}-env`;
             const values: Record<string, string> = {};
-            for (const [k, ref] of Object.entries(secretEnv)) {
+            for (const [k, ref] of sorted(secretEnv)) {
                 values[k] = secret.get(ref);
                 env.push({ name: k, valueFrom: { secretKeyRef: { name: sname, key: k } } });
             }
@@ -283,7 +283,7 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
 
         const volumes: any[] = [];
         const mounts: any[] = [];
-        const files = Object.entries(d.config_files ?? {});
+        const files = sorted(d.config_files);
         if (files.length > 0) {
             const cname = `${name}-files`;
             const data: Record<string, string> = {};
@@ -300,7 +300,7 @@ export abstract class Workload<D extends WorkloadDefinition, S extends WorkloadS
             // a change restarts the pods.
             annotations["monk.io/files"] = digest(data);
         }
-        for (const [key, v] of Object.entries(d.storage ?? {})) {
+        for (const [key, v] of sorted(d.storage)) {
             if (!v?.path) throw new Error(`storage ${key} needs a path`);
             const vname = dnsName(key);
             mounts.push(v.read_only ? { name: vname, mountPath: v.path, readOnly: true } : { name: vname, mountPath: v.path });
