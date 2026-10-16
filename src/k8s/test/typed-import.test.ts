@@ -65,7 +65,10 @@ function service(): any {
 function headless(): any {
     return {
         apiVersion: "v1", kind: "Service",
-        metadata: { name: "cache", namespace: "shop", uid: "uid-cache" },
+        metadata: {
+            name: "cache", namespace: "shop", uid: "uid-cache",
+            managedFields: [{ manager: "kubectl-client-side-apply", operation: "Update", fieldsV1: { "f:spec": { "f:clusterIP": {}, "f:internalTrafficPolicy": {}, "f:ports": {}, "f:selector": {}, "f:sessionAffinity": {}, "f:type": {} } } }],
+        },
         spec: {
             ports: [{ name: "redis", port: 6379, protocol: "TCP", targetPort: 6379 }],
             selector: { app: "cache" },
@@ -81,7 +84,7 @@ function claim(): any {
         apiVersion: "v1", kind: "PersistentVolumeClaim",
         metadata: {
             name: "data", namespace: "shop", uid: "uid-pvc",
-            annotations: { "pv.kubernetes.io/bind-completed": "yes", "volume.kubernetes.io/storage-provisioner": "rancher.io/local-path", "volume.kubernetes.io/selected-node": "kind-control-plane" },
+            annotations: { "pv.kubernetes.io/bind-completed": "yes", "pv.kubernetes.io/bound-by-controller": "yes", "volume.kubernetes.io/storage-provisioner": "rancher.io/local-path", "volume.kubernetes.io/selected-node": "kind-control-plane" },
             finalizers: ["kubernetes.io/pvc-protection"],
             // Bound by the cluster's binder, not by whoever made the claim.
             managedFields: [
@@ -162,12 +165,21 @@ test("an object a typed entity cannot render as it is falls back, saying why", (
     expect(typedFor(nodePort, CONNECTION).typed?.fields.service_type).toBe("NodePort");
     nodePort.metadata.managedFields[0].fieldsV1["f:spec"]["f:ports"]['k:{"port":80,"protocol":"TCP"}']["f:nodePort"] = {};
     expect(reason(nodePort)).toBe("k8s/service has no setting for nodePort, which was set by hand");
+    // A claim made for a volume by name; the binder marks only the claims it binds itself.
     const bound = claim();
-    bound.metadata.managedFields[0].fieldsV1["f:spec"]["f:volumeName"] = {};
+    delete bound.metadata.annotations["pv.kubernetes.io/bound-by-controller"];
     expect(reason(bound)).toBe("k8s/volume has no setting for volumeName, which was set by hand");
+    const dualStack = service();
+    dualStack.spec.ipFamilyPolicy = "RequireDualStack";
+    dualStack.spec.ipFamilies = ["IPv4", "IPv6"];
+    dualStack.metadata.managedFields[0].fieldsV1["f:spec"]["f:ipFamilyPolicy"] = {};
+    expect(reason(dualStack)).toBe("k8s/service has no setting for ipFamilyPolicy, which was set by hand");
+    const fixedIP = service();
+    fixedIP.metadata.managedFields[0].fieldsV1["f:spec"]["f:clusterIP"] = {};
+    expect(reason(fixedIP)).toBe("k8s/service has no setting for clusterIP, which was set by hand");
     const unknown = service();
     delete unknown.metadata.managedFields;
-    expect(reason(unknown)).toBe("k8s/service has no setting for clusterIP, which was set by hand");
+    expect(reason(unknown)).toMatch(/^k8s\/service has no setting for clusterIP.*, and with no managedFields there is no telling whether the cluster picked it$/);
 
     // A value Monk would run as ArrowScript stays inside a manifest.
     const script = configMap();
@@ -221,6 +233,23 @@ test("a typed entity from an import, switched to manage, applies the object as i
         // owner note and what the cluster sets aside.
         expect(within(asManifest(api.state.objects.get(key)), asManifest(obj))).toEqual([]);
     }
+});
+
+test("a k8s/resource keeps a Service IP someone asked for, and drops one the cluster picked", () => {
+    const picked = service();
+    expect(asManifest(picked).spec.clusterIP).toBeUndefined();
+    const fixedIP = service();
+    fixedIP.metadata.managedFields[0].fieldsV1["f:spec"]["f:clusterIP"] = {};
+    expect(asManifest(fixedIP).spec.clusterIP).toBe(fixedIP.spec.clusterIP);
+    expect(asManifest(fixedIP).spec.clusterIPs).toBeUndefined();
+    const headless = service();
+    headless.spec.clusterIP = "None";
+    expect(asManifest(headless).spec.clusterIP).toBe("None");
+});
+
+test("an import never writes a value Monk would read as ArrowScript", () => {
+    expect(() => yamlField("greeting", "<- not a script", "  ")).toThrow("greeting starts with <-");
+    expect(() => yamlField("args", ["a", " <-b"], "  ")).toThrow("args[1] starts with <-");
 });
 
 test("the settings an import writes read back as they were written", () => {

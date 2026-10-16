@@ -5,6 +5,69 @@ import { Workload, WorkloadDefinition, WorkloadState, parsePort, named } from ".
 // extends its class here, and an import renders objects through the same
 // class, so the two cannot drift apart.
 
+/**
+ * A Service in front of pods.
+ * @interface ServiceDefinition
+ */
+export interface ServiceDefinition extends NamedDefinition {
+    /**
+     * @description Pods to send traffic to, by their app.kubernetes.io/name label: the name of a k8s/deployment or k8s/stateful-set
+     */
+    app?: string;
+
+    /**
+     * @description Pods to send traffic to, by labels (instead of app)
+     */
+    selector?: Record<string, string>;
+
+    /**
+     * @description Ports: 80, or 80:8080 to send port 80 to the pods' 8080, with /udp for UDP; http=80:8080 names the port (default tcp-80), =80 leaves it unnamed
+     */
+    ports: (number | string)[];
+
+    /**
+     * @description ClusterIP (default), NodePort, LoadBalancer or Headless
+     */
+    service_type?: string;
+}
+
+/**
+ * Settings, as a ConfigMap.
+ * @interface ConfigMapDefinition
+ */
+export interface ConfigMapDefinition extends NamedDefinition {
+    /**
+     * @description The settings: key to value
+     */
+    data: Record<string, string>;
+}
+
+/**
+ * A volume pods can mount.
+ * @interface VolumeDefinition
+ */
+export interface VolumeDefinition extends NamedDefinition {
+    /**
+     * @description Size, e.g. 10Gi
+     */
+    size: string;
+
+    /**
+     * @description Storage class (default: the cluster's default)
+     */
+    storage_class?: string;
+
+    /**
+     * @description ReadWriteOnce (default), ReadWriteMany, ReadOnlyMany or ReadWriteOncePod
+     */
+    access_mode?: string;
+
+    /**
+     * @description Delete the volume and its data when the entity is deleted (default false: it is kept, as Monk keeps a runnable's volumes)
+     */
+    delete_volumes?: boolean;
+}
+
 /** What k8s/deployment applies. */
 export abstract class DeploymentObjects<D extends WorkloadDefinition & { replicas?: number }, S extends WorkloadState> extends Workload<D, S> {
     protected kind(): string {
@@ -17,35 +80,35 @@ export abstract class DeploymentObjects<D extends WorkloadDefinition & { replica
 }
 
 /** What k8s/service applies. */
-export abstract class ServiceObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+export abstract class ServiceObjects<D extends ServiceDefinition, S extends NamedState> extends NamedObjects<D, S> {
     protected kind(): string {
         return "Service";
     }
 
     protected build(name: string): any[] {
-        return serviceObjects(name, this.definition as any);
+        return serviceObjects(name, this.definition);
     }
 }
 
 /** What k8s/config-map applies. */
-export abstract class ConfigMapObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+export abstract class ConfigMapObjects<D extends ConfigMapDefinition, S extends NamedState> extends NamedObjects<D, S> {
     protected kind(): string {
         return "ConfigMap";
     }
 
     protected build(name: string): any[] {
-        return configMapObjects(name, this.definition as any);
+        return configMapObjects(name, this.definition);
     }
 }
 
 /** What k8s/volume applies. */
-export abstract class VolumeObjects<D extends NamedDefinition, S extends NamedState> extends NamedObjects<D, S> {
+export abstract class VolumeObjects<D extends VolumeDefinition, S extends NamedState> extends NamedObjects<D, S> {
     protected kind(): string {
         return "PersistentVolumeClaim";
     }
 
     protected build(name: string): any[] {
-        return volumeObjects(name, this.definition as any);
+        return volumeObjects(name, this.definition);
     }
 }
 

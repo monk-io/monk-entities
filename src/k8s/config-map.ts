@@ -1,16 +1,5 @@
-import { NamedDefinition, NamedState } from "./named.ts";
-import { ConfigMapObjects } from "./builders.ts";
-
-/**
- * Settings, as a ConfigMap.
- * @interface ConfigMapDefinition
- */
-export interface ConfigMapDefinition extends NamedDefinition {
-    /**
-     * @description The settings: key to value
-     */
-    data: Record<string, string>;
-}
+import { NamedState } from "./named.ts";
+import { ConfigMapObjects, ConfigMapDefinition } from "./builders.ts";
 
 /**
  * @description A ConfigMap.

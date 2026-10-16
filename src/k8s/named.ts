@@ -69,14 +69,26 @@ export function isMap(v: any): v is Record<string, any> {
 }
 
 /**
- * The entries of a map setting sorted by key. Monk keeps a definition's
- * maps as a tree and hands them back sorted, so an entity sorts them too:
- * a list made from one (variables, volumes) is in the same order before
- * and after the template is loaded.
+ * The entries of a map setting in the order Monk hands them back. Monk
+ * keeps a definition's maps as a tree and returns their keys sorted, and
+ * an object lists integer keys first, in numeric order; an entity orders
+ * them the same way, so a list made from one (variables, volumes) is in
+ * the same order before and after the template is loaded.
  */
 export function sorted(v: { [key: string]: any } | undefined): [string, any][] {
-    return Object.entries(v ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return Object.entries(v ?? {}).sort(([a], [b]) => keyOrder(a, b));
 }
+
+/** The order of an object's keys once Monk has had them: integers first. */
+export function keyOrder(a: string, b: string): number {
+    const ia = INDEX.test(a);
+    const ib = INDEX.test(b);
+    if (ia !== ib) return ia ? -1 : 1;
+    if (ia) return Number(a) - Number(b);
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
+const INDEX = /^(0|[1-9][0-9]{0,8})$/;
 
 /** A short hash of a value, to roll pods when what they read at start changes. */
 export function digest(v: unknown): string {
