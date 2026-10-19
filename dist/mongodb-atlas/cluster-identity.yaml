@@ -3,5 +3,5 @@ namespace: mongodb-atlas
 cluster-identity:
   defines: module
   metadata:
-    version-hash: 4e11b07eacee
+    version-hash: c8b3ca89814c
   source: <<< cluster-identity.js
