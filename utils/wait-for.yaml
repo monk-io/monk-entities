@@ -1,19 +1,25 @@
 namespace: utils
 
+# Holds back the runnables that depend on it until an action succeeds. The
+# instance does the waiting in ArrowScript, with wait-for, which calls the
+# action every `delay` seconds, at most `max-attempts` times:
+#
+#   url-ready:
+#     defines: utils/wait-for-action
+#     ready: <- true wait-for(5, 24, "my-app/project/get-production-urls")
+#
+# The run fails when the action never succeeds. Keep `true` before wait-for:
+# a wait-for that gives up leaves an error, which has to be the last value.
 wait-for-action:
   defines: entity
   schema:
-    target:
-      type: string
-    action:
-      type: string
+    ready:
+      type: boolean
   checks:
     readiness:
-      period: 5
-      initialDelay: 5
-      attempts: 20
       code: |
         function main(def) {
-          const action = require("action");
-          action.do(`${def.target}/${def.action}`);
+          if (def.ready !== true) {
+            throw new Error("the action has not succeeded");
+          }
         }
