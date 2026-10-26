@@ -3,6 +3,8 @@ namespace: aws-sns-test
 # Standard topic for testing
 test-topic:
   defines: aws-sns/topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: monk-test-sns-topic
   display_name: Monk Test Topic
@@ -13,6 +15,8 @@ test-topic:
 # FIFO topic for testing
 test-fifo-topic:
   defines: aws-sns/topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: monk-test-sns-fifo
   fifo_topic: true
@@ -24,6 +28,8 @@ test-fifo-topic:
 # Topic with encryption
 test-encrypted-topic:
   defines: aws-sns/topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: monk-test-sns-encrypted
   display_name: Monk Test Encrypted Topic

@@ -2,6 +2,8 @@ namespace: firebase
 
 myinstance:
   defines: firebase/firebase-db-instance
+  permissions:
+    cloud: [gcp]
   name: common-access-project-4swaig
   location: us-central1
   project-id: common-access-project

@@ -6,6 +6,8 @@ namespace: cognito-auth-example
 # User Pool - The foundation for user management
 user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: CognitoAuthExample
   username_attributes:
@@ -28,6 +30,8 @@ user-pool:
 # Hosted UI Domain - Provides login/signup interface
 auth-domain:
   defines: aws-cognito/user-pool-domain
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-auth-example/user-pool
@@ -44,6 +48,8 @@ auth-domain:
 # Web Application Client - For the React frontend
 web-app-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-auth-example/user-pool
@@ -90,6 +96,8 @@ web-app-client:
 # Google Social Login Provider
 google-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-auth-example/user-pool
@@ -116,6 +124,8 @@ google-provider:
 # Identity Pool - Enables AWS resource access for authenticated users
 identity-pool:
   defines: aws-cognito/identity-pool
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-auth-example/user-pool

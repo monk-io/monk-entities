@@ -2,6 +2,8 @@ namespace: aws-iam-test
 
 test-iam-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: test-iam-policy-entity
   policy_description: "Test IAM policy for aws/iam entity integration testing"
@@ -41,6 +43,8 @@ test-iam-policy:
 
 test-iam-user:
   defines: aws-iam/iam-user
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_name: test-iam-user-entity
   create_access_keys: true
@@ -65,6 +69,8 @@ test-iam-user:
 
 test-iam-user-standalone:
   defines: aws-iam/iam-user
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_name: test-iam-standalone-user
   create_access_keys: true

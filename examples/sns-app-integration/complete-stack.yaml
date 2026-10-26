@@ -6,6 +6,8 @@ namespace: sns-app-integration
 # SNS Topics
 app-notifications:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: app-notifications-demo
   display_name: Application Notifications
@@ -19,6 +21,8 @@ app-notifications:
 
 critical-alerts:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: critical-alerts-demo
   display_name: Critical System Alerts
@@ -34,6 +38,8 @@ critical-alerts:
 
 order-events:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: order-events-demo.fifo
   display_name: Order Processing Events
@@ -50,6 +56,8 @@ order-events:
 # IAM Service Policy with SNS permissions
 sns-publisher-service-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: SNSPublisherServicePolicy
   policy_description: "SNS publish permissions for publisher service role"
@@ -100,6 +108,8 @@ sns-publisher-service-policy:
 # Service Role with SNS permissions
 sns-publisher-service-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: SNSPublisherServiceRole
   role_description: "Service role with SNS permissions for publisher application"
@@ -139,6 +149,8 @@ sns-publisher-service-role:
 # AssumeRole policy for the minimal user
 sns-assume-role-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: SNSAssumeRolePolicy
   policy_description: "Allow assuming the SNS publisher service role"
@@ -158,6 +170,8 @@ sns-assume-role-policy:
 # Minimal IAM User (can only assume roles)
 sns-assume-user:
   defines: aws-iam/iam-user
+  permissions:
+    cloud: [aws]
   permitted-secrets:
     sns-assume-role-access-key-id: true
     sns-assume-role-secret-access-key: true

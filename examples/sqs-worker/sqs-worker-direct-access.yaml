@@ -6,6 +6,8 @@ namespace: sqs-example-direct
 # SQS Queue
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-sqs-queue-direct
   delay_seconds: 0
@@ -25,6 +27,8 @@ test-queue:
 # IAM Policy for SQS access
 sqs-worker-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: SQSWorkerDirectAccessPolicy
   policy_description: "Direct SQS access for worker application"
@@ -62,6 +66,8 @@ sqs-worker-policy:
 # IAM User with access keys
 sqs-worker-user:
   defines: aws-iam/iam-user
+  permissions:
+    cloud: [aws]
   permitted-secrets:
     sqs-worker-direct-access-key-id: true
     sqs-worker-direct-secret-access-key: true

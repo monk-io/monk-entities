@@ -8,6 +8,8 @@ namespace: do-spaces-example
 # -----------------------------------------------------------------------------
 spaces-keys:
   defines: digitalocean-spaces/spaces-keys
+  permissions:
+    cloud: [digitalocean]
   permitted-secrets:
     do-spaces-access-key: true
     do-spaces-secret-key: true
@@ -28,6 +30,8 @@ spaces-keys:
 # -----------------------------------------------------------------------------
 space:
   defines: digitalocean-spaces/spaces-bucket
+  permissions:
+    cloud: [digitalocean]
   region: nyc3
   bucket_name: test-unique-backet-sergey
   permitted-secrets:

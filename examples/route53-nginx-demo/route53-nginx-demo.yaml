@@ -45,6 +45,8 @@ nginx:
 # Public hosted zone for the domain
 dns-zone:
   defines: aws-route53/hosted-zone
+  permissions:
+    cloud: [aws]
   region: us-east-1
   zone_name: example-app.com
   zone_comment: "Route53 Nginx Demo - managed by Monk"
@@ -58,6 +60,8 @@ dns-zone:
 # A record pointing to the ingress (traefik) public IP
 web-record:
   defines: aws-route53/record
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -78,6 +82,8 @@ web-record:
 # Health check for the web endpoint
 web-health-check:
   defines: aws-route53/health-check
+  permissions:
+    cloud: [aws]
   region: us-east-1
   check_type: HTTP
   fqdn: www.example-app.com

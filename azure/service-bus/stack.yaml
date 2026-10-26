@@ -2,6 +2,8 @@ namespace: service-bus
 
 busnamespace:
   defines: service-bus/bus-namespace
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -20,6 +22,8 @@ busnamespace:
 
 busqueue:
   defines: service-bus/bus-queue
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -33,6 +37,8 @@ busqueue:
 
 bustopic:
   defines: service-bus/bus-topic
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -46,6 +52,8 @@ bustopic:
 
 namespaceAuthorizationRule:
   defines: service-bus/bus-namespace-auth-role
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -67,6 +75,8 @@ namespaceAuthorizationRule:
 
 queueAuthorizationRule:
   defines: service-bus/bus-queue-auth-role
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"
@@ -89,6 +99,8 @@ queueAuthorizationRule:
 
 topicAuthorizationRule:
   defines: service-bus/bus-topic-auth-role
+  permissions:
+    cloud: [azure]
   subscriptionId: "31b0b43d-0900-45b7-86a4-4cdd3cfd2550"
   resourceGroupName: "rg-service-bus"
   namespaceName: "monkservicebusnamespace"

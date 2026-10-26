@@ -2,5 +2,7 @@ namespace: gcp
 
 my-storage:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   project: monk-379719
   name: monk-demo-1

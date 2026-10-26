@@ -10,6 +10,8 @@ namespace: do-domains-example
 # Create a domain with A record pointing to IP
 domain-with-ip:
   defines: digitalocean-domains/domain
+  permissions:
+    cloud: [digitalocean]
   name: example.com
   ip_address: 192.168.1.1
   ttl: 3600
@@ -20,6 +22,8 @@ domain-with-ip:
 # Create a domain without initial A record
 domain-only:
   defines: digitalocean-domains/domain
+  permissions:
+    cloud: [digitalocean]
   name: monk-test-domain-unique-12345.com
   services:
     data:

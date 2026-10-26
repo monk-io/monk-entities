@@ -44,6 +44,8 @@ namespace: gcp-cloudrun-multi-service
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - run.googleapis.com
     - sqladmin.googleapis.com
@@ -60,6 +62,8 @@ enable-apis:
 
 app-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: cloudrun-multi-runner
   display_name: Cloud Run multi-service demo SA
   account_description: Shared runtime identity for API service, frontend service, and export job
@@ -83,6 +87,8 @@ app-sa:
 
 exports-bucket:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   # Bucket names are globally unique — bump the suffix if you get a conflict
   name: monk-cloudrun-multi-exports-1
   location: US
@@ -107,6 +113,8 @@ exports-bucket:
 
 postgres:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   # Instance names cannot be reused for ~1 week after deletion — bump suffix on redeploy
   name: monk-cloudrun-multi-db-1
   database_version: POSTGRES_15
@@ -127,6 +135,8 @@ postgres:
 
 task-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: taskdb
   charset: UTF8
@@ -145,6 +155,8 @@ task-database:
 
 task-db-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: taskuser
   # password_secret names the Monk secret where a random password is stored
@@ -184,6 +196,9 @@ task-db-user:
 
 api:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
+    blobs: [api]
   name: cloudrun-multi-api
   location: us-central1
   blob_name: api
@@ -253,6 +268,9 @@ api:
 
 frontend:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
+    blobs: [frontend]
   name: cloudrun-multi-frontend
   location: us-central1
   blob_name: frontend
@@ -311,6 +329,8 @@ frontend:
 
 batch-export-job:
   defines: gcp/cloud-run-job
+  permissions:
+    cloud: [gcp]
   name: cloudrun-multi-export-job
   location: us-central1
   # Pre-built image: Cloud Run Jobs require an image URI (blob_name not supported).

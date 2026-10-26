@@ -11,6 +11,8 @@ namespace: gcp-test
 
 test-enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
     - bigquery.googleapis.com
@@ -31,6 +33,8 @@ test-enable-apis:
 
 test-sql-instance:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: test-postgres-instance
   database_version: POSTGRES_14
   tier: db-f1-micro
@@ -54,6 +58,8 @@ test-sql-instance:
 
 test-sql-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: test_database
   services:
@@ -75,6 +81,8 @@ test-sql-database:
 
 test-sql-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: test_user
   password_secret: test-db-password
@@ -99,6 +107,8 @@ test-sql-user:
 
 test-bigquery:
   defines: gcp/big-query
+  permissions:
+    cloud: [gcp]
   dataset: test_dataset
   location: US
   description: Test dataset for GCP entities
@@ -117,6 +127,8 @@ test-bigquery:
 
 test-storage:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   name: gcp-test-bucket-monkec-unique
   location: US
   storage_class: STANDARD
@@ -136,6 +148,8 @@ test-storage:
 
 test-memorystore:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   name: test-redis-cache
   region: us-central1
   tier: BASIC
@@ -164,6 +178,8 @@ test-memorystore:
 
 test-service-account:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: test-monkec-sa
   display_name: Test Service Account
   description: Service account for MonkEC testing
@@ -184,6 +200,8 @@ test-service-account:
 
 test-service-account-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   secret: test-sa-credentials
   service_account_id: <- connection-target("service-account") entity-state get-member("unique_id")
   permitted-secrets:
@@ -207,6 +225,8 @@ test-service-account-key:
 
 test-storage-hmac-keys:
   defines: gcp/cloud-storage-hmac-keys
+  permissions:
+    cloud: [gcp]
   service_account_email: <- connection-target("service-account") entity-state get-member("email")
   access_key_secret_ref: test-gcs-hmac-access-key
   secret_key_secret_ref: test-gcs-hmac-secret-key
@@ -230,6 +250,8 @@ test-storage-hmac-keys:
 
 test-dns-zone:
   defines: gcp/cloud-dns-zone
+  permissions:
+    cloud: [gcp]
   name: test-monkec-dns-zone
   dns_name: "test-monkec-dns.example.com."
   zone_description: "MonkEC integration test zone"
@@ -251,6 +273,8 @@ test-dns-zone:
 
 test-dns-record:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   zone_name: test-monkec-dns-zone
   record_name: "www.test-monkec-dns.example.com."
   record_type: A
@@ -269,6 +293,8 @@ test-dns-record:
 
 test-artifact-registry:
   defines: gcp/artifact-registry-repository
+  permissions:
+    cloud: [gcp]
   name: test-monkec-docker-repo
   location: us-central1
   repo_format: DOCKER
@@ -293,6 +319,8 @@ test-artifact-registry:
 
 test-project-iam-binding:
   defines: gcp/project-iam-binding
+  permissions:
+    cloud: [gcp]
   role: roles/browser
   member: <- `serviceAccount:${connection-target("sa") entity-state get-member("email")}`
   connections:
@@ -312,6 +340,8 @@ test-project-iam-binding:
 
 test-resource-iam-binding:
   defines: gcp/resource-iam-binding
+  permissions:
+    cloud: [gcp]
   resource_type: storage_bucket
   resource_id: gcp-test-bucket-monkec-unique
   role: roles/storage.objectViewer
@@ -336,6 +366,8 @@ test-resource-iam-binding:
 
 test-pubsub-topic:
   defines: gcp/pubsub-topic
+  permissions:
+    cloud: [gcp]
   name: test-monkec-topic
   labels:
     environment: test
@@ -355,6 +387,8 @@ test-pubsub-topic:
 
 test-pubsub-subscription:
   defines: gcp/pubsub-subscription
+  permissions:
+    cloud: [gcp]
   name: test-monkec-subscription
   topic_name: <- connection-target("topic") entity-state get-member("topic_name")
   ack_deadline_seconds: 30

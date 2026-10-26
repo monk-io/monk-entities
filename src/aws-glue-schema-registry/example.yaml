@@ -3,6 +3,8 @@ namespace: aws-glue-schema-registry-example
 # Schema Registry - container for schemas
 my-registry:
   defines: aws-glue-schema-registry/registry
+  permissions:
+    cloud: [aws]
   region: us-east-1
   registry_name: example-data-registry
   registry_description: Example schema registry for data pipeline schemas
@@ -13,6 +15,8 @@ my-registry:
 # AVRO Schema for user events
 user-events-schema:
   defines: aws-glue-schema-registry/schema
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -35,6 +39,8 @@ user-events-schema:
 # JSON Schema for orders
 order-schema:
   defines: aws-glue-schema-registry/schema
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:

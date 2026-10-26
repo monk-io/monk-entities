@@ -3,6 +3,8 @@ namespace: digitalocean-database-test
 # PostgreSQL database cluster — primary test instance
 test-postgres-db:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: monkec-test-pg-cluster
   engine: pg
   version: "16"

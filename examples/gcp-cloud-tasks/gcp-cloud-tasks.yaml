@@ -8,6 +8,8 @@ namespace: gcp-cloud-tasks
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - cloudtasks.googleapis.com
     - iam.googleapis.com
@@ -16,6 +18,8 @@ enable-apis:
 
 tasks-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: cloud-tasks-demo-sa
   display_name: Cloud Tasks Demo Service Account
   roles:
@@ -32,6 +36,8 @@ tasks-sa:
 
 tasks-sa-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   secret: cloud-tasks-sa-key
   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
   permitted-secrets:
@@ -51,6 +57,8 @@ tasks-sa-key:
 # Queue with conservative rate limits and retry policy
 task-queue:
   defines: gcp/cloud-tasks-queue
+  permissions:
+    cloud: [gcp]
   name: demo-task-queue
   location: us-central1
   max_dispatches_per_second: 10

@@ -93,6 +93,8 @@ Notes:
 
 - Provide `example.yaml` and `test/stack-template.yaml`
 - Include `permitted-secrets` for all secrets used by the entity
+- Include `permissions: {cloud: [<provider>]}` on every instance of an entity that uses `cloud/*`
+  with the cluster's credentials, and `blobs: [<name>]` when it reads a blob (`doc/templates.md`)
 
 ## Readiness
 

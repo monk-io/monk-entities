@@ -7,6 +7,8 @@ namespace: gcp-iap-test
 
 enable-iap-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - iap.googleapis.com
 
@@ -18,6 +20,8 @@ enable-iap-api:
 
 test-iap-brand:
   defines: gcp/iap-brand
+  permissions:
+    cloud: [gcp]
   services:
     data:
       protocol: custom
@@ -29,6 +33,8 @@ test-iap-brand:
 
 test-iap-oauth-client:
   defines: gcp/iap-oauth-client
+  permissions:
+    cloud: [gcp]
   brand_id: <- connection-target("brand") entity-state get-member("brand_id")
   display_name: monk-iap-test-client
   secret_ref: gcp-iap-test-client-secret
@@ -54,6 +60,8 @@ test-iap-oauth-client:
 
 test-iap-tunnel-group:
   defines: gcp/iap-tunnel-dest-group
+  permissions:
+    cloud: [gcp]
   name: monk-iap-test-group
   location: us-central1
   cidrs:
@@ -71,6 +79,8 @@ test-iap-tunnel-group:
 
 test-iap-access-policy:
   defines: gcp/iap-access-policy
+  permissions:
+    cloud: [gcp]
   target_kind: project
   role: roles/iap.httpsResourceAccessor
   members:

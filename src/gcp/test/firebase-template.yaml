@@ -9,6 +9,8 @@ namespace: gcp-firebase-test
 
 enable-firebase-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - firebase.googleapis.com
     - firebasehosting.googleapis.com
@@ -16,6 +18,8 @@ enable-firebase-apis:
 # Firebase Hosting site (creates a {name}.web.app subdomain)
 test-firebase-site:
   defines: gcp/firebase-hosting-site
+  permissions:
+    cloud: [gcp]
   name: monk-test-site-xyz123
   services:
     data:
@@ -29,6 +33,8 @@ test-firebase-site:
 # Preview channel for the site above (short TTL so it self-cleans)
 test-firebase-channel:
   defines: gcp/firebase-hosting-channel
+  permissions:
+    cloud: [gcp]
   name: monk-test-preview
   site: <- connection-target("site") entity-state get-member("site_id")
   ttl: "3600s"

@@ -3,6 +3,8 @@ namespace: dynamodb-example
 # DynamoDB Table using our custom entity
 users-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: users-table
 

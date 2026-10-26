@@ -3,6 +3,8 @@ namespace: aws-s3-example
 # Basic S3 bucket
 my-basic-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: my-basic-s3-bucket
   versioning: false
@@ -15,6 +17,8 @@ my-basic-bucket:
 # S3 bucket with versioning and CORS
 my-website-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-west-2
   bucket_name: my-website-bucket
   versioning: true
@@ -35,6 +39,8 @@ my-website-bucket:
 # S3 bucket with lifecycle rules
 my-data-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: my-data-archive-bucket
   versioning: true
@@ -65,6 +71,8 @@ my-data-bucket:
 # S3 bucket with encryption
 my-secure-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: my-secure-documents-bucket
   versioning: true
@@ -83,6 +91,8 @@ my-secure-bucket:
 # S3 bucket for static website hosting
 my-website-hosting-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: my-static-website-bucket
   versioning: false

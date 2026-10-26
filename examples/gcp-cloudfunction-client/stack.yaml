@@ -37,6 +37,8 @@ function-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - cloudfunctions.googleapis.com
     - cloudbuild.googleapis.com
@@ -53,6 +55,8 @@ enable-apis:
 
 function-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: cloudfunction-invoker
   display_name: Cloud Function Invoker
   description: Service account for invoking cloud functions
@@ -94,6 +98,9 @@ function-sa:
 
 hello-function:
   defines: gcp/cloud-function
+  permissions:
+    cloud: [gcp]
+    blobs: [hello-function-code]
   name: hello-world-gen2
   location: us-central1
   blob_name: hello-function-code

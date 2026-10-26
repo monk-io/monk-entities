@@ -25,6 +25,8 @@ namespace: azure-postgresql-test
 # ----------------------------------------------------------------------------
 flexible-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   server_name: monk-test-pg-server
@@ -55,6 +57,8 @@ flexible-server:
 # ----------------------------------------------------------------------------
 test-database:
   defines: azure-postgresql/database
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   server_name: monk-test-pg-server

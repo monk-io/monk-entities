@@ -5,6 +5,8 @@ namespace: aws-dynamo-db-backup-test
 
 backup-test-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: monkec-backup-test-table
   attribute_definitions:

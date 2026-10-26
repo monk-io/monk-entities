@@ -6,6 +6,8 @@ namespace: sqs-example-assume-role
 # SQS Queue
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-sqs-queue-assume-role
   delay_seconds: 0
@@ -25,6 +27,8 @@ test-queue:
 # Service Role with SQS permissions
 sqs-worker-service-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: SQSWorkerServiceRole
   role_description: "Service role with SQS permissions for worker application"
@@ -64,6 +68,8 @@ sqs-worker-service-role:
 # Policy with SQS permissions
 sqs-worker-service-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: SQSWorkerServicePolicy
   policy_description: "SQS permissions for worker service role"
@@ -101,6 +107,8 @@ sqs-worker-service-policy:
 # AssumeRole policy for the minimal user
 sqs-assume-role-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: SQSAssumeRolePolicy
   policy_description: "Allow assuming the SQS worker service role"
@@ -120,6 +128,8 @@ sqs-assume-role-policy:
 # Minimal IAM User (can only assume roles)
 sqs-assume-user:
   defines: aws-iam/iam-user
+  permissions:
+    cloud: [aws]
   permitted-secrets:
     sqs-assume-role-access-key-id: true
     sqs-assume-role-secret-access-key: true

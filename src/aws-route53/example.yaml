@@ -3,6 +3,8 @@ namespace: aws-route53-example
 # Public hosted zone
 my-zone:
   defines: aws-route53/hosted-zone
+  permissions:
+    cloud: [aws]
   region: us-east-1
   zone_name: my-domain.com
   zone_comment: "Managed by Monk"
@@ -16,6 +18,8 @@ my-zone:
 # A record pointing to an IP
 web-record:
   defines: aws-route53/record
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -36,6 +40,8 @@ web-record:
 # MX record for email
 mail-record:
   defines: aws-route53/record
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -57,6 +63,8 @@ mail-record:
 # TXT record for SPF
 spf-record:
   defines: aws-route53/record
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -77,6 +85,8 @@ spf-record:
 # CNAME record
 api-record:
   defines: aws-route53/record
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:
@@ -97,6 +107,8 @@ api-record:
 # Health check for the web server
 web-health-check:
   defines: aws-route53/health-check
+  permissions:
+    cloud: [aws]
   region: us-east-1
   check_type: HTTPS
   fqdn: www.my-domain.com
@@ -110,6 +122,8 @@ web-health-check:
 # Private hosted zone for internal DNS
 internal-zone:
   defines: aws-route53/hosted-zone
+  permissions:
+    cloud: [aws]
   region: us-east-1
   zone_name: internal.my-domain.com
   is_private: true

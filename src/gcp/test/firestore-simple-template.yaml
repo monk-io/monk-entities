@@ -3,6 +3,8 @@ namespace: gcp-firestore-test
 
 enable-firestore-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - firestore.googleapis.com
   services:
@@ -11,6 +13,8 @@ enable-firestore-api:
 
 backup-firestore:
   defines: gcp/firestore
+  permissions:
+    cloud: [gcp]
   database_id: monk-test-firestore
   location: us-central1
   depends:

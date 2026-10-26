@@ -2,6 +2,8 @@ namespace: firebase
 
 exif:
   defines: firebase/cloudfunc-v1
+  permissions:
+    cloud: [gcp]
   files:
     index:
       path: index.js
