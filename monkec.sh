@@ -1,7 +1,7 @@
 #!/bin/sh
 # Wrapper for running MonkEC Docker image for compile/test
 
-MONKEC_IMAGE="${MONKEC_IMAGE:-monkimages.azurecr.io/monkec:main}"
+MONKEC_IMAGE="${MONKEC_IMAGE:-images.monk.io/monkec:main}"
 MONK_SOCKET="${MONK_SOCKET:-/var/lib/monkd/monkd.sock}"
 MONK_TOKEN_FOLDER="${MONK_TOKEN_FOLDER:-$HOME/.monk/}"
 

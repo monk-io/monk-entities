@@ -191,7 +191,7 @@ publisher:
       type: string
   containers:
     app:
-      image: monkimages.azurecr.io/azure-servicebus-app:latest
+      image: images.monk.io/azure-servicebus-app:latest
 
 # =============================================================================
 # Stacks

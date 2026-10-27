@@ -109,7 +109,7 @@ nextjs-app:
       type: string
   containers:
     app:
-      image: monkimages.azurecr.io/clerk-auth-next-app:latest
+      image: images.monk.io/clerk-auth-next-app:latest
       ports:
         - "3000:3000"
 

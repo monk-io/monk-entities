@@ -14,7 +14,7 @@ Manages Vercel projects with full CRUD operations:
 - Build configuration
 
 ### 2. Deployment Runnable (`deploy.yaml`)
-Deploys applications to Vercel using the existing Docker image `monkimages.azurecr.io/example-vercel-build:latest` which has the Vercel CLI pre-installed.
+Deploys applications to Vercel using the existing Docker image `images.monk.io/example-vercel-build:latest` which has the Vercel CLI pre-installed.
 
 ## Usage
 
@@ -96,7 +96,7 @@ The deployment runnable supports:
 
 ## Docker Image
 
-The deployment uses the existing Docker image `monkimages.azurecr.io/example-vercel-build:latest` which includes:
+The deployment uses the existing Docker image `images.monk.io/example-vercel-build:latest` which includes:
 - Node.js runtime
 - Vercel CLI pre-installed
 - Common build tools
@@ -128,7 +128,7 @@ monk run stack-integration.test.yaml
 
 ## Best Practices
 
-1. **Use the existing Docker image**: The `monkimages.azurecr.io/example-vercel-build:latest` image is optimized for Vercel deployments
+1. **Use the existing Docker image**: The `images.monk.io/example-vercel-build:latest` image is optimized for Vercel deployments
 2. **Mount source code as blobs**: Use the `blobs://` protocol to mount your source code
 3. **Set up proper dependencies**: Ensure the project exists before deploying
 4. **Use pre-deploy scripts**: Handle dependency installation and building in the pre-deploy script

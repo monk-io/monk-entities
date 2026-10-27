@@ -28,7 +28,7 @@ mongodb-atlas/project  ──┐
 ## Prerequisites
 
 - Node.js 18+ and npm (to build the image)
-- Docker + access to `monkimages.azurecr.io`
+- Docker + access to `images.monk.io`
 - A MonkEC cluster/daemon
 - MongoDB Atlas **service-account** credentials (Org Settings → Access Manager →
   Service Accounts), stored as a Monk secret in `clientId:clientSecret` form
@@ -51,9 +51,9 @@ cd examples/mongodb-atlas-js-client
 npm install
 npm run build
 
-docker build -t monkimages.azurecr.io/mongodb-atlas-js-client:latest .
-az acr login --name monkimages
-docker push monkimages.azurecr.io/mongodb-atlas-js-client:latest
+docker build -t images.monk.io/mongodb-atlas-js-client:latest .
+docker login images.monk.io
+docker push images.monk.io/mongodb-atlas-js-client:latest
 ```
 
 ## Deploy

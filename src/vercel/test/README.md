@@ -283,7 +283,7 @@ When running the integration test, you should see:
    - Change the project name in `stack-template.yaml` if needed
 
 4. **Docker Image Issues**
-   - Ensure the `monkimages.azurecr.io/example-vercel-build:latest` image is accessible
+   - Ensure the `images.monk.io/example-vercel-build:latest` image is accessible
    - Check that the image has the Vercel CLI installed
 
 ### Debug Mode

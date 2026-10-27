@@ -113,7 +113,7 @@ tasks-client:
       type: string
   containers:
     app:
-      image: monkimages.azurecr.io/gcp-cloud-tasks:latest
+      image: images.monk.io/gcp-cloud-tasks:latest
 
 # === Deploy Everything ===
 

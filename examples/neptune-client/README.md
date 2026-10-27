@@ -7,7 +7,7 @@ A TypeScript-based client that demonstrates how to connect to and interact with 
 ✅ **Verified Working**: All components tested and operational  
 ✅ **MonkEC Integration**: Full orchestration with automatic security group management  
 ✅ **Docker Ready**: Multi-stage build with security best practices  
-✅ **Production Deployed**: Successfully deployed to Azure Container Registry  
+✅ **Production Deployed**: Successfully pushed to images.monk.io  
 ✅ **VPC Access Tested**: Validated connectivity from AWS EC2 instance  
 
 ## 🏗️ Architecture
@@ -290,7 +290,7 @@ neptune-client:
 
   containers:
     client:
-      image: monkimages.azurecr.io/neptune-client:v1
+      image: images.monk.io/neptune-client:v1
       environment:
         - NEPTUNE_USE_SSL=true
         - NEPTUNE_TIMEOUT=30000

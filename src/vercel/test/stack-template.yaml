@@ -104,7 +104,7 @@ deploy:
                 <p>This page was deployed using:</p>
                 <ul>
                     <li><strong>Monk Entities:</strong> Vercel Project & Deployment</li>
-                    <li><strong>Container:</strong> monkimages.azurecr.io/example-vercel-build:latest</li>
+                    <li><strong>Container:</strong> images.monk.io/example-vercel-build:latest</li>
                     <li><strong>Framework:</strong> Static HTML</li>
                     <li><strong>Deployment Time:</strong> <span id="timestamp"></span></li>
                 </ul>

@@ -64,7 +64,7 @@ Cloud SQL Postgres     Cloud Storage
   - `roles/storage.admin`
   - `roles/cloudbuild.builds.editor`
   - `roles/artifactregistry.admin`
-- Docker + access to `monkimages.azurecr.io` (for the job image)
+- Docker + access to `images.monk.io` (for the job image)
 
 ## Step 1 — Build and push all images
 

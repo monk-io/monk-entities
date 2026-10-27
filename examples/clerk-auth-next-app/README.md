@@ -51,11 +51,11 @@ npm install
 npm run build
 
 # Build Docker image
-docker build -t monkimages.azurecr.io/clerk-auth-next-app:latest .
+docker build -t images.monk.io/clerk-auth-next-app:latest .
 
 # Push to registry
-az acr login --name monkimages
-docker push monkimages.azurecr.io/clerk-auth-next-app:latest
+docker login images.monk.io
+docker push images.monk.io/clerk-auth-next-app:latest
 ```
 
 ### 2. Configure Secrets

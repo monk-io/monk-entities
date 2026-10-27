@@ -7,7 +7,7 @@ deploy:
     default-vercel-token: true
   containers:
     deploy:
-      image: monkimages.azurecr.io/example-vercel-build:latest
+      image: images.monk.io/example-vercel-build:latest
       restart: no
       bash: /tmp/init.sh
       paths:
