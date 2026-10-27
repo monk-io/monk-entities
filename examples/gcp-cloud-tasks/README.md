@@ -36,11 +36,10 @@ cd examples/gcp-cloud-tasks
 npm install
 npm run build
 
-docker build -t monkimages.azurecr.io/gcp-cloud-tasks:latest .
+docker build -t images.monk.io/gcp-cloud-tasks:latest .
 
-az login
-az acr login --name monkimages
-docker push monkimages.azurecr.io/gcp-cloud-tasks:latest
+docker login images.monk.io
+docker push images.monk.io/gcp-cloud-tasks:latest
 ```
 
 ### 2. Deploy with Monk

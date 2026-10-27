@@ -41,7 +41,7 @@ backend:
       protocol: tcp
   containers:
     backend:
-      image: monkimages.azurecr.io/example-backend:latest
+      image: images.monk.io/example-backend:latest
       restart: always
       bash: <- `/app/main -docker -db-conn ${db-conn}`
   depends:

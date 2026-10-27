@@ -132,7 +132,7 @@ cosmosdb-js-client:
 
   containers:
     client:
-      image: monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+      image: images.monk.io/azure-cosmosdb-js-client:latest
 
 # Configure network access control for Cosmos DB (VNet + IP Firewall)
 # Restricts access to specific Azure VNets and public IP addresses

@@ -114,7 +114,7 @@ nextjs-app:
       type: string
   containers:
     app:
-      image: monkimages.azurecr.io/workos-authkit-next-app:latest
+      image: images.monk.io/workos-authkit-next-app:latest
       ports:
         - "3000:3000"
 

@@ -6,7 +6,7 @@ deploy:
     default-gcp-service-account: true
   containers:
     deploy:
-      image: monkimages.azurecr.io/firebase-build
+      image: images.monk.io/firebase-build
       image-tag: <- $node-version
       restart: no
       bash: /tmp/init.sh

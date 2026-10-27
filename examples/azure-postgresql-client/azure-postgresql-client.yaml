@@ -233,7 +233,7 @@ postgres-client:
 
   containers:
     client:
-      image: monkimages.azurecr.io/azure-postgresql-client:latest
+      image: images.monk.io/azure-postgresql-client:latest
       environment:
         - DB_SSL_MODE=require
         - DB_CONNECTION_LIMIT=10
@@ -435,7 +435,7 @@ public-postgres-client:
 
   containers:
     client:
-      image: monkimages.azurecr.io/azure-postgresql-client:latest
+      image: images.monk.io/azure-postgresql-client:latest
       environment:
         - DB_SSL_MODE=require
         - DB_CONNECTION_LIMIT=10

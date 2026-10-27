@@ -7,7 +7,7 @@ A comprehensive TypeScript client application for Azure Cosmos DB demonstrating 
 ✅ **Verified Working**: All components tested and operational  
 ✅ **MonkEC Integration**: Full orchestration with automatic secret management  
 ✅ **Docker Ready**: Multi-stage build with security best practices  
-✅ **Production Deployed**: Successfully deployed to Azure Container Registry  
+✅ **Production Deployed**: Successfully pushed to images.monk.io  
 ✅ **Crypto Issue Resolved**: Node.js crypto module properly configured  
 
 ## 🏗️ Architecture
@@ -107,7 +107,7 @@ npm run clean
 
 ```bash
 # Build the Docker image locally
-docker build -t monkimages.azurecr.io/azure-cosmosdb-js-client:latest .
+docker build -t images.monk.io/azure-cosmosdb-js-client:latest .
 ```
 
 **Docker Build Process:**
@@ -120,24 +120,21 @@ docker build -t monkimages.azurecr.io/azure-cosmosdb-js-client:latest .
 
 ```bash
 # Run the container locally with environment file
-docker run --env-file .env monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+docker run --env-file .env images.monk.io/azure-cosmosdb-js-client:latest
 ```
 
-### 3. Azure Container Registry Authentication
+### 3. Registry Authentication
 
 ```bash
-# Login to Azure
-az login
-
-# Login to Azure Container Registry
-az acr login --name monkimages
+# Login to images.monk.io
+docker login images.monk.io
 ```
 
 ### 4. Push Image to Registry
 
 ```bash
-# Push the image to Azure Container Registry
-docker push monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+# Push the image to images.monk.io
+docker push images.monk.io/azure-cosmosdb-js-client:latest
 ```
 
 ## 📦 Complete Build & Push Workflow
@@ -152,14 +149,13 @@ npm install
 npm run build
 
 # 3. Build Docker image
-docker build -t monkimages.azurecr.io/azure-cosmosdb-js-client:latest .
+docker build -t images.monk.io/azure-cosmosdb-js-client:latest .
 
-# 4. Authenticate with Azure Container Registry
-az login
-az acr login --name monkimages
+# 4. Authenticate with images.monk.io
+docker login images.monk.io
 
 # 5. Push image to registry
-docker push monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+docker push images.monk.io/azure-cosmosdb-js-client:latest
 ```
 
 ## 🎯 MonkEC Integration ✅ **VERIFIED WORKING**
@@ -227,7 +223,7 @@ cosmosdb-js-client:
       type: string
   containers:
     client:
-      image: monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+      image: images.monk.io/azure-cosmosdb-js-client:latest
 ```
 
 ### Deploy with MonkEC
@@ -419,15 +415,15 @@ monk logs -f azure-cosmosdb-client-example/cosmosdb-js-client
 
 ```bash
 # Docker build testing
-docker build -t monkimages.azurecr.io/azure-cosmosdb-js-client:latest .
+docker build -t images.monk.io/azure-cosmosdb-js-client:latest .
 # Result: ✅ Multi-stage build successful, crypto issue resolved
 
-# Azure Container Registry testing
-docker push monkimages.azurecr.io/azure-cosmosdb-js-client:latest  
-# Result: ✅ Successfully pushed to ACR
+# Registry testing
+docker push images.monk.io/azure-cosmosdb-js-client:latest  
+# Result: ✅ Successfully pushed to images.monk.io
 
 # Container execution testing
-docker run --env-file .env monkimages.azurecr.io/azure-cosmosdb-js-client:latest
+docker run --env-file .env images.monk.io/azure-cosmosdb-js-client:latest
 # Result: ✅ Container runs successfully with crypto validation
 ```
 
@@ -495,7 +491,7 @@ The client provides detailed logging:
 - ✅ **Logging**: Structured logging with operation details and performance metrics
 - ✅ **Graceful Shutdown**: Proper SIGINT/SIGTERM signal handling
 - ✅ **Configuration**: Flexible authentication methods with automatic failover
-- ✅ **Docker Registry**: Successfully deployed to Azure Container Registry
+- ✅ **Docker Registry**: Successfully pushed to images.monk.io
 - ✅ **MonkEC Integration**: Full orchestration with dependency management
 
 ## 🎯 Summary & Next Steps

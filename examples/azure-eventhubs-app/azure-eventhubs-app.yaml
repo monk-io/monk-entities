@@ -168,7 +168,7 @@ streaming-app:
       type: string
   containers:
     app:
-      image: monkimages.azurecr.io/azure-eventhubs-app:latest
+      image: images.monk.io/azure-eventhubs-app:latest
 
 # =============================================================================
 # Stacks
