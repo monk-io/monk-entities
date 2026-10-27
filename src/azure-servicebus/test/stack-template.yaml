@@ -22,6 +22,8 @@ variables:
 # Service Bus Namespace
 test-namespace:
   defines: azure-servicebus/service-bus-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -37,6 +39,8 @@ test-namespace:
 # Test Queue
 test-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -53,6 +57,8 @@ test-queue:
 # Test Topic
 test-topic:
   defines: azure-servicebus/topic
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -68,6 +74,8 @@ test-topic:
 # Test Subscription (all messages)
 test-subscription-all:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -83,6 +91,8 @@ test-subscription-all:
 # Test Subscription (filtered)
 test-subscription-filtered:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name

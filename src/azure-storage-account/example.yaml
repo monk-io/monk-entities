@@ -3,6 +3,8 @@ namespace: azure-storage-example
 # Example 1: Basic Storage Account with Standard LRS
 basic-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   account_name: "mybasicstorage123"
@@ -22,6 +24,8 @@ basic-storage:
 # Example 2: Production Storage Account with Geo-Redundancy
 production-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   account_name: "prodstorageha123"
@@ -42,6 +46,8 @@ production-storage:
 # Example 3: Premium Block Blob Storage for high-performance workloads
 premium-blob-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "premium-rg" # Replace with your resource group
   account_name: "premiumblobstorage"
@@ -60,6 +66,8 @@ premium-blob-storage:
 # Example 4: Data Lake Storage Gen2 (Hierarchical Namespace)
 datalake-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "analytics-rg" # Replace with your resource group
   account_name: "mydatalakestorage"
@@ -79,6 +87,8 @@ datalake-storage:
 # Example 5: Storage Account with Network Rules (Firewall)
 secure-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "secure-rg" # Replace with your resource group
   account_name: "securestorage123"
@@ -106,6 +116,8 @@ secure-storage:
 # Example 6: Storage Account with Secret Population
 storage-with-secrets:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "app-rg" # Replace with your resource group
   account_name: "appstorage123"
@@ -131,6 +143,8 @@ storage-with-secrets:
 # Example 7: Basic Blob Container
 app-data-container:
   defines: azure-storage-account/blob-container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   storage_account_name: "mybasicstorage123"
@@ -143,6 +157,8 @@ app-data-container:
 # Example 8: Public Blob Container for Static Assets
 static-assets-container:
   defines: azure-storage-account/blob-container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   storage_account_name: "mybasicstorage123"
@@ -155,6 +171,8 @@ static-assets-container:
 # Example 9: Immutable Storage Container for Compliance
 compliance-container:
   defines: azure-storage-account/blob-container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "secure-rg" # Replace with your resource group
   storage_account_name: "securestorage123"
@@ -253,6 +271,8 @@ app-stack:
 # Example 13: Cool Storage for Archival
 archive-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "archive-rg" # Replace with your resource group
   account_name: "archivestorage123"
@@ -272,6 +292,8 @@ archive-storage:
 # Example 14: File Storage for SMB Shares
 file-storage:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "files-rg" # Replace with your resource group
   account_name: "filestorage123"

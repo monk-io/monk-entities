@@ -2,6 +2,8 @@ namespace: aws-dynamo-db-test
 
 test-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: monk-test-dynamodb
   attribute_definitions:

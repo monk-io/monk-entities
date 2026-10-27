@@ -5,6 +5,8 @@ namespace: aws-rds-backup-test
 
 backup-mysql-instance:
   defines: aws-rds/rds-instance
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_instance_identifier: monkec-backup-test-mysql
   db_instance_class: db.t3.micro

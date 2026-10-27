@@ -5,6 +5,8 @@ namespace: do-database-backup-test
 
 backup-postgres-db:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: backup-test-postgres
   engine: pg
   version: "16"

@@ -6,6 +6,8 @@ namespace: gcp-cloud-run-test
 # Cloud Run Service — deploys a simple hello container
 test-service:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
   name: monk-test-cr-service
   location: us-central1
   image: us-docker.pkg.dev/cloudrun/container/hello
@@ -27,6 +29,8 @@ test-service:
 # Requires iap.googleapis.com enabled in the project.
 test-iap-settings:
   defines: gcp/iap-settings
+  permissions:
+    cloud: [gcp]
   target_kind: cloud-run
   region: us-central1
   cloud_run_service: monk-test-cr-service
@@ -46,6 +50,8 @@ test-iap-settings:
 # Cloud Run Job — runs a simple container to completion
 test-job:
   defines: gcp/cloud-run-job
+  permissions:
+    cloud: [gcp]
   name: monk-test-cr-job
   location: us-central1
   image: us-docker.pkg.dev/cloudrun/container/hello

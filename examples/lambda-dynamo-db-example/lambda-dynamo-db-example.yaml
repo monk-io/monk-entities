@@ -3,6 +3,8 @@ namespace: lambda-dynamo-example
 # DynamoDB Table for user data
 users-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: lambda-users-table
 
@@ -36,6 +38,8 @@ users-table:
 # IAM Policy for Lambda DynamoDB access
 lambda-dynamodb-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: lambda-dynamodb-access-policy
   policy_description: "IAM policy granting Lambda full access to DynamoDB table"
@@ -84,6 +88,8 @@ lambda-dynamodb-policy:
 # IAM Role for Lambda execution
 lambda-execution-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: lambda-dynamo-execution-role
   role_description: "Lambda execution role with DynamoDB access"
@@ -117,6 +123,9 @@ lambda-execution-role:
 # Lambda Function with DynamoDB integration
 lambda-dynamo-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [lambda-dynamo-db-example]
   region: us-east-1
   blob_name: lambda-dynamo-db-example
   function_name: lambda-dynamo-function
@@ -160,6 +169,8 @@ lambda-dynamo-function:
 
 lambda-dynamo-container-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
   region: us-east-1
   image_uri: 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-dynamo-db:latest
   function_name: lambda-dynamo-container-function
@@ -213,6 +224,8 @@ example-stack:
 
 api-gateway:
   defines: aws-api-gateway/api-gateway
+  permissions:
+    cloud: [aws]
   region: us-east-1
   name: lambda-dynamo-api
   protocol_type: HTTP

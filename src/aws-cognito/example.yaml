@@ -3,6 +3,8 @@ namespace: my-app
 # Basic Identity Pool for AWS credentials access
 basic-identity-pool:
   defines: aws-cognito/identity-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   identity_pool_name: my-app-identity-pool
   allow_unauthenticated_identities: false
@@ -13,6 +15,8 @@ basic-identity-pool:
 # Advanced Identity Pool with multiple login providers
 advanced-identity-pool:
   defines: aws-cognito/identity-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   identity_pool_name: my-app-advanced-identity-pool
   allow_unauthenticated_identities: true
@@ -44,6 +48,8 @@ advanced-identity-pool:
 # Basic User Pool for simple authentication
 basic-user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: my-app-users
   mfa_configuration: OPTIONAL
@@ -58,6 +64,8 @@ basic-user-pool:
 # Advanced User Pool with comprehensive configuration
 advanced-user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: my-app-advanced-users
   mfa_configuration: ON
@@ -159,6 +167,8 @@ advanced-user-pool:
 # Development User Pool with relaxed settings
 dev-user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: my-app-dev-users
   mfa_configuration: OFF
@@ -199,6 +209,8 @@ dev-user-pool:
 # Basic User Pool Client for web applications
 basic-user-pool-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.pool_id`
   client_name: my-app-web-client
@@ -217,6 +229,8 @@ basic-user-pool-client:
 # Advanced User Pool Client with OAuth/OIDC configuration
 oauth-user-pool-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.pool_id`
   client_name: my-app-oauth-client
@@ -280,6 +294,8 @@ oauth-user-pool-client:
 # Mobile app client with native flows
 mobile-user-pool-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.pool_id`
   client_name: my-app-mobile-client
@@ -328,6 +344,8 @@ mobile-user-pool-client:
 # Server-to-server client with credentials flow
 server-user-pool-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.pool_id`
   client_name: my-app-server-client
@@ -380,6 +398,8 @@ server-user-pool-client:
 # Google Social Identity Provider
 google-identity-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: Google
@@ -398,6 +418,8 @@ google-identity-provider:
 # Facebook Social Identity Provider
 facebook-identity-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: Facebook
@@ -417,6 +439,8 @@ facebook-identity-provider:
 # Corporate SAML Identity Provider
 corporate-saml-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: CorporateAD
@@ -438,6 +462,8 @@ corporate-saml-provider:
 # OpenID Connect Identity Provider
 oidc-identity-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: CustomOIDC
@@ -465,6 +491,8 @@ oidc-identity-provider:
 # Sign in with Apple Identity Provider
 apple-identity-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: SignInWithApple
@@ -487,6 +515,8 @@ apple-identity-provider:
 # Amazon Login Identity Provider
 amazon-identity-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   provider_name: LoginWithAmazon
@@ -506,6 +536,8 @@ amazon-identity-provider:
 # Basic Cognito prefix domain (simple setup)
 basic-user-pool-domain:
   defines: aws-cognito/user-pool-domain
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   domain: myapp-auth
@@ -514,6 +546,8 @@ basic-user-pool-domain:
 # Custom domain with SSL certificate
 custom-user-pool-domain:
   defines: aws-cognito/user-pool-domain
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   domain: auth.mycompany.com
@@ -524,6 +558,8 @@ custom-user-pool-domain:
 # Enterprise custom domain with classic UI
 enterprise-user-pool-domain:
   defines: aws-cognito/user-pool-domain
+  permissions:
+    cloud: [aws]
   region: us-east-1
   user_pool_id: <- `my-app-users.user_pool_id`
   domain: login.enterprise.com

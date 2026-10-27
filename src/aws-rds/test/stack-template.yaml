@@ -9,6 +9,8 @@ stack:
 
 test-mysql-instance:
   defines: aws-rds/rds-instance
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_instance_identifier: monkec-test-mysql-db
   db_instance_class: db.t3.micro
@@ -34,6 +36,8 @@ test-mysql-instance:
 
 test-postgres-instance:
   defines: aws-rds/rds-instance
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_instance_identifier: monkec-test-postgres-db
   db_instance_class: db.t3.micro

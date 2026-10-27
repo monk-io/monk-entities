@@ -42,6 +42,8 @@ namespace: aws-neptune-example
 
 my-cluster:
   defines: aws-neptune/cluster
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_cluster_identifier: neptune-example-cluster-2
   engine_version: "1.2.1.0"
@@ -82,6 +84,8 @@ my-cluster:
 
 my-instance:
   defines: aws-neptune/instance
+  permissions:
+    cloud: [aws]
   
   # CRITICAL: Must wait for cluster to be available
   # Neptune clusters take 10-15 minutes to create
@@ -188,6 +192,8 @@ my-client:
 
 my-access-list:
   defines: aws-neptune/neptune-access-list
+  permissions:
+    cloud: [aws]
   
   # Get region from cluster DEFINITION (static value)
   region: <- connection-target("cluster") entity get-member("region")

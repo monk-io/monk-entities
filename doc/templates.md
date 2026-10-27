@@ -57,6 +57,25 @@ my-entity:
 
 Without `permitted-secrets`, the entity cannot read the secret at runtime.
 
+## Permissions: cloud credentials and blobs
+
+An entity that signs requests with the cluster's cloud credentials (`cloud/aws`, `cloud/gcp`,
+`cloud/azure`, `cloud/digitalocean`, `cloud/hetzner`) needs its template to name the provider. One
+that reads blobs needs the blob names; globs work.
+
+```yaml
+my-function:
+  defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [my-function-code]
+  blob_name: my-function-code
+```
+
+Without them the run fails with `may not use cloud "aws"` (or `blobs "..."`), and `blobs.list()`
+returns only the blobs listed. Credentials passed in the request itself (for example DigitalOcean
+Spaces keys given to `cloud/aws`) need no grant.
+
 ## Expressing Dependencies and Sharing Values
 
 Use `depends` to wait for other runnables and `connections` to reference their services. With `connection-target(...)` you can read the target entity's state or variables.

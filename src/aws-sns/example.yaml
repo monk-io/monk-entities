@@ -3,6 +3,8 @@ namespace: aws-sns-example
 # Standard SNS topic
 notifications:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: app-notifications
   display_name: Application Notifications
@@ -13,6 +15,8 @@ notifications:
 # FIFO topic for ordered messages
 orders:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: order-events
   fifo_topic: true
@@ -25,6 +29,8 @@ orders:
 # Topic with encryption
 secure-notifications:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: secure-notifications
   display_name: Secure Notifications

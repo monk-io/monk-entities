@@ -3,6 +3,8 @@ namespace: aws-cloudfront-examples
 # Basic CloudFront distribution with S3 origin
 basic-s3-distribution:
   defines: aws-cloudfront/distribution
+  permissions:
+    cloud: [aws]
   region: us-east-1
   comment: "Basic CloudFront distribution for S3 website"
   enabled: true
@@ -39,6 +41,8 @@ basic-s3-distribution:
 # Advanced CloudFront distribution with custom origin and multiple cache behaviors
 advanced-custom-distribution:
   defines: aws-cloudfront/distribution
+  permissions:
+    cloud: [aws]
   region: us-east-1
   comment: "Advanced CloudFront distribution with custom origin"
   enabled: true
@@ -144,6 +148,8 @@ advanced-custom-distribution:
 # Simple distribution for single page application
 spa-distribution:
   defines: aws-cloudfront/distribution
+  permissions:
+    cloud: [aws]
   region: us-east-1
   comment: "CloudFront distribution for React SPA"
   enabled: true

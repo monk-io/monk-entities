@@ -37,6 +37,8 @@ redis-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - redis.googleapis.com
     - compute.googleapis.com
@@ -49,6 +51,8 @@ enable-apis:
 
 redis-cache:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   # Instance ID - unique within the project and region
   name: monk-demo-redis
   

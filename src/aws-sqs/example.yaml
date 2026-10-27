@@ -3,6 +3,8 @@ namespace: aws-sqs-examples
 # Standard SQS Queue Example
 standard-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: standard-example-queue
   delay_seconds: 0
@@ -20,6 +22,8 @@ standard-queue:
 # FIFO SQS Queue Example  
 fifo-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: fifo-example-queue.fifo
   delay_seconds: 0
@@ -38,6 +42,8 @@ fifo-queue:
 # Queue with Dead Letter Queue Configuration
 main-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: main-processing-queue
   delay_seconds: 5
@@ -56,6 +62,8 @@ main-queue:
 # Dead Letter Queue
 dead-letter-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: dead-letter-queue
   delay_seconds: 0
@@ -75,6 +83,8 @@ dead-letter-queue:
 # High-throughput Queue with Custom Encryption
 high-throughput-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: high-throughput-queue
   delay_seconds: 0
@@ -92,6 +102,8 @@ high-throughput-queue:
 # Simple test queue for development
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-queue
   tags:

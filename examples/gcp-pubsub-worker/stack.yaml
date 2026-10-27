@@ -32,6 +32,8 @@ pubsub-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - pubsub.googleapis.com
     - iam.googleapis.com
@@ -47,6 +49,8 @@ enable-apis:
 
 notifications-topic:
   defines: gcp/pubsub-topic
+  permissions:
+    cloud: [gcp]
   name: demo-notifications
   labels:
     environment: demo
@@ -72,6 +76,8 @@ notifications-topic:
 
 worker-subscription:
   defines: gcp/pubsub-subscription
+  permissions:
+    cloud: [gcp]
   name: demo-worker-sub
   topic_name: <- connection-target("topic") entity-state get-member("topic_name")
   ack_deadline_seconds: 60
@@ -106,6 +112,8 @@ worker-subscription:
 
 pubsub-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: pubsub-demo-worker
   display_name: Pub/Sub Demo Worker
   description: Service account for Pub/Sub demo application
@@ -125,6 +133,8 @@ pubsub-sa:
 
 pubsub-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
   secret: pubsub-sa-key
 

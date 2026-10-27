@@ -3,6 +3,8 @@ namespace: azure-storage-test
 # Test Storage Account
 storage-account:
   defines: azure-storage-account/storage-account
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   account_name: monkteststorage${RANDOM_SUFFIX}
@@ -21,6 +23,8 @@ storage-account:
 # Test Blob Container
 blob-container:
   defines: azure-storage-account/blob-container
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   storage_account_name: monkteststorage${RANDOM_SUFFIX}

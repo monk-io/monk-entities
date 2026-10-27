@@ -13,6 +13,8 @@ namespace: gcp-cloud-armor-detach-test
 # Step 1: Enable APIs the test needs.
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - compute.googleapis.com
     - storage.googleapis.com
@@ -20,6 +22,8 @@ enable-apis:
 # Step 2: GCS bucket — origin for the CDN backend bucket below.
 test-bucket:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   name: monk-test-armor-detach-origin
   location: US
   storage_class: STANDARD
@@ -35,6 +39,8 @@ test-bucket:
 # the behavior under test.
 test-armor-policy:
   defines: gcp/cloud-armor-security-policy
+  permissions:
+    cloud: [gcp]
   name: monk-test-armor-detach-policy
   policy_description: Auto-detach test policy
   policy_type: CLOUD_ARMOR_EDGE
@@ -59,6 +65,8 @@ test-armor-policy:
 # bare policy name.
 test-backend-bucket:
   defines: gcp/cloud-cdn-backend-bucket
+  permissions:
+    cloud: [gcp]
   name: monk-test-armor-detach-backend
   bucket_name: monk-test-armor-detach-origin
   enable_cdn: true

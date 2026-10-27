@@ -2,6 +2,8 @@ namespace: sqs-example
 
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-sqs-queue
   delay_seconds: 0

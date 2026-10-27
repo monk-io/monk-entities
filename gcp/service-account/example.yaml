@@ -2,6 +2,8 @@ namespace: gcp
 
 myacc:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: testmyacc
   roles:
     - roles/viewer
@@ -10,6 +12,8 @@ myacc:
 
 mykey:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   secret: gcp-secret
   permitted-secrets:
     gcp-secret: true

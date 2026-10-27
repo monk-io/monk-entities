@@ -12,6 +12,8 @@ namespace: hetzner-storage-box-example
 # -----------------------------------------------------------------------------
 my-box:
   defines: hetzner-storage-box/storage-box
+  permissions:
+    cloud: [hetzner]
   name: monk-storage-box
   storage_box_type: bx11
   location: fsn1

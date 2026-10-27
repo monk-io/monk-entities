@@ -6,6 +6,8 @@ namespace: sns-subscription-demo
 # SNS Topic
 my-topic:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: my-demo-topic
   display_name: My Demo Topic
@@ -19,6 +21,8 @@ my-topic:
 # Email Subscription
 email-subscription:
   defines: aws-sns/sns-subscription
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
   protocol: email

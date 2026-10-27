@@ -3,6 +3,8 @@ namespace: digitalocean-monitoring-example
 # Basic CPU monitoring alert for high CPU usage
 monk-cpu-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-cpu-high-alert
   metric_type: v1/insights/droplet/cpu
   compare: GreaterThan
@@ -16,6 +18,8 @@ monk-cpu-alert:
 
 monk-memory-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-memory-high-alert
   metric_type: v1/insights/droplet/memory_utilization_percent
   compare: GreaterThan
@@ -33,6 +37,8 @@ monk-memory-alert:
 # Disk utilization monitoring
 monk-disk-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-disk-full-alert
   metric_type: v1/insights/droplet/disk_utilization_percent
   compare: GreaterThan
@@ -44,6 +50,8 @@ monk-disk-alert:
 # Load average monitoring
 monk-load-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-load-high-alert
   metric_type: v1/insights/droplet/load_5
   compare: GreaterThan
@@ -57,6 +65,8 @@ monk-load-alert:
 # Network bandwidth monitoring
 monk-bandwidth-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-bandwidth-high-alert
   metric_type: v1/insights/droplet/public_outbound_bandwidth
   compare: GreaterThan
@@ -68,6 +78,8 @@ monk-bandwidth-alert:
 # Disk I/O monitoring
 monk-disk-io-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-disk-write-alert
   metric_type: v1/insights/droplet/disk_write
   compare: GreaterThan
@@ -82,6 +94,8 @@ monk-disk-io-alert:
 # Load Balancer monitoring
 monk-lb-cpu-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-lb-cpu-high-alert
   metric_type: v1/insights/lbaas/avg_cpu_utilization_percent
   compare: GreaterThan
@@ -95,6 +109,8 @@ monk-lb-cpu-alert:
 # Load Balancer HTTP errors
 monk-lb-5xx-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-lb-5xx-errors-alert
   metric_type: v1/insights/lbaas/increase_in_http_error_rate_percentage_5xx
   compare: GreaterThan
@@ -108,6 +124,8 @@ monk-lb-5xx-alert:
 # Database monitoring
 monk-db-cpu-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-db-cpu-alerts
   metric_type: v1/dbaas/alerts/cpu_alerts
   compare: GreaterThan
@@ -121,6 +139,8 @@ monk-db-cpu-alert:
 # Droplet autoscale monitoring
 monk-autoscale-instances-alert:
   defines: digitalocean-monitoring/monitoring
+  permissions:
+    cloud: [digitalocean]
   name: monk-autoscale-instances-alert
   metric_type: v1/droplet/autoscale_alerts/current_instances
   compare: GreaterThan

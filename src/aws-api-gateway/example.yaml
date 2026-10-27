@@ -3,6 +3,8 @@ namespace: aws-api-gateway-examples
 # Minimal API Gateway HTTP API with Lambda proxy integration
 minimal-api:
   defines: aws-api-gateway/api-gateway
+  permissions:
+    cloud: [aws]
   region: us-east-1
   name: minimal-http-api
   protocol_type: HTTP
@@ -28,6 +30,9 @@ minimal-api:
 # Sample Lambda function to integrate with API Gateway
 hello-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [hello-world-code]
   region: us-east-1
   blob_name: hello-world-code
   function_name: api-gw-hello-function

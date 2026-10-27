@@ -20,6 +20,8 @@ namespace: gcp-cloudrun-job
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - run.googleapis.com
     - iam.googleapis.com
@@ -32,6 +34,8 @@ enable-apis:
 
 job-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: cloudrun-job-runner
   display_name: Cloud Run Job runner
   account_description: Runtime identity for the demo Cloud Run job
@@ -60,6 +64,8 @@ job-sa:
 
 batch-job:
   defines: gcp/cloud-run-job
+  permissions:
+    cloud: [gcp]
   name: monk-demo-batch
   location: us-central1
   # Google's public sample image — runs to completion and prints task info.
