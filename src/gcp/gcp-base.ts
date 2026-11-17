@@ -8,6 +8,7 @@
 import { MonkEntity } from "monkec/base";
 import gcp from "cloud/gcp";
 import cli from "cli";
+import { retry, isRetryable } from "monkec/resilience";
 import { parseGcpError, isOperationDone, isOperationFailed } from "./common.ts";
 
 /**
@@ -202,6 +203,72 @@ export abstract class GcpEntity<
             return JSON.parse(response.body);
         } catch {
             return { raw: response.body };
+        }
+    }
+
+    /**
+     * Sends a request to a GCP API and returns its parsed JSON body ({} when
+     * empty). Unlike get/post/..., a failure throws an Error carrying the
+     * properties `monkec/resilience` reads (`status`, `kind`, `method`,
+     * `url`, `body`, `headers`), so `httpFailure`, `deleteIfExists` and
+     * `ensureCreated` work with it. Requests the API refused (429, 503)
+     * and, for GET, PUT and DELETE, requests that may have failed midway
+     * are retried; a POST that may have gone through is not.
+     */
+    protected request(method: "GET" | "POST" | "PUT" | "DELETE", url: string, body?: unknown): any {
+        return retry(() => this.requestOnce(method, url, body), {
+            when: (e) => isRetryable(e, method),
+            what: `GCP ${method} ${url}`,
+        });
+    }
+
+    /** One try of request(). */
+    private requestOnce(method: "GET" | "POST" | "PUT" | "DELETE", url: string, body?: unknown): any {
+        const options: any = {};
+        if (body !== undefined) {
+            options.body = JSON.stringify(body);
+            options.headers = { "Content-Type": "application/json" };
+        }
+        let response: GcpHttpResponse;
+        switch (method) {
+            case "GET": response = gcp.get(url, options); break;
+            case "POST": response = gcp.post(url, options); break;
+            case "PUT": response = gcp.put(url, options); break;
+            case "DELETE": response = gcp.delete(url, options); break;
+        }
+        const fail = (kind: "status" | "transport" | "malformed", detail: string): Error => {
+            const err: any = new Error(`GCP ${method} ${url} failed: ${detail}`);
+            err.name = "HttpError";
+            err.status = kind === "status" ? response.statusCode : 0;
+            err.kind = kind;
+            err.method = method;
+            err.url = url;
+            err.body = response.body ?? "";
+            err.headers = response.headers ?? {};
+            return err;
+        };
+        if (!response.statusCode) {
+            throw fail("transport", response.error || "no response");
+        }
+        if (response.statusCode >= 400) {
+            let detail = `${response.statusCode}`;
+            try {
+                const e = JSON.parse(response.body).error;
+                if (e?.message) detail += `: ${e.message}`;
+                const reasons = (e?.errors ?? []).map((x: any) => x.reason).filter(Boolean);
+                if (reasons.length > 0) detail += ` [${reasons.join(", ")}]`;
+            } catch {
+                // not a GCP error body; the status says enough
+            }
+            throw fail("status", detail);
+        }
+        if (!response.body) return {};
+        try {
+            const parsed = JSON.parse(response.body);
+            if (typeof parsed !== "object" || parsed === null) throw new Error("not an object");
+            return parsed;
+        } catch {
+            throw fail("malformed", "the response is not JSON");
         }
     }
 

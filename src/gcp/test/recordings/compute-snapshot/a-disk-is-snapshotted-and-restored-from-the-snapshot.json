@@ -1,0 +1,1176 @@
+{
+  "interactions": [
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-disk-1 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc"
+    },
+    {
+      "body": {
+        "labels": {
+          "monk-owner": "643a7c5da6455a9cbca9f0bfde584e2d3157771c"
+        },
+        "name": "monk-entities-test-snapsrc",
+        "sizeGb": "10",
+        "type": "projects/test-project/zones/europe-west1-b/diskTypes/pd-standard"
+      },
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "POST",
+      "response": {
+        "id": "5958365848813031800",
+        "insertTime": "2026-11-17T07:15:35.083-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "startTime": "2026-11-17T07:15:35.089-08:00",
+        "status": "RUNNING",
+        "targetId": "7397129817949327737",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "YDyfyDRfeGTP0D0V_7ClyHoyML4=/yKMQ-T40UamqgoSVxw32OCXr7Ms="
+      },
+      "method": "GET",
+      "response": {
+        "id": "5958365848813031800",
+        "insertTime": "2026-11-17T07:15:35.083-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "startTime": "2026-11-17T07:15:35.089-08:00",
+        "status": "RUNNING",
+        "targetId": "7397129817949327737",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "fnxCBom7vEL1w4JC9vbhcNuEJvA=/sdW4a_DcxDR2foTFs7IA7aADXDM="
+      },
+      "method": "GET",
+      "response": {
+        "endTime": "2026-11-17T07:15:35.671-08:00",
+        "id": "5958365848813031800",
+        "insertTime": "2026-11-17T07:15:35.083-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "operationType": "insert",
+        "progress": 100,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153",
+        "startTime": "2026-11-17T07:15:35.089-08:00",
+        "status": "DONE",
+        "targetId": "7397129817949327737",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928534710-6607a5db5677f-484bf74c-4a9c1153"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationTimestamp": "2026-11-17T07:15:35.087-08:00",
+        "enableConfidentialCompute": false,
+        "id": "7397129817949327737",
+        "kind": "compute#disk",
+        "labelFingerprint": "qRjqImpP5jQ=",
+        "labels": {
+          "monk-owner": "643a7c5da6455a9cbca9f0bfde584e2d3157771c"
+        },
+        "name": "monk-entities-test-snapsrc",
+        "physicalBlockSizeBytes": "4096",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sizeGb": "10",
+        "status": "READY",
+        "type": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/diskTypes/pd-standard",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/global/snapshots/monk-entities-test-snap' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/global/snapshots/monk-entities-test-snap' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-snapshot-2 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "body": {
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "sourceDisk": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "POST",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "84wp1dIMt9-wMtcgdStE3LF0ZiE=/IIHoyiclnHO6C7XcLOJLaNsd3dg="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "jsrcGrXPRdgZhsGRvT_OOX06Wjw=/PtlT381_COkdjieIqd27b0hdDR0="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "0eDabW6Q21HGxBJRdS4O0SlNFU0=/6nIdwMcjpn55F1NF6cBvXHZI86E="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "KGbhcrsLWgehne4DitZF3nBLPQI=/tRlynJcCt3MJCtMMzHiDQmNpGJU="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "CchqG5CgIG-zBQKvSGvWLYh2_mE=/X2NNMGNom6bLB2PD1p6gqwXdzuk="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "YMbHOjzE6Af5iyPSnZT4nl6zUiE=/jaVqQvGQ6mk9Qus1F8zoHCVjiXE="
+      },
+      "method": "GET",
+      "response": {
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "dl5zOBTMdPRVFcwUnztM1_AeUIU=/CQhSR2fPTPC7gc2DsP9aCkni4hQ="
+      },
+      "method": "GET",
+      "response": {
+        "endTime": "2026-11-17T07:16:07.092-08:00",
+        "id": "6998133983285465457",
+        "insertTime": "2026-11-17T07:15:42.990-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "operationType": "insert",
+        "progress": 100,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc",
+        "startTime": "2026-11-17T07:15:42.994-08:00",
+        "status": "DONE",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928541281-6607a5e19ae5c-8feb19f6-a89706fc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "READY",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-disk-3 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "READY",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-disk-3 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "body": {
+        "labels": {
+          "monk-owner": "787cf066f4d74edc2bab242cc34a2a166fa0631f"
+        },
+        "name": "monk-entities-test-restored",
+        "sizeGb": "10",
+        "sourceSnapshot": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+      },
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "POST",
+      "response": {
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 create",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "CbmL0J4FEE_44lpcljtUC5p3qT4=/m25US2-Yy2eTBs1Yg8bCXF1cSjc="
+      },
+      "method": "GET",
+      "response": {
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "N8n7O6A4yOk1OuL2pZsm07nQix0=/6ODlQMVmenLuRHKzYeWdo0HiESo="
+      },
+      "method": "GET",
+      "response": {
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "W8h1vwvNMcP31Z3QT-yP-V8A0bY=/eQ-qec8dkWfrL5ZFbsfkXaFmmA0="
+      },
+      "method": "GET",
+      "response": {
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "83eeOSm0hW3VgjyliNu7qp4z9xM=/gpKWhCVW-ktPI51naIdZ0-wKo-c="
+      },
+      "method": "GET",
+      "response": {
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "ETag": "FIHZyGDzdtAFjmhGLd0kNGesQnc=/ySf567LhTBNcbQsH5criNftiDP8="
+      },
+      "method": "GET",
+      "response": {
+        "endTime": "2026-11-17T07:16:31.601-08:00",
+        "id": "3595433009019474259",
+        "insertTime": "2026-11-17T07:16:12.667-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "operationType": "insert",
+        "progress": 100,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748",
+        "startTime": "2026-11-17T07:16:12.673-08:00",
+        "status": "DONE",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928572447-6607a5ff53ac6-7d9f435f-c50c0748"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationTimestamp": "2026-11-17T07:16:12.672-08:00",
+        "enableConfidentialCompute": false,
+        "id": "2465212949192626515",
+        "kind": "compute#disk",
+        "labelFingerprint": "V48Un6W4JDI=",
+        "labels": {
+          "monk-owner": "787cf066f4d74edc2bab242cc34a2a166fa0631f"
+        },
+        "name": "monk-entities-test-restored",
+        "physicalBlockSizeBytes": "4096",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "sizeGb": "10",
+        "sourceSnapshot": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceSnapshotId": "7157195520112447858",
+        "status": "READY",
+        "type": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/diskTypes/pd-standard",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 check-readiness",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationTimestamp": "2026-11-17T07:16:12.672-08:00",
+        "enableConfidentialCompute": false,
+        "id": "2465212949192626515",
+        "kind": "compute#disk",
+        "labelFingerprint": "V48Un6W4JDI=",
+        "labels": {
+          "monk-owner": "787cf066f4d74edc2bab242cc34a2a166fa0631f"
+        },
+        "name": "monk-entities-test-restored",
+        "physicalBlockSizeBytes": "4096",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "sizeGb": "10",
+        "sourceSnapshot": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceSnapshotId": "7157195520112447858",
+        "status": "READY",
+        "type": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/diskTypes/pd-standard",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 purge",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "DELETE",
+      "response": {
+        "id": "2791452252610613565",
+        "insertTime": "2026-11-17T07:16:34.475-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928594390-6607a61440f18-243ad06d-45f4a040",
+        "operationType": "delete",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928594390-6607a61440f18-243ad06d-45f4a040",
+        "startTime": "2026-11-17T07:16:34.489-08:00",
+        "status": "RUNNING",
+        "targetId": "2465212949192626515",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-3 purge",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-disk-3 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-restored"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "DELETE",
+      "response": {
+        "id": "2919833622566523196",
+        "insertTime": "2026-11-17T07:16:35.080-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928594970-6607a614ce7fb-e42c481b-5e8d87b8",
+        "operationType": "delete",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/operations/operation-1794928594970-6607a614ce7fb-e42c481b-5e8d87b8",
+        "startTime": "2026-11-17T07:16:35.089-08:00",
+        "status": "RUNNING",
+        "targetId": "7157195520112447858",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "user": "redacted-1"
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 purge",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationSizeBytes": "0",
+        "creationTimestamp": "2026-11-17T07:15:42.993-08:00",
+        "diskSizeGb": "10",
+        "downloadBytes": "3743",
+        "enableConfidentialCompute": false,
+        "id": "7157195520112447858",
+        "kind": "compute#snapshot",
+        "labelFingerprint": "zaNBkFQkNt0=",
+        "labels": {
+          "monk-owner": "9cede023dbfbdf22618f67cbcc1ecc8c12d9b195",
+          "purpose": "monk-entities-test"
+        },
+        "name": "monk-entities-test-snap",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap",
+        "sourceDisk": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sourceDiskId": "7397129817949327737",
+        "status": "DELETING",
+        "storageBytes": "0",
+        "storageBytesStatus": "UP_TO_DATE",
+        "storageLocations": [
+          "europe-west1"
+        ]
+      },
+      "status": 200,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/global/snapshots/monk-entities-test-snap' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/global/snapshots/monk-entities-test-snap' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-snapshot-2 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/global/snapshots/monk-entities-test-snap"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "creationTimestamp": "2026-11-17T07:15:35.087-08:00",
+        "enableConfidentialCompute": false,
+        "id": "7397129817949327737",
+        "kind": "compute#disk",
+        "labelFingerprint": "qRjqImpP5jQ=",
+        "labels": {
+          "monk-owner": "643a7c5da6455a9cbca9f0bfde584e2d3157771c"
+        },
+        "name": "monk-entities-test-snapsrc",
+        "physicalBlockSizeBytes": "4096",
+        "satisfiesPzi": true,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "sizeGb": "10",
+        "status": "READY",
+        "type": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/diskTypes/pd-standard",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 purge",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "DELETE",
+      "response": {
+        "id": "4817945349032366392",
+        "insertTime": "2026-11-17T07:16:39.652-08:00",
+        "kind": "compute#operation",
+        "name": "operation-1794928599565-6607a61930673-36842eb9-e211d69f",
+        "operationType": "delete",
+        "progress": 0,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/operations/operation-1794928599565-6607a61930673-36842eb9-e211d69f",
+        "startTime": "2026-11-17T07:16:39.672-08:00",
+        "status": "RUNNING",
+        "targetId": "7397129817949327737",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc",
+        "user": "redacted-1",
+        "zone": "https://www.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b"
+      },
+      "status": 200,
+      "step": "compute-disk-1 purge",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc"
+    },
+    {
+      "headers": {
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      "method": "GET",
+      "response": {
+        "error": {
+          "code": 404,
+          "errors": [
+            {
+              "domain": "global",
+              "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc' was not found",
+              "reason": "notFound"
+            }
+          ],
+          "message": "The resource 'projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc' was not found"
+        }
+      },
+      "status": 404,
+      "step": "compute-disk-1 check-deleted",
+      "url": "https://compute.googleapis.com/compute/v1/projects/test-project/zones/europe-west1-b/disks/monk-entities-test-snapsrc"
+    }
+  ],
+  "recorded": "2026-11-17T15:15:34Z",
+  "vars": {
+    "GCP_PROJECT": "test-project",
+    "GCP_ZONE": "europe-west1-b"
+  }
+}
