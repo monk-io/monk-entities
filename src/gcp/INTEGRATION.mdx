@@ -18,6 +18,7 @@ Google Cloud Platform (GCP) provides fully managed cloud services including rela
 - Memorystore for Redis instances with export/import support
 - Cloud Storage buckets
 - Cloud Storage HMAC keys for S3-compatible access
+- Persistent Disks (blank, cloned from a disk, or restored from a snapshot) and disk snapshots
 - Service accounts and IAM bindings
 - API enablement via Service Usage
 
@@ -62,6 +63,7 @@ Grant only the roles for the entities your stack uses:
 | Artifact Registry (`artifact-registry-repository`) | `roles/artifactregistry.admin` |
 | Cloud CDN / load balancing (`cloud-cdn-backend-bucket`, `cloud-cdn-backend-service`) | `roles/compute.loadBalancerAdmin` |
 | Cloud Tasks (`cloud-tasks-queue`) | `roles/cloudtasks.admin` |
+| Persistent Disks and snapshots (`compute-disk`, `compute-snapshot`) | `roles/compute.storageAdmin` |
 | Cloud Armor (`cloud-armor-security-policy`) | `roles/compute.securityAdmin` |
 | Service accounts (`gcp/service-account`, `service-account-key`) | `roles/iam.serviceAccountAdmin`, `roles/iam.serviceAccountKeyAdmin` |
 | Project IAM bindings (`project-iam-binding`, `resource-iam-binding`) | `roles/resourcemanager.projectIamAdmin` |

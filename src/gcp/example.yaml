@@ -476,3 +476,59 @@ task-queue:
 #   storage_auto_resize: true
 #   backup_start_time: "03:00"
 #   point_in_time_recovery_enabled: true
+
+# =============================================================================
+# Example: Persistent Disks: clone, snapshot, restore
+# =============================================================================
+# Clone a data disk into a new disk in the same zone, take a snapshot of the
+# source, and restore another disk from that snapshot. A runnable can mount a
+# disk by naming it in its `volumes:` block; Monk mounts an existing disk as
+# it is and formats only a disk with no filesystem, so cloned data is kept.
+# The entities use the cluster's GCP credentials, which `permissions` grants.
+
+# data-clone:
+#   defines: gcp/compute-disk
+#   name: data-clone-1
+#   zone: europe-west1-b
+#   source_disk: main-data            # name in this project and zone, or a self-link
+#   # disk_type: pd-balanced          # default: the source's type
+#   # size_gb: 50                     # default: the source's size; never smaller
+#   labels:
+#     purpose: branch
+#   permissions:
+#     cloud: [gcp]
+
+# data-snapshot:
+#   defines: gcp/compute-snapshot
+#   name: main-data-snap-1
+#   source_disk: main-data
+#   zone: europe-west1-b
+#   storage_locations: [europe-west1]
+#   permissions:
+#     cloud: [gcp]
+
+# data-restored:
+#   defines: gcp/compute-disk
+#   name: data-restored-1
+#   zone: europe-west1-b
+#   source_snapshot: <- connection-target("snap") entity-state get-member("self_link")
+#   connections:
+#     snap:
+#       runnable: gcp-example/data-snapshot
+#       service: default
+#   depends:
+#     wait-for:
+#       runnables:
+#         - gcp-example/data-snapshot
+#       timeout: 1800
+#   permissions:
+#     cloud: [gcp]
+
+# scratch-disk:
+#   defines: gcp/compute-disk
+#   name: scratch-1
+#   zone: europe-west1-b
+#   disk_type: pd-standard
+#   size_gb: 10                       # required for a blank disk
+#   permissions:
+#     cloud: [gcp]

@@ -25,6 +25,8 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-cdn-backend-bucket` | Cloud CDN backend bucket for static content from GCS |
 | `gcp/cloud-cdn-backend-service` | Cloud CDN backend service for dynamic backends |
 | `gcp/cloud-tasks-queue` | Cloud Tasks queues for HTTP task dispatch |
+| `gcp/compute-disk` | Persistent Disks: blank, cloned from a disk, or restored from a snapshot |
+| `gcp/compute-snapshot` | Standard snapshots of Persistent Disks |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 | `gcp/identity-platform-config` | Identity Platform project-level configuration (sign-in, MFA, domains) |
@@ -730,6 +732,74 @@ my-cdn-service:
 **Required API:**
 - `compute.googleapis.com` via `gcp/service-usage`
 
+### compute-disk
+
+Create a zonal Persistent Disk: blank, a clone of another disk in the same zone, or restored from a snapshot. `create` returns as soon as GCP accepts the request; the entity is ready once the disk is `READY`, which for a clone of a large disk takes minutes (readiness waits up to 30). A runnable can then name the disk in its `volumes:` block: Monk finds the disk by name and mounts it as it is (it formats only a disk with no filesystem), so cloned data is kept.
+
+```yaml
+data-clone:
+  defines: gcp/compute-disk
+  name: data-clone-1                    # Required: disk name, unique in the zone
+  zone: europe-west1-b                  # Required
+  source_disk: main-data                # Optional: name, projects/P/zones/Z/disks/D, or self-link
+  # source_snapshot: main-data-snap-1   # Optional: name, projects/P/global/snapshots/S, or self-link
+  # disk_type: pd-balanced              # Default: the source disk's type (GCP default otherwise)
+  # size_gb: 50                         # Default: the source's size; must not be smaller. Required for a blank disk
+  labels:
+    purpose: branch
+  permissions:
+    cloud: [gcp]
+```
+
+Set at most one of `source_disk` and `source_snapshot`. Raising `size_gb` later resizes the disk; disks cannot shrink, and the type and source cannot change in place.
+
+**State:** `name`, `id`, `self_link`, `zone`, `size_gb`, `disk_type`, `status`, `source_disk`, `source_snapshot`, `users` (instances it is attached to), `existing`, `operation_name`.
+
+**Delete:** deletes the disk and waits until it is gone. A disk attached to an instance is not deleted; the error names the instances, so stop what mounts it first. A disk that existed before the entity created it is adopted (`existing: true`) and left in place, unless `force_ownership: true`. Disks the entity creates carry a `monk-owner` label, so a create whose response was lost is not mistaken for someone else's disk.
+
+**Actions:**
+- `get-info`: the disk as GCP describes it
+- `snapshot`: start a snapshot of the disk (`name`, optional `storage_location`); the snapshot is not managed by Monk, use `gcp/compute-snapshot` for one that is
+- `get-cost-estimate`: capacity cost breakdown
+- `costs`: hourly and monthly cost as JSON for billing
+
+Costs use Compute Engine list prices per GB-month (us-central1 / europe-west1 rates; other regions are higher). Provisioned IOPS and throughput (pd-extreme, Hyperdisk) are not included.
+
+**Required Permissions:**
+- `compute.disks.create`, `compute.disks.get`, `compute.disks.delete`, `compute.disks.resize`, `compute.disks.setLabels`
+- `compute.disks.useReadOnly` on a source disk; `compute.snapshots.get`, `compute.snapshots.useReadOnly` on a source snapshot
+- `compute.disks.createSnapshot`, `compute.snapshots.create` (for the `snapshot` action)
+- `compute.zoneOperations.get`
+
+### compute-snapshot
+
+Take a standard snapshot of a Persistent Disk. Ready once the snapshot is `READY`; restore it with `gcp/compute-disk` (`source_snapshot`). Several snapshots can be taken back to back by defining one entity per snapshot.
+
+```yaml
+data-snapshot:
+  defines: gcp/compute-snapshot
+  name: main-data-snap-1                # Required: unique in the project
+  source_disk: main-data                # Required: name, path, or self-link
+  zone: europe-west1-b                  # Required when source_disk is a bare name
+  storage_locations: [europe-west1]     # Optional: region or multi-region
+  permissions:
+    cloud: [gcp]
+```
+
+**State:** `name`, `id`, `self_link`, `status`, `source_disk`, `disk_size_gb`, `storage_bytes`, `storage_locations`, `existing`, `operation_name`.
+
+**Delete:** deletes the snapshot and waits until it is gone; disks restored from it are not affected. Adopted snapshots are left in place unless `force_ownership: true`.
+
+**Actions:** `get-info`, `get-cost-estimate`, `costs` (snapshot storage at the list price per GB-month of what the snapshot stores).
+
+**Required Permissions:**
+- `compute.snapshots.create`, `compute.snapshots.get`, `compute.snapshots.delete`, `compute.snapshots.setLabels`
+- `compute.disks.createSnapshot` on the source disk
+- `compute.globalOperations.get`
+
+**Required API (both):**
+- `compute.googleapis.com` via `gcp/service-usage`
+
 ### cloud-tasks-queue
 
 Create and manage Cloud Tasks queues for dispatching HTTP tasks.
@@ -861,6 +931,21 @@ cp src/gcp/test/env.example src/gcp/test/.env
 # Run tests
 sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose
 ```
+
+Offline tests (`test/*.test.ts`, currently `compute-disk` and `compute-snapshot`) need no cluster
+and no credentials: they replay recordings of live runs.
+
+```bash
+monk entity test src/gcp
+monk entity test --explore src/gcp     # with faults injected
+
+# Re-record against a real project (creates and deletes 10 GB pd-standard disks and a snapshot)
+GCP_CREDENTIALS="$(cat key.json)" GCP_PROJECT=my-project GCP_ZONE=europe-west1-b \
+  monk entity test --record --run 'cloned from another|snapshotted and restored' src/gcp
+```
+
+The service account key in `GCP_CREDENTIALS` is only used to get access tokens; it is never
+written to the recordings.
 
 ## Backup & Restore Interface
 
