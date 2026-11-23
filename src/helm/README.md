@@ -20,6 +20,16 @@ chart:
     secrets: [ghcr-token]
 ```
 
+- `chart_blob` renders a chart that comes with the stack instead: a
+  MANIFEST line `BLOBS chart/app` uploads the directory with `monk load`,
+  and `chart_blob: blobs://chart/app` names it by its content hash, so each
+  version of the chart is its own blob and a new one renders again.
+- `pin_images: ["ghcr.io/acme/*"]` pins matching images to the digest
+  their tag points at, looked up in the registry (`registry_secrets` maps a
+  host to its credentials). A push under the same tag then changes the
+  manifest and an unchanged image doesn't, so whoever applies it rolls out
+  exactly what changed. An update with the same chart and values looks the
+  digests up again without rendering again.
 - `state.manifest` is the rendered YAML, up to 512 KiB.
 - An update with a new chart, version or values renders again; the old
   manifest stays in the state until the new one is ready.
