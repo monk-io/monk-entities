@@ -6,19 +6,27 @@ on:
   workflow_dispatch:
     inputs: {}
 
+# main takes changes only through reviewed pull requests, except from deploy
+# keys. The dist environment holds this repository's one deploy key
+# (secret DIST_DEPLOY_KEY) and only lets jobs on main use it, so this job
+# can push the rebuilt dist straight to main and no branch can.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+
+concurrency:
+  group: build-dist
+  cancel-in-progress: false
 
 jobs:
   build-and-commit:
     runs-on: ubuntu-latest
-    
+    environment: dist
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        ssh-key: ${{ secrets.DIST_DEPLOY_KEY }}
         fetch-depth: 0
 
     - name: Install Podman
@@ -51,13 +59,8 @@ jobs:
     - name: Commit and push dist changes
       if: steps.check-changes.outputs.no-changes == 'false'
       run: |
-        echo "Attempting to commit changes..."
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add dist/
-        echo
-        echo "### Git status after add, before commit ###"
-        git status
-        echo "-------------------------------------------"
         git commit -m "Build: Update dist files [skip ci]"
-        git push 
+        git push origin HEAD:main
