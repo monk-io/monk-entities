@@ -255,6 +255,9 @@ export abstract class GcpEntity<
             try {
                 const e = JSON.parse(response.body).error;
                 if (e?.message) detail += `: ${e.message}`;
+                const violations = (e?.details ?? []).flatMap((x: any) => x.fieldViolations ?? [])
+                    .map((v: any) => `${v.field}: ${v.description}`);
+                if (violations.length > 0) detail += ` (${violations.join("; ")})`;
                 const reasons = (e?.errors ?? []).map((x: any) => x.reason).filter(Boolean);
                 if (reasons.length > 0) detail += ` [${reasons.join(", ")}]`;
             } catch {

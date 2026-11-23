@@ -27,6 +27,7 @@ Google Cloud Platform entities for MonkEC. This package provides TypeScript-base
 | `gcp/cloud-tasks-queue` | Cloud Tasks queues for HTTP task dispatch |
 | `gcp/compute-disk` | Persistent Disks: blank, cloned from a disk, or restored from a snapshot |
 | `gcp/compute-snapshot` | Standard snapshots of Persistent Disks |
+| `gcp/gke-cluster` | Zonal GKE Standard cluster with one node pool |
 | `gcp/service-account` | Service accounts with IAM role bindings |
 | `gcp/service-account-key` | Service account keys stored in Monk secrets |
 | `gcp/identity-platform-config` | Identity Platform project-level configuration (sign-in, MFA, domains) |
@@ -800,6 +801,66 @@ data-snapshot:
 **Required API (both):**
 - `compute.googleapis.com` via `gcp/service-usage`
 
+### gke-cluster
+
+Create a zonal Google Kubernetes Engine Standard cluster with one node pool. `create` returns as soon as GCP accepts the request; the entity is ready once the cluster is `RUNNING` (5-8 minutes; readiness waits up to about 22). The state exposes `gke_cluster`, `gke_location` and `gke_project`, which the `k8s/*` entities take to reach the cluster with the Monk cluster's GCP credentials.
+
+```yaml
+gke:
+  defines: gcp/gke-cluster
+  name: workloads                       # Required: at most 40 chars
+  location: europe-west1-b              # Required: a zone (regions are refused)
+  # release_channel: REGULAR            # RAPID, REGULAR, STABLE, EXTENDED or NONE
+  # kubernetes_version: "1.33"          # Default: the channel's default
+  machine_type: e2-standard-2           # Default: e2-standard-2
+  node_count: 3                         # Default: 3
+  disk_size_gb: 30                      # Default: 30
+  disk_type: pd-standard                # Default: pd-standard
+  # spot: true                          # Spot VMs: cheaper, reclaimed at any time
+  # dataplane_v2: true                  # Default: true; enforces NetworkPolicies
+  # logging: false                      # Default: false (off keeps the cost down)
+  # monitoring: false                   # Default: false
+  # network: default
+  # subnetwork: my-subnet
+  labels:
+    purpose: demo
+  permissions:
+    cloud: [gcp]
+
+app-namespace:
+  defines: k8s/manifest
+  gke_cluster: <- connection-target("gke") entity-state get-member("gke_cluster")
+  gke_location: <- connection-target("gke") entity-state get-member("gke_location")
+  gke_project: <- connection-target("gke") entity-state get-member("gke_project")
+  connections:
+    gke:
+      runnable: gcp-example/gke
+      service: default
+```
+
+The disk defaults differ from GKE's own (100 GB `pd-balanced` per node) because those disks count against the regional SSD quota. The GCE Persistent Disk CSI driver add-on is enabled. Logging and monitoring are off by default.
+
+`dataplane_v2` (default `true`) creates the cluster with GKE Dataplane V2 (`ADVANCED_DATAPATH`), which enforces Kubernetes NetworkPolicies. It is create-only: changing it needs a new cluster.
+
+**Update:** changing `node_count` resizes the pool; changing `labels` sets the cluster's resource labels. Both are cluster operations that cannot overlap, so when both change the resize is applied first and the labels with the next `monk update`. Anything else (`machine_type`, disks, `spot`, network, `kubernetes_version`, `release_channel`, `dataplane_v2`) needs a new cluster: the entity says so and leaves the cluster alone.
+
+**State:** `name`, `location`, `project`, `gke_cluster`, `gke_location`, `gke_project`, `endpoint`, `ca_certificate`, `status`, `master_version`, `node_pool`, `node_count`, `self_link`, `existing`, `operation_name`.
+
+**Delete:** deletes the cluster and waits until it is gone (3-5 minutes; up to 15). A cluster that existed before the entity created it is adopted (`existing: true`) and left in place, unless `force_ownership: true`. Clusters the entity creates carry a `monk-owner` label.
+
+**Actions:**
+- `get-info`: the cluster as GCP describes it
+- `get-kubeconfig`: a kubeconfig using the `gke-gcloud-auth-plugin` exec form (Monk's k8s module maps it to Monk's GCP credentials; kubectl needs the plugin installed)
+- `get-cost-estimate`: node VMs and boot disks at list prices (e2 types; spot at about 30%). The management fee is not included: the first zonal cluster per billing account is free
+- `costs`: hourly and monthly cost as JSON for billing
+
+**Required Permissions:**
+- `container.clusters.create`, `container.clusters.get`, `container.clusters.delete`, `container.clusters.update`, `container.operations.get`
+- `iam.serviceAccounts.actAs` on the nodes' service account
+
+**Required API:**
+- `container.googleapis.com` via `gcp/service-usage`
+
 ### cloud-tasks-queue
 
 Create and manage Cloud Tasks queues for dispatching HTTP tasks.
@@ -932,7 +993,7 @@ cp src/gcp/test/env.example src/gcp/test/.env
 sudo INPUT_DIR=./src/gcp/ ./monkec.sh test --verbose
 ```
 
-Offline tests (`test/*.test.ts`, currently `compute-disk` and `compute-snapshot`) need no cluster
+Offline tests (`test/*.test.ts`, currently `compute-disk`, `compute-snapshot` and `gke-cluster`) need no cluster
 and no credentials: they replay recordings of live runs.
 
 ```bash

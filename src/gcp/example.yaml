@@ -532,3 +532,24 @@ task-queue:
 #   size_gb: 10                       # required for a blank disk
 #   permissions:
 #     cloud: [gcp]
+
+# =============================================================================
+# Example: GKE cluster
+# =============================================================================
+# A zonal GKE Standard cluster with one node pool. Ready in 5-8 minutes. The
+# state carries gke_cluster, gke_location and gke_project for k8s/* entities.
+# Logging and monitoring are off by default; dataplane_v2 (default true)
+# enforces NetworkPolicies and cannot be changed later.
+
+# gke:
+#   defines: gcp/gke-cluster
+#   name: workloads
+#   location: europe-west1-b
+#   machine_type: e2-standard-2
+#   node_count: 3                     # changing it resizes the pool
+#   disk_size_gb: 30
+#   disk_type: pd-standard
+#   labels:
+#     purpose: demo
+#   permissions:
+#     cloud: [gcp]
