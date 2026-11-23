@@ -25,8 +25,8 @@ import {
 } from "./compute-common.ts";
 
 /**
- * List prices per hour of e2 VMs (us-central1 / europe-west1; other regions
- * cost up to ~40% more). Approximations: the catalog is too large to read
+ * List prices per hour of e2 VMs in us-central1 (europe-west1 is about 10%
+ * higher, other regions up to ~40%). Approximations: the catalog is too large to read
  * in an entity step.
  */
 const NODE_PRICE_PER_HOUR: Record<string, number> = {
@@ -309,10 +309,15 @@ export class GkeCluster extends GcpEntity<GkeClusterDefinition, GkeClusterState>
         return pools.find((p) => p.name === this.poolName()) ?? pools[0];
     }
 
-    /** Current node count: the cluster's, which is the pool's when there is one pool. */
+    /**
+     * The pool's node count. GKE's JSON leaves out fields that are 0, so a
+     * pool without initialNodeCount has 0 nodes. The pool's count follows
+     * setSize at once; the cluster's currentNodeCount lags, and is only the
+     * fallback when there is no pool to read.
+     */
     private liveNodeCount(c: any, pool: any): number | undefined {
-        if ((c.nodePools ?? []).length === 1 && c.currentNodeCount !== undefined) return Number(c.currentNodeCount);
-        return pool?.initialNodeCount !== undefined ? Number(pool.initialNodeCount) : undefined;
+        if (pool) return Number(pool.initialNodeCount ?? 0);
+        return c.currentNodeCount !== undefined ? Number(c.currentNodeCount) : undefined;
     }
 
     private desiredLabels(): Record<string, string> {
@@ -530,7 +535,7 @@ export class GkeCluster extends GcpEntity<GkeClusterDefinition, GkeClusterState>
             cli.output(`Cluster ${name} is ${live.status}${live.statusMessage ? ` (${live.statusMessage})` : ""}`);
             return false;
         }
-        // GKE counts the nodes a little after a resize operation is done.
+        // The pool's count is the asked-for one once a resize is done.
         const want = this.definition.node_count ?? 3;
         if (!this.state.existing && this.state.node_count !== undefined && this.state.node_count !== want) {
             cli.output(`Cluster ${name} is RUNNING with ${this.state.node_count} of ${want} nodes`);

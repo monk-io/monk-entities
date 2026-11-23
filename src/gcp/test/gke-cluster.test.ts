@@ -196,7 +196,7 @@ test("a cluster is not ready while GCP is still creating it", (t) => {
     let checks = 0;
     t.http.use(`GET ${CLUSTER}`, (req, next) => withJson(next(), (b) => {
         checks++;
-        if (checks <= 3) b.status = "PROVISIONING";
+        if (checks <= 1) b.status = "PROVISIONING";
     }));
     expect(() => c.checkReadiness()).toThrow();
     // The create operation runs first, then the cluster provisions.
@@ -233,6 +233,30 @@ test("a resize before labels: labels wait for the next update", (t) => {
     expect(c.output.join("\n")).toContain("set by the next update");
     expect(t.http.requests().filter((r) => r.includes(":setResourceLabels"))).toEqual([]);
     expect(t.http.requests().filter((r) => r.includes(":setSize")).length).toBeGreaterThan(0);
+}, { explore: false });
+
+test("a pool scaled to 0 is ready, though GKE leaves out the zero counts", (t) => {
+    gke(t, RECORDED);
+    const c = readyCluster(t);
+    let size: any;
+    t.http.handle(`POST ${CLUSTER}/nodePools/default-pool:setSize`, (req) => {
+        size = req.json();
+        return json(200, { name: "op-size", operationType: "SET_NODE_POOL_SIZE", status: "RUNNING" });
+    });
+    t.http.handle(`GET ${OPERATION}`, () => json(200, { name: "op-size", operationType: "SET_NODE_POOL_SIZE", status: "DONE" }));
+    c.redefine({ ...c.definition, node_count: 0 });
+    c.update();
+    expect(size.nodeCount).toBe(0);
+    // Resized to 0: as proto3 JSON does, the fields whose value is 0 are
+    // not there.
+    t.http.use(`GET ${CLUSTER}`, (req, next) => withJson(next(), (b) => {
+        delete b.currentNodeCount;
+        for (const p of b.nodePools ?? []) delete p.initialNodeCount;
+    }));
+    c.waitReady(5);
+    expect(c.state.node_count).toBe(0);
+    c.do("costs");
+    expect(Number(JSON.parse(c.output.join("\n")).costs.hour.amount ?? 0)).toBe(0);
 }, { explore: false });
 
 test("labels are set with the cluster's fingerprint", (t) => {
