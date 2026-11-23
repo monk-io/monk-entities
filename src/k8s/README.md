@@ -25,6 +25,7 @@ module; it is not built with monkec.
 | `k8s/ingress` | HTTP routing from a host to a Service, with cert-manager TLS if asked. |
 | `k8s/kube-namespace` | A Namespace (`namespace` itself is a word Monk templates keep). |
 | `k8s/volume` | A PersistentVolumeClaim several workloads can share. |
+| `k8s/branch` | A copy of a namespace, its volumes' data included, in a new namespace on the same cluster: a branch of production to test against (below). GKE volumes. |
 
 All but `k8s/cluster`, `k8s/lookup` and `k8s/inventory` manage objects the
 same way (below) and have the actions `status`, `get` (Secret values
@@ -245,6 +246,59 @@ but the `monk.io/owner` annotation (a Deployment counts that as a new
 generation; its pods are not replaced), and from then on its settings are
 the ones to edit. Leave objects that Argo CD or Flux manages in observe mode: two tools
 applying the same fields undo each other.
+
+## Branching a namespace
+
+`k8s/branch` copies a namespace that is already on a cluster (deployed with
+kubectl, Helm or Argo CD) into a new one, data included, and seals the copy
+off from the rest of the cluster:
+
+```yaml
+b1:
+  defines: k8s/branch
+  gke_cluster: prod-cluster
+  gke_location: europe-west1-b
+  source_namespace: prod
+  namespace: br-b1
+  replicas:
+    loadgen: 0            # leave a writer out of the copy
+  before_clone:           # optional: a Job in prod that runs first
+    image: cassandra:5.0.9
+    command: [sh, -c, "nodetool -h cassandra-0.cassandra.prod.svc.cluster.local flush"]
+```
+
+- Every bound PersistentVolumeClaim of the source on a GCE Persistent Disk
+  (GKE's PD CSI driver) gets a clone of its disk. Compute Engine makes it in
+  seconds, whatever the size, in the same zone. The branch then has a
+  PersistentVolume for each clone and a claim of the source's name bound
+  to it, so a copied StatefulSet takes its pods' claims over by name and
+  starts on the source's data. Other volume types are refused for now.
+- Deployments, StatefulSets, Services, ConfigMaps, Secrets and
+  ServiceAccounts are copied, without what the cluster set on the
+  originals. In their strings, `<name>.<source>.svc` becomes
+  `<name>.<branch>.svc`. Short names (`db`) already resolve in the branch.
+  Services lose their node ports, and LoadBalancer and NodePort Services
+  become ClusterIP unless `expose: true`. `replicas` sets a workload's
+  replicas in the copy.
+- `isolate` (on by default) adds a NetworkPolicy so that the branch's pods
+  take traffic only from each other and reach only each other and the
+  cluster's DNS. `allow_egress` adds CIDRs. Copies of databases keep their
+  original peers' addresses in their data (Cassandra's `system.peers`, a
+  replica's primary) and would otherwise reach them. The cluster has to
+  enforce NetworkPolicies (GKE Dataplane V2, Calico, Cilium).
+- The clones are crash-consistent, as if the source's nodes had lost
+  power at the same moment, and a database recovers them as it does after
+  a crash. `before_clone` runs a Job in the source namespace first (a
+  flush, a checkpoint), and the clones wait until it completes.
+- Readiness waits until every cloned disk is ready and every copied
+  workload has rolled out. `state.clone_seconds` and `state.ready_seconds`
+  say how long the branch took, counted from when it was asked for.
+- Deleting the branch deletes its namespace, then its volumes and the
+  cloned disks (`keep_disks: true` keeps the disks). The source namespace
+  is only read, apart from the `before_clone` Job.
+- The Monk cluster's GCP credentials clone and delete the disks. They need
+  `compute.disks.create`, `compute.disks.get` and `compute.disks.delete`,
+  and `compute.disks.useReadOnly` on the source disks.
 
 ## Tests
 
