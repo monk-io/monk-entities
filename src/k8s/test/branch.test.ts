@@ -228,7 +228,7 @@ test("a before_clone Job runs in the source first, and the disks wait for it", (
     expect(disks.state.inserts).toEqual([]);
     b.waitReady();
     expect(disks.state.inserts.length).toBe(2);
-});
+}, { explore: false }); // same requests as the lifecycle test, which is explored
 
 test("disks an earlier run kept are not reused: the branch made again refuses them", (t) => {
     const api = t.use(kube);
@@ -244,7 +244,7 @@ test("disks an earlier run kept are not reused: the branch made again refuses th
     // Made again in the same namespace: the kept disks are an earlier run's.
     expect([...disks.state.disks.values()].every((d) => d.labels["monk-kept"] === "true")).toBe(true);
     expect(() => b.create()).toThrow("was kept when this branch was deleted before");
-});
+}, { explore: false }); // same requests as the lifecycle test, which is explored
 
 test("a disk of the clone's name that another branch made is neither used nor deleted", (t) => {
     const api = t.use(kube);
@@ -271,7 +271,7 @@ test("a disk of the clone's name that another branch made is neither used nor de
     c.waitDeleted();
     expect([...new Set(disks.state.deletes)]).toEqual(["br-1-data-cassandra-1"]);
     expect(c.output.join("\n")).toContain("leaving disk br-1-data-cassandra-0");
-});
+}, { explore: false }); // same requests as the lifecycle test, which is explored
 
 /** Fails the second disk insert after it went through, as when its answer is lost. */
 function loseSecondInsert(t: Test) {
@@ -331,7 +331,7 @@ test("other_claims: empty gives a claim that can't be cloned a new, empty one", 
     expect(claim.spec.volumeName).toBeUndefined();
     expect(claim.spec.storageClassName).toBe("filestore");
     expect(disks.state.inserts.length).toBe(2);
-});
+}, { explore: false }); // same requests as the lifecycle test, which is explored
 
 test("a namespace that isn't the branch's is refused", (t) => {
     const api = t.use(kube);
