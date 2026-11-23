@@ -16,6 +16,11 @@ interface Disks {
     deletes: string[];
 }
 
+/** A disk as Compute Engine shows it. */
+function view(d: any): any {
+    return { name: d.name, status: d.status, sourceDisk: d.sourceDisk, labels: d.labels, zone: d.zone, labelFingerprint: d.labelFingerprint };
+}
+
 /** Compute Engine disks: an insert is READY after a read; a delete is gone after one. */
 const gce = fakeApi<Disks>(GCE, () => {
     const st: Disks = { disks: new Map(), inserts: [], deletes: [] };
@@ -27,7 +32,10 @@ const gce = fakeApi<Disks>(GCE, () => {
                 const body = req.json();
                 if (st.disks.has(body.name)) return json(409, { error: { code: 409, message: "already exists" } });
                 st.inserts.push(body);
-                st.disks.set(body.name, { name: body.name, status: "CREATING", sourceDisk: body.sourceDisk, labels: body.labels, reads: 0 });
+                st.disks.set(body.name, {
+                    name: body.name, status: "CREATING", sourceDisk: body.sourceDisk, labels: body.labels, reads: 0,
+                    zone: `https://www.googleapis.com/compute/v1/projects/${req.params.p}/zones/${req.params.z}`, labelFingerprint: "fp0",
+                });
                 return json(200, { kind: "compute#operation", status: "RUNNING" });
             },
             "GET /compute/v1/projects/:p/zones/:z/disks/:d": (req: Request) => {
@@ -39,7 +47,27 @@ const gce = fakeApi<Disks>(GCE, () => {
                 }
                 d.reads++;
                 if (d.status === "CREATING" && d.reads >= 2) d.status = "READY";
-                return json(200, { name: d.name, status: d.status, sourceDisk: d.sourceDisk, labels: d.labels });
+                return json(200, view(d));
+            },
+            // Lists by the one filter the branch uses: labels.monk-owner = "<hash>".
+            "GET /compute/v1/projects/:p/aggregated/disks": (req: Request) => {
+                const m = /labels\.monk-owner = "([^"]+)"/.exec(req.query.filter ?? "");
+                const byZone: Record<string, any> = {};
+                for (const d of st.disks.values()) {
+                    if (gone.has(d.name) || (m && d.labels?.["monk-owner"] !== m[1])) continue;
+                    const z = `zones/${String(d.zone).split("/").pop()}`;
+                    (byZone[z] ??= { disks: [] }).disks.push(view(d));
+                }
+                return json(200, { items: byZone });
+            },
+            "POST /compute/v1/projects/:p/zones/:z/disks/:d/setLabels": (req: Request) => {
+                const d = st.disks.get(req.params.d);
+                if (!d) return json(404, { error: { code: 404, message: "not found" } });
+                const body = req.json();
+                if (body.labelFingerprint !== d.labelFingerprint) return json(412, { error: { code: 412, message: "fingerprint" } });
+                d.labels = body.labels;
+                d.labelFingerprint = d.labelFingerprint + "x";
+                return json(200, { kind: "compute#operation", status: "RUNNING" });
             },
             "DELETE /compute/v1/projects/:p/zones/:z/disks/:d": (req: Request) => {
                 const d = st.disks.get(req.params.d);
@@ -183,7 +211,8 @@ test("a namespace is branched: disks cloned, claims bound to them, objects copie
     b.waitDeleted();
     expect(api.state.objects.has("namespaces//br-1")).toBe(false);
     expect(api.state.objects.has("persistentvolumes//br-1-data-cassandra-0")).toBe(false);
-    expect(disks.state.deletes.sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
+    // A DELETE whose answer was lost is sent again; that is harmless.
+    expect([...new Set(disks.state.deletes)].sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
     // Prod's disks and volumes stay.
     expect(api.state.objects.has("persistentvolumes//pvc-0")).toBe(true);
 });
@@ -213,7 +242,8 @@ test("disks an earlier run kept are not reused: the branch made again refuses th
     expect(disks.state.disks.size).toBe(2);
     expect(disks.state.deletes).toEqual([]);
     // Made again in the same namespace: the kept disks are an earlier run's.
-    expect(() => b.create()).toThrow("is a clone an earlier run of this branch kept");
+    expect([...disks.state.disks.values()].every((d) => d.labels["monk-kept"] === "true")).toBe(true);
+    expect(() => b.create()).toThrow("was kept when this branch was deleted before");
 });
 
 test("a disk of the clone's name that another branch made is neither used nor deleted", (t) => {
@@ -239,9 +269,46 @@ test("a disk of the clone's name that another branch made is neither used nor de
     disks.state.disks.get("br-1-data-cassandra-0").labels["monk-owner"] = "someone-else";
     c.delete();
     c.waitDeleted();
-    expect(disks.state.deletes).toEqual(["br-1-data-cassandra-1"]);
+    expect([...new Set(disks.state.deletes)]).toEqual(["br-1-data-cassandra-1"]);
     expect(c.output.join("\n")).toContain("leaving disk br-1-data-cassandra-0");
 });
+
+/** Fails the second disk insert after it went through, as when its answer is lost. */
+function loseSecondInsert(t: Test) {
+    let posts = 0;
+    t.http.use(`POST ${GCE}/compute/v1/projects/:p/zones/:z/disks`, (req, next) => {
+        posts++;
+        const r = next();
+        if (posts === 2) return json(500, { error: { code: 500, message: "backend error" } });
+        return r;
+    });
+}
+
+test("a branch whose create failed after cloning runs again on its own clones", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    loseSecondInsert(t);
+    const b = branch(t);
+    expect(() => b.create()).toThrow();
+    b.create();
+    b.waitReady();
+    expect(disks.state.inserts.length).toBe(2);
+    expect(api.state.objects.get("persistentvolumeclaims/br-1/data-cassandra-1").spec.volumeName).toBe("br-1-data-cassandra-1");
+}, { explore: false }); // the test makes its own fault; exploration covers lost inserts elsewhere
+
+test("deleting a branch whose create failed after cloning deletes its clones", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    loseSecondInsert(t);
+    const b = branch(t);
+    expect(() => b.create()).toThrow();
+    b.delete();
+    b.waitDeleted();
+    expect([...new Set(disks.state.deletes)].sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
+    expect(api.state.objects.has("namespaces//br-1")).toBe(false);
+}, { explore: false }); // the test makes its own fault; exploration covers lost inserts elsewhere
 
 test("other_claims: empty gives a claim that can't be cloned a new, empty one", (t) => {
     const api = t.use(kube);

@@ -276,10 +276,12 @@ b1:
   Filestore, a regional disk) makes the branch refuse, unless
   `other_claims: empty`, which gives the branch a new, empty claim of the
   same name, class and size instead.
-- Each clone carries GCE labels saying which branch made it and in which
-  run (`monk-owner`, `monk-run`). A disk of the clone's name that another
-  branch made, or that an earlier run of this one kept, is never used: the
-  branch refuses before it writes anything, and says which.
+- Each clone carries GCE labels saying which branch made it
+  (`monk-owner`) and for which namespace. A disk of the clone's name that
+  another branch made, or that an earlier delete of this one kept
+  (`monk-kept`), is never used: the branch refuses before it writes
+  anything, and says which. Clones left by a create that failed are the
+  branch's own, and a create run again uses them.
 - Deployments, StatefulSets, Services, ConfigMaps, Secrets,
   ServiceAccounts, Roles and RoleBindings are copied, without what the
   cluster set on the originals. A RoleBinding's service accounts of the
@@ -305,9 +307,10 @@ b1:
 - Readiness waits until every cloned disk is ready and every copied
   workload has rolled out. `state.clone_seconds` and `state.ready_seconds`
   say how long the branch took, counted from when it was asked for.
-- Deleting the branch deletes its namespace, then its volumes and the
-  cloned disks it made in this run (`keep_disks: true` keeps them). A
-  disk with another branch's or another run's labels is left in place. The source namespace
+- Deleting the branch deletes its namespace, then its volumes and its
+  cloned disks, found by their labels in GCE, so a delete after a failed
+  create removes the clones it made too. `keep_disks: true` keeps them and
+  labels them `monk-kept`. Disks other branches made are left in place. The source namespace
   is only read, apart from the `before_clone` Job.
 - Copying Roles needs the rights they grant, or the `escalate` and `bind`
   verbs on Roles and RoleBindings, as Kubernetes requires of anyone who

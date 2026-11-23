@@ -19,9 +19,9 @@ const BRANCH_OF = "monk.io/branch-of";
 const BRANCH_LABEL = "monk.io/branch";
 const MARKER = "monk-branch";
 const PD_DRIVER = "pd.csi.storage.gke.io";
-/** GCE labels on each clone: who made it, and in which run. */
+/** GCE labels on each clone: the branch that made it, and whether a delete kept it. */
 const OWNER_LABEL = "monk-owner";
-const RUN_LABEL = "monk-run";
+const KEPT_LABEL = "monk-kept";
 const COMPUTE = "https://compute.googleapis.com/compute/v1";
 
 /**
@@ -120,8 +120,6 @@ export interface BranchState {
     source_namespace?: string;
     /** @description The claims cloned */
     claims?: ClonedClaim[];
-    /** @description This run of the branch, as each clone's monk-run label says */
-    run_id?: string;
     /** @description Whether a before_clone Job was started */
     before_clone_job?: string;
     /** @description When the branch was asked for (create) */
@@ -190,9 +188,6 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         const ns = this.target();
         const src = this.definition.source_namespace;
         this.state.requested_at = new Date().toISOString();
-        // A branch made again in the same namespace is another run: its
-        // clones must be new ones, not those an earlier run kept.
-        this.state.run_id = crypto.sha256(`${this.path} ${this.state.requested_at}`).slice(0, 16);
         this.state.namespace = ns;
         this.state.source_namespace = src;
 
@@ -202,6 +197,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         if (existing && existing.metadata?.annotations?.[OWNER] !== this.path) {
             throw new Error(`namespace ${ns} exists and is not this branch's`);
         }
+
         this.state.claims = this.claims();
         for (const c of this.state.claims) {
             if (c.empty) continue;
@@ -348,7 +344,6 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
                     "monk-branch": this.target().slice(0, 63),
                     "monk-branch-of": this.definition.source_namespace.slice(0, 63),
                     [OWNER_LABEL]: this.owner(),
-                    [RUN_LABEL]: this.state.run_id ?? "",
                 },
                 description: `Clone of ${c.source_disk} for Kubernetes branch ${this.target()} (${this.path})`,
             };
@@ -379,16 +374,61 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     }
 
     /**
-     * Why disk d is not this run's clone of c, or undefined when it is:
-     * a disk of the same name may be one an earlier run kept, or another
-     * cluster's branch into a namespace of the same name.
+     * Why disk d can't be this branch's clone of c, or undefined when it
+     * can: a disk of the same name may be another cluster's branch into a
+     * namespace of the same name, or one an earlier delete of this branch
+     * kept (keep_disks). A clone this branch made in a create that failed
+     * is its own, and is used.
      */
     private notOurs(c: ClonedClaim, d: any): string | undefined {
         const labels = d.labels ?? {};
         if (labels[OWNER_LABEL] !== this.owner()) return "was not made by this branch";
-        if (labels[RUN_LABEL] !== this.state.run_id) return "is a clone an earlier run of this branch kept";
+        if (labels[KEPT_LABEL]) return "was kept when this branch was deleted before (keep_disks)";
         if (!String(d.sourceDisk ?? "").endsWith(c.source_disk)) return `is not a clone of ${c.source_disk}`;
         return undefined;
+    }
+
+    /**
+     * This branch's clones in GCE, found by their labels rather than from
+     * state, so a delete also finds the clones of a create that failed
+     * before its state was kept: disks labelled with this branch as owner
+     * and with its namespace, cloned from one of the source's disks, and
+     * not kept by an earlier delete.
+     */
+    private clones(): any[] {
+        const sources = new Set<string>();
+        for (const c of this.state.claims ?? []) if (!c.empty) sources.add(c.source_disk);
+        try {
+            for (const c of this.claims()) if (!c.empty) sources.add(c.source_disk);
+        } catch (e) {
+            // The source may be gone or have changed; state still names what was cloned.
+            cli.output(`could not read the source's claims again: ${(e as any)?.message ?? e}`);
+        }
+        const projects = new Set<string>();
+        for (const src of sources) {
+            const h = parseHandle(src);
+            if (h) projects.add(h.project);
+        }
+        const ns = this.target().slice(0, 63);
+        const filter = encodeURIComponent(`labels.${OWNER_LABEL} = "${this.owner()}"`);
+        const out: any[] = [];
+        for (const project of projects) {
+            let page = "";
+            do {
+                const r = this.gce("GET", `${COMPUTE}/projects/${project}/aggregated/disks?filter=${filter}${page ? `&pageToken=${page}` : ""}`);
+                for (const scope of Object.values(r.items ?? {}) as any[]) {
+                    for (const d of scope.disks ?? []) {
+                        const labels = d.labels ?? {};
+                        if (labels["monk-branch"] !== ns || labels[KEPT_LABEL]) continue;
+                        const from = String(d.sourceDisk ?? "");
+                        if (![...sources].some((src) => from.endsWith(src))) continue;
+                        out.push({ ...d, project, zone: String(d.zone ?? "").split("/").pop() });
+                    }
+                }
+                page = r.nextPageToken ?? "";
+            } while (page);
+        }
+        return out;
     }
 
     override checkReadiness(): boolean {
@@ -561,6 +601,17 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             cli.output(`namespace ${ns} is not this branch's; leaving it`);
             return;
         }
+        if (this.definition.keep_disks) {
+            // Kept disks are never this branch's clones again: a branch made
+            // again in this namespace clones anew instead of starting on them.
+            for (const d of this.clones()) {
+                this.gce("POST", `${COMPUTE}/projects/${d.project}/zones/${d.zone}/disks/${d.name}/setLabels`, {
+                    labels: { ...(d.labels ?? {}), [KEPT_LABEL]: "true" },
+                    labelFingerprint: d.labelFingerprint,
+                });
+                cli.output(`keeping disk ${d.name}`);
+            }
+        }
         if (live) {
             this.k8s(`deleting namespace ${ns}`, (c) => k8s.remove(c, { apiVersion: "v1", kind: "Namespace", name: ns }));
             cli.output(`deleting namespace ${ns}`);
@@ -590,24 +641,26 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
                 waiting = true;
                 continue;
             }
-            if (this.definition.keep_disks) continue;
-            const d = this.disk(c);
-            if (d === null) continue;
-            const not = this.notOurs(c, d);
-            if (not) {
-                cli.output(`leaving disk ${c.disk}: it ${not}`);
-                continue;
-            }
+        }
+        if (this.definition.keep_disks) return !waiting;
+        for (const d of this.clones()) {
             if ((d.users ?? []).length > 0) {
-                cli.output(`waiting for ${c.disk} to detach`);
+                cli.output(`waiting for ${d.name} to detach`);
                 waiting = true;
                 continue;
             }
             if (d.status !== "DELETING") {
-                this.gce("DELETE", `${COMPUTE}/projects/${c.project}/zones/${c.zone}/disks/${c.disk}`);
-                cli.output(`deleting disk ${c.disk}`);
+                this.gce("DELETE", `${COMPUTE}/projects/${d.project}/zones/${d.zone}/disks/${d.name}`);
+                cli.output(`deleting disk ${d.name}`);
             }
             waiting = true;
+        }
+        // Disks of a clone's name this branch didn't make are left alone.
+        for (const c of this.state.claims ?? []) {
+            if (c.empty) continue;
+            const d = this.disk(c);
+            const not = d === null ? undefined : this.notOurs(c, d);
+            if (not) cli.output(`leaving disk ${c.disk}: it ${not}`);
         }
         return !waiting;
     }
