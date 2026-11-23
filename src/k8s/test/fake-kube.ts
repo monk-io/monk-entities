@@ -26,6 +26,8 @@ const BUILTIN: Kind[] = [
     { group: "", version: "v1", kind: "PersistentVolume", plural: "persistentvolumes", namespaced: false },
     { group: "", version: "v1", kind: "Pod", plural: "pods", namespaced: true },
     { group: "", version: "v1", kind: "ServiceAccount", plural: "serviceaccounts", namespaced: true },
+    { group: "rbac.authorization.k8s.io", version: "v1", kind: "Role", plural: "roles", namespaced: true },
+    { group: "rbac.authorization.k8s.io", version: "v1", kind: "RoleBinding", plural: "rolebindings", namespaced: true },
     { group: "networking.k8s.io", version: "v1", kind: "NetworkPolicy", plural: "networkpolicies", namespaced: true },
     { group: "apps", version: "v1", kind: "Deployment", plural: "deployments", namespaced: true },
     { group: "apps", version: "v1", kind: "StatefulSet", plural: "statefulsets", namespaced: true },

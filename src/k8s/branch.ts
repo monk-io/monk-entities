@@ -2,6 +2,7 @@ import { action, Args } from "monkec/base";
 import k8s from "k8s";
 import gcp from "cloud/gcp";
 import cli from "cli";
+import crypto from "crypto";
 import { retry, isRetryable } from "monkec/resilience";
 import { K8sEntity, K8sConnection } from "./k8s-base.ts";
 import { readiness } from "./readiness.ts";
@@ -18,6 +19,9 @@ const BRANCH_OF = "monk.io/branch-of";
 const BRANCH_LABEL = "monk.io/branch";
 const MARKER = "monk-branch";
 const PD_DRIVER = "pd.csi.storage.gke.io";
+/** GCE labels on each clone: who made it, and in which run. */
+const OWNER_LABEL = "monk-owner";
+const RUN_LABEL = "monk-run";
 const COMPUTE = "https://compute.googleapis.com/compute/v1";
 
 /**
@@ -66,6 +70,11 @@ export interface BranchDefinition extends K8sConnection {
     };
 
     /**
+     * @description What to do with a claim whose volume can't be cloned (not a zonal GCE Persistent Disk, e.g. NFS or Filestore): "fail" (default) refuses to branch; "empty" gives the branch a new, empty claim of the same name, class and size
+     */
+    other_claims?: "fail" | "empty";
+
+    /**
      * @description Keep the cloned disks when the branch is deleted (default false: they are deleted with it)
      */
     keep_disks?: boolean;
@@ -96,6 +105,8 @@ export interface ClonedClaim {
     access_modes: string[];
     /** @description Filesystem type of the source volume */
     fs_type?: string;
+    /** @description Not cloned (other_claims: empty): the branch gets a new, empty claim */
+    empty?: boolean;
 }
 
 /**
@@ -109,6 +120,8 @@ export interface BranchState {
     source_namespace?: string;
     /** @description The claims cloned */
     claims?: ClonedClaim[];
+    /** @description This run of the branch, as each clone's monk-run label says */
+    run_id?: string;
     /** @description Whether a before_clone Job was started */
     before_clone_job?: string;
     /** @description When the branch was asked for (create) */
@@ -177,13 +190,27 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         const ns = this.target();
         const src = this.definition.source_namespace;
         this.state.requested_at = new Date().toISOString();
+        // A branch made again in the same namespace is another run: its
+        // clones must be new ones, not those an earlier run kept.
+        this.state.run_id = crypto.sha256(`${this.path} ${this.state.requested_at}`).slice(0, 16);
         this.state.namespace = ns;
         this.state.source_namespace = src;
 
+        // Everything that can refuse the branch is checked before anything
+        // is written, so a refused branch leaves nothing behind.
         const existing = this.k8s(`reading namespace ${ns}`, (c) => k8s.read(c, { apiVersion: "v1", kind: "Namespace", name: ns }));
         if (existing && existing.metadata?.annotations?.[OWNER] !== this.path) {
             throw new Error(`namespace ${ns} exists and is not this branch's`);
         }
+        this.state.claims = this.claims();
+        for (const c of this.state.claims) {
+            if (c.empty) continue;
+            const d = this.disk(c);
+            const not = d === null ? undefined : this.notOurs(c, d);
+            if (not) throw new Error(`disk ${c.disk} already exists and ${not}; delete it, or branch into another namespace`);
+        }
+        cli.output(`${this.state.claims.filter((c) => !c.empty).length} volumes to clone from ${src}`);
+
         this.apply({
             apiVersion: "v1",
             kind: "Namespace",
@@ -192,9 +219,6 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         if (this.definition.isolate !== false) {
             this.apply(isolationPolicy(ns, this.annotations(), this.definition.allow_egress ?? []));
         }
-
-        this.state.claims = this.claims();
-        cli.output(`${this.state.claims.length} volumes to clone from ${src}`);
 
         if (this.definition.before_clone) {
             this.state.before_clone_job = this.startBeforeClone();
@@ -224,11 +248,28 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             const pv = this.k8s(`reading volume ${pvc.spec.volumeName}`, (c) =>
                 k8s.read(c, { apiVersion: "v1", kind: "PersistentVolume", name: pvc.spec.volumeName }));
             const csi = pv?.spec?.csi;
-            if (!csi || csi.driver !== PD_DRIVER) {
-                throw new Error(`claim ${name}: its volume is not a GCE Persistent Disk (driver ${csi?.driver ?? "none"}); only ${PD_DRIVER} volumes can be cloned`);
+            const h = csi?.driver === PD_DRIVER ? parseHandle(csi.volumeHandle) : undefined;
+            if (!h || !h.zonal) {
+                const why = !csi || csi.driver !== PD_DRIVER
+                    ? `its volume is not a GCE Persistent Disk (driver ${csi?.driver ?? "none"})`
+                    : `volume handle ${csi.volumeHandle} is not a zonal disk`;
+                if ((this.definition.other_claims ?? "fail") !== "empty") {
+                    throw new Error(`claim ${name}: ${why}; only zonal ${PD_DRIVER} volumes can be cloned (other_claims: empty gives such claims a new, empty volume instead)`);
+                }
+                cli.output(`claim ${name}: ${why}; the branch gets a new, empty claim`);
+                out.push({
+                    claim: name,
+                    source_disk: "",
+                    disk: "",
+                    project: "",
+                    zone: "",
+                    capacity: pvc.spec.resources?.requests?.storage ?? pvc.status?.capacity?.storage,
+                    storage_class: pvc.spec.storageClassName,
+                    access_modes: pvc.spec.accessModes ?? ["ReadWriteOnce"],
+                    empty: true,
+                });
+                continue;
             }
-            const h = parseHandle(csi.volumeHandle);
-            if (!h || !h.zonal) throw new Error(`claim ${name}: volume handle ${csi.volumeHandle} is not a zonal disk`);
             out.push({
                 claim: name,
                 source_disk: csi.volumeHandle,
@@ -293,11 +334,22 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     /** Asks GCE for each clone that doesn't exist yet. */
     private cloneDisks(): void {
         for (const c of this.state.claims ?? []) {
-            if (this.disk(c) !== null) continue;
+            if (c.empty) continue;
+            const existing = this.disk(c);
+            if (existing !== null) {
+                const not = this.notOurs(c, existing);
+                if (not) throw new Error(`disk ${c.disk} already exists and ${not}; delete it, or branch into another namespace`);
+                continue;
+            }
             const body: any = {
                 name: c.disk,
                 sourceDisk: c.source_disk,
-                labels: { "monk-branch": this.target().slice(0, 63), "monk-branch-of": this.definition.source_namespace.slice(0, 63) },
+                labels: {
+                    "monk-branch": this.target().slice(0, 63),
+                    "monk-branch-of": this.definition.source_namespace.slice(0, 63),
+                    [OWNER_LABEL]: this.owner(),
+                    [RUN_LABEL]: this.state.run_id ?? "",
+                },
                 description: `Clone of ${c.source_disk} for Kubernetes branch ${this.target()} (${this.path})`,
             };
             if (c.disk_type) body.type = `projects/${c.project}/zones/${c.zone}/diskTypes/${c.disk_type}`;
@@ -321,6 +373,24 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         }
     }
 
+    /** The monk-owner label value of this branch's clones. */
+    private owner(): string {
+        return crypto.sha256(this.path).slice(0, 40);
+    }
+
+    /**
+     * Why disk d is not this run's clone of c, or undefined when it is:
+     * a disk of the same name may be one an earlier run kept, or another
+     * cluster's branch into a namespace of the same name.
+     */
+    private notOurs(c: ClonedClaim, d: any): string | undefined {
+        const labels = d.labels ?? {};
+        if (labels[OWNER_LABEL] !== this.owner()) return "was not made by this branch";
+        if (labels[RUN_LABEL] !== this.state.run_id) return "is a clone an earlier run of this branch kept";
+        if (!String(d.sourceDisk ?? "").endsWith(c.source_disk)) return `is not a clone of ${c.source_disk}`;
+        return undefined;
+    }
+
     override checkReadiness(): boolean {
         // State changes made in a check that fails are not kept, so every
         // step here reads what is there and does what is missing.
@@ -329,6 +399,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
 
         const pending: string[] = [];
         for (const c of this.state.claims ?? []) {
+            if (c.empty) continue;
             const d = this.disk(c);
             if (d?.status === "FAILED") throw new Error(`cloning ${c.disk} failed`);
             if (d?.status !== "READY") pending.push(`${c.disk} (${d?.status ?? "not there yet"})`);
@@ -374,6 +445,19 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     private bindVolumes(): void {
         const ns = this.target();
         for (const c of this.state.claims ?? []) {
+            if (c.empty) {
+                this.apply({
+                    apiVersion: "v1",
+                    kind: "PersistentVolumeClaim",
+                    metadata: { name: c.claim, namespace: ns, annotations: this.annotations() },
+                    spec: {
+                        accessModes: c.access_modes,
+                        resources: { requests: { storage: c.capacity } },
+                        ...(c.storage_class ? { storageClassName: c.storage_class } : {}),
+                    },
+                });
+                continue;
+            }
             const pvName = c.disk;
             this.apply({
                 apiVersion: "v1",
@@ -498,6 +582,8 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         }
         let waiting = false;
         for (const c of this.state.claims ?? []) {
+            // An empty claim's volume goes with the namespace.
+            if (c.empty) continue;
             const pv = this.k8s(`reading volume ${c.disk}`, (cl) => k8s.read(cl, { apiVersion: "v1", kind: "PersistentVolume", name: c.disk }));
             if (pv && pv.metadata?.annotations?.[OWNER] === this.path) {
                 this.k8s(`deleting volume ${c.disk}`, (cl) => k8s.remove(cl, { apiVersion: "v1", kind: "PersistentVolume", name: c.disk }));
@@ -507,6 +593,11 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             if (this.definition.keep_disks) continue;
             const d = this.disk(c);
             if (d === null) continue;
+            const not = this.notOurs(c, d);
+            if (not) {
+                cli.output(`leaving disk ${c.disk}: it ${not}`);
+                continue;
+            }
             if ((d.users ?? []).length > 0) {
                 cli.output(`waiting for ${c.disk} to detach`);
                 waiting = true;

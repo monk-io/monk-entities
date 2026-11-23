@@ -272,13 +272,25 @@ b1:
   seconds, whatever the size, in the same zone. The branch then has a
   PersistentVolume for each clone and a claim of the source's name bound
   to it, so a copied StatefulSet takes its pods' claims over by name and
-  starts on the source's data. Other volume types are refused for now.
-- Deployments, StatefulSets, Services, ConfigMaps, Secrets and
-  ServiceAccounts are copied, without what the cluster set on the
-  originals. In their strings, `<name>.<source>.svc` becomes
+  starts on the source's data. A claim on any other volume (NFS,
+  Filestore, a regional disk) makes the branch refuse, unless
+  `other_claims: empty`, which gives the branch a new, empty claim of the
+  same name, class and size instead.
+- Each clone carries GCE labels saying which branch made it and in which
+  run (`monk-owner`, `monk-run`). A disk of the clone's name that another
+  branch made, or that an earlier run of this one kept, is never used: the
+  branch refuses before it writes anything, and says which.
+- Deployments, StatefulSets, Services, ConfigMaps, Secrets,
+  ServiceAccounts, Roles and RoleBindings are copied, without what the
+  cluster set on the originals. A RoleBinding's service accounts of the
+  source become the branch's; its other subjects stay as they are.
+  ClusterRoleBindings are cluster-wide and not copied, so a service account
+  that relies on one has no such rights in the branch. In their strings, `<name>.<source>.svc` becomes
   `<name>.<branch>.svc`. Short names (`db`) already resolve in the branch.
   Services lose their node ports, and LoadBalancer and NodePort Services
-  become ClusterIP unless `expose: true`. `replicas` sets a workload's
+  become ClusterIP unless `expose: true`. With `isolate` on, nothing
+  outside the namespace can reach an exposed Service either, so `expose`
+  only helps together with `isolate: false`. `replicas` sets a workload's
   replicas in the copy.
 - `isolate` (on by default) adds a NetworkPolicy so that the branch's pods
   take traffic only from each other and reach only each other and the
@@ -294,8 +306,12 @@ b1:
   workload has rolled out. `state.clone_seconds` and `state.ready_seconds`
   say how long the branch took, counted from when it was asked for.
 - Deleting the branch deletes its namespace, then its volumes and the
-  cloned disks (`keep_disks: true` keeps the disks). The source namespace
+  cloned disks it made in this run (`keep_disks: true` keeps them). A
+  disk with another branch's or another run's labels is left in place. The source namespace
   is only read, apart from the `before_clone` Job.
+- Copying Roles needs the rights they grant, or the `escalate` and `bind`
+  verbs on Roles and RoleBindings, as Kubernetes requires of anyone who
+  creates them.
 - The Monk cluster's GCP credentials clone and delete the disks. They need
   `compute.disks.create`, `compute.disks.get` and `compute.disks.delete`,
   and `compute.disks.useReadOnly` on the source disks.

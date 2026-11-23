@@ -10,6 +10,8 @@
 /** The kinds a branch copies, in the order it applies them. */
 export const COPIED_KINDS: { apiVersion: string; kind: string }[] = [
     { apiVersion: "v1", kind: "ServiceAccount" },
+    { apiVersion: "rbac.authorization.k8s.io/v1", kind: "Role" },
+    { apiVersion: "rbac.authorization.k8s.io/v1", kind: "RoleBinding" },
     { apiVersion: "v1", kind: "Secret" },
     { apiVersion: "v1", kind: "ConfigMap" },
     { apiVersion: "v1", kind: "Service" },
@@ -97,6 +99,16 @@ export function copyOf(obj: any, o: CopyOptions): any | undefined {
             // Token secrets are the cluster's to make.
             if (obj.automountServiceAccountToken !== undefined) copy.automountServiceAccountToken = obj.automountServiceAccountToken;
             if (obj.imagePullSecrets) copy.imagePullSecrets = obj.imagePullSecrets;
+            return copy;
+        case "Role":
+            copy.rules = obj.rules ?? [];
+            return copy;
+        case "RoleBinding":
+            // Service accounts of the source are the branch's copies; anything
+            // else (users, groups, other namespaces' accounts) stays as it is.
+            copy.roleRef = obj.roleRef;
+            copy.subjects = (obj.subjects ?? []).map((sub: any) =>
+                sub.kind === "ServiceAccount" && (sub.namespace ?? o.source) === o.source ? { ...sub, namespace: o.target } : sub);
             return copy;
         case "Secret":
             copy.type = obj.type;
