@@ -2,7 +2,10 @@ name: Entity tests
 
 # Type-checks every package and runs the offline tests of those that have
 # them (src/<package>/test/*.test.ts), with fault exploration: nothing here
-# reaches a real API or needs a Monk cluster.
+# reaches a real API or needs a Monk cluster. A pull request tests only the
+# packages it changes, unless it changes what they all share (src/monkec,
+# src/lib, the TypeScript and Deno config); pushes to main and
+# manual runs test them all.
 on:
   pull_request:
   push:
@@ -11,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   check-and-test:
@@ -42,15 +46,32 @@ jobs:
       - name: Packages
         id: packages
         if: steps.monk.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           all=$(find src -mindepth 1 -maxdepth 1 -type d ! -name lib | sort | tr '\n' ' ')
-          tested=""
+          with_tests=""
           for d in $all; do
-            if compgen -G "$d/test/*.test.ts" >/dev/null; then tested="$tested$d "; fi
+            if compgen -G "$d/test/*.test.ts" >/dev/null; then with_tests="$with_tests$d "; fi
           done
+
+          tested="$with_tests"
+          if [ -n "$PR" ]; then
+            changed=$(gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only)
+            if grep -qE '^(src/(monkec|lib)/|src/tsconfig\.json$|deno\.(json|lock)$)' <<< "$changed"; then
+              echo "This pull request changes what every package shares: testing them all."
+            else
+              tested=""
+              for d in $with_tests; do
+                if grep -q "^$d/" <<< "$changed"; then tested="$tested$d "; fi
+              done
+            fi
+          fi
           echo "all=$all" >> "$GITHUB_OUTPUT"
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
-          echo "packages: $(wc -w <<< "$all"), with tests: ${tested:-none}"
+          echo "packages: $(wc -w <<< "$all"), with tests: ${with_tests:-none}"
+          echo "testing: ${tested:-none}"
 
       - name: Type-check packages
         if: steps.monk.outputs.available == 'true'
