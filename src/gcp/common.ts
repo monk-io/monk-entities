@@ -52,6 +52,7 @@ export const ARTIFACT_REGISTRY_API_URL = "https://artifactregistry.googleapis.co
 
 /** Compute Engine API base URL */
 export const COMPUTE_API_URL = "https://compute.googleapis.com/compute/v1";
+export const CONTAINER_API_URL = "https://container.googleapis.com/v1";
 
 /** Cloud Tasks API base URL */
 export const CLOUD_TASKS_API_URL = "https://cloudtasks.googleapis.com/v2";
