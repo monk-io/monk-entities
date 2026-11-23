@@ -3,7 +3,7 @@
 // fake-kube.ts, with a fake of Compute Engine's disks.
 import { test, expect, Test, fakeApi, json, Request } from "monk/test";
 import { Branch } from "../branch.ts";
-import { copyOf, rewriteHosts, diskName, isolationPolicy } from "../branch-copy.ts";
+import { copyOf, rewriteHosts, diskName, isolationPolicy, claimsOf, fromManifest } from "../branch-copy.ts";
 import { kube, KUBE } from "./fake-kube.ts";
 
 const GCE = "https://compute.googleapis.com";
@@ -368,4 +368,157 @@ test("copies: hosts rewritten only in .svc names, isolation, disk names", (t) =>
     const long = diskName("a-very-long-branch-namespace-name-for-testing", "data-some-statefulset-with-a-long-name-0");
     expect(long.length < 64).toBe(true);
     expect(long).not.toBe(diskName("a-very-long-branch-namespace-name-for-testing", "data-some-statefulset-with-a-long-name-1"));
+});
+
+/** What `helm template app chart -n br-1` gives: prod's Cassandra, a new Postgres, a web app, and what a branch leaves out. */
+function rendered(webImage: string): string {
+    return `
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: br-1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres
+type: Opaque
+stringData:
+  password: hunter2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  type: LoadBalancer
+  selector: {app: web}
+  ports: [{port: 80, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: web}}
+  template:
+    metadata: {labels: {app: web}}
+    spec:
+      imagePullSecrets: [{name: ghcr}]
+      containers: [{name: web, image: "${webImage}"}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+spec:
+  replicas: 2
+  serviceName: cassandra
+  selector: {matchLabels: {app: cassandra}}
+  template:
+    metadata: {labels: {app: cassandra}}
+    spec:
+      containers: [{name: cassandra, image: "cassandra:5.0.9", env: [{name: CASSANDRA_SEEDS, value: cassandra-0.cassandra}]}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 30Gi}}}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  serviceName: postgres
+  selector: {matchLabels: {app: postgres}}
+  template:
+    metadata: {labels: {app: postgres}}
+    spec:
+      containers: [{name: postgres, image: "postgres:17.5-alpine"}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 5Gi}}}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-test
+  annotations:
+    helm.sh/hook: test
+spec:
+  containers: [{name: t, image: busybox}]
+`;
+}
+
+test("a branch from a manifest clones the volumes it claims and applies its objects, not the source's", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    api.state.objects.set("secrets/prod/ghcr", { apiVersion: "v1", kind: "Secret", metadata: { name: "ghcr", namespace: "prod" }, type: "kubernetes.io/dockerconfigjson", data: { ".dockerconfigjson": btoa("{}") } });
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2"), copy_secrets: ["ghcr"] });
+
+    b.create();
+    // Prod's two Cassandra claims are cloned; the new Postgres claim is not in prod.
+    expect(b.state.claims?.map((c) => c.claim)).toEqual(["data-cassandra-0", "data-cassandra-1"]);
+    expect(b.output.join("\n")).toMatch(/claim data-postgres-0: not in prod; the branch's starts empty/);
+    b.waitReady();
+
+    expect(api.state.objects.get("deployments/br-1/web").spec.template.spec.containers[0].image).toBe("ghcr.io/x/web:v2");
+    expect(api.state.objects.get("services/br-1/web").spec.type).toBe("ClusterIP");
+    expect(api.state.objects.get("statefulsets/br-1/cassandra").metadata.annotations["monk.io/branch-of"]).toBe("prod");
+    expect(api.state.objects.get("persistentvolumeclaims/br-1/data-cassandra-0").spec.volumeName).toBe("br-1-data-cassandra-0");
+    expect(api.state.objects.get("secrets/br-1/ghcr").type).toBe("kubernetes.io/dockerconfigjson");
+    // Not the source's objects: prod's loadgen and its db Secret stay behind.
+    expect(api.state.objects.has("deployments/br-1/loadgen")).toBe(false);
+    expect(api.state.objects.has("secrets/br-1/db")).toBe(false);
+    expect(api.state.objects.has("pods/br-1/web-test")).toBe(false);
+    expect(b.state.objects).toEqual([
+        "Secret/ghcr", "Secret/postgres", "Service/web", "StatefulSet/cassandra", "StatefulSet/postgres", "Deployment/web",
+    ]);
+    expect(b.state.manifest_hash !== undefined).toBe(true);
+    expect(disks.state.inserts.length).toBe(2);
+});
+
+test("a new manifest is applied in place, on the same clones", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2") });
+    b.create();
+    b.waitReady();
+    const first = b.state.manifest_hash;
+
+    b.redefine({ ...b.definition, manifest: rendered("ghcr.io/x/web:v3") });
+    b.update();
+    b.waitReady();
+    expect(api.state.objects.get("deployments/br-1/web").spec.template.spec.containers[0].image).toBe("ghcr.io/x/web:v3");
+    expect(b.state.manifest_hash !== first).toBe(true);
+    // Cloned once.
+    expect(disks.state.inserts.length).toBe(2);
+}, { explore: false }); // the lifecycle above is explored
+
+test("a manifest's claims: its PVCs, and each StatefulSet pod's, with replicas overridden", () => {
+    const objs = [
+        { kind: "PersistentVolumeClaim", metadata: { name: "uploads" } },
+        { kind: "StatefulSet", metadata: { name: "db" }, spec: { replicas: 3, volumeClaimTemplates: [{ metadata: { name: "data" } }, { metadata: { name: "wal" } }] } },
+        { kind: "StatefulSet", metadata: { name: "cache" }, spec: { volumeClaimTemplates: [{ metadata: { name: "data" } }] } },
+    ];
+    expect(claimsOf(objs)).toEqual(["uploads", "data-db-0", "data-db-1", "data-db-2", "wal-db-0", "wal-db-1", "wal-db-2", "data-cache-0"]);
+    expect(claimsOf(objs, { db: 1 })).toEqual(["uploads", "data-db-0", "wal-db-0", "data-cache-0"]);
+    const m = fromManifest([
+        { apiVersion: "v1", kind: "PersistentVolumeClaim", metadata: { name: "uploads" }, spec: {} },
+        { apiVersion: "networking.k8s.io/v1", kind: "Ingress", metadata: { name: "web", namespace: "prod" }, spec: { rules: [] } },
+        { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "app" }, data: { a: "b" } },
+        { apiVersion: "v1", kind: "Namespace", metadata: { name: "br-1" } },
+        { apiVersion: "v1", kind: "Pod", metadata: { name: "t", annotations: { "helm.sh/hook": "pre-install, test-success" } } },
+    ], { source: "prod", target: "br-1", annotations: { "monk.io/owner": "x" } }, ["uploads"]);
+    expect(m.left).toEqual([
+        "PersistentVolumeClaim/uploads: bound to a clone by the branch",
+        "Namespace/br-1: cluster-scoped",
+        "Pod/t: a Helm test hook",
+    ]);
+    // Kinds copyOf doesn't know pass through, in the target namespace.
+    expect(m.apply.map((o) => `${o.kind}/${o.metadata.namespace}`)).toEqual(["ConfigMap/br-1", "Ingress/br-1"]);
+    expect(m.apply[1].metadata.annotations["monk.io/owner"]).toBe("x");
 });

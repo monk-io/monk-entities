@@ -236,3 +236,92 @@ export function parseHandle(handle: string): { project: string; location: string
     if (!m) return undefined;
     return { project: m[1], location: m[3], zonal: m[2] === "zones", disk: m[4] };
 }
+
+/** Kinds that don't live in a namespace: a branch made from a manifest leaves them out. */
+const CLUSTER_SCOPED = [
+    "Namespace", "ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "PersistentVolume",
+    "StorageClass", "PriorityClass", "IngressClass", "RuntimeClass", "ValidatingWebhookConfiguration",
+    "MutatingWebhookConfiguration", "APIService", "CSIDriver", "VolumeAttachment",
+];
+
+/** The order a branch applies a manifest's objects in: what others use first, workloads last. */
+const MANIFEST_ORDER = [
+    "ServiceAccount", "Role", "RoleBinding", "Secret", "ConfigMap", "PersistentVolumeClaim", "Service",
+];
+const WORKLOADS = ["StatefulSet", "Deployment", "DaemonSet", "Job", "CronJob"];
+
+function rank(kind: string): number {
+    const i = MANIFEST_ORDER.indexOf(kind);
+    if (i >= 0) return i;
+    const w = WORKLOADS.indexOf(kind);
+    return w >= 0 ? MANIFEST_ORDER.length + 1 + w : MANIFEST_ORDER.length;
+}
+
+/**
+ * The claims a manifest's objects use: its PersistentVolumeClaims, and the
+ * `<template>-<statefulset>-<n>` claims of each StatefulSet's pods, with
+ * replicas overriding the manifest's.
+ */
+export function claimsOf(objs: any[], replicas?: Record<string, number>): string[] {
+    const out: string[] = [];
+    for (const obj of objs) {
+        const name = obj?.metadata?.name;
+        if (obj?.kind === "PersistentVolumeClaim" && name) out.push(name);
+        if (obj?.kind !== "StatefulSet" || !name) continue;
+        const n = replicas?.[name] ?? obj.spec?.replicas ?? 1;
+        for (const t of obj.spec?.volumeClaimTemplates ?? []) {
+            for (let i = 0; i < n; i++) out.push(`${t.metadata?.name}-${name}-${i}`);
+        }
+    }
+    return out;
+}
+
+/** What a branch does with a manifest's objects. */
+export interface FromManifest {
+    /** The objects to apply, in order. */
+    apply: any[];
+    /** Objects left out, as "Kind/name: why". */
+    left: string[];
+}
+
+/**
+ * The objects to apply in the target namespace for a rendered manifest
+ * (`helm template`, kustomize): each put in the target namespace with the
+ * branch's annotations, Services and replicas as copyOf makes them.
+ * Cluster-scoped objects, Helm test hooks and the claims the branch binds
+ * to clones itself (`bound`) are left out.
+ */
+export function fromManifest(objs: any[], o: CopyOptions, bound: string[] = []): FromManifest {
+    const apply: any[] = [];
+    const left: string[] = [];
+    // Rendered for the target: nothing to rewrite.
+    const same: CopyOptions = { ...o, source: o.target };
+    for (const obj of objs) {
+        if (!obj?.kind || !obj.metadata?.name) continue;
+        const id = `${obj.kind}/${obj.metadata.name}`;
+        if (CLUSTER_SCOPED.includes(obj.kind)) {
+            left.push(`${id}: cluster-scoped`);
+            continue;
+        }
+        if (String(obj.metadata.annotations?.["helm.sh/hook"] ?? "").split(",").some((h: string) => h.trim().startsWith("test"))) {
+            left.push(`${id}: a Helm test hook`);
+            continue;
+        }
+        if (obj.kind === "PersistentVolumeClaim" && bound.includes(obj.metadata.name)) {
+            left.push(`${id}: bound to a clone by the branch`);
+            continue;
+        }
+        let copy = copyOf(obj, same);
+        if (copy === undefined) {
+            if (skipped(obj)) {
+                left.push(`${id}: owned by another object`);
+                continue;
+            }
+            const { status: _status, metadata: _metadata, ...rest } = obj;
+            copy = { ...rest, metadata: cleanMetadata(obj, same) };
+        }
+        apply.push(copy);
+    }
+    apply.sort((a, b) => rank(a.kind) - rank(b.kind));
+    return { apply, left };
+}

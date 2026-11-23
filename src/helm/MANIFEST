@@ -1,0 +1,4 @@
+REPO helm
+DESCRIPTION Helm charts rendered by Monk, for entities that apply the result.
+HOSTING managed
+TAGS helm,kubernetes,charts
