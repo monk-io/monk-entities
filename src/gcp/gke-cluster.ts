@@ -603,7 +603,7 @@ export class GkeCluster extends GcpEntity<GkeClusterDefinition, GkeClusterState>
     }
 
     /** Checks a few times, 10 s apart, before saying the cluster is still there. */
-    override checkDeleted(): boolean {
+    checkDeleted(): boolean {
         if (this.keeps()) return true;
         for (let i = 0; ; i++) {
             if (this.deletedOnce()) return true;
