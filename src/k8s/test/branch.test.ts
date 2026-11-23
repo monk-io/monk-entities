@@ -103,6 +103,12 @@ function seedProd(objects: Map<string, any>) {
     put("configmaps/prod/app", { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "app", namespace: "prod", uid: "cm" }, data: { DB: "cassandra.prod.svc:9042" } });
     put("configmaps/prod/kube-root-ca.crt", { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "kube-root-ca.crt", namespace: "prod" }, data: { "ca.crt": "x" } });
     put("secrets/prod/db", { apiVersion: "v1", kind: "Secret", metadata: { name: "db", namespace: "prod", uid: "sec" }, type: "Opaque", data: { password: btoa("hunter2"), url: btoa("cql://cassandra.prod.svc:9042") } });
+    put("roles/prod/reader", { apiVersion: "rbac.authorization.k8s.io/v1", kind: "Role", metadata: { name: "reader", namespace: "prod" }, rules: [{ apiGroups: [""], resources: ["configmaps"], verbs: ["get"] }] });
+    put("rolebindings/prod/reader", {
+        apiVersion: "rbac.authorization.k8s.io/v1", kind: "RoleBinding", metadata: { name: "reader", namespace: "prod" },
+        roleRef: { apiGroup: "rbac.authorization.k8s.io", kind: "Role", name: "reader" },
+        subjects: [{ kind: "ServiceAccount", name: "app", namespace: "prod" }, { kind: "ServiceAccount", name: "ci", namespace: "tools" }, { kind: "User", name: "jane" }],
+    });
     put("secrets/prod/tok", { apiVersion: "v1", kind: "Secret", metadata: { name: "tok", namespace: "prod" }, type: "kubernetes.io/service-account-token", data: {} });
 }
 
@@ -160,8 +166,16 @@ test("a namespace is branched: disks cloned, claims bound to them, objects copie
     expect(api.state.objects.get("statefulsets/prod/cassandra").metadata.resourceVersion).toBe("77");
     expect(api.state.objects.get("services/prod/web").spec.type).toBe("LoadBalancer");
 
+    const rb = api.state.objects.get("rolebindings/br-1/reader");
+    expect(rb.subjects).toEqual([
+        { kind: "ServiceAccount", name: "app", namespace: "br-1" },
+        { kind: "ServiceAccount", name: "ci", namespace: "tools" },
+        { kind: "User", name: "jane" },
+    ]);
+    expect(api.state.objects.get("roles/br-1/reader").rules[0].verbs).toEqual(["get"]);
+
     expect(b.state.objects).toEqual([
-        "Secret/db", "ConfigMap/app", "Service/cassandra", "Service/web", "StatefulSet/cassandra", "Deployment/loadgen",
+        "Role/reader", "RoleBinding/reader", "Secret/db", "ConfigMap/app", "Service/cassandra", "Service/web", "StatefulSet/cassandra", "Deployment/loadgen",
     ]);
     expect(b.state.ready_seconds !== undefined).toBe(true);
 
@@ -184,6 +198,71 @@ test("a before_clone Job runs in the source first, and the disks wait for it", (
     expect(api.state.objects.get("jobs/prod/br-1-before-clone").spec.template.spec.containers[0].command).toEqual(["nodetool", "flush"]);
     expect(disks.state.inserts).toEqual([]);
     b.waitReady();
+    expect(disks.state.inserts.length).toBe(2);
+});
+
+test("disks an earlier run kept are not reused: the branch made again refuses them", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t, { keep_disks: true });
+    b.create();
+    b.waitReady();
+    b.delete();
+    b.waitDeleted();
+    expect(disks.state.disks.size).toBe(2);
+    expect(disks.state.deletes).toEqual([]);
+    // Made again in the same namespace: the kept disks are an earlier run's.
+    expect(() => b.create()).toThrow("is a clone an earlier run of this branch kept");
+});
+
+test("a disk of the clone's name that another branch made is neither used nor deleted", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    // Another cluster's branch into a namespace of the same name.
+    disks.state.disks.set("br-1-data-cassandra-0", {
+        name: "br-1-data-cassandra-0", status: "READY", sourceDisk: HANDLE("pvc-0"),
+        labels: { "monk-owner": "someone-else", "monk-run": "x" }, reads: 0,
+    });
+    const b = branch(t);
+    expect(() => b.create()).toThrow("was not made by this branch");
+    // Refused before anything was written.
+    expect(api.state.objects.has("namespaces//br-1")).toBe(false);
+    expect(disks.state.inserts).toEqual([]);
+
+    // And a branch whose disk is taken over afterwards leaves it on delete.
+    disks.state.disks.delete("br-1-data-cassandra-0");
+    const c = branch(t);
+    c.create();
+    c.waitReady();
+    disks.state.disks.get("br-1-data-cassandra-0").labels["monk-owner"] = "someone-else";
+    c.delete();
+    c.waitDeleted();
+    expect(disks.state.deletes).toEqual(["br-1-data-cassandra-1"]);
+    expect(c.output.join("\n")).toContain("leaving disk br-1-data-cassandra-0");
+});
+
+test("other_claims: empty gives a claim that can't be cloned a new, empty one", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    api.state.objects.set("persistentvolumes//nfs-1", {
+        apiVersion: "v1", kind: "PersistentVolume", metadata: { name: "nfs-1" },
+        spec: { capacity: { storage: "1Ti" }, nfs: { server: "10.0.0.9", path: "/share" } },
+    });
+    api.state.objects.set("persistentvolumeclaims/prod/shared", {
+        apiVersion: "v1", kind: "PersistentVolumeClaim", metadata: { name: "shared", namespace: "prod" },
+        spec: { accessModes: ["ReadWriteMany"], storageClassName: "filestore", volumeName: "nfs-1", resources: { requests: { storage: "1Ti" } } },
+        status: { phase: "Bound" },
+    });
+    expect(() => branch(t).create()).toThrow("other_claims: empty");
+    const b = branch(t, { other_claims: "empty" });
+    b.create();
+    b.waitReady();
+    const claim = api.state.objects.get("persistentvolumeclaims/br-1/shared");
+    expect(claim.spec.volumeName).toBeUndefined();
+    expect(claim.spec.storageClassName).toBe("filestore");
     expect(disks.state.inserts.length).toBe(2);
 });
 
