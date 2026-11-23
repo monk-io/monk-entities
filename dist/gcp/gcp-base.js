@@ -38,6 +38,7 @@ module.exports = __toCommonJS(gcp_base_exports);
 var import_base = require("monkec/base");
 var import_gcp = __toESM(require("cloud/gcp"));
 var import_cli = __toESM(require("cli"));
+var import_resilience = require("monkec/resilience");
 
 // input/gcp/common.ts
 function parseGcpError(response) {
@@ -195,6 +196,79 @@ var GcpEntity = class extends import_base.MonkEntity {
       return JSON.parse(response.body);
     } catch {
       return { raw: response.body };
+    }
+  }
+  /**
+   * Sends a request to a GCP API and returns its parsed JSON body ({} when
+   * empty). Unlike get/post/..., a failure throws an Error carrying the
+   * properties `monkec/resilience` reads (`status`, `kind`, `method`,
+   * `url`, `body`, `headers`), so `httpFailure`, `deleteIfExists` and
+   * `ensureCreated` work with it. Requests the API refused (429, 503)
+   * and, for GET, PUT and DELETE, requests that may have failed midway
+   * are retried; a POST that may have gone through is not.
+   */
+  request(method, url, body) {
+    return (0, import_resilience.retry)(() => this.requestOnce(method, url, body), {
+      when: (e) => (0, import_resilience.isRetryable)(e, method),
+      what: `GCP ${method} ${url}`
+    });
+  }
+  /** One try of request(). */
+  requestOnce(method, url, body) {
+    const options = {};
+    if (body !== void 0) {
+      options.body = JSON.stringify(body);
+      options.headers = { "Content-Type": "application/json" };
+    }
+    let response;
+    switch (method) {
+      case "GET":
+        response = import_gcp.default.get(url, options);
+        break;
+      case "POST":
+        response = import_gcp.default.post(url, options);
+        break;
+      case "PUT":
+        response = import_gcp.default.put(url, options);
+        break;
+      case "DELETE":
+        response = import_gcp.default.delete(url, options);
+        break;
+    }
+    const fail = (kind, detail) => {
+      const err = new Error(`GCP ${method} ${url} failed: ${detail}`);
+      err.name = "HttpError";
+      err.status = kind === "status" ? response.statusCode : 0;
+      err.kind = kind;
+      err.method = method;
+      err.url = url;
+      err.body = response.body ?? "";
+      err.headers = response.headers ?? {};
+      return err;
+    };
+    if (!response.statusCode) {
+      throw fail("transport", response.error || "no response");
+    }
+    if (response.statusCode >= 400) {
+      let detail = `${response.statusCode}`;
+      try {
+        const e = JSON.parse(response.body).error;
+        if (e?.message) detail += `: ${e.message}`;
+        const violations = (e?.details ?? []).flatMap((x) => x.fieldViolations ?? []).map((v) => `${v.field}: ${v.description}`);
+        if (violations.length > 0) detail += ` (${violations.join("; ")})`;
+        const reasons = (e?.errors ?? []).map((x) => x.reason).filter(Boolean);
+        if (reasons.length > 0) detail += ` [${reasons.join(", ")}]`;
+      } catch {
+      }
+      throw fail("status", detail);
+    }
+    if (!response.body) return {};
+    try {
+      const parsed = JSON.parse(response.body);
+      if (typeof parsed !== "object" || parsed === null) throw new Error("not an object");
+      return parsed;
+    } catch {
+      throw fail("malformed", "the response is not JSON");
     }
   }
   /**

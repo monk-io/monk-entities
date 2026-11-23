@@ -1,0 +1,213 @@
+namespace: gcp
+gke-cluster:
+  defines: entity
+  metadata:
+    name: GkeCluster
+    description: |-
+      Manages a zonal GKE Standard cluster with one node pool.
+      Create returns as soon as GCP accepts the request; the entity is ready when
+      the cluster is RUNNING (5-8 minutes; readiness waits up to ~22).
+      The state carries `gke_cluster`, `gke_location` and `gke_project`, so
+      `k8s/*` entities can connect with the Monk cluster's GCP credentials.
+
+      Update resizes the node pool (`node_count`) and sets labels. Anything
+      else (machine type, disks, version, network, `dataplane_v2`, `spot`)
+      needs a new cluster; the entity says so and leaves the cluster alone.
+      Resizing and labelling are cluster operations that cannot overlap: when
+      both change, the size is applied first and the labels with the next update.
+
+      Deleting removes the cluster and its nodes, and waits until it is gone
+      (3-5 minutes). A cluster that existed before the entity created it is
+      adopted and left in place on delete, unless `force_ownership` is set.
+
+      Logging and monitoring are off by default (`logging: false`,
+      `monitoring: false`) to keep the cost down.
+
+      ## Required Permissions
+      - `container.clusters.create`, `container.clusters.get`, `container.clusters.delete`
+      - `container.clusters.update` - resize and labels
+      - `container.operations.get`
+      - `iam.serviceAccounts.actAs` on the nodes' service account (the default compute one)
+
+      ## Secrets
+      - Reads: none (authenticated via gcp provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.gke_cluster`, `state.gke_location`, `state.gke_project` - for `k8s/*` entities
+      - `state.endpoint`, `state.ca_certificate` - API server address and CA
+      - `state.status`, `state.master_version`, `state.node_pool`, `state.node_count`
+
+      ## Composing with Other Entities
+      Works with:
+      - `k8s/*` entities - `gke_cluster`, `gke_location`, `gke_project`
+      - `gcp/service-usage` - enable container.googleapis.com
+    version-hash: 42d929495ff9
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: 'Cluster name (lowercase letters, digits, dashes; starts with a letter; at most 40 chars)'
+    location:
+      type: string
+      description: |-
+        Zone the cluster lives in, e.g. europe-west1-b. A zonal
+        cluster has one control plane and its nodes in that zone; a region is refused.
+    kubernetes_version:
+      type: string
+      description: |-
+        Kubernetes version for a new cluster, e.g. 1.33 or 1.33.5-gke.1080000.
+        Default: the release channel's default. Cannot be changed in place.
+    release_channel:
+      type: string
+      description: 'RAPID, REGULAR, STABLE, EXTENDED or NONE (no channel: you upgrade by hand).'
+      default: REGULAR
+    node_pool_name:
+      type: string
+      description: Name of the node pool
+      default: default-pool
+    machine_type:
+      type: string
+      description: Machine type of the nodes. Needs a new cluster to change.
+      default: e2-standard-2
+    node_count:
+      type: number
+      minimum: 0
+      description: Number of nodes in the pool. Changing it resizes the pool.
+      default: 3
+    disk_size_gb:
+      type: number
+      minimum: 10
+      description: |-
+        Boot disk size per node in GB. GKE's own default is 100 GB
+        pd-balanced, which counts against the regional SSD quota; this entity
+        defaults to a smaller standard disk. Needs a new cluster to change.
+      default: 30
+    disk_type:
+      type: string
+      description: 'Boot disk type: pd-standard, pd-balanced or pd-ssd. Needs a new cluster to change.'
+      default: pd-standard
+    spot:
+      type: boolean
+      description: 'Run the nodes on Spot VMs: cheaper, and reclaimed by GCP at any time.'
+      default: false
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: |-
+          Labels on the cluster (GCP resource labels). Changing them
+          updates the cluster. The cluster also gets a monk-owner label naming the
+          Monk instance that created it.
+      description: |-
+        Labels on the cluster (GCP resource labels). Changing them
+        updates the cluster. The cluster also gets a monk-owner label naming the
+        Monk instance that created it.
+    network:
+      type: string
+      description: VPC network name or path
+      default: default
+    subnetwork:
+      type: string
+      description: 'Subnetwork name or path. Default: the network''s subnetwork in the cluster''s region.'
+    dataplane_v2:
+      type: boolean
+      description: |-
+        Use GKE Dataplane V2 (ADVANCED_DATAPATH), which enforces
+        Kubernetes NetworkPolicies. Create-only: a cluster made without it
+        cannot get it, and one made with it cannot lose it; changing this
+        needs a new cluster.
+      default: true
+    logging:
+      type: boolean
+      description: Send logs to Cloud Logging. Off by default to keep the cost down.
+      default: false
+    monitoring:
+      type: boolean
+      description: Send metrics to Cloud Monitoring. Off by default to keep the cost down.
+      default: false
+    required:
+      - name
+      - location
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Cluster name
+    location:
+      type: string
+      description: Zone of the cluster
+    project:
+      type: string
+      description: Project of the cluster
+    gke_cluster:
+      type: string
+      description: 'Cluster name, for the k8s entities'' gke_cluster'
+    gke_location:
+      type: string
+      description: 'Zone, for the k8s entities'' gke_location'
+    gke_project:
+      type: string
+      description: 'Project, for the k8s entities'' gke_project'
+    endpoint:
+      type: string
+      description: IP address of the Kubernetes API server
+    ca_certificate:
+      type: string
+      description: Base64 PEM CA certificate of the cluster
+    status:
+      type: string
+      description: 'PROVISIONING, RUNNING, RECONCILING, STOPPING, ERROR or DEGRADED'
+    master_version:
+      type: string
+      description: Kubernetes version of the control plane
+    node_pool:
+      type: string
+      description: Name of the node pool
+    node_count:
+      type: number
+      description: Number of nodes in the pool
+    self_link:
+      type: string
+      description: Full self-link of the cluster
+  lifecycle:
+    sync: <<< gke-cluster-sync.js
+    get-info: ''
+    get-kubeconfig: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 15
+      initialDelay: 10
+      attempts: 90
+    liveness:
+      period: 300
+  requires:
+    - monkec/base
+    - monkec/resilience
+    - cli
+    - gcp/gcp-base
+    - gcp/common
+    - gcp/compute-common

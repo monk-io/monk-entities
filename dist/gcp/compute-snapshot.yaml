@@ -1,0 +1,133 @@
+namespace: gcp
+compute-snapshot:
+  defines: entity
+  metadata:
+    name: ComputeSnapshot
+    description: |-
+      Takes a standard snapshot of a zonal Persistent Disk. Create
+      returns as soon as GCP accepts the request; the entity is ready when the
+      snapshot is READY. Restore it into a new disk with gcp/compute-disk
+      (`source_snapshot` set to this snapshot's `self_link` or name).
+      Deleting removes the snapshot and waits until it is gone; disks restored
+      from it are not affected. A snapshot that existed before the entity
+      created it is adopted and left in place on delete, unless
+      `force_ownership` is set.
+
+      ## Required Permissions
+      - `compute.snapshots.create`, `compute.snapshots.get`, `compute.snapshots.delete`
+      - `compute.snapshots.setLabels` — labels on create
+      - `compute.disks.createSnapshot` on the source disk
+      - `compute.globalOperations.get` — operation status
+
+      ## Secrets
+      - Reads: none (authenticated via gcp provider)
+      - Writes: none
+
+      ## State Fields for Composition
+      - `state.self_link` - for gcp/compute-disk `source_snapshot`
+      - `state.name`, `state.status`, `state.disk_size_gb`, `state.storage_bytes`
+
+      ## Composing with Other Entities
+      Works with:
+      - `gcp/compute-disk` - the disk to snapshot, and disks restored from it
+    version-hash: 42d929495ff9
+  schema:
+    project:
+      type: string
+      description: 'Override the GCP project ID (optional, defaults to environment)'
+    force_ownership:
+      type: boolean
+      description: |-
+        When true, classify the resource as owned by this entity
+        even if `create()` finds it pre-existing in the cloud (the usual
+        adopt branch). Subsequent `delete()` will remove it.
+
+        Use this when you know the resource was created by a previous run of
+        your stack — e.g. after a Monk cluster reset wiped the ledger. Without
+        this flag, the entity adopts (sets `existing=true`) and `delete()`
+        refuses to clean up on teardown, leaving residue in the cloud.
+
+        Leave unset/false when the resource is genuinely externally-managed
+        and you just want to read/reconcile it.
+    name:
+      type: string
+      description: 'Snapshot name, unique in the project (1-63 chars: lowercase letters, digits, dashes; starts with a letter)'
+    source_disk:
+      type: string
+      description: |-
+        Disk to snapshot: a name (in this project and `zone`), a
+        path (projects/P/zones/Z/disks/D) or a self-link.
+    zone:
+      type: string
+      description: Zone of the source disk; needed when source_disk is a bare name.
+    storage_locations:
+      type: array
+      items:
+        type: string
+      description: |-
+        Where the snapshot is stored: one region (europe-west1)
+        or multi-region (eu, us, asia). Defaults to the multi-region nearest
+        the disk.
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+        description: |-
+          Labels to put on the snapshot. It also gets a monk-owner
+          label naming the Monk instance that created it.
+      description: |-
+        Labels to put on the snapshot. It also gets a monk-owner
+        label naming the Monk instance that created it.
+    required:
+      - name
+      - source_disk
+  state-schema:
+    existing:
+      type: boolean
+      description: Indicates if the resource already existed before this entity managed it
+    operation_name:
+      type: string
+      description: Operation name for tracking long-running operations
+    name:
+      type: string
+      description: Snapshot name
+    id:
+      type: string
+      description: Numeric snapshot ID
+    self_link:
+      type: string
+      description: 'Full self-link of the snapshot, for compute-disk''s source_snapshot'
+    status:
+      type: string
+      description: 'CREATING, UPLOADING, READY, FAILED or DELETING'
+    source_disk:
+      type: string
+      description: Self-link of the disk the snapshot was taken of
+    disk_size_gb:
+      type: number
+      description: Size in GB of the disk the snapshot was taken of
+    storage_bytes:
+      type: number
+      description: Bytes the snapshot stores (what it is billed for)
+    storage_locations:
+      type: array
+      items:
+        type: string
+      description: Where the snapshot is stored
+  lifecycle:
+    sync: <<< compute-snapshot-sync.js
+    get-info: ''
+    get-cost-estimate: ''
+    costs: ''
+  checks:
+    readiness:
+      period: 10
+      initialDelay: 5
+      attempts: 180
+  requires:
+    - monkec/base
+    - monkec/resilience
+    - cli
+    - gcp/gcp-base
+    - gcp/common
+    - gcp/compute-common

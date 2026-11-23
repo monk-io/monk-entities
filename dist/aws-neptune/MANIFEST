@@ -50,5 +50,5 @@ neptune-access-list:
   services:
     data:
       protocol: custom
-LOAD cluster-parameter-group.yaml neptune-access-list.yaml instance.yaml common.yaml subnet-group.yaml cluster.yaml neptune-base.yaml
-RESOURCES subnet-group-sync.js instance-sync.js cluster-parameter-group-sync.js common.js neptune-base.js cluster-sync.js neptune-access-list-sync.js
+LOAD cluster-parameter-group.yaml neptune-base.yaml cluster.yaml common.yaml instance.yaml subnet-group.yaml neptune-access-list.yaml
+RESOURCES common.js subnet-group-sync.js cluster-sync.js neptune-access-list-sync.js cluster-parameter-group-sync.js neptune-base.js instance-sync.js

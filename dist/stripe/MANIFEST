@@ -3,5 +3,5 @@ VERSION_HASH c326f768f517
 DESCRIPTION Payments, products, prices, and webhooks.
 HOSTING managed
 TAGS stripe,payments,billing
-LOAD product.yaml credentials.yaml stripe-base.yaml price.yaml webhook-endpoint.yaml
-RESOURCES webhook-endpoint-sync.js credentials-sync.js product-sync.js stripe-base.js price-sync.js
+LOAD price.yaml stripe-base.yaml credentials.yaml webhook-endpoint.yaml product.yaml
+RESOURCES price-sync.js stripe-base.js credentials-sync.js webhook-endpoint-sync.js product-sync.js
