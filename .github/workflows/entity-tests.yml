@@ -21,10 +21,10 @@ jobs:
       - name: Install monk (nightly)
         run: |
           mkdir -p "$RUNNER_TEMP/monk"
-          curl -sSfL https://monkreleases.blob.core.windows.net/nightly/linux/monk-amd64-latest.tar.gz \
+          curl -sSfL https://get.monk.io/nightly/linux/monk-amd64-latest.tar.gz \
             | tar -xz -C "$RUNNER_TEMP/monk" monk
           echo "$RUNNER_TEMP/monk" >> "$GITHUB_PATH"
-          echo "monk nightly $(curl -sSfL https://monkreleases.blob.core.windows.net/nightly/linux/latest-version)"
+          echo "monk nightly $(curl -sSfL https://get.monk.io/nightly/linux/latest-version)"
 
       # monk entity is new; until a nightly has it, say so rather than fail
       # every pull request. (An unknown command prints help and exits 0, so
