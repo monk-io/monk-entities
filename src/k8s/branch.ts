@@ -9,6 +9,8 @@ import { readiness } from "./readiness.ts";
 import {
     COPIED_KINDS,
     copyOf,
+    claimsOf,
+    fromManifest,
     isolationPolicy,
     diskName,
     parseHandle,
@@ -78,6 +80,16 @@ export interface BranchDefinition extends K8sConnection {
      * @description Keep the cloned disks when the branch is deleted (default false: they are deleted with it)
      */
     keep_disks?: boolean;
+
+    /**
+     * @description The objects to run in the branch, as rendered YAML (e.g. helm template's output, from a helm/template entity), instead of copies of the source's. The source's volumes these objects claim are still cloned. An update with a new manifest applies it in place, on the same clones.
+     */
+    manifest?: string;
+
+    /**
+     * @description With manifest: Secrets of the source namespace to copy as they are, e.g. an image pull secret the chart doesn't make
+     */
+    copy_secrets?: string[];
 }
 
 /**
@@ -132,8 +144,10 @@ export interface BranchState {
     clone_seconds?: number;
     /** @description Seconds from requested_at to ready_at */
     ready_seconds?: number;
-    /** @description Objects copied, as Kind/name */
+    /** @description Objects copied or applied, as Kind/name */
     objects?: string[];
+    /** @description With manifest: the hash of the manifest last applied */
+    manifest_hash?: string;
 }
 
 /** Seconds between two ISO times. */
@@ -224,8 +238,15 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     }
 
     override update(): void {
-        // A branch is a copy as of when it was made; changing what to copy
-        // means a new branch.
+        if (this.definition.manifest !== undefined) {
+            // The data stays as it was cloned; the objects follow the
+            // manifest. Readiness applies a manifest whose hash the marker
+            // doesn't have yet.
+            cli.output(`the branch applies the new manifest on its clones once its disks are ready`);
+            return;
+        }
+        // A copy is as of when it was made; changing what to copy means a
+        // new branch.
         cli.output("a branch is not updated in place: delete it and run it again for a new copy");
     }
 
@@ -234,9 +255,14 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         const src = this.definition.source_namespace;
         const pvcs = this.k8s(`listing claims in ${src}`, (c) =>
             k8s.list(c, { apiVersion: "v1", kind: "PersistentVolumeClaim", namespace: src }));
+        const wanted = this.definition.manifest === undefined ? undefined : claimsOf(this.manifestObjects(), this.definition.replicas);
         const out: ClonedClaim[] = [];
         for (const pvc of pvcs) {
             const name = pvc.metadata.name;
+            if (wanted && !wanted.includes(name)) {
+                cli.output(`skipping claim ${name}: the manifest doesn't use it`);
+                continue;
+            }
             if (pvc.status?.phase !== "Bound" || !pvc.spec?.volumeName) {
                 cli.output(`skipping claim ${name}: not bound`);
                 continue;
@@ -279,7 +305,23 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
                 fs_type: csi.fsType,
             });
         }
+        for (const name of wanted ?? []) {
+            if (!out.some((c) => c.claim === name)) cli.output(`claim ${name}: not in ${src}; the branch's starts empty`);
+        }
         return out;
+    }
+
+    /** The manifest's objects. */
+    private manifestObjects(): any[] {
+        try {
+            return k8s.parse(this.definition.manifest ?? "");
+        } catch (e) {
+            throw new Error(`manifest: ${e instanceof Error ? e.message : String(e)}`);
+        }
+    }
+
+    private manifestHash(): string {
+        return crypto.sha256(this.definition.manifest ?? "").slice(0, 16);
     }
 
     /** Starts the before_clone Job in the source namespace; returns its name. */
@@ -455,14 +497,15 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         if (marker === null) {
             this.bindVolumes();
             const objects = this.copyObjects();
-            const at = new Date().toISOString();
-            this.apply({
-                apiVersion: "v1",
-                kind: "ConfigMap",
-                metadata: { name: MARKER, namespace: ns, annotations: this.annotations() },
-                data: { applied_at: at, objects: objects.join("\n") },
-            });
+            this.writeMarker(objects, new Date().toISOString());
             cli.output(`applied ${objects.length} objects to ${ns}`);
+            return false;
+        }
+        if (this.definition.manifest !== undefined && marker.data?.manifest !== this.manifestHash()) {
+            // An update brought a new manifest: apply it on the same clones.
+            const objects = this.applyManifest();
+            this.writeMarker(objects, marker.data?.applied_at ?? new Date().toISOString());
+            cli.output(`applied the new manifest's ${objects.length} objects to ${ns}`);
             return false;
         }
 
@@ -474,6 +517,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         const now = new Date().toISOString();
         this.state.applied_at = marker.data?.applied_at;
         this.state.objects = (marker.data?.objects ?? "").split("\n").filter((s: string) => s);
+        if (this.definition.manifest !== undefined) this.state.manifest_hash = marker.data?.manifest;
         this.state.ready_at = now;
         this.state.clone_seconds = seconds(this.state.requested_at, this.state.applied_at);
         this.state.ready_seconds = seconds(this.state.requested_at, now);
@@ -540,6 +584,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
 
     /** Copies the source's objects into the branch; returns them as Kind/name. */
     private copyObjects(): string[] {
+        if (this.definition.manifest !== undefined) return this.applyManifest();
         const src = this.definition.source_namespace;
         const ns = this.target();
         const done: string[] = [];
@@ -560,6 +605,52 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             }
         }
         return done;
+    }
+
+    /** Applies the manifest's objects, and the source's copy_secrets; returns them as Kind/name. */
+    private applyManifest(): string[] {
+        const src = this.definition.source_namespace;
+        const ns = this.target();
+        const opts = {
+            source: src,
+            target: ns,
+            annotations: this.annotations(),
+            replicas: this.definition.replicas,
+            expose: this.definition.expose,
+        };
+        const done: string[] = [];
+        for (const name of this.definition.copy_secrets ?? []) {
+            const secret = this.k8s(`reading Secret ${name} in ${src}`, (c) =>
+                k8s.read(c, { apiVersion: "v1", kind: "Secret", name, namespace: src }));
+            if (secret === null) throw new Error(`copy_secrets: Secret ${name} is not in ${src}`);
+            const copy = copyOf({ apiVersion: "v1", kind: "Secret", ...secret }, opts);
+            if (!copy) continue;
+            this.apply(copy);
+            done.push(`Secret/${name}`);
+        }
+        const bound = (this.state.claims ?? []).map((c) => c.claim);
+        const m = fromManifest(this.manifestObjects(), opts, bound);
+        for (const l of m.left) cli.output(`leaving out ${l}`);
+        for (const obj of m.apply) {
+            this.apply(obj);
+            done.push(`${obj.kind}/${obj.metadata.name}`);
+        }
+        return done;
+    }
+
+    /** Writes the marker: the objects are applied, and from which manifest. */
+    private writeMarker(objects: string[], at: string): void {
+        const ns = this.target();
+        this.apply({
+            apiVersion: "v1",
+            kind: "ConfigMap",
+            metadata: { name: MARKER, namespace: ns, annotations: this.annotations() },
+            data: {
+                applied_at: at,
+                objects: objects.join("\n"),
+                ...(this.definition.manifest !== undefined ? { manifest: this.manifestHash() } : {}),
+            },
+        });
     }
 
     /** The first workload in the branch that isn't ready, with why; undefined when all are. */

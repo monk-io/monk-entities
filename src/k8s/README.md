@@ -319,6 +319,51 @@ b1:
   `compute.disks.create`, `compute.disks.get` and `compute.disks.delete`,
   and `compute.disks.useReadOnly` on the source disks.
 
+### From a chart instead of the source's objects
+
+With `manifest`, the branch runs the objects of a rendered manifest
+instead of copies of the source's: the chart at a git branch, say, on a
+copy of production's data. `helm/template` renders it:
+
+```yaml
+chart:
+  defines: helm/template
+  chart: oci://ghcr.io/acme/charts/app
+  version: 0.1.0-3f2a9c1           # what CI pushed for the branch
+  release: app                     # as production's release
+  namespace: capsule-new-search
+  values:
+    image: {tag: 3f2a9c1}
+    loadgen: {enabled: false}
+  registry_secret: ghcr-token
+  permissions:
+    tasks: {max: 1}
+    secrets: [ghcr-token]
+
+branch:
+  defines: k8s/branch
+  source_namespace: prod
+  namespace: capsule-new-search
+  manifest: <- connection-target("chart") entity-state get-member("manifest")
+  copy_secrets: [ghcr]             # the image pull secret, which the chart doesn't make
+  connections:
+    chart: {target: acme/chart}
+  depends:
+    wait-for: {runnables: [acme/chart]}
+```
+
+- Only the source's claims that the manifest's objects use are cloned:
+  its PersistentVolumeClaims, and the `<template>-<statefulset>-<n>` claims
+  of each StatefulSet's pods. A claim the source doesn't have starts empty.
+  Charts that name objects by release need the same release name as
+  production for their claims to match.
+- Each object is put in the branch's namespace with the same Service and
+  `replicas` rules as a copy. Cluster-scoped objects, Helm test hooks and
+  the claims bound to clones are left out.
+- An update with a new manifest (a later push) applies it on the same
+  clones: the data stays as it was branched, the objects follow the
+  manifest. Objects the new manifest no longer has are not deleted.
+
 ## Tests
 
 ```bash
