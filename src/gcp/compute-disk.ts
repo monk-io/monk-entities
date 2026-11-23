@@ -431,7 +431,7 @@ export class ComputeDisk extends GcpEntity<ComputeDiskDefinition, ComputeDiskSta
         }
     }
 
-    override checkDeleted(): boolean {
+    checkDeleted(): boolean {
         if (this.keeps()) return true;
         const name = this.definition.name;
         const live = this.getDisk();

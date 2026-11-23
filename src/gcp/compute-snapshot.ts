@@ -292,7 +292,7 @@ export class ComputeSnapshot extends GcpEntity<ComputeSnapshotDefinition, Comput
         }
     }
 
-    override checkDeleted(): boolean {
+    checkDeleted(): boolean {
         if (this.keeps()) return true;
         const name = this.definition.name;
         const live = this.getSnapshot();
