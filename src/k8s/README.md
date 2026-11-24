@@ -363,10 +363,19 @@ branch:
   production for their claims to match.
 - Each object is put in the branch's namespace with the same Service and
   `replicas` rules as a copy. Cluster-scoped objects, Helm test hooks and
-  the claims bound to clones are left out.
-- An update with a new manifest (a later push) applies it on the same
-  clones: the data stays as it was branched, the objects follow the
-  manifest. Objects the new manifest no longer has are not deleted.
+  the claims bound to clones are left out. So are the chart's network
+  policies (NetworkPolicy, Cilium's and Calico's) unless `isolate: false`:
+  policies add up, and one allowing egress would let the clones reach
+  production. Ingresses and Gateway API routes are applied only with
+  `expose`, so a branch doesn't claim production's hostnames.
+- An update with a new manifest (a later push), or new `replicas`,
+  `expose`, `isolate` or `copy_secrets`, applies it on the same clones:
+  the data stays as it was branched, the objects follow the manifest.
+  Objects the new manifest no longer has are not deleted.
+- A Job whose spec changed (a migration on a new image) is deleted and
+  applied anew, as a Job's template can't change. Helm's hook ordering and
+  weights are not honoured: a `pre-upgrade` migration runs alongside the
+  new workloads rolling out, not before them.
 
 ## Tests
 

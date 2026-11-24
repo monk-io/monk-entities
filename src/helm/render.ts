@@ -67,7 +67,8 @@ export function renderSpec(i: RenderInput): any {
         command: [SCRIPT],
         env,
         files: { [VALUES]: JSON.stringify(i.values ?? {}) },
-        ...(i.chart_blob ? { blobs: { [CHART_DIR]: i.chart_blob } } : {}),
+        // monk load leaves blobs://<name or hash>; the tasks module takes the bare name or hash.
+        ...(i.chart_blob ? { blobs: { [CHART_DIR]: i.chart_blob.replace(/^blobs:\/\//, "") } } : {}),
         outputs: [OUT],
         timeout: 600,
     };

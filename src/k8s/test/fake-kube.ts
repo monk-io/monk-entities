@@ -131,6 +131,9 @@ function object(s: KubeState, req: Request, group: string, version: string): Res
         const obj = req.json();
         if (obj.kind !== kind.kind || obj.metadata?.name !== p.name) return status(400, "BadRequest", "the object does not match the URL");
         if (kind.namespaced && obj.metadata.namespace !== ns) return status(400, "BadRequest", "the namespace of the object does not match the URL");
+        if (kind.kind === "Job" && live && JSON.stringify(live.spec?.template) !== JSON.stringify(obj.spec?.template)) {
+            return status(422, "Invalid", `Job.batch "${p.name}" is invalid: spec.template: Invalid value: field is immutable`);
+        }
         s.managers.push(req.query.fieldManager);
         const merged = live ? { ...live, ...obj, metadata: { ...live.metadata, ...obj.metadata } } : obj;
         merged.metadata.annotations = { ...(live?.metadata?.annotations ?? {}), ...(obj.metadata.annotations ?? {}) };

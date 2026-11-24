@@ -289,6 +289,23 @@ test("a branch deletes its clones after GKE copied the cluster's monk-owner labe
     expect([...new Set(disks.state.deletes)].sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
 }, { explore: false }); // same requests as the lifecycle test, which is explored
 
+test("a branch deletes clones made before the owner label's rename, which carry only monk-owner", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t);
+    b.create();
+    b.waitReady();
+    // As an earlier version labelled them.
+    for (const d of disks.state.disks.values()) {
+        const { "monk-branch-owner": owner, ...rest } = d.labels;
+        d.labels = { ...rest, "monk-owner": owner };
+    }
+    b.delete();
+    b.waitDeleted();
+    expect([...new Set(disks.state.deletes)].sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
+}, { explore: false }); // same requests as the lifecycle test, which is explored
+
 /** Fails the second disk insert after it went through, as when its answer is lost. */
 function loseSecondInsert(t: Test) {
     let posts = 0;
@@ -536,6 +553,62 @@ test("a new manifest is applied in place, on the same clones", (t) => {
     expect(disks.state.inserts.length).toBe(2);
 }, { explore: false }); // the lifecycle above is explored
 
+/** A migration Job, as charts render one, running image. */
+function migration(image: string): string {
+    return `---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  annotations: {helm.sh/hook: "pre-install,pre-upgrade", helm.sh/hook-delete-policy: before-hook-creation}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers: [{name: migrate, image: "${image}"}]
+`;
+}
+
+test("a new manifest whose Job changed replaces the Job, whose template can't be changed in place", (t) => {
+    const api = t.use(kube);
+    t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2") + migration("ghcr.io/x/web:v2") });
+    b.create();
+    b.waitReady();
+    const uid = api.state.objects.get("jobs/br-1/migrate").metadata.uid;
+
+    // The same Job again is applied over the one there.
+    b.redefine({ ...b.definition, manifest: rendered("ghcr.io/x/web:v2") + migration("ghcr.io/x/web:v2"), replicas: { web: 2 } });
+    b.update();
+    b.waitReady();
+    expect(api.state.objects.get("jobs/br-1/migrate").metadata.uid).toBe(uid);
+
+    b.redefine({ ...b.definition, manifest: rendered("ghcr.io/x/web:v3") + migration("ghcr.io/x/web:v3") });
+    b.update();
+    b.waitReady();
+    const job = api.state.objects.get("jobs/br-1/migrate");
+    expect(job.spec.template.spec.containers[0].image).toBe("ghcr.io/x/web:v3");
+    expect(job.metadata.uid !== uid).toBe(true);
+}, { explore: false }); // the lifecycle is explored
+
+test("a manifest branch applies again when replicas, expose or copy_secrets change, not only the manifest", (t) => {
+    const api = t.use(kube);
+    t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2") });
+    b.create();
+    b.waitReady();
+    const first = b.state.manifest_hash;
+
+    b.redefine({ ...b.definition, replicas: { web: 3 }, expose: true });
+    b.update();
+    b.waitReady();
+    expect(api.state.objects.get("deployments/br-1/web").spec.replicas).toBe(3);
+    expect(api.state.objects.get("services/br-1/web").spec.type).toBe("LoadBalancer");
+    expect(b.state.manifest_hash !== first).toBe(true);
+}, { explore: false }); // the lifecycle is explored
+
 test("a manifest's claims: its PVCs, and each StatefulSet pod's, with replicas overridden", () => {
     const objs = [
         { kind: "PersistentVolumeClaim", metadata: { name: "uploads" } },
@@ -553,10 +626,33 @@ test("a manifest's claims: its PVCs, and each StatefulSet pod's, with replicas o
     ], { source: "prod", target: "br-1", annotations: { "monk.io/owner": "x" } }, ["uploads"]);
     expect(m.left).toEqual([
         "PersistentVolumeClaim/uploads: bound to a clone by the branch",
+        "Ingress/web: routes outside traffic in, and the branch isn't exposed",
         "Namespace/br-1: cluster-scoped",
         "Pod/t: a Helm test hook",
     ]);
-    // Kinds copyOf doesn't know pass through, in the target namespace.
-    expect(m.apply.map((o) => `${o.kind}/${o.metadata.namespace}`)).toEqual(["ConfigMap/br-1", "Ingress/br-1"]);
-    expect(m.apply[1].metadata.annotations["monk.io/owner"]).toBe("x");
+    expect(m.apply.map((o) => `${o.kind}/${o.metadata.namespace}`)).toEqual(["ConfigMap/br-1"]);
+});
+
+test("a manifest's network policies stay out of an isolated branch, and its routes out of one that isn't exposed", () => {
+    const objs = [
+        // As Bitnami charts render by default: egress anywhere.
+        { apiVersion: "networking.k8s.io/v1", kind: "NetworkPolicy", metadata: { name: "postgres" }, spec: { podSelector: {}, policyTypes: ["Egress"], egress: [{}] } },
+        { apiVersion: "cilium.io/v2", kind: "CiliumNetworkPolicy", metadata: { name: "c" }, spec: {} },
+        { apiVersion: "crd.projectcalico.org/v1", kind: "NetworkPolicy", metadata: { name: "k" }, spec: {} },
+        { apiVersion: "networking.k8s.io/v1", kind: "Ingress", metadata: { name: "web" }, spec: { rules: [{ host: "app.example.com" }] } },
+        { apiVersion: "gateway.networking.k8s.io/v1", kind: "HTTPRoute", metadata: { name: "web" }, spec: { hostnames: ["app.example.com"] } },
+        { apiVersion: "v1", kind: "ConfigMap", metadata: { name: "app" }, data: {} },
+    ];
+    const o = { source: "br-1", target: "br-1", annotations: {} };
+    const kept = (opts: any) => fromManifest(objs, { ...o, ...opts }).apply.map((x) => `${x.kind}/${x.metadata.name}`);
+    expect(kept({})).toEqual(["ConfigMap/app"]);
+    expect(fromManifest(objs, o).left).toEqual([
+        "NetworkPolicy/postgres: a network policy, which could undo the branch's isolation",
+        "CiliumNetworkPolicy/c: a network policy, which could undo the branch's isolation",
+        "NetworkPolicy/k: a network policy, which could undo the branch's isolation",
+        "Ingress/web: routes outside traffic in, and the branch isn't exposed",
+        "HTTPRoute/web: routes outside traffic in, and the branch isn't exposed",
+    ]);
+    expect(kept({ expose: true })).toEqual(["ConfigMap/app", "Ingress/web", "HTTPRoute/web"]);
+    expect(kept({ isolate: false })).toEqual(["ConfigMap/app", "NetworkPolicy/postgres", "CiliumNetworkPolicy/c", "NetworkPolicy/k"]);
 });

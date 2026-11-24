@@ -39,6 +39,8 @@ export interface CopyOptions {
     replicas?: Record<string, number>;
     /** Keep LoadBalancer and NodePort Services as they are, instead of making them ClusterIP. */
     expose?: boolean;
+    /** Whether the branch's isolation policy is in place (on unless false). */
+    isolate?: boolean;
 }
 
 /** Whether a branch leaves obj behind: what the cluster made, or something else owns. */
@@ -274,6 +276,23 @@ const CLUSTER_SCOPED = [
     "MutatingWebhookConfiguration", "APIService", "CSIDriver", "VolumeAttachment",
 ];
 
+/**
+ * Whether obj is a network policy: the core kind, or a CNI's. Policies add
+ * up, so a chart's that allows egress would undo the branch's isolation.
+ */
+function networkPolicy(obj: any): boolean {
+    const group = String(obj.apiVersion ?? "").split("/")[0];
+    if (obj.kind === "NetworkPolicy") return true;
+    if (group === "cilium.io") return obj.kind === "CiliumNetworkPolicy";
+    return group === "crd.projectcalico.org" || group === "projectcalico.org";
+}
+
+/** Whether obj routes traffic from outside the cluster in: an Ingress, or a Gateway API object. */
+function route(obj: any): boolean {
+    if (obj.kind === "Ingress") return true;
+    return String(obj.apiVersion ?? "").startsWith("gateway.networking.k8s.io/");
+}
+
 /** The order a branch applies a manifest's objects in: what others use first, workloads last. */
 const MANIFEST_ORDER = [
     "ServiceAccount", "Role", "RoleBinding", "Secret", "ConfigMap", "PersistentVolumeClaim", "Service",
@@ -319,7 +338,9 @@ export interface FromManifest {
  * (`helm template`, kustomize): each put in the target namespace with the
  * branch's annotations, Services and replicas as copyOf makes them.
  * Cluster-scoped objects, Helm test hooks and the claims the branch binds
- * to clones itself (`bound`) are left out.
+ * to clones itself (`bound`) are left out; so are network policies on an
+ * isolated branch, and Ingresses and Gateway API routes unless it is exposed,
+ * where they would take production's hostnames.
  */
 export function fromManifest(objs: any[], o: CopyOptions, bound: string[] = []): FromManifest {
     const apply: any[] = [];
@@ -335,6 +356,14 @@ export function fromManifest(objs: any[], o: CopyOptions, bound: string[] = []):
         }
         if (String(obj.metadata.annotations?.["helm.sh/hook"] ?? "").split(",").some((h: string) => h.trim().startsWith("test"))) {
             left.push(`${id}: a Helm test hook`);
+            continue;
+        }
+        if (o.isolate !== false && networkPolicy(obj)) {
+            left.push(`${id}: a network policy, which could undo the branch's isolation`);
+            continue;
+        }
+        if (!o.expose && route(obj)) {
+            left.push(`${id}: routes outside traffic in, and the branch isn't exposed`);
             continue;
         }
         if (obj.kind === "PersistentVolumeClaim" && bound.includes(obj.metadata.name)) {
