@@ -50,7 +50,7 @@ test("a chart from a blob is unpacked in the task and rendered from there", () =
     const spec = renderSpec({ chart_blob: "9f2c1e", release: "app", namespace: "capsule-x" });
     expect(spec.blobs).toEqual({ [CHART_DIR]: "9f2c1e" });
     expect(spec.env.CHART).toBe(CHART_DIR);
-    expect(() => renderSpec({ release: "a", namespace: "n" })).toThrow(/chart or chart_blob/);
+    expect(() => renderSpec({ release: "a", namespace: "n" })).toThrow(/exactly one of chart or chart_blob/);
     expect(() => renderSpec({ chart: "x", chart_blob: "y", release: "a", namespace: "n" })).toThrow(/chart or chart_blob/);
 });
 

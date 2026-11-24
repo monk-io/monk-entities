@@ -151,7 +151,7 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
         for (const image of imagesToPin(objs, patterns)) {
             const host = parseImage(image).registry;
             const name = this.definition.registry_secrets?.[host];
-            const login = name ? credentials(secret.get(name) ?? "") : undefined;
+            const login = name ? credentials(this.secretValue(name, `registry_secrets["${host}"]`)) : undefined;
             digests[image] = resolveDigest(image, (url, o) => http.do(url, o), login);
         }
         const changed = Object.entries(digests).filter(([img, d]) => this.state.digests?.[img] !== d).map(([img]) => img);
@@ -170,6 +170,13 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
         }
     }
 
+    /** A registry secret's value; a missing or empty one is an error here, not a 401 from the registry later. */
+    private secretValue(name: string, field: string): string {
+        const v = secret.get(name);
+        if (!v) throw new Error(`${field}: secret ${name} is empty or missing`);
+        return v;
+    }
+
     private what(): string {
         return this.definition.chart ?? `chart blob ${this.definition.chart_blob}`;
     }
@@ -185,7 +192,7 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
         if (d.registry_secret) {
             const host = registryOf(d.chart ?? "");
             if (!host) throw new Error("registry_secret is for oci:// charts");
-            login = { host, ...credentials(secret.get(d.registry_secret) ?? "") };
+            login = { host, ...credentials(this.secretValue(d.registry_secret, "registry_secret")) };
         }
         const run = tasks.start(TASK, renderSpec({
             chart: d.chart, chart_blob: d.chart_blob, repo: d.repo, version: d.version, release: d.release, namespace: d.namespace,

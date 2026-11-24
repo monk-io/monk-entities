@@ -47,7 +47,7 @@ echo "rendered $(grep -c '^kind:' ${OUT}) objects"`;
 
 /** The task spec that renders the chart. */
 export function renderSpec(i: RenderInput): any {
-    if (!i.chart === !i.chart_blob) throw new Error("give chart or chart_blob, not both");
+    if (!i.chart === !i.chart_blob) throw new Error("give exactly one of chart or chart_blob");
     const env: Record<string, string> = {
         RELEASE: i.release,
         CHART: i.chart_blob ? CHART_DIR : i.chart!,

@@ -506,6 +506,18 @@ test("a branch from a manifest clones the volumes it claims and applies its obje
     expect(disks.state.inserts.length).toBe(2);
 });
 
+test("copy_secrets naming a Secret a branch doesn't copy is an error, not a silent skip", (t) => {
+    const api = t.use(kube);
+    t.use(gce);
+    seedProd(api.state.objects);
+    api.state.objects.set("secrets/prod/sa", { apiVersion: "v1", kind: "Secret", metadata: { name: "sa", namespace: "prod" }, type: "kubernetes.io/service-account-token", data: {} });
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2"), copy_secrets: ["sa"] });
+    expect(() => {
+        b.create();
+        b.waitReady();
+    }).toThrow(/copy_secrets: Secret sa in prod is of type kubernetes.io\/service-account-token/);
+});
+
 test("a new manifest is applied in place, on the same clones", (t) => {
     const api = t.use(kube);
     const disks = t.use(gce);

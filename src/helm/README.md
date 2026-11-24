@@ -23,7 +23,8 @@ chart:
 - `chart_blob` renders a chart that comes with the stack instead: a
   MANIFEST line `BLOBS chart/app` uploads the directory with `monk load`,
   and `chart_blob: blobs://chart/app` names it by its content hash, so each
-  version of the chart is its own blob and a new one renders again.
+  version of the chart is its own blob and a new one renders again. The
+  entity reads the blob only with a grant: `permissions: blobs: [chart/app]`.
 - `pin_images: ["ghcr.io/acme/*"]` pins matching images to the digest
   their tag points at, looked up in the registry (`registry_secrets` maps a
   host to its credentials). A push under the same tag then changes the
