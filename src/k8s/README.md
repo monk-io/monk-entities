@@ -339,6 +339,8 @@ chart:
   permissions:
     tasks: {max: 1}
     secrets: [ghcr-token]
+  services:                        # what the branch connects to
+    manifest: {protocol: custom}
 
 branch:
   defines: k8s/branch
@@ -347,7 +349,7 @@ branch:
   manifest: <- connection-target("chart") entity-state get-member("manifest")
   copy_secrets: [ghcr]             # the image pull secret, which the chart doesn't make
   connections:
-    chart: {target: acme/chart}
+    chart: {runnable: acme/chart, service: manifest}
   depends:
     wait-for: {runnables: [acme/chart]}
 ```
