@@ -50,6 +50,8 @@ test("a chart from a blob is unpacked in the task and rendered from there", () =
     const spec = renderSpec({ chart_blob: "9f2c1e", release: "app", namespace: "capsule-x" });
     expect(spec.blobs).toEqual({ [CHART_DIR]: "9f2c1e" });
     expect(spec.env.CHART).toBe(CHART_DIR);
+    // As monk load leaves `chart_blob: blobs://chart/app`: the prefix stays.
+    expect(renderSpec({ chart_blob: "blobs://9f2c1e", release: "app", namespace: "capsule-x" }).blobs).toEqual({ [CHART_DIR]: "9f2c1e" });
     expect(() => renderSpec({ release: "a", namespace: "n" })).toThrow(/exactly one of chart or chart_blob/);
     expect(() => renderSpec({ chart: "x", chart_blob: "y", release: "a", namespace: "n" })).toThrow(/chart or chart_blob/);
 });

@@ -88,6 +88,8 @@ export interface TemplateState {
     inputs?: string;
     /** @description The render task's run */
     task_id?: string;
+    /** @description A run an update stopped because the inputs changed under it; the new render starts once it is gone */
+    superseded?: string;
     /** @description When it was rendered */
     rendered_at?: string;
 }
@@ -123,8 +125,27 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     }
 
     override checkReadiness(): boolean {
+        if (this.state.superseded) {
+            // What this check sets isn't kept until it passes, so a render
+            // started here is found again by the task's name, not its run.
+            const run = tasks.get(TASK);
+            if (!run) {
+                this.start();
+                return false;
+            }
+            if (run.id === this.state.superseded) {
+                cli.output(`waiting for the earlier render to stop (${run.state})`);
+                return false;
+            }
+            return this.finish(run);
+        }
         if (!this.state.task_id) return this.state.manifest !== undefined;
-        const o = outcome(tasks.get(TASK, this.state.task_id));
+        return this.finish(tasks.get(TASK, this.state.task_id));
+    }
+
+    /** Takes a render's manifest when its run is done; false while it runs, and throws when it failed. */
+    private finish(run: any): boolean {
+        const o = outcome(run);
         if (o.kind === "waiting") {
             cli.output(o.why);
             return false;
@@ -134,6 +155,7 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
         this.state.rendered = o.manifest;
         this.state.rendered_at = new Date().toISOString();
         this.state.task_id = undefined;
+        this.state.superseded = undefined;
         const n = (o.manifest.match(/^kind:/gm) ?? []).length;
         cli.output(`rendered ${this.what()}${this.definition.version ? ` ${this.definition.version}` : ""}: ${n} objects`);
         return true;
@@ -161,9 +183,10 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     }
 
     override delete(): void {
-        if (this.state.task_id) {
+        if (this.state.task_id || this.state.superseded) {
             try {
-                tasks.remove(TASK, this.state.task_id);
+                // By name: a render started after a superseded one has no run in state.
+                tasks.remove(TASK);
             } catch (e) {
                 cli.output(`render task: ${e instanceof Error ? e.message : String(e)}`);
             }
@@ -186,7 +209,27 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
         return crypto.sha256(JSON.stringify([d.chart, d.chart_blob, d.repo, d.version, d.release, d.namespace, d.values ?? {}, d.kube_version, d.image])).slice(0, 16);
     }
 
+    /**
+     * Renders the inputs. A render still running has the old inputs: it is
+     * stopped, and the readiness check starts the new one once the task's
+     * name is free (monkd refuses to start a name that hasn't ended).
+     */
     private render(): void {
+        const id = this.state.task_id;
+        if (id && outcome(tasks.get(TASK, id)).kind === "waiting") {
+            tasks.remove(TASK, id);
+            this.state.superseded = id;
+            this.state.task_id = undefined;
+        }
+        if (this.state.superseded) {
+            this.state.inputs = this.inputs();
+            cli.output("the inputs changed while a render ran; stopping it and rendering again");
+            return;
+        }
+        this.start();
+    }
+
+    private start(): void {
         const d = this.definition;
         let login;
         if (d.registry_secret) {

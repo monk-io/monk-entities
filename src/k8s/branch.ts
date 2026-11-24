@@ -21,6 +21,8 @@ const OWNER = "monk.io/owner";
 const BRANCH_OF = "monk.io/branch-of";
 const BRANCH_LABEL = "monk.io/branch";
 const MARKER = "monk-branch";
+/** Hash of the spec a Job was applied with: a Job's template can't change, so a new one replaces it. */
+const JOB_SPEC = "monk.io/job-spec";
 const PD_DRIVER = "pd.csi.storage.gke.io";
 /**
  * GCE labels on each clone: the branch that made it, and whether a delete kept it. Not
@@ -248,8 +250,8 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     override update(): void {
         if (this.definition.manifest !== undefined) {
             // The data stays as it was cloned; the objects follow the
-            // manifest. Readiness applies a manifest whose hash the marker
-            // doesn't have yet.
+            // manifest, replicas, expose, isolate and copy_secrets. Readiness
+            // applies them when their hash isn't the marker's.
             cli.output(`the branch applies the new manifest on its clones once its disks are ready`);
             return;
         }
@@ -328,8 +330,10 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         }
     }
 
+    /** Hash of all that shapes the objects applied from the manifest. */
     private manifestHash(): string {
-        return crypto.sha256(this.definition.manifest ?? "").slice(0, 16);
+        const d = this.definition;
+        return crypto.sha256(JSON.stringify([d.manifest ?? "", d.replicas ?? {}, d.expose ?? false, d.isolate ?? true, d.copy_secrets ?? []])).slice(0, 16);
     }
 
     /** Starts the before_clone Job in the source namespace; returns its name. */
@@ -460,23 +464,30 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             if (h) projects.add(h.project);
         }
         const ns = this.target().slice(0, 63);
-        const filter = encodeURIComponent(`labels.${OWNER_LABEL} = "${this.owner()}"`);
         const out: any[] = [];
-        for (const project of projects) {
-            let page = "";
-            do {
-                const r = this.gce("GET", `${COMPUTE}/projects/${project}/aggregated/disks?filter=${filter}${page ? `&pageToken=${page}` : ""}`);
-                for (const scope of Object.values(r.items ?? {}) as any[]) {
-                    for (const d of scope.disks ?? []) {
-                        const labels = d.labels ?? {};
-                        if (labels["monk-branch"] !== ns || labels[KEPT_LABEL]) continue;
-                        const from = String(d.sourceDisk ?? "");
-                        if (![...sources].some((src) => from.endsWith(src))) continue;
-                        out.push({ ...d, project, zone: String(d.zone ?? "").split("/").pop() });
+        const seen = new Set<string>();
+        // Clones made before the label rename carry only LEGACY_OWNER_LABEL.
+        for (const key of [OWNER_LABEL, LEGACY_OWNER_LABEL]) {
+            const filter = encodeURIComponent(`labels.${key} = "${this.owner()}"`);
+            for (const project of projects) {
+                let page = "";
+                do {
+                    const r = this.gce("GET", `${COMPUTE}/projects/${project}/aggregated/disks?filter=${filter}${page ? `&pageToken=${page}` : ""}`);
+                    for (const scope of Object.values(r.items ?? {}) as any[]) {
+                        for (const d of scope.disks ?? []) {
+                            const labels = d.labels ?? {};
+                            if (labels["monk-branch"] !== ns || labels[KEPT_LABEL]) continue;
+                            const from = String(d.sourceDisk ?? "");
+                            if (![...sources].some((src) => from.endsWith(src))) continue;
+                            const zone = String(d.zone ?? "").split("/").pop();
+                            if (seen.has(`${project}/${zone}/${d.name}`)) continue;
+                            seen.add(`${project}/${zone}/${d.name}`);
+                            out.push({ ...d, project, zone });
+                        }
                     }
-                }
-                page = r.nextPageToken ?? "";
-            } while (page);
+                    page = r.nextPageToken ?? "";
+                } while (page);
+            }
         }
         return out;
     }
@@ -505,6 +516,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         if (marker === null) {
             this.bindVolumes();
             const objects = this.copyObjects();
+            if (!objects) return false;
             this.writeMarker(objects, new Date().toISOString());
             cli.output(`applied ${objects.length} objects to ${ns}`);
             return false;
@@ -512,6 +524,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         if (this.definition.manifest !== undefined && marker.data?.manifest !== this.manifestHash()) {
             // An update brought a new manifest: apply it on the same clones.
             const objects = this.applyManifest();
+            if (!objects) return false;
             this.writeMarker(objects, marker.data?.applied_at ?? new Date().toISOString());
             cli.output(`applied the new manifest's ${objects.length} objects to ${ns}`);
             return false;
@@ -591,7 +604,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     }
 
     /** Copies the source's objects into the branch; returns them as Kind/name. */
-    private copyObjects(): string[] {
+    private copyObjects(): string[] | undefined {
         if (this.definition.manifest !== undefined) return this.applyManifest();
         const src = this.definition.source_namespace;
         const ns = this.target();
@@ -616,8 +629,11 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         return done;
     }
 
-    /** Applies the manifest's objects, and the source's copy_secrets; returns them as Kind/name. */
-    private applyManifest(): string[] {
+    /**
+     * Applies the manifest's objects, and the source's copy_secrets; returns
+     * them as Kind/name, or undefined while Jobs it changed are being replaced.
+     */
+    private applyManifest(): string[] | undefined {
         const src = this.definition.source_namespace;
         const ns = this.target();
         const opts = {
@@ -626,6 +642,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             annotations: this.annotations(),
             replicas: this.definition.replicas,
             expose: this.definition.expose,
+            isolate: this.definition.isolate,
         };
         const done: string[] = [];
         for (const name of this.definition.copy_secrets ?? []) {
@@ -639,6 +656,11 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         }
         const bound = (this.state.claims ?? []).map((c) => c.claim);
         const m = fromManifest(this.manifestObjects(), opts, bound);
+        for (const obj of m.apply) {
+            if (obj.kind !== "Job") continue;
+            obj.metadata.annotations = { ...obj.metadata.annotations, [JOB_SPEC]: crypto.sha256(JSON.stringify(obj.spec ?? {})).slice(0, 16) };
+        }
+        if (this.replacingJobs(m.apply)) return undefined;
         for (const l of m.left) cli.output(`leaving out ${l}`);
         for (const obj of m.apply) {
             this.apply(obj);
@@ -646,6 +668,32 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             done.push(`${obj.kind}/${obj.metadata.name}`);
         }
         return done;
+    }
+
+    /**
+     * Deletes each of the branch's Jobs whose spec isn't the one to apply: a
+     * Job's template can't be changed, so a new one (a migration with a new
+     * image) is applied once the old is gone, as Helm's before-hook-creation
+     * does. True while any is still there.
+     */
+    private replacingJobs(objs: any[]): boolean {
+        const ns = this.target();
+        let waiting = false;
+        for (const obj of objs) {
+            if (obj.kind !== "Job") continue;
+            const name = obj.metadata.name;
+            const ref = { apiVersion: "batch/v1", kind: "Job", name, namespace: ns };
+            const live = this.k8s(`reading Job ${name}`, (c) => k8s.read(c, ref));
+            if (live === null || live.metadata?.annotations?.[JOB_SPEC] === obj.metadata.annotations[JOB_SPEC]) continue;
+            waiting = true;
+            if (live.metadata?.deletionTimestamp) {
+                cli.output(`waiting for Job ${name} to go`);
+                continue;
+            }
+            this.k8s(`deleting Job ${name}`, (c) => k8s.remove(c, ref, { propagation: "Background" }));
+            cli.output(`replacing Job ${name}: its spec changed, and a Job's template can't be`);
+        }
+        return waiting;
     }
 
     /** With expose on an isolated branch, lets outside traffic reach the pods behind an exposed Service. */
