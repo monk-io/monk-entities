@@ -277,7 +277,9 @@ b1:
   `other_claims: empty`, which gives the branch a new, empty claim of the
   same name, class and size instead.
 - Each clone carries GCE labels saying which branch made it
-  (`monk-owner`) and for which namespace. A disk of the clone's name that
+  (`monk-branch-owner`) and for which namespace. Not `monk-owner`: GKE
+  copies the cluster's resource labels onto attached disks every hour, and
+  a cluster Monk made has a `monk-owner` label of its own. A disk of the clone's name that
   another branch made, or that an earlier delete of this one kept
   (`monk-kept`), is never used: the branch refuses before it writes
   anything, and says which. Clones left by a create that failed are the

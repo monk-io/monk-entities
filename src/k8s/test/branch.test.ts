@@ -49,12 +49,12 @@ const gce = fakeApi<Disks>(GCE, () => {
                 if (d.status === "CREATING" && d.reads >= 2) d.status = "READY";
                 return json(200, view(d));
             },
-            // Lists by the one filter the branch uses: labels.monk-owner = "<hash>".
+            // Lists by the one kind of filter the branch uses: labels.<key> = "<value>".
             "GET /compute/v1/projects/:p/aggregated/disks": (req: Request) => {
-                const m = /labels\.monk-owner = "([^"]+)"/.exec(req.query.filter ?? "");
+                const m = /labels\.([a-z0-9_-]+) = "([^"]+)"/.exec(req.query.filter ?? "");
                 const byZone: Record<string, any> = {};
                 for (const d of st.disks.values()) {
-                    if (gone.has(d.name) || (m && d.labels?.["monk-owner"] !== m[1])) continue;
+                    if (gone.has(d.name) || (m && d.labels?.[m[1]] !== m[2])) continue;
                     const z = `zones/${String(d.zone).split("/").pop()}`;
                     (byZone[z] ??= { disks: [] }).disks.push(view(d));
                 }
@@ -253,7 +253,7 @@ test("a disk of the clone's name that another branch made is neither used nor de
     // Another cluster's branch into a namespace of the same name.
     disks.state.disks.set("br-1-data-cassandra-0", {
         name: "br-1-data-cassandra-0", status: "READY", sourceDisk: HANDLE("pvc-0"),
-        labels: { "monk-owner": "someone-else", "monk-run": "x" }, reads: 0,
+        labels: { "monk-branch-owner": "someone-else", "monk-run": "x" }, reads: 0,
     });
     const b = branch(t);
     expect(() => b.create()).toThrow("was not made by this branch");
@@ -266,11 +266,27 @@ test("a disk of the clone's name that another branch made is neither used nor de
     const c = branch(t);
     c.create();
     c.waitReady();
-    disks.state.disks.get("br-1-data-cassandra-0").labels["monk-owner"] = "someone-else";
+    disks.state.disks.get("br-1-data-cassandra-0").labels["monk-branch-owner"] = "someone-else";
     c.delete();
     c.waitDeleted();
     expect([...new Set(disks.state.deletes)]).toEqual(["br-1-data-cassandra-1"]);
     expect(c.output.join("\n")).toContain("leaving disk br-1-data-cassandra-0");
+}, { explore: false }); // same requests as the lifecycle test, which is explored
+
+test("a branch deletes its clones after GKE copied the cluster's monk-owner label onto them", (t) => {
+    const api = t.use(kube);
+    const disks = t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t);
+    b.create();
+    b.waitReady();
+    // GKE's hourly sync of the cluster's resource labels onto the disks attached to its nodes.
+    for (const d of disks.state.disks.values()) {
+        d.labels = { ...d.labels, "monk-owner": "the-cluster", "monk-experiment": "x" };
+    }
+    b.delete();
+    b.waitDeleted();
+    expect([...new Set(disks.state.deletes)].sort()).toEqual(["br-1-data-cassandra-0", "br-1-data-cassandra-1"]);
 }, { explore: false }); // same requests as the lifecycle test, which is explored
 
 /** Fails the second disk insert after it went through, as when its answer is lost. */
