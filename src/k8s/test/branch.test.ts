@@ -3,7 +3,7 @@
 // fake-kube.ts, with a fake of Compute Engine's disks.
 import { test, expect, Test, fakeApi, json, Request } from "monk/test";
 import { Branch } from "../branch.ts";
-import { copyOf, rewriteHosts, diskName, isolationPolicy, claimsOf, fromManifest } from "../branch-copy.ts";
+import { copyOf, rewriteHosts, diskName, isolationPolicy, exposurePolicy, claimsOf, fromManifest } from "../branch-copy.ts";
 import { kube, KUBE } from "./fake-kube.ts";
 
 const GCE = "https://compute.googleapis.com";
@@ -364,6 +364,16 @@ test("copies: hosts rewritten only in .svc names, isolation, disk names", (t) =>
     expect(copyOf({ apiVersion: "v1", kind: "ConfigMap", metadata: { name: "x", ownerReferences: [{ uid: "u" }] } }, { source: "a", target: "b", annotations: {} })).toBeUndefined();
     const pol = isolationPolicy("b", {}, ["10.0.0.0/8"]);
     expect(pol.spec.egress[2].to[0].ipBlock.cidr).toBe("10.0.0.0/8");
+    const open = exposurePolicy({ ...exposed, spec: { ...exposed.spec, selector: { app: "w" }, ports: [{ port: 80, targetPort: 8080 }] } }, "b", {});
+    expect(open.metadata.name).toBe("monk-branch-expose-w");
+    expect(open.spec.podSelector.matchLabels).toEqual({ app: "w" });
+    expect(open.spec.ingress[0].from[0].ipBlock.cidr).toBe("0.0.0.0/0");
+    expect(open.spec.ingress[0].ports).toEqual([{ protocol: "TCP", port: 8080 }]);
+    expect(exposurePolicy({ kind: "Service", metadata: { name: "c" }, spec: { type: "ClusterIP", selector: { app: "c" } } }, "b", {})).toBeUndefined();
+    expect(exposurePolicy({ kind: "Service", metadata: { name: "e" }, spec: { type: "LoadBalancer" } }, "b", {})).toBeUndefined();
+    const sd = copyOf({ apiVersion: "v1", kind: "Secret", metadata: { name: "pg" }, type: "Opaque", stringData: { url: "postgres://a@db.prod.svc:5432/x", password: "p" } },
+        { source: "prod", target: "b", annotations: {} });
+    expect(sd.stringData).toEqual({ url: "postgres://a@db.b.svc:5432/x", password: "p" });
     expect(diskName("br-1", "data-cassandra-0")).toBe("br-1-data-cassandra-0");
     const long = diskName("a-very-long-branch-namespace-name-for-testing", "data-some-statefulset-with-a-long-name-0");
     expect(long.length < 64).toBe(true);

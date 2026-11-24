@@ -12,6 +12,7 @@ import {
     claimsOf,
     fromManifest,
     isolationPolicy,
+    exposurePolicy,
     diskName,
     parseHandle,
 } from "./branch-copy.ts";
@@ -601,6 +602,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
                 });
                 if (!copy) continue;
                 this.apply(copy);
+                this.openExposed(copy);
                 done.push(`${k.kind}/${obj.metadata.name}`);
             }
         }
@@ -633,9 +635,17 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         for (const l of m.left) cli.output(`leaving out ${l}`);
         for (const obj of m.apply) {
             this.apply(obj);
+            this.openExposed(obj);
             done.push(`${obj.kind}/${obj.metadata.name}`);
         }
         return done;
+    }
+
+    /** With expose on an isolated branch, lets outside traffic reach the pods behind an exposed Service. */
+    private openExposed(obj: any): void {
+        if (!this.definition.expose || this.definition.isolate === false) return;
+        const pol = exposurePolicy(obj, this.target(), this.annotations());
+        if (pol) this.apply(pol);
     }
 
     /** Writes the marker: the objects are applied, and from which manifest. */

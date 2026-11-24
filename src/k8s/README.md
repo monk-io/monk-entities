@@ -290,9 +290,9 @@ b1:
   that relies on one has no such rights in the branch. In their strings, `<name>.<source>.svc` becomes
   `<name>.<branch>.svc`. Short names (`db`) already resolve in the branch.
   Services lose their node ports, and LoadBalancer and NodePort Services
-  become ClusterIP unless `expose: true`. With `isolate` on, nothing
-  outside the namespace can reach an exposed Service either, so `expose`
-  only helps together with `isolate: false`. `replicas` sets a workload's
+  become ClusterIP unless `expose: true`. With `isolate` on, an exposed
+  Service also gets a NetworkPolicy that lets traffic from anywhere reach
+  its pods on its target ports, and nothing else. `replicas` sets a workload's
   replicas in the copy.
 - `isolate` (on by default) adds a NetworkPolicy so that the branch's pods
   take traffic only from each other and reach only each other and the

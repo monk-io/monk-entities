@@ -113,6 +113,9 @@ export function copyOf(obj: any, o: CopyOptions): any | undefined {
         case "Secret":
             copy.type = obj.type;
             if (obj.data) copy.data = obj.data;
+            // A rendered manifest's Secrets usually carry plain strings, which the API server
+            // turns into data only when it stores them.
+            if (obj.stringData) copy.stringData = rewriteHosts(obj.stringData, o.source, o.target);
             if (obj.immutable !== undefined) copy.immutable = obj.immutable;
             return rewriteSecret(copy, o);
         case "ConfigMap":
@@ -213,6 +216,33 @@ export function isolationPolicy(namespace: string, annotations: Record<string, s
             policyTypes: ["Ingress", "Egress"],
             ingress: [{ from: [{ podSelector: {} }] }],
             egress,
+        },
+    };
+}
+
+/**
+ * What lets traffic from outside the cluster reach the pods behind a
+ * Service the branch exposes (`expose`), which the isolation policy alone
+ * would drop: it takes traffic only from the branch's own pods. Only the
+ * Service's pods and target ports are opened; NetworkPolicies add up, so
+ * everything else stays sealed. Undefined for anything but a LoadBalancer
+ * or NodePort Service with a selector.
+ */
+export function exposurePolicy(svc: any, namespace: string, annotations: Record<string, string>): any {
+    if (svc?.kind !== "Service") return undefined;
+    const type = svc.spec?.type;
+    if (type !== "LoadBalancer" && type !== "NodePort") return undefined;
+    const selector = svc.spec?.selector;
+    if (!selector || Object.keys(selector).length === 0) return undefined;
+    const ports = (svc.spec.ports ?? []).map((p: any) => ({ protocol: p.protocol ?? "TCP", port: p.targetPort ?? p.port }));
+    return {
+        apiVersion: "networking.k8s.io/v1",
+        kind: "NetworkPolicy",
+        metadata: { name: `monk-branch-expose-${svc.metadata.name}`.slice(0, 253), namespace, annotations },
+        spec: {
+            podSelector: { matchLabels: selector },
+            policyTypes: ["Ingress"],
+            ingress: [{ from: [{ ipBlock: { cidr: "0.0.0.0/0" } }], ...(ports.length > 0 ? { ports } : {}) }],
         },
     };
 }
