@@ -22,8 +22,15 @@ const BRANCH_OF = "monk.io/branch-of";
 const BRANCH_LABEL = "monk.io/branch";
 const MARKER = "monk-branch";
 const PD_DRIVER = "pd.csi.storage.gke.io";
-/** GCE labels on each clone: the branch that made it, and whether a delete kept it. */
-const OWNER_LABEL = "monk-owner";
+/**
+ * GCE labels on each clone: the branch that made it, and whether a delete kept it. Not
+ * "monk-owner": GKE copies its cluster's resource labels onto the disks attached to its nodes
+ * every hour, overwriting labels of the same key, and a cluster Monk made carries monk-owner.
+ * Clones made before the rename carry LEGACY_OWNER_LABEL, which counts while GKE hasn't
+ * overwritten it.
+ */
+const OWNER_LABEL = "monk-branch-owner";
+const LEGACY_OWNER_LABEL = "monk-owner";
 const KEPT_LABEL = "monk-kept";
 const COMPUTE = "https://compute.googleapis.com/compute/v1";
 
@@ -411,7 +418,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
         }
     }
 
-    /** The monk-owner label value of this branch's clones. */
+    /** The owner label value of this branch's clones. */
     private owner(): string {
         return crypto.sha256(this.path).slice(0, 40);
     }
@@ -425,7 +432,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
      */
     private notOurs(c: ClonedClaim, d: any): string | undefined {
         const labels = d.labels ?? {};
-        if (labels[OWNER_LABEL] !== this.owner()) return "was not made by this branch";
+        if ((labels[OWNER_LABEL] ?? labels[LEGACY_OWNER_LABEL]) !== this.owner()) return "was not made by this branch";
         if (labels[KEPT_LABEL]) return "was kept when this branch was deleted before (keep_disks)";
         if (!String(d.sourceDisk ?? "").endsWith(c.source_disk)) return `is not a clone of ${c.source_disk}`;
         return undefined;
