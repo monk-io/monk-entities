@@ -633,7 +633,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
                 k8s.read(c, { apiVersion: "v1", kind: "Secret", name, namespace: src }));
             if (secret === null) throw new Error(`copy_secrets: Secret ${name} is not in ${src}`);
             const copy = copyOf({ apiVersion: "v1", kind: "Secret", ...secret }, opts);
-            if (!copy) continue;
+            if (!copy) throw new Error(`copy_secrets: Secret ${name} in ${src} is ${secret.type ? `of type ${secret.type}, ` : ""}not one a branch copies`);
             this.apply(copy);
             done.push(`Secret/${name}`);
         }
