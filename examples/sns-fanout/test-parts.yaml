@@ -6,6 +6,8 @@ namespace: sns-test
 # 1. Just the topic
 topic-only:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: test-events-topic
   display_name: Test Events
@@ -15,6 +17,8 @@ topic-only:
 # 2. Just the queue
 queue-only:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-events-queue
   message_retention_period: 345600
@@ -27,6 +31,8 @@ queue-only:
 # Run this AFTER both topic and queue are created
 subscription-only:
   defines: aws-sns/sns-subscription
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_arn: arn:aws:sns:us-east-1:065217599764:test-events-topic
   protocol: sqs
@@ -36,6 +42,8 @@ subscription-only:
 # 4. Email subscription (standalone)
 email-only:
   defines: aws-sns/sns-subscription
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_arn: arn:aws:sns:us-east-1:065217599764:test-events-topic
   protocol: email

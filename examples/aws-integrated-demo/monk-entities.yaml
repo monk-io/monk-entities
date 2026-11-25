@@ -13,6 +13,8 @@ frontend-site:
 
 lambda-api-execution-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: lambda-api-execution-policy
   policy_description: IAM policy for Lambda execution
@@ -57,6 +59,8 @@ lambda-api-execution-policy:
 
 lambda-api-execution-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: lambda-api-execution-role
   role_description: Lambda execution role
@@ -84,6 +88,9 @@ lambda-api-execution-role:
 
 lambda-api:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [lambda-api-code]
   region: us-east-1
   blob_name: lambda-api-code
   function_name: lambda-api
@@ -171,6 +178,8 @@ lambda-api:
 
 dynamodb:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: dynamodb
   billing_mode: PAY_PER_REQUEST
@@ -181,6 +190,8 @@ dynamodb:
 
 dynamodb-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: users-table
   billing_mode: PAY_PER_REQUEST

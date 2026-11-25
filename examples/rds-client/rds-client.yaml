@@ -14,6 +14,8 @@ rds-demo-app:
 # MySQL RDS Instance
 mysql-database:
   defines: aws-rds/rds-instance
+  permissions:
+    cloud: [aws]
   permitted-secrets:
     demo-mysql-db-master-password: true
   variables:
@@ -117,6 +119,8 @@ mysql-client:
 
 mysql-access-list:
   defines: aws-rds/rds-access-list
+  permissions:
+    cloud: [aws]
   region: <- connection-target("db") entity get-member("region")
   security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
   port: <- connection-target("db") entity-state get-member("endpoint_port")
@@ -135,6 +139,8 @@ mysql-access-list:
 # PostgreSQL RDS Instance
 postgres-database:
   defines: aws-rds/rds-instance
+  permissions:
+    cloud: [aws]
   permitted-secrets:
     demo-postgres-db-master-password: true
   variables:
@@ -234,6 +240,8 @@ postgres-client:
 
 postgres-access-list:
   defines: aws-rds/rds-access-list
+  permissions:
+    cloud: [aws]
   region: <- connection-target("db") entity get-member("region")
   security_group_id: <- connection-target("db") entity-state get-member("created_security_group_id")
   port: <- connection-target("db") entity-state get-member("endpoint_port")

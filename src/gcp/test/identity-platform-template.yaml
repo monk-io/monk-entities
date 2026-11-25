@@ -3,6 +3,8 @@ namespace: gcp-identity-platform-test
 # Identity Platform project-level config
 test-identity-config:
   defines: gcp/identity-platform-config
+  permissions:
+    cloud: [gcp]
   authorized_domains:
     - monk-test-identity.example.com
     - localhost
@@ -16,6 +18,8 @@ test-identity-config:
 # Tenant for testing
 test-tenant:
   defines: gcp/identity-platform-tenant
+  permissions:
+    cloud: [gcp]
   display_name: monk-test-tenant
   allow_password_signup: true
   enable_email_link_signin: false
@@ -29,6 +33,8 @@ test-tenant:
 # OIDC provider at project level (no tenant_id)
 test-oidc-config:
   defines: gcp/identity-platform-o-auth-idp-config
+  permissions:
+    cloud: [gcp]
   name: oidc.monk-test-provider
   display_name: Monk Test OIDC
   enabled: true
@@ -39,6 +45,8 @@ test-oidc-config:
 # Tenant-scoped OIDC provider
 test-tenant-oidc-config:
   defines: gcp/identity-platform-o-auth-idp-config
+  permissions:
+    cloud: [gcp]
   name: oidc.monk-test-tenant-provider
   tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
   display_name: monk-test-tenant OIDC
@@ -59,6 +67,8 @@ test-tenant-oidc-config:
 # Default IdP (Google) at project level
 test-default-idp:
   defines: gcp/identity-platform-default-idp-config
+  permissions:
+    cloud: [gcp]
   idp_id: google.com
   enabled: true
   client_id: monk-test-google-client-id.apps.googleusercontent.com
@@ -67,6 +77,8 @@ test-default-idp:
 # SAML provider at project level
 test-saml-config:
   defines: gcp/identity-platform-inbound-saml-config
+  permissions:
+    cloud: [gcp]
   name: saml.monk-test-provider
   display_name: Monk Test SAML
   enabled: true

@@ -3,6 +3,8 @@ namespace: azure-cosmosdb-example
 # Example 1: Basic single-region Cosmos DB setup
 basic-cosmos-setup:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   account_name: "my-basic-cosmos"
@@ -23,6 +25,8 @@ basic-cosmos-setup:
 # Example 2: Production multi-region setup with high availability
 production-cosmos-ha:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   account_name: "prod-cosmos-ha"
@@ -53,6 +57,8 @@ production-cosmos-ha:
 # Example 3: MongoDB API Cosmos DB
 mongodb-cosmos:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "mongodb-rg" # Replace with your resource group
   account_name: "my-mongodb-cosmos"
@@ -74,6 +80,8 @@ mongodb-cosmos:
 # Example 4: Cosmos DB with secret population for access keys
 secure-cosmos-with-secrets:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "secure-rg" # Replace with your resource group
   account_name: "secure-cosmos-db"
@@ -101,6 +109,8 @@ secure-cosmos-with-secrets:
 # Example 5: Database with manual throughput
 ecommerce-database:
   defines: azure-cosmosdb/database
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   database_account_name: "my-basic-cosmos" # Must match an existing account
@@ -114,6 +124,8 @@ ecommerce-database:
 # Example 5: Database with autoscale throughput
 analytics-database:
   defines: azure-cosmosdb/database
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha" # Must match an existing account
@@ -128,6 +140,8 @@ analytics-database:
 # Example 6: High-throughput production database
 user-data-database:
   defines: azure-cosmosdb/database
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha" # Must match an existing account
@@ -142,6 +156,8 @@ user-data-database:
 # Example 7: Basic container with manual throughput
 products-container:
   defines: azure-cosmosdb/container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   database_account_name: "my-basic-cosmos"
@@ -159,6 +175,8 @@ products-container:
 # Example 8: Container with autoscale and custom partition key
 orders-container:
   defines: azure-cosmosdb/container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   database_account_name: "my-basic-cosmos"
@@ -178,6 +196,8 @@ orders-container:
 # Example 9: Production container with advanced configuration
 users-container:
   defines: azure-cosmosdb/container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha"
@@ -208,6 +228,8 @@ users-container:
 # Example 10: Analytics container with time-series data
 events-container:
   defines: azure-cosmosdb/container
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   database_account_name: "prod-cosmos-ha"
@@ -366,6 +388,8 @@ microservices-stack:
 # Enables point-in-time restore capability
 cosmos-continuous-backup-7day:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "4ec90fad-9391-4a75-847b-0cc5486ee576"
   resource_group_name: "ivan-test"
   account_name: "cosmos-backup-7day-test"
@@ -388,6 +412,8 @@ cosmos-continuous-backup-7day:
 # Production-grade backup with extended restore window
 cosmos-continuous-backup-30day:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   account_name: "cosmos-backup-30day"
@@ -414,6 +440,8 @@ cosmos-continuous-backup-30day:
 # Traditional backup mode with configurable interval
 cosmos-periodic-backup:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "backup-demo-rg" # Replace with your resource group
   account_name: "cosmos-periodic-backup"

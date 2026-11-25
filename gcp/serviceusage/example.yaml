@@ -2,6 +2,8 @@ namespace: gcp
 
 enable-apis:
   defines: gcp/serviceusage
+  permissions:
+    cloud: [gcp]
   apis:
     - firebasedatabase.googleapis.com
     - firebasehosting.googleapis.com

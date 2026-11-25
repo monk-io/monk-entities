@@ -3,6 +3,8 @@ namespace: ses-demo
 # Demo Email Identity Configuration
 demo-email:
   defines: aws-ses/ses-email-identity
+  permissions:
+    cloud: [aws]
   region: us-east-1
   email_address: ivan@monk.io
   dkim_signing_enabled: true
@@ -10,6 +12,8 @@ demo-email:
 # Demo Domain Identity Configuration
 demo-domain:
   defines: aws-ses/ses-domain-identity
+  permissions:
+    cloud: [aws]
   region: us-east-1
   domain_name: demo.monk.io
   dkim_signing_enabled: true
@@ -19,6 +23,8 @@ demo-domain:
 # Demo Configuration Set
 demo-config:
   defines: aws-ses/ses-configuration-set
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:

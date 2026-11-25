@@ -2,6 +2,8 @@ namespace: aws-ec2-examples
 
 vpc:
   defines: aws-ec2/vpc
+  permissions:
+    cloud: [aws]
   region: us-east-1
   cidr_block: 10.1.0.0/16
   enable_dns_support: true
@@ -11,6 +13,8 @@ vpc:
 
 subnet:
   defines: aws-ec2/subnet
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   cidr_block: 10.1.1.0/24
@@ -19,6 +23,8 @@ subnet:
 
 sg:
   defines: aws-ec2/security-group
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   group_name: demo-sg

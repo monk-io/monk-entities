@@ -3,6 +3,8 @@ namespace: digitalocean-database-example
 # Basic PostgreSQL database cluster
 my-postgres-db:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: my-postgres-cluster
   engine: pg
   version: "16"
@@ -16,6 +18,8 @@ my-postgres-db:
 # MySQL database cluster with additional storage
 my-mysql-cluster:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: my-mysql-cluster
   engine: mysql
   version: "8.0"
@@ -30,6 +34,8 @@ my-mysql-cluster:
 # Valkey cache cluster (redis is mapped to valkey for backwards compatibility)
 my-valkey-cache:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: my-valkey-cache
   engine: valkey
   version: "8"
@@ -43,6 +49,8 @@ my-valkey-cache:
 # MongoDB cluster
 my-mongodb:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: my-mongodb-cluster3
   engine: mongodb
   version: "7.0"

@@ -7,6 +7,9 @@ namespace: gcp-cloudrun-source-test
 
 hello-service:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
+    blobs: [helloworld]
   name: monk-test-source-deploy
   location: us-central1
   blob_name: helloworld

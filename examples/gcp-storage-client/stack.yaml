@@ -37,6 +37,8 @@ storage-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - storage.googleapis.com
     - iam.googleapis.com
@@ -51,6 +53,8 @@ enable-apis:
 
 data-bucket:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   # Bucket names must be globally unique - add a unique suffix in practice
   name: monk-demo-storage-bucket
   location: US
@@ -95,6 +99,8 @@ data-bucket:
 
 storage-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: demo-storage-app
   display_name: Demo Storage Application
   description: Service account for storage demo application
@@ -122,6 +128,8 @@ storage-sa:
 
 storage-sa-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
   secret: demo-gcs-credentials
 

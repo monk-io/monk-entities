@@ -37,6 +37,8 @@ namespace: gcp-fullstack-demo
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
     - run.googleapis.com
@@ -55,6 +57,8 @@ enable-apis:
 
 app-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: fullstack-demo-runner
   display_name: Fullstack demo runtime SA
   account_description: Runtime identity for the Cloud Run backend and Cloud Function
@@ -79,6 +83,8 @@ app-sa:
 
 uploads-bucket:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   # Bucket names are globally unique. Bump the suffix on collisions.
   name: monk-fullstack-demo-uploads-1
   location: US
@@ -103,6 +109,8 @@ uploads-bucket:
 
 postgres:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   # Cloud SQL blocks reuse of instance names for ~1 week after deletion.
   # Bump this suffix if you redeploy within that window.
   name: monk-fullstack-demo-db-1
@@ -124,6 +132,8 @@ postgres:
 
 app-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: appdb
   charset: UTF8
@@ -142,6 +152,8 @@ app-database:
 
 app-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: appuser
   password_secret: fullstack-demo-db-password
@@ -169,6 +181,9 @@ app-user:
 
 echo-function:
   defines: gcp/cloud-function
+  permissions:
+    cloud: [gcp]
+    blobs: [function]
   name: fullstack-demo-transform
   location: us-central1
   blob_name: function
@@ -208,6 +223,9 @@ echo-function:
 
 backend:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
+    blobs: [backend]
   name: fullstack-demo-api
   location: us-central1
   # Source deploy from `backend/` (Cloud Run source deploy uses Google's

@@ -2,6 +2,8 @@ namespace: firebase
 
 date:
   defines: firebase/cloudfunc-v2
+  permissions:
+    cloud: [gcp]
   files:
     index:
       path: index.js
@@ -22,6 +24,8 @@ date:
 
 thumbnail:
   defines: firebase/cloudfunc-v2
+  permissions:
+    cloud: [gcp]
   files:
     index:
       path: index.js

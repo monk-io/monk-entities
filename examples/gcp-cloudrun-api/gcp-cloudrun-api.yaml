@@ -15,6 +15,8 @@ namespace: gcp-cloudrun-api
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
     - run.googleapis.com
@@ -28,6 +30,8 @@ enable-apis:
 
 postgres:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: cloudrun-demo-db
   database_version: POSTGRES_15
   tier: db-f1-micro
@@ -51,6 +55,8 @@ postgres:
 
 app-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: appdb
   charset: UTF8
@@ -73,6 +79,8 @@ app-database:
 
 app-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: apiuser
   password_secret: cloudrun-demo-db-password
@@ -100,6 +108,8 @@ app-user:
 
 api-service:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
   name: cloudrun-demo-api
   location: us-central1
   image: gcr.io/monk-tests/gcp-cloudrun-api:latest  # Replace with your GCR/Artifact Registry image

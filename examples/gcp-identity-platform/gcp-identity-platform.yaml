@@ -12,6 +12,8 @@ namespace: gcp-identity-platform
 
 enable-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   name: identitytoolkit.googleapis.com
 
 # === Project-Level Configuration ===
@@ -19,6 +21,8 @@ enable-api:
 # Enable email sign-in, MFA, and multi-tenancy for the project
 identity-config:
   defines: gcp/identity-platform-config
+  permissions:
+    cloud: [gcp]
   authorized_domains:
     - myapp.example.com
     - localhost
@@ -41,6 +45,8 @@ identity-config:
 # Isolate users for "Acme Corp" — each SaaS customer gets its own tenant
 acme-tenant:
   defines: gcp/identity-platform-tenant
+  permissions:
+    cloud: [gcp]
   display_name: acme-corp
   allow_password_signup: true
   enable_email_link_signin: true
@@ -62,6 +68,8 @@ acme-tenant:
 # Replace client_id and client_secret with real values from Google Cloud Console
 google-signin:
   defines: gcp/identity-platform-default-idp-config
+  permissions:
+    cloud: [gcp]
   idp_id: google.com
   tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
   enabled: true
@@ -81,6 +89,8 @@ google-signin:
 # Replace client_id, issuer, and client_secret with your IdP values
 corp-oidc:
   defines: gcp/identity-platform-o-auth-idp-config
+  permissions:
+    cloud: [gcp]
   name: oidc.corp-sso
   tenant_id: <- connection-target("tenant") entity-state get-member("tenant_id")
   display_name: Corporate SSO

@@ -45,6 +45,8 @@ nginx:
 # Enable the Cloud DNS API
 enable-dns-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - dns.googleapis.com
   services:
@@ -54,6 +56,8 @@ enable-dns-api:
 # Public managed zone for the domain
 dns-zone:
   defines: gcp/cloud-dns-zone
+  permissions:
+    cloud: [gcp]
   name: example-app-zone
   dns_name: "example-app.com."
   zone_description: "Cloud DNS Nginx Demo - managed by Monk"
@@ -73,6 +77,8 @@ dns-zone:
 # A record pointing to the ingress (traefik) public IP
 web-record:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   depends:
     wait-for:
       runnables:
@@ -88,6 +94,8 @@ web-record:
 # MX record for email (example configuration)
 mail-record:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   depends:
     wait-for:
       runnables:
@@ -103,6 +111,8 @@ mail-record:
 # TXT record for domain verification (SPF example)
 txt-record:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   depends:
     wait-for:
       runnables:

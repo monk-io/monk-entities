@@ -9,6 +9,8 @@ namespace: gcp-cloud-armor-test
 # Rules exercise: IP allow, IP deny, CEL expression + throttle (rate limit).
 test-ca-policy:
   defines: gcp/cloud-armor-security-policy
+  permissions:
+    cloud: [gcp]
   name: monk-test-ca-policy
   policy_description: "MonkEC Cloud Armor integration test policy"
   default_action: deny(403)

@@ -3,6 +3,8 @@ namespace: digitalocean-container-registry-example
 # Basic Container Registry with basic tier ($5/month)
 my-basic-registry:
   defines: digitalocean-container-registry/registry
+  permissions:
+    cloud: [digitalocean]
   name: monk-docker-registry-fra
   region: fra1
   subscription_tier: basic
@@ -10,6 +12,8 @@ my-basic-registry:
 # Professional Container Registry with storage quota
 my-professional-registry:
   defines: digitalocean-container-registry/registry
+  permissions:
+    cloud: [digitalocean]
   name: monk-pro-registry-sfo
   region: sfo3
   subscription_tier: professional
@@ -18,6 +22,8 @@ my-professional-registry:
 # Container Registry in Europe
 my-eu-registry:
   defines: digitalocean-container-registry/registry
+  permissions:
+    cloud: [digitalocean]
   name: monk-eu-registry-ams
   region: ams3
   subscription_tier: professional
@@ -26,6 +32,8 @@ my-eu-registry:
 # Container Registry in Asia
 my-asia-registry:
   defines: digitalocean-container-registry/registry
+  permissions:
+    cloud: [digitalocean]
   name: monk-asia-registry-sgp
   region: sgp1
   subscription_tier: basic

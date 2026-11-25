@@ -3,6 +3,8 @@ namespace: azure-cosmosdb-test
 # Test Cosmos DB Database Account
 database-account:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   account_name: monk-test-cosmos-db

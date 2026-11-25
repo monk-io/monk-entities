@@ -2,6 +2,8 @@ namespace: aws-iam-test
 
 test-working-iam-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   
   region: "us-east-1"
   role_name: "test-working-iam-role-entity"

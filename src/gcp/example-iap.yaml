@@ -17,6 +17,8 @@ namespace: gcp-iap-example
 
 iap-brand:
   defines: gcp/iap-brand
+  permissions:
+    cloud: [gcp]
   services:
     data:
       protocol: custom
@@ -28,6 +30,8 @@ iap-brand:
 
 iap-oauth-client:
   defines: gcp/iap-oauth-client
+  permissions:
+    cloud: [gcp]
   brand_id: <- connection-target("brand") entity-state get-member("brand_id")
   display_name: "example-iap-client"
   secret_ref: gcp-iap-oauth-client-secret
@@ -55,6 +59,8 @@ iap-oauth-client:
 
 iap-project-access:
   defines: gcp/iap-access-policy
+  permissions:
+    cloud: [gcp]
   target_kind: project
   role: "roles/iap.httpsResourceAccessor"
   members:
@@ -72,6 +78,8 @@ iap-project-access:
 
 iap-tunnel-group:
   defines: gcp/iap-tunnel-dest-group
+  permissions:
+    cloud: [gcp]
   name: example-tunnel-group
   location: us-central1
   cidrs:

@@ -3,6 +3,8 @@ namespace: gcp-tasks-test
 # Cloud Tasks Queue
 test-cloud-tasks-queue:
   defines: gcp/cloud-tasks-queue
+  permissions:
+    cloud: [gcp]
   name: monk-ct-queue-run1
   location: us-central1
   max_dispatches_per_second: 10

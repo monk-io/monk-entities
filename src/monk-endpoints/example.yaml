@@ -67,8 +67,7 @@ vercel-static-deploy:
 
 vercel-url-ready:
   defines: utils/wait-for-action
-  target: endpoints-example/vercel-project
-  action: get-production-urls
+  ready: <- true wait-for(5, 24, "endpoints-example/vercel-project/get-production-urls")
   depends:
     wait-for:
       runnables:

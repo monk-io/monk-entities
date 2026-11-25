@@ -27,7 +27,7 @@ For each entity class, extract:
 - **Actions** — all `@action()` decorators with method signatures and `Args` parameters
 - **Readiness** — `static readonly readiness` config (period, initialDelay, attempts)
 - **Dependencies** — does the entity reference other entities (e.g., project_id from another entity)?
-- **Auth pattern** — uses `secret.get()` (needs `permitted-secrets` + `.env`) or cloud builtin (no secrets needed)
+- **Auth pattern** — uses `secret.get()` (needs `permitted-secrets` + `.env`) or cloud builtin (no secrets needed, but `permissions: {cloud: [<provider>]}`)
 
 **Detect cross-entity references:** Look for Definition fields that reference IDs from other entities in the same package. Common patterns:
 - A field named `zone_id`, `project_id`, `cluster_id`, `instance_id`, etc. that matches a State field (`state.zone_id`, `state.id`) of another entity
@@ -127,6 +127,10 @@ test-<entity1>:
   defines: <package>/<entity-class>
   <required_field>: <test_value>
   <optional_field>: <test_value>
+  # For cloud builtin entities (cloud/aws, cloud/gcp, ...), and blobs read by name:
+  permissions:
+    cloud: [<provider>]
+    blobs: [<blob_name>]
   # For API-token based entities:
   permitted-secrets:
     <package>-api-token: true
@@ -160,7 +164,7 @@ test-<entity2>:
 6. **Dependencies** — use `connections` + `depends.wait-for` for entity references. Always use `service: default`
 7. **`connection-target("name") entity-state get-member("field")`** — read **state** fields (runtime values from `create()`). Use `entity get-member("field")` for **definition** fields (template values)
 8. **Never hardcode cross-entity IDs** — if a Definition field like `zone_id`, `project_id`, `cluster_id` references another entity's state, it MUST use `connection-target()`. Never use placeholder values like `REPLACE_WITH_ID` or `placeholder`. If the dependency is within the same package, wire it. If it's an external dependency, document it in a comment.
-9. **Cloud builtins** (aws-*, azure-*, gcp*) — do NOT add `permitted-secrets` (auto-injected)
+9. **Cloud builtins** (aws-*, azure-*, gcp*) — do NOT add `permitted-secrets`; DO add `permissions: {cloud: [aws]}` (or gcp, azure, digitalocean, hetzner) to every instance, and `blobs: [<blob_name>]` when it reads a blob
 10. **API-token entities** — add `permitted-secrets` and `secret_ref` field
 
 ### Timeout guidelines

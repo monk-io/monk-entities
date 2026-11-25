@@ -2,6 +2,8 @@ namespace: aws-lambda-test
 
 lambda-execution-policy:
   defines: aws-iam/iam-policy
+  permissions:
+    cloud: [aws]
   region: us-east-1
   policy_name: lambda-execution-policy
   policy_description: "Lambda execution IAM policy"
@@ -24,6 +26,8 @@ lambda-execution-policy:
 
 lambda-execution-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: "us-east-1"
   role_name: "lambda-execution-role"
   role_description: "Lambda execution IAM role"
@@ -55,6 +59,9 @@ lambda-execution-role:
 
 lambda-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [lambda-test-code]
   region: us-east-1
   blob_name: lambda-test-code
   function_name: lambda-function
@@ -82,6 +89,9 @@ lambda-function:
 
 lambda-go-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [lambda-go-test-code]
   region: us-east-1
   blob_name: lambda-go-test-code
   function_name: lambda-go-function
@@ -110,6 +120,8 @@ lambda-go-function:
 
 lambda-container-function:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
   region: us-east-1
   image_uri: 065217599764.dkr.ecr.us-east-1.amazonaws.com/monk/lambda-test:latest
   function_name: lambda-container-function

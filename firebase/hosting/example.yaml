@@ -2,6 +2,8 @@ namespace: firebase
 
 mysite:
   defines: firebase/firebase-site
+  permissions:
+    cloud: [gcp]
   name: common-access-project-orekhyk0
   project: common-access-project
   # Keep the site on purge, so it can be reused later. Deleting a site is a permanent action.
@@ -10,5 +12,7 @@ mysite:
 
 mysite-beta:
   defines: firebase/firebase-channel
+  permissions:
+    cloud: [gcp]
   name: beta
   site: <- get-entity("firebase/mysite") get-member("name")

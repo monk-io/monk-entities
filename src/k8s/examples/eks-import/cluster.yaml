@@ -5,6 +5,8 @@ namespace: eks-import-demo
 
 vpc:
   defines: aws-ec2/vpc
+  permissions:
+    cloud: [aws]
   region: us-east-1
   cidr_block: 10.30.0.0/16
   enable_dns_support: true
@@ -17,6 +19,8 @@ vpc:
 
 gateway:
   defines: aws-ec2/internet-gateway
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   services:
@@ -34,6 +38,8 @@ gateway:
 
 subnet-a:
   defines: aws-ec2/subnet
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   cidr_block: 10.30.1.0/24
@@ -56,6 +62,8 @@ subnet-a:
 
 subnet-b:
   defines: aws-ec2/subnet
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   cidr_block: 10.30.2.0/24
@@ -78,6 +86,8 @@ subnet-b:
 
 routes:
   defines: aws-ec2/route-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   vpc_id: <- connection-target("vpc") entity-state get-member("vpc_id")
   routes:
@@ -112,6 +122,8 @@ routes:
 
 cluster-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: import-demo-eks-cluster
   assume_role_policy_document:
@@ -131,6 +143,8 @@ cluster-role:
 
 node-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   region: us-east-1
   role_name: import-demo-eks-nodes
   assume_role_policy_document:
@@ -150,6 +164,8 @@ node-role:
 
 eks:
   defines: aws-eks/cluster
+  permissions:
+    cloud: [aws]
   region: us-east-1
   name: import-demo
   version: "1.34"                 # quoted: YAML reads 1.30 as 1.3
@@ -179,6 +195,8 @@ eks:
 
 nodes:
   defines: aws-eks/node-group
+  permissions:
+    cloud: [aws]
   region: us-east-1
   cluster_name: <- connection-target("eks") entity-state get-member("name")
   name: general

@@ -38,6 +38,8 @@ firestore-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - firestore.googleapis.com
     - iam.googleapis.com
@@ -52,6 +54,8 @@ enable-apis:
 
 firestore-db:
   defines: gcp/firestore
+  permissions:
+    cloud: [gcp]
   location: nam5 # US multi-region for high availability
   type: FIRESTORE_NATIVE
   point_in_time_recovery: DISABLED
@@ -73,6 +77,8 @@ firestore-db:
 
 firestore-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: firestore-client
   display_name: Firestore Client
   description: Service account for Firestore database access
@@ -96,6 +102,8 @@ firestore-sa:
 
 firestore-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
   secret: firestore-sa-key
 

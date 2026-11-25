@@ -13,6 +13,8 @@ namespace: gcp-artifact-registry
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - artifactregistry.googleapis.com
   services:
@@ -27,6 +29,8 @@ enable-apis:
 
 docker-repo:
   defines: gcp/artifact-registry-repository
+  permissions:
+    cloud: [gcp]
   name: app-docker
   location: us-central1
   repo_format: DOCKER
@@ -51,6 +55,8 @@ docker-repo:
 
 npm-mirror:
   defines: gcp/artifact-registry-repository
+  permissions:
+    cloud: [gcp]
   name: npm-mirror
   location: us-central1
   repo_format: NPM

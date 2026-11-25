@@ -38,6 +38,8 @@ cloudsql-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
     - iam.googleapis.com
@@ -52,6 +54,8 @@ enable-apis:
 
 postgres-instance:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: demo-postgres-instance
   database_version: POSTGRES_15
   tier: db-f1-micro
@@ -98,6 +102,8 @@ postgres-instance:
 
 app-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: appdb
   charset: UTF8
@@ -125,6 +131,8 @@ app-database:
 
 app-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: appuser
   password_secret: demo-db-password

@@ -2,6 +2,8 @@ namespace: aws-sqs-test
 
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-sqs-queue
   delay_seconds: 0
@@ -18,6 +20,8 @@ test-queue:
 
 test-fifo-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-sqs-fifo-queue
   delay_seconds: 0
@@ -36,6 +40,8 @@ test-fifo-queue:
 # Dead Letter Queue - Created first, exposes ARN via service
 test-dlq:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-dlq
   message_retention_period: 1209600 # 14 days - longer retention for failed messages
@@ -53,6 +59,8 @@ test-dlq:
 # Main Queue with DLQ - Uses connection-target to get DLQ ARN
 test-queue-with-dlq:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-queue-with-dlq
   delay_seconds: 0

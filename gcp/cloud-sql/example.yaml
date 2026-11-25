@@ -2,11 +2,15 @@ namespace: gcp
 
 enable-apis:
   defines: gcp/serviceusage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
 
 myinstance:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: testmyinstance1
   database-version: MYSQL_8_0
   tier: "db-g1-small"
@@ -19,6 +23,8 @@ myinstance:
 
 mydb:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   name: mydb1
   connections:
     instance:
@@ -32,6 +38,8 @@ mydb:
 
 myuser:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   name: myuser1
   connections:
     instance:

@@ -6,6 +6,8 @@ namespace: gcp-cloud-cdn-test
 # Cloud Storage bucket — origin for the backend bucket
 test-storage:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   name: monk-test-cdn-bucket-origin
   location: US
   storage_class: STANDARD
@@ -17,6 +19,8 @@ test-storage:
 # Cloud CDN Backend Bucket — serves static content from GCS
 test-backend-bucket:
   defines: gcp/cloud-cdn-backend-bucket
+  permissions:
+    cloud: [gcp]
   name: monk-test-cdn-bb
   bucket_name: monk-test-cdn-bucket-origin
   enable_cdn: true
@@ -38,6 +42,8 @@ test-backend-bucket:
 # Cloud CDN Backend Service — CDN-enabled backend service (no backends for testing)
 test-backend-service:
   defines: gcp/cloud-cdn-backend-service
+  permissions:
+    cloud: [gcp]
   name: monk-test-cdn-bs
   enable_cdn: true
   cache_mode: CACHE_ALL_STATIC

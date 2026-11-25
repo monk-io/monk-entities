@@ -27,6 +27,8 @@ namespace: azure-eventhubs-app
 # =============================================================================
 eventhubs-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   permitted-secrets:
     eventhubs-connection-string: true
   subscription_id: "your-subscription-id"
@@ -51,6 +53,8 @@ eventhubs-namespace:
 # =============================================================================
 telemetry-hub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-eventhubs-app"
@@ -67,6 +71,8 @@ telemetry-hub:
 # =============================================================================
 alerts-hub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-eventhubs-app"
@@ -83,6 +89,8 @@ alerts-hub:
 # =============================================================================
 realtime-dashboard-cg:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-eventhubs-app"
@@ -96,6 +104,8 @@ realtime-dashboard-cg:
 
 batch-analytics-cg:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-eventhubs-app"
@@ -112,6 +122,8 @@ batch-analytics-cg:
 # =============================================================================
 alert-processor-cg:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-eventhubs-app"

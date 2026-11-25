@@ -8,6 +8,8 @@ namespace: azure-eventhubs-example
 # =============================================================================
 basic-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -24,6 +26,8 @@ basic-namespace:
 # =============================================================================
 autoinflate-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-autoinflate"
@@ -44,6 +48,8 @@ autoinflate-namespace:
 # =============================================================================
 premium-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-premium"
@@ -66,6 +72,8 @@ premium-namespace:
 # =============================================================================
 basic-eventhub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -82,6 +90,8 @@ basic-eventhub:
 # =============================================================================
 extended-retention-eventhub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -98,6 +108,8 @@ extended-retention-eventhub:
 # =============================================================================
 capture-eventhub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -123,6 +135,8 @@ capture-eventhub:
 # =============================================================================
 basic-consumer-group:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -138,6 +152,8 @@ basic-consumer-group:
 # =============================================================================
 metadata-consumer-group:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myeventhubs-basic"
@@ -159,6 +175,8 @@ metadata-consumer-group:
 
 streaming-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"
@@ -177,6 +195,8 @@ streaming-namespace:
 # Event hub for user activity events
 user-activity-hub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"
@@ -191,6 +211,8 @@ user-activity-hub:
 # Event hub for system metrics
 metrics-hub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"
@@ -205,6 +227,8 @@ metrics-hub:
 # Consumer group for real-time dashboard
 dashboard-consumer:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"
@@ -219,6 +243,8 @@ dashboard-consumer:
 # Consumer group for batch analytics
 analytics-consumer:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"
@@ -233,6 +259,8 @@ analytics-consumer:
 # Consumer group for metrics alerting
 alerting-consumer:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "streaming-solution"

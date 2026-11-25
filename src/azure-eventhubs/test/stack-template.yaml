@@ -22,6 +22,8 @@ variables:
 # Event Hubs Namespace
 test-namespace:
   defines: azure-eventhubs/event-hubs-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -38,6 +40,8 @@ test-namespace:
 # Test Event Hub
 test-eventhub:
   defines: azure-eventhubs/event-hub
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name
@@ -52,6 +56,8 @@ test-eventhub:
 # Test Consumer Group
 test-consumer-group:
   defines: azure-eventhubs/consumer-group
+  permissions:
+    cloud: [azure]
   subscription_id: <- $subscription_id
   resource_group_name: <- $resource_group_name
   namespace_name: <- $namespace_name

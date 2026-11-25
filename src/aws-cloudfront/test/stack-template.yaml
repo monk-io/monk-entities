@@ -3,6 +3,8 @@ namespace: aws-cloudfront-test
 # Basic CloudFront distribution test with simple S3 origin
 test-basic-distribution:
   defines: aws-cloudfront/cloud-front-distribution
+  permissions:
+    cloud: [aws]
   region: us-east-1
   comment: "Test CloudFront distribution - basic S3 origin"
   enabled: true
@@ -40,6 +42,8 @@ test-basic-distribution:
 # More complex CloudFront distribution test with multiple cache behaviors
 test-custom-origin-distribution:
   defines: aws-cloudfront/cloud-front-distribution
+  permissions:
+    cloud: [aws]
   region: us-east-1
   comment: "Test CloudFront distribution - custom origin with cache behaviors"
   enabled: true

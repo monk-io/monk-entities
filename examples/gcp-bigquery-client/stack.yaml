@@ -37,6 +37,8 @@ bigquery-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - bigquery.googleapis.com
     - iam.googleapis.com
@@ -51,6 +53,8 @@ enable-apis:
 
 analytics-dataset:
   defines: gcp/big-query
+  permissions:
+    cloud: [gcp]
   dataset: monk_demo_analytics
   location: US
   description: Demo analytics dataset created by Monk
@@ -121,6 +125,8 @@ analytics-dataset:
 
 analytics-sa:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: demo-bigquery-app
   display_name: Demo BigQuery Application
   description: Service account for BigQuery demo application
@@ -147,6 +153,8 @@ analytics-sa:
 
 analytics-sa-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   service_account_id: <- connection-target("sa") entity-state get-member("unique_id")
   secret: demo-bq-credentials
 

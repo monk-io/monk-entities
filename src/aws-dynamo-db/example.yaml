@@ -3,6 +3,8 @@ namespace: aws-dynamo-db-example
 # Simple DynamoDB table with pay-per-request billing
 simple-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: simple-example-table
   attribute_definitions:
@@ -20,6 +22,8 @@ simple-table:
 # DynamoDB table with composite key and provisioned billing
 user-posts-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: user-posts-example
   attribute_definitions:
@@ -48,6 +52,8 @@ user-posts-table:
 # Advanced table with Global Secondary Index
 analytics-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: analytics-example
   attribute_definitions:

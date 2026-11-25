@@ -2,6 +2,8 @@ namespace: my-infra
 
 my-postgres-db:
   defines: digitalocean-database/database
+  permissions:
+    cloud: [digitalocean]
   name: my-app-db
   engine: pg
   version: "16"

@@ -11,6 +11,8 @@ namespace: gcp-backup-test
 
 enable-sql-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
   services:
@@ -23,6 +25,8 @@ enable-sql-api:
 
 backup-sql-instance:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: backup-test-postgres
   database_version: POSTGRES_14
   tier: db-f1-micro

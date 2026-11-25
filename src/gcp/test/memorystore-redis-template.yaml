@@ -26,6 +26,8 @@ namespace: gcp-redis-test
 
 enable-redis-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - redis.googleapis.com
   services:
@@ -39,6 +41,8 @@ enable-redis-api:
 
 basic-redis:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   name: monkec-test-redis-basic
   region: us-central1
   tier: BASIC
@@ -61,6 +65,8 @@ basic-redis:
 
 redis-with-persistence:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   name: monkec-test-redis-persist
   region: us-central1
   tier: BASIC
@@ -87,6 +93,8 @@ redis-with-persistence:
 
 redis-with-maintenance:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   name: monkec-test-redis-maint
   region: us-central1
   tier: BASIC

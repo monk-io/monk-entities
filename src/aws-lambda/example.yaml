@@ -3,6 +3,9 @@ namespace: aws-lambda-examples
 # Basic Lambda function example
 hello-world:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [hello-world-code]
   region: us-east-1
   blob_name: hello-world-code
   function_name: hello-world-function
@@ -19,6 +22,9 @@ hello-world:
 # Advanced Lambda function with full configuration
 data-processor:
   defines: aws-lambda/lambda-function
+  permissions:
+    cloud: [aws]
+    blobs: [data-processor-code]
   region: us-west-2
   blob_name: data-processor-code
   function_name: data-processor-function
@@ -60,6 +66,9 @@ data-processor:
 # Java Lambda function with layers
 api-handler:
   defines: aws-lambda/function
+  permissions:
+    cloud: [aws]
+    blobs: [api-handler-code]
   region: eu-central-1
   blob_name: api-handler-code
   function_name: api-handler-function
@@ -88,6 +97,8 @@ api-handler:
 # Container image Lambda function
 container-function:
   defines: aws-lambda/function
+  permissions:
+    cloud: [aws]
   region: eu-west-1
   image_uri: 123456789012.dkr.ecr.eu-west-1.amazonaws.com/my-lambda-app:latest
   function_name: container-function
@@ -113,6 +124,9 @@ container-function:
 # Lambda with EFS file system
 ml-inference:
   defines: aws-lambda/function
+  permissions:
+    cloud: [aws]
+    blobs: [ml-inference-code]
   region: us-east-2
   blob_name: ml-inference-code
   function_name: ml-inference-function
@@ -144,6 +158,9 @@ ml-inference:
 # ARM64 Lambda with SnapStart
 serverless-api:
   defines: aws-lambda/function
+  permissions:
+    cloud: [aws]
+    blobs: [serverless-api-code]
   region: us-west-1
   blob_name: serverless-api-code
   function_name: serverless-api-function

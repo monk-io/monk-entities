@@ -6,6 +6,8 @@ namespace: gcp-cloud-function-test
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - cloudfunctions.googleapis.com
     - cloudbuild.googleapis.com
@@ -15,6 +17,9 @@ enable-apis:
 
 test-function:
   defines: gcp/cloud-function
+  permissions:
+    cloud: [gcp]
+    blobs: [cloud-function-code]
   name: monk-test-cloud-function
   location: us-central1
   blob_name: cloud-function-code

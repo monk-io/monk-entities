@@ -3,6 +3,8 @@ namespace: aws-dynamo-db-advanced-test
 # Table with provisioned billing and composite key
 provisioned-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: monk-test-provisioned-table
   attribute_definitions:
@@ -32,6 +34,8 @@ provisioned-table:
 # Table with Global Secondary Index
 gsi-table:
   defines: aws-dynamo-db/dynamo-db-table
+  permissions:
+    cloud: [aws]
   region: us-east-1
   table_name: monk-test-gsi-table
   attribute_definitions:

@@ -10,6 +10,8 @@ namespace: gcp-bigquery-test
 
 enable-bigquery-api:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - bigquery.googleapis.com
   services:
@@ -22,6 +24,8 @@ enable-bigquery-api:
 
 backup-dataset:
   defines: gcp/big-query
+  permissions:
+    cloud: [gcp]
   dataset: backup_test_dataset
   location: US
   depends:

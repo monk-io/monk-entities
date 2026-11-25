@@ -2,6 +2,8 @@ namespace: aws-iam-examples
 
 test-iam-role:
   defines: aws-iam/iam-role
+  permissions:
+    cloud: [aws]
   
   variables:
     region: us-east-1

@@ -3,6 +3,8 @@ namespace: cognito-test
 # Basic Identity Pool for testing
 test-identity-pool:
   defines: aws-cognito/identity-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   identity_pool_name: monk-test-identity-pool
   allow_unauthenticated_identities: true
@@ -15,6 +17,8 @@ test-identity-pool:
 # Basic User Pool for testing
 test-user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: monk-test-user-pool
   mfa_configuration: OFF
@@ -55,6 +59,8 @@ test-user-pool:
 # Advanced User Pool for comprehensive testing
 test-advanced-user-pool:
   defines: aws-cognito/user-pool
+  permissions:
+    cloud: [aws]
   region: us-east-1
   pool_name: monk-test-advanced-user-pool
   mfa_configuration: ON
@@ -128,6 +134,8 @@ test-advanced-user-pool:
 # Basic User Pool Client for testing
 test-user-pool-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-test/test-user-pool
@@ -172,6 +180,8 @@ test-user-pool-client:
 # OAuth User Pool Client for testing OAuth flows
 test-oauth-client:
   defines: aws-cognito/user-pool-client
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-test/test-user-pool
@@ -235,6 +245,8 @@ test-oauth-client:
 # Test Identity Provider (Google for testing)
 test-google-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-test/test-user-pool
@@ -261,6 +273,8 @@ test-google-provider:
 # Test OIDC Identity Provider
 test-oidc-provider:
   defines: aws-cognito/identity-provider
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-test/test-user-pool
@@ -291,6 +305,8 @@ test-oidc-provider:
 # Test User Pool Domain (Cognito prefix domain)
 test-user-pool-domain:
   defines: aws-cognito/user-pool-domain
+  permissions:
+    cloud: [aws]
   connections:
     user-pool:
       runnable: cognito-test/test-user-pool

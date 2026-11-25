@@ -2,6 +2,8 @@ namespace: do-agent-example
 
 agent:
   defines: digitalocean-agent/agent
+  permissions:
+    cloud: [digitalocean]
   name: api-create
   instruction: "be a weather reporter"
   model_id: "OpenAI GPT-oss-120b"

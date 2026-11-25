@@ -5,6 +5,8 @@ namespace: azure-cosmosdb-backup-test
 
 backup-account:
   defines: azure-cosmosdb/database-account
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   account_name: monk-backup-test-cosmos
@@ -28,6 +30,8 @@ backup-account:
 # Test database for backup/restore scenarios
 backup-database:
   defines: azure-cosmosdb/database
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   account_name: <- connection-target("account") entity-state get-member("account_name")
@@ -46,6 +50,8 @@ backup-database:
 # Test container for backup/restore scenarios
 backup-container:
   defines: azure-cosmosdb/container
+  permissions:
+    cloud: [azure]
   subscription_id: ${AZURE_SUBSCRIPTION_ID}
   resource_group_name: ${AZURE_RESOURCE_GROUP_NAME}
   account_name: <- connection-target("account") entity-state get-member("account_name")

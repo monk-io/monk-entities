@@ -8,6 +8,8 @@ namespace: azure-servicebus-example
 # =============================================================================
 basic-namespace:
   defines: azure-servicebus/service-bus-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -23,6 +25,8 @@ basic-namespace:
 # =============================================================================
 premium-namespace:
   defines: azure-servicebus/service-bus-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-premium"
@@ -45,6 +49,8 @@ premium-namespace:
 # =============================================================================
 basic-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -62,6 +68,8 @@ basic-queue:
 # =============================================================================
 session-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -85,6 +93,8 @@ session-queue:
 # =============================================================================
 forwarding-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -102,6 +112,8 @@ forwarding-queue:
 # =============================================================================
 dead-letter-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -118,6 +130,8 @@ dead-letter-queue:
 # =============================================================================
 basic-topic:
   defines: azure-servicebus/topic
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -135,6 +149,8 @@ basic-topic:
 # =============================================================================
 partitioned-topic:
   defines: azure-servicebus/topic
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -155,6 +171,8 @@ partitioned-topic:
 # =============================================================================
 all-events-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -173,6 +191,8 @@ all-events-subscription:
 # =============================================================================
 high-priority-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -193,6 +213,8 @@ high-priority-subscription:
 # =============================================================================
 ordered-events-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -211,6 +233,8 @@ ordered-events-subscription:
 # =============================================================================
 forwarding-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "myservicebus-basic"
@@ -237,6 +261,8 @@ forwarding-subscription:
 
 messaging-namespace:
   defines: azure-servicebus/service-bus-namespace
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"
@@ -250,6 +276,8 @@ messaging-namespace:
 
 messaging-dlq:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"
@@ -263,6 +291,8 @@ messaging-dlq:
 
 messaging-topic:
   defines: azure-servicebus/topic
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"
@@ -278,6 +308,8 @@ messaging-topic:
 # Subscription for order processing service
 orders-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"
@@ -296,6 +328,8 @@ orders-subscription:
 # Subscription for notification service
 notifications-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"
@@ -314,6 +348,8 @@ notifications-subscription:
 # Subscription for analytics service (receives all events)
 analytics-subscription:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "messaging-solution"

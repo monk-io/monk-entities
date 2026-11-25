@@ -3,6 +3,8 @@ namespace: aws-s3-test
 # Basic S3 bucket with minimal configuration
 test-basic-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: test-s3-basic-bucket-monk-integration
   versioning: false
@@ -16,6 +18,8 @@ test-basic-bucket:
 # Versioned bucket with CORS configuration
 test-versioned-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: test-s3-versioned-bucket-monk-integration
   versioning: true
@@ -36,6 +40,8 @@ test-versioned-bucket:
 # Advanced bucket with lifecycle and encryption
 test-advanced-bucket:
   defines: aws-s3/s3-bucket
+  permissions:
+    cloud: [aws]
   region: us-east-1
   bucket_name: test-s3-advanced-bucket-monk-integration
   versioning: true

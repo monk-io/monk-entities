@@ -65,6 +65,8 @@ namespace: azure-postgresql-example
 # ----------------------------------------------------------------------------
 basic-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   server_name: "my-postgres-server"
@@ -99,6 +101,8 @@ basic-server:
 # ----------------------------------------------------------------------------
 production-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "production-rg" # Replace with your resource group
   server_name: "prod-postgres-ha"
@@ -136,6 +140,8 @@ production-server:
 # ----------------------------------------------------------------------------
 analytics-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "analytics-rg" # Replace with your resource group
   server_name: "analytics-postgres"
@@ -170,6 +176,8 @@ analytics-server:
 # ----------------------------------------------------------------------------
 app-database:
   defines: azure-postgresql/database
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   server_name: "my-postgres-server"
@@ -194,6 +202,8 @@ app-database:
 # ----------------------------------------------------------------------------
 analytics-database:
   defines: azure-postgresql/database
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   server_name: "my-postgres-server"
@@ -312,6 +322,8 @@ production-stack:
 # ----------------------------------------------------------------------------
 vnet-integrated-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   server_name: "my-private-postgres"
@@ -399,6 +411,8 @@ vnet-app:
 # ----------------------------------------------------------------------------
 public-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   subscription_id: "12345678-1234-1234-1234-123456789012" # Replace with your subscription ID
   resource_group_name: "my-resource-group" # Replace with your resource group
   server_name: "my-public-postgres"
@@ -442,6 +456,8 @@ public-server:
 # ----------------------------------------------------------------------------
 public-access-list:
   defines: azure-postgresql/access-list
+  permissions:
+    cloud: [azure]
   connections:
     server:
       runnable: azure-postgresql-example/public-server

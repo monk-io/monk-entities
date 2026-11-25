@@ -12,6 +12,8 @@ namespace: gcp-example
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - sqladmin.googleapis.com
     - bigquery.googleapis.com
@@ -29,6 +31,8 @@ enable-apis:
 
 app-service-account:
   defines: gcp/service-account
+  permissions:
+    cloud: [gcp]
   name: my-app-sa
   display_name: My Application Service Account
   description: Service account for my application
@@ -44,6 +48,8 @@ app-service-account:
 
 app-service-account-key:
   defines: gcp/service-account-key
+  permissions:
+    cloud: [gcp]
   secret: app-sa-credentials
   service_account_id: <- connection-target("service-account") entity-state get-member("unique_id")
   permitted-secrets:
@@ -65,6 +71,8 @@ app-service-account-key:
 
 postgres-instance:
   defines: gcp/cloud-sql-instance
+  permissions:
+    cloud: [gcp]
   name: my-app-postgres
   database_version: POSTGRES_14
   tier: db-f1-micro
@@ -89,6 +97,8 @@ postgres-instance:
 
 app-database:
   defines: gcp/cloud-sql-database
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: myapp_production
   services:
@@ -106,6 +116,8 @@ app-database:
 
 app-db-user:
   defines: gcp/cloud-sql-user
+  permissions:
+    cloud: [gcp]
   instance: <- connection-target("instance") entity get-member("name")
   name: app_user
   password_secret: app-db-password
@@ -131,6 +143,8 @@ app-db-user:
 
 analytics-dataset:
   defines: gcp/big-query
+  permissions:
+    cloud: [gcp]
   dataset: app_analytics
   location: US
   description: Analytics data for my application
@@ -150,6 +164,8 @@ analytics-dataset:
 
 app-bucket:
   defines: gcp/cloud-storage
+  permissions:
+    cloud: [gcp]
   name: my-app-storage-bucket-unique-name  # Must be globally unique!
   location: US
   storage_class: STANDARD
@@ -171,6 +187,8 @@ app-bucket:
 
 redis-cache:
   defines: gcp/memorystore-redis
+  permissions:
+    cloud: [gcp]
   name: my-app-cache
   region: us-central1
   tier: BASIC
@@ -193,6 +211,8 @@ redis-cache:
 
 storage-hmac-keys:
   defines: gcp/cloud-storage-hmac-keys
+  permissions:
+    cloud: [gcp]
   service_account_email: <- connection-target("service-account") entity-state get-member("email")
   access_key_secret_ref: gcs-hmac-access-key
   secret_key_secret_ref: gcs-hmac-secret-key
@@ -216,6 +236,8 @@ storage-hmac-keys:
 
 notifications-topic:
   defines: gcp/pubsub-topic
+  permissions:
+    cloud: [gcp]
   name: app-notifications
   labels:
     environment: production
@@ -232,6 +254,8 @@ notifications-topic:
 
 notifications-subscription:
   defines: gcp/pubsub-subscription
+  permissions:
+    cloud: [gcp]
   name: notifications-worker
   topic_name: <- connection-target("topic") entity-state get-member("topic_name")
   ack_deadline_seconds: 60
@@ -258,6 +282,8 @@ notifications-subscription:
 
 hello-service:
   defines: gcp/cloud-run-service
+  permissions:
+    cloud: [gcp]
   name: hello-service
   location: us-central1
   image: us-docker.pkg.dev/cloudrun/container/hello
@@ -287,6 +313,8 @@ hello-service:
 
 data-processor:
   defines: gcp/cloud-run-job
+  permissions:
+    cloud: [gcp]
   name: data-processor
   location: us-central1
   image: us-docker.pkg.dev/cloudrun/container/job
@@ -312,6 +340,8 @@ data-processor:
 
 app-dns-zone:
   defines: gcp/cloud-dns-zone
+  permissions:
+    cloud: [gcp]
   name: app-example-zone
   dns_name: "app.example.com."
   zone_description: "DNS zone for the application"
@@ -330,6 +360,8 @@ app-dns-zone:
 
 app-dns-record-a:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   zone_name: app-example-zone
   record_name: "www.app.example.com."
   record_type: A
@@ -344,6 +376,8 @@ app-dns-record-a:
 
 app-dns-record-cname:
   defines: gcp/cloud-dns-record-set
+  permissions:
+    cloud: [gcp]
   zone_name: app-example-zone
   record_name: "api.app.example.com."
   record_type: CNAME
@@ -363,6 +397,8 @@ app-dns-record-cname:
 
 docker-repo:
   defines: gcp/artifact-registry-repository
+  permissions:
+    cloud: [gcp]
   name: my-app-docker
   location: us-central1
   repo_format: DOCKER
@@ -387,6 +423,8 @@ docker-repo:
 
 cdn-static-assets:
   defines: gcp/cloud-cdn-backend-bucket
+  permissions:
+    cloud: [gcp]
   name: my-app-static-cdn
   bucket_name: my-app-storage-bucket-unique-name
   enable_cdn: true
@@ -428,6 +466,8 @@ cdn-static-assets:
 
 task-queue:
   defines: gcp/cloud-tasks-queue
+  permissions:
+    cloud: [gcp]
   name: app-task-queue
   location: us-central1
   max_dispatches_per_second: 100

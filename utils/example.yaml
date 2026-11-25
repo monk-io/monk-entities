@@ -1,14 +1,9 @@
 namespace: example
 
-# repeatedly calls a target's action until it succeeds
+# calls the project's get-production-urls action until it succeeds
 wait-url:
   defines: utils/wait-for-action
-  target: <- connection-target("project")
-  action: "get-production-urls"
-  connections:
-    project:
-      target: example/example-project
-      service: data
+  ready: <- true wait-for(5, 24, "example/example-project/get-production-urls")
   depends:
     wait-for:
       runnables:

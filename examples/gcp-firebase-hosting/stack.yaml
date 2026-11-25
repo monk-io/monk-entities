@@ -36,6 +36,8 @@ hosting-app:
 
 enable-apis:
   defines: gcp/service-usage
+  permissions:
+    cloud: [gcp]
   apis:
     - firebasehosting.googleapis.com
   services:
@@ -49,6 +51,8 @@ enable-apis:
 
 hosting-site:
   defines: gcp/firebase-hosting-site
+  permissions:
+    cloud: [gcp]
   name: monk-demo-site
   keep_on_delete: false
 
@@ -74,6 +78,8 @@ hosting-site:
 
 preview-channel:
   defines: gcp/firebase-hosting-channel
+  permissions:
+    cloud: [gcp]
   name: preview
   site: <- connection-target("site") entity-state get-member("site_id")
   ttl: "604800s" # 7 days

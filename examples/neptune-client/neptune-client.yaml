@@ -7,6 +7,8 @@ namespace: neptune-client
 
 neptune-cluster:
   defines: aws-neptune/cluster
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_cluster_identifier: neptune-client-prod
   port: 8182
@@ -28,6 +30,8 @@ neptune-cluster:
 
 neptune-instance:
   defines: aws-neptune/instance
+  permissions:
+    cloud: [aws]
   region: us-east-1
   db_instance_identifier: neptune-client-prod-1
   db_instance_class: db.t3.medium
@@ -98,6 +102,8 @@ neptune-client-prod:
 
 neptune-access-list:
   defines: aws-neptune/neptune-access-list
+  permissions:
+    cloud: [aws]
   region: us-east-1
   port: 8182
   vpc_id: <- connection-target("db") entity-state get-member("vpc_id")

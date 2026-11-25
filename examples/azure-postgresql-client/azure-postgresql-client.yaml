@@ -94,6 +94,8 @@ azure-pg-demo-app:
 # ----------------------------------------------------------------------------
 postgres-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   permitted-secrets:
     postgres-admin-password: true
 
@@ -164,6 +166,8 @@ postgres-server:
 # ----------------------------------------------------------------------------
 postgres-database:
   defines: azure-postgresql/database
+  permissions:
+    cloud: [azure]
   connections:
     server:
       runnable: azure-pg-client-demo/postgres-server
@@ -305,6 +309,8 @@ azure-pg-public-demo:
 # ----------------------------------------------------------------------------
 public-postgres-server:
   defines: azure-postgresql/flexible-server
+  permissions:
+    cloud: [azure]
   permitted-secrets:
     postgres-admin-password: true
 
@@ -366,6 +372,8 @@ public-postgres-server:
 # ----------------------------------------------------------------------------
 public-postgres-database:
   defines: azure-postgresql/database
+  permissions:
+    cloud: [azure]
   connections:
     server:
       runnable: azure-pg-client-demo/public-postgres-server
@@ -470,6 +478,8 @@ public-postgres-client:
 # ----------------------------------------------------------------------------
 postgres-access-list:
   defines: azure-postgresql/access-list
+  permissions:
+    cloud: [azure]
   connections:
     server:
       runnable: azure-pg-client-demo/public-postgres-server

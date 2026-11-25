@@ -6,6 +6,8 @@ namespace: sns-simple-test
 # SNS Topic
 test-topic:
   defines: aws-sns/sns-topic
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_name: test-topic-simple
   display_name: Test Topic
@@ -18,6 +20,8 @@ test-topic:
 # SQS Queue
 test-queue:
   defines: aws-sqs/sqs-queue
+  permissions:
+    cloud: [aws]
   region: us-east-1
   queue_name: test-queue-simple
   message_retention_period: 345600
@@ -32,6 +36,8 @@ test-queue:
 # Simple SQS Subscription (no filter)
 test-subscription:
   defines: aws-sns/sns-subscription
+  permissions:
+    cloud: [aws]
   region: us-east-1
   topic_arn: <- connection-target("topic") entity-state get-member("topic_arn")
   protocol: sqs

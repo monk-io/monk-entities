@@ -3,6 +3,8 @@ namespace: ses-example
 # Example 1: Email Identity
 email-identity:
   defines: aws-ses/email-identity
+  permissions:
+    cloud: [aws]
   region: us-east-1
   email_address: noreply@example.com
   dkim_signing_enabled: true
@@ -10,6 +12,8 @@ email-identity:
 # Example 2: Domain Identity with full configuration
 domain-identity:
   defines: aws-ses/domain-identity
+  permissions:
+    cloud: [aws]
   region: us-east-1
   domain_name: example.com
   dkim_signing_enabled: true
@@ -19,6 +23,8 @@ domain-identity:
 # Example 3: Configuration Set
 configuration-set:
   defines: aws-ses/configuration-set
+  permissions:
+    cloud: [aws]
   depends:
     wait-for:
       runnables:

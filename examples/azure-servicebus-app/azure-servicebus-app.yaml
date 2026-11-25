@@ -21,6 +21,8 @@ namespace: azure-servicebus-app
 # =============================================================================
 servicebus-namespace:
   defines: azure-servicebus/service-bus-namespace
+  permissions:
+    cloud: [azure]
   permitted-secrets:
     servicebus-connection-string: true
   subscription_id: "your-subscription-id"
@@ -41,6 +43,8 @@ servicebus-namespace:
 # =============================================================================
 commands-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
@@ -61,6 +65,8 @@ commands-queue:
 # =============================================================================
 dead-letter-queue:
   defines: azure-servicebus/queue
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
@@ -77,6 +83,8 @@ dead-letter-queue:
 # =============================================================================
 order-events-topic:
   defines: azure-servicebus/topic
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
@@ -94,6 +102,8 @@ order-events-topic:
 # =============================================================================
 order-processor-sub:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
@@ -116,6 +126,8 @@ order-processor-sub:
 # =============================================================================
 payment-handler-sub:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
@@ -137,6 +149,8 @@ payment-handler-sub:
 # =============================================================================
 audit-logger-sub:
   defines: azure-servicebus/subscription
+  permissions:
+    cloud: [azure]
   subscription_id: "your-subscription-id"
   resource_group_name: "your-resource-group"
   namespace_name: "monk-servicebus-app"
