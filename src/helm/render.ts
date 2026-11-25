@@ -6,6 +6,8 @@
 
 /** Where the task writes the manifest, and its values file. */
 export const OUT = "/out/manifest.yaml";
+/** Where the task writes the hash of the inputs it renders, so a run says what it rendered. */
+export const INPUTS_OUT = "/out/inputs";
 export const VALUES = "/work/values.yaml";
 
 /** Where a chart from a blob is unpacked in the task. */
@@ -22,6 +24,8 @@ export interface RenderInput {
     values?: Record<string, unknown>;
     kube_version?: string;
     image?: string;
+    /** Hash of the inputs, which the run hands back as INPUTS_OUT. */
+    inputs?: string;
     /** host, user and password for `helm registry login`, from the registry secret. */
     login?: { host: string; user: string; password: string };
 }
@@ -35,6 +39,7 @@ export const IMAGE = "alpine/helm:4.3.2";
  */
 const SCRIPT = `set -eu
 mkdir -p /out
+printf '%s' "\${INPUTS:-}" > ${INPUTS_OUT}
 if [ -n "\${REGISTRY_PASSWORD:-}" ]; then
   printf '%s' "$REGISTRY_PASSWORD" | helm registry login "$REGISTRY_HOST" -u "$REGISTRY_USER" --password-stdin >/dev/null
 fi
@@ -53,6 +58,7 @@ export function renderSpec(i: RenderInput): any {
         CHART: i.chart_blob ? CHART_DIR : i.chart!,
         NAMESPACE: i.namespace,
     };
+    if (i.inputs) env.INPUTS = i.inputs;
     if (i.version) env.VERSION = i.version;
     if (i.repo) env.REPO = i.repo;
     if (i.kube_version) env.KUBE_VERSION = i.kube_version;
@@ -69,7 +75,7 @@ export function renderSpec(i: RenderInput): any {
         files: { [VALUES]: JSON.stringify(i.values ?? {}) },
         // monk load leaves blobs://<name or hash>; the tasks module takes the bare name or hash.
         ...(i.chart_blob ? { blobs: { [CHART_DIR]: i.chart_blob.replace(/^blobs:\/\//, "") } } : {}),
-        outputs: [OUT],
+        outputs: [OUT, INPUTS_OUT],
         timeout: 600,
     };
 }
@@ -113,6 +119,32 @@ export function outcome(run: any): Outcome {
             return { kind: "failed", why: `render task ${run.state}${code}${tail ? `: ${tail}` : ""}` };
         }
     }
+}
+
+/** What a readiness check does about the render task's current run, given the inputs wanted. */
+export type Step =
+    | { kind: "start" }
+    | { kind: "waiting"; why: string }
+    | { kind: "done"; manifest: string }
+    | { kind: "failed"; why: string };
+
+/**
+ * The step for run, the render task's run (null when there is none), with
+ * want the hash of the inputs to render: start a render when there is no
+ * run, or the run that ended rendered other inputs; wait while one runs or
+ * stops; else the run's outcome. A run that ended is matched by the inputs it
+ * wrote, never by being newer than another, so a render of inputs an update
+ * has since changed is never taken. A run from before runs wrote their
+ * inputs counts as the wanted one.
+ */
+export function step(run: any, want: string): Step {
+    if (!run) return { kind: "start" };
+    if (run.state === "stopping") return { kind: "waiting", why: "an earlier render is stopping" };
+    const o = outcome(run);
+    if (o.kind === "waiting") return o;
+    const of = run.outputs?.[INPUTS_OUT];
+    if (of !== undefined && of !== want) return { kind: "start" };
+    return o;
 }
 
 /** An image reference's parts: registry host, repository, tag and digest. */

@@ -2,7 +2,7 @@
 // entity itself runs its render in a task, which has no fake: it is tested
 // live (README).
 import { test, expect } from "monk/test";
-import { renderSpec, registryOf, credentials, outcome, OUT, VALUES, IMAGE, CHART_DIR, parseImage, imagesToPin, pinned, toManifest, resolveDigest, matches } from "../render.ts";
+import { renderSpec, registryOf, credentials, outcome, step, INPUTS_OUT, OUT, VALUES, IMAGE, CHART_DIR, parseImage, imagesToPin, pinned, toManifest, resolveDigest, matches } from "../render.ts";
 
 test("the render task gets every input in its environment, and the values as a file", () => {
     const spec = renderSpec({
@@ -17,7 +17,7 @@ test("the render task gets every input in its environment, and the values as a f
         REGISTRY_HOST: "ghcr.io", REGISTRY_USER: "token", REGISTRY_PASSWORD: "s3cret",
     });
     expect(JSON.parse(spec.files[VALUES])).toEqual({ image: { tag: "abc" }, loadgen: { enabled: false } });
-    expect(spec.outputs).toEqual([OUT]);
+    expect(spec.outputs).toEqual([OUT, INPUTS_OUT]);
     // Inputs never reach the script's text.
     expect(spec.command[0].includes("capsule-x") || spec.command[0].includes("s3cret")).toBe(false);
 });
@@ -54,6 +54,27 @@ test("a chart from a blob is unpacked in the task and rendered from there", () =
     expect(renderSpec({ chart_blob: "blobs://9f2c1e", release: "app", namespace: "capsule-x" }).blobs).toEqual({ [CHART_DIR]: "9f2c1e" });
     expect(() => renderSpec({ release: "a", namespace: "n" })).toThrow(/exactly one of chart or chart_blob/);
     expect(() => renderSpec({ chart: "x", chart_blob: "y", release: "a", namespace: "n" })).toThrow(/chart or chart_blob/);
+});
+
+test("the run hands back the hash of the inputs it rendered", () => {
+    const spec = renderSpec({ chart: "./chart", release: "r", namespace: "n", inputs: "abc123" });
+    expect(spec.env.INPUTS).toBe("abc123");
+    expect(spec.command[0].includes(INPUTS_OUT)).toBe(true);
+    expect(spec.command[0].includes("abc123")).toBe(false);
+});
+
+test("a readiness check takes only a run of the inputs wanted now", () => {
+    const done = (inputs: string | undefined) => ({ state: "succeeded", outputs: { [OUT]: `kind: ConfigMap # ${inputs}\n`, ...(inputs ? { [INPUTS_OUT]: inputs } : {}) } });
+    // No run, or the name freed by a stop: start one.
+    expect(step(null, "i3")).toEqual({ kind: "start" });
+    expect(step({ state: "stopping" }, "i3").kind).toBe("waiting");
+    expect(step({ state: "running" }, "i3").kind).toBe("waiting");
+    // Two updates in a row: the run the first one's check started (i2) ends after the second (i3).
+    expect(step(done("i2"), "i3")).toEqual({ kind: "start" });
+    expect(step(done("i3"), "i3")).toEqual({ kind: "done", manifest: "kind: ConfigMap # i3\n" });
+    // A run from before runs wrote their inputs.
+    expect(step(done(undefined), "i3").kind).toBe("done");
+    expect(step({ state: "failed", exitCode: 1, stderr: "boom" }, "i3").kind).toBe("failed");
 });
 
 test("image references are split as Docker does", () => {

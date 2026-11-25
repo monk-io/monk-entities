@@ -609,6 +609,21 @@ test("a manifest branch applies again when replicas, expose or copy_secrets chan
     expect(b.state.manifest_hash !== first).toBe(true);
 }, { explore: false }); // the lifecycle is explored
 
+test("an update that changes isolate, or turns expose off, is refused: a reapply doesn't redo isolation", (t) => {
+    const api = t.use(kube);
+    t.use(gce);
+    seedProd(api.state.objects);
+    const b = branch(t, { manifest: rendered("ghcr.io/x/web:v2"), expose: true });
+    b.create();
+    b.waitReady();
+    expect(b.state.isolated).toBe(true);
+
+    b.redefine({ ...b.definition, isolate: false });
+    expect(() => b.update()).toThrow(/isolate can't change on a branch: delete it and run it again/);
+    b.redefine({ ...b.definition, isolate: true, expose: false });
+    expect(() => b.update()).toThrow(/expose can't be turned off on a branch/);
+}, { explore: false }); // the lifecycle is explored
+
 test("a manifest's claims: its PVCs, and each StatefulSet pod's, with replicas overridden", () => {
     const objs = [
         { kind: "PersistentVolumeClaim", metadata: { name: "uploads" } },
