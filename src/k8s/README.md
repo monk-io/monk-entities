@@ -369,9 +369,11 @@ branch:
   production. Ingresses and Gateway API routes are applied only with
   `expose`, so a branch doesn't claim production's hostnames.
 - An update with a new manifest (a later push), or new `replicas`,
-  `expose`, `isolate` or `copy_secrets`, applies it on the same clones:
+  `copy_secrets` or `expose` turned on, applies it on the same clones:
   the data stays as it was branched, the objects follow the manifest.
-  Objects the new manifest no longer has are not deleted.
+  Objects the new manifest no longer has are not deleted. An update that
+  changes `isolate`, or turns `expose` off, is refused: delete the branch
+  and run it again.
 - A Job whose spec changed (a migration on a new image) is deleted and
   applied anew, as a Job's template can't change. Helm's hook ordering and
   weights are not honoured: a `pre-upgrade` migration runs alongside the

@@ -158,6 +158,10 @@ export interface BranchState {
     objects?: string[];
     /** @description With manifest: the hash of the manifest last applied */
     manifest_hash?: string;
+    /** @description Whether the branch was made isolated; isolate can't change after */
+    isolated?: boolean;
+    /** @description Whether the branch is exposed; expose can be turned on by an update, not off */
+    exposed?: boolean;
 }
 
 /** Seconds between two ISO times. */
@@ -236,7 +240,9 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             kind: "Namespace",
             metadata: { name: ns, annotations: this.annotations(), labels: { [BRANCH_LABEL]: "true", [BRANCH_OF]: src } },
         });
-        if (this.definition.isolate !== false) {
+        this.state.isolated = this.definition.isolate !== false;
+        this.state.exposed = this.definition.expose === true;
+        if (this.state.isolated) {
             this.apply(isolationPolicy(ns, this.annotations(), this.definition.allow_egress ?? []));
         }
 
@@ -249,9 +255,21 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
 
     override update(): void {
         if (this.definition.manifest !== undefined) {
+            // Isolation is set up once, in create: a reapply neither adds nor
+            // removes the isolation policy, nor the policies, routes and
+            // exposure an earlier apply made. So isolate can't change, and
+            // expose can be turned on but not off.
+            const isolated = this.definition.isolate !== false;
+            if (this.state.isolated !== undefined && this.state.isolated !== isolated) {
+                throw new Error(`isolate can't change on a branch: delete it and run it again`);
+            }
+            if (this.state.exposed && this.definition.expose !== true) {
+                throw new Error(`expose can't be turned off on a branch: delete it and run it again`);
+            }
+            this.state.exposed = this.definition.expose === true;
             // The data stays as it was cloned; the objects follow the
-            // manifest, replicas, expose, isolate and copy_secrets. Readiness
-            // applies them when their hash isn't the marker's.
+            // manifest, replicas, expose and copy_secrets. Readiness applies
+            // them when their hash isn't the marker's.
             cli.output(`the branch applies the new manifest on its clones once its disks are ready`);
             return;
         }
@@ -333,7 +351,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
     /** Hash of all that shapes the objects applied from the manifest. */
     private manifestHash(): string {
         const d = this.definition;
-        return crypto.sha256(JSON.stringify([d.manifest ?? "", d.replicas ?? {}, d.expose ?? false, d.isolate ?? true, d.copy_secrets ?? []])).slice(0, 16);
+        return crypto.sha256(JSON.stringify([d.manifest ?? "", d.replicas ?? {}, d.expose ?? false, d.copy_secrets ?? []])).slice(0, 16);
     }
 
     /** Starts the before_clone Job in the source namespace; returns its name. */
@@ -642,7 +660,7 @@ export class Branch extends K8sEntity<BranchDefinition, BranchState> {
             annotations: this.annotations(),
             replicas: this.definition.replicas,
             expose: this.definition.expose,
-            isolate: this.definition.isolate,
+            isolate: this.state.isolated ?? this.definition.isolate !== false,
         };
         const done: string[] = [];
         for (const name of this.definition.copy_secrets ?? []) {

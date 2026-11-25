@@ -5,7 +5,7 @@ import k8s from "k8s";
 import secret from "secret";
 import cli from "cli";
 import crypto from "crypto";
-import { renderSpec, registryOf, credentials, outcome, IMAGE, imagesToPin, pinned, toManifest, resolveDigest, parseImage } from "./render.ts";
+import { renderSpec, registryOf, credentials, outcome, step, IMAGE, imagesToPin, pinned, toManifest, resolveDigest, parseImage } from "./render.ts";
 
 /**
  * A chart to render, and with what.
@@ -86,10 +86,8 @@ export interface TemplateState {
     digests?: Record<string, string>;
     /** @description Hash of the inputs it was rendered from */
     inputs?: string;
-    /** @description The render task's run */
-    task_id?: string;
-    /** @description A run an update stopped because the inputs changed under it; the new render starts once it is gone */
-    superseded?: string;
+    /** @description Hash of the inputs of the render an update started last */
+    started?: string;
     /** @description When it was rendered */
     rendered_at?: string;
 }
@@ -118,6 +116,7 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     override update(): void {
         if (this.state.inputs === this.inputs() && this.state.rendered !== undefined) {
             // The same render; its images' tags may point elsewhere now.
+            this.stopOther();
             this.pin(this.state.rendered);
             return;
         }
@@ -125,38 +124,26 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     }
 
     override checkReadiness(): boolean {
-        if (this.state.superseded) {
-            // What this check sets isn't kept until it passes, so a render
-            // started here is found again by the task's name, not its run.
-            const run = tasks.get(TASK);
-            if (!run) {
+        const want = this.inputs();
+        if (this.state.inputs === want && this.state.rendered !== undefined) return this.state.manifest !== undefined;
+        // What this check sets isn't kept until it passes, so the run is found
+        // by the task's name, and known by the inputs it wrote.
+        const s = step(tasks.get(TASK), want);
+        switch (s.kind) {
+            case "start":
                 this.start();
                 return false;
-            }
-            if (run.id === this.state.superseded) {
-                cli.output(`waiting for the earlier render to stop (${run.state})`);
+            case "waiting":
+                cli.output(s.why);
                 return false;
-            }
-            return this.finish(run);
+            case "failed":
+                throw new Error(`${this.what()}: ${s.why}`);
         }
-        if (!this.state.task_id) return this.state.manifest !== undefined;
-        return this.finish(tasks.get(TASK, this.state.task_id));
-    }
-
-    /** Takes a render's manifest when its run is done; false while it runs, and throws when it failed. */
-    private finish(run: any): boolean {
-        const o = outcome(run);
-        if (o.kind === "waiting") {
-            cli.output(o.why);
-            return false;
-        }
-        if (o.kind === "failed") throw new Error(`${this.what()}: ${o.why}`);
-        this.pin(o.manifest);
-        this.state.rendered = o.manifest;
+        this.pin(s.manifest);
+        this.state.rendered = s.manifest;
+        this.state.inputs = want;
         this.state.rendered_at = new Date().toISOString();
-        this.state.task_id = undefined;
-        this.state.superseded = undefined;
-        const n = (o.manifest.match(/^kind:/gm) ?? []).length;
+        const n = (s.manifest.match(/^kind:/gm) ?? []).length;
         cli.output(`rendered ${this.what()}${this.definition.version ? ` ${this.definition.version}` : ""}: ${n} objects`);
         return true;
     }
@@ -183,9 +170,8 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     }
 
     override delete(): void {
-        if (this.state.task_id || this.state.superseded) {
+        if (tasks.get(TASK)) {
             try {
-                // By name: a render started after a superseded one has no run in state.
                 tasks.remove(TASK);
             } catch (e) {
                 cli.output(`render task: ${e instanceof Error ? e.message : String(e)}`);
@@ -210,22 +196,24 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
     }
 
     /**
-     * Renders the inputs. A render still running has the old inputs: it is
-     * stopped, and the readiness check starts the new one once the task's
-     * name is free (monkd refuses to start a name that hasn't ended).
+     * Stops a render still running that an update didn't start for the
+     * inputs wanted now, so the name is free for the render that is; the
+     * readiness check starts that once the stopped one is gone (monkd refuses
+     * to start a name that hasn't ended). True when one is running or stopping.
      */
+    private stopOther(): boolean {
+        const run = tasks.get(TASK);
+        if (!run) return false;
+        if (run.state === "stopping") return true;
+        if (outcome(run).kind !== "waiting") return false;
+        if (this.state.started === this.inputs()) return true;
+        tasks.remove(TASK, run.id);
+        cli.output("the inputs changed while a render ran; stopping it and rendering again");
+        return true;
+    }
+
     private render(): void {
-        const id = this.state.task_id;
-        if (id && outcome(tasks.get(TASK, id)).kind === "waiting") {
-            tasks.remove(TASK, id);
-            this.state.superseded = id;
-            this.state.task_id = undefined;
-        }
-        if (this.state.superseded) {
-            this.state.inputs = this.inputs();
-            cli.output("the inputs changed while a render ran; stopping it and rendering again");
-            return;
-        }
+        if (this.stopOther()) return;
         this.start();
     }
 
@@ -237,12 +225,11 @@ export class Template extends MonkEntity<TemplateDefinition, TemplateState> {
             if (!host) throw new Error("registry_secret is for oci:// charts");
             login = { host, ...credentials(this.secretValue(d.registry_secret, "registry_secret")) };
         }
-        const run = tasks.start(TASK, renderSpec({
+        tasks.start(TASK, renderSpec({
             chart: d.chart, chart_blob: d.chart_blob, repo: d.repo, version: d.version, release: d.release, namespace: d.namespace,
-            values: d.values, kube_version: d.kube_version, image: d.image, login,
+            values: d.values, kube_version: d.kube_version, image: d.image, login, inputs: this.inputs(),
         }));
-        this.state.task_id = run.id;
-        this.state.inputs = this.inputs();
+        this.state.started = this.inputs();
         cli.output(`rendering ${this.what()}${d.version ? ` ${d.version}` : ""} for ${d.namespace} with ${d.image ?? IMAGE}`);
     }
 }
